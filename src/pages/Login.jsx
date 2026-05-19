@@ -52,7 +52,8 @@ const Login = () => {
         throw new Error(data.error || 'Failed to login');
       }
 
-      alert('Đăng nhập thành công! Xin chào ' + data.user.name);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      navigate('/');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -82,7 +83,8 @@ const Login = () => {
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || 'Google login failed');
         
-        alert('Đăng nhập Google thành công! Xin chào ' + data.user.name);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        navigate('/');
       } catch (err) {
         setError(err.message);
       } finally {

@@ -70,7 +70,8 @@ const Register = () => {
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || 'Google login failed');
         
-        alert('Đăng nhập Google thành công! Xin chào ' + data.user.name);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        navigate('/');
       } catch (err) {
         setError(err.message);
       } finally {
