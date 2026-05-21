@@ -273,7 +273,7 @@ const Home = () => {
             <div 
               className="category-card" 
               key={category.name}
-              onClick={() => { setSearchType(category.name); setSearchLoc(''); }}
+              onClick={() => navigate(`/swipe/${encodeURIComponent(category.name)}`)}
             >
               <img 
                 src={category.image} 
