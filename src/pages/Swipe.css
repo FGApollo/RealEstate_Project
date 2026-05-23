@@ -204,7 +204,7 @@
   filter: blur(35px) brightness(0.4) saturate(1.2);
   z-index: -1;
   transform: scale(1.05);
-  transition: background-image 0.5s ease-in-out;
+  transition: none;
 }
 
 /* Floating Filter button */

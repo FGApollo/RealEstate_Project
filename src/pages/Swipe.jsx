@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { 
   Search, Heart, Map, User, X, Info, MapPin, 
   Bed, Bath, Maximize, SlidersHorizontal, RefreshCw, ChevronLeft,
@@ -9,258 +9,8 @@ import { motion, useMotionValue, useTransform, useAnimation } from 'framer-motio
 import './Swipe.css';
 
 // Mock Properties for categories
-const mockProperties = {
-  'Đất Nền': [
-    {
-      id: 'datnen-1',
-      title: 'Đất Nền Ven Biển Mỹ Khê',
-      description: 'Lô đất nền ven biển vị trí đắc địa, ngay sát bãi tắm Mỹ Khê. Thích hợp xây dựng khách sạn, nhà hàng, căn hộ dịch vụ cao cấp.',
-      price: 18500000000,
-      area: 150,
-      bedrooms: 0,
-      bathrooms: 0,
-      address: 'Võ Nguyên Giáp, Ngũ Hành Sơn, Đà Nẵng',
-      city: 'Đà Nẵng',
-      property_type: 'Đất Nền',
-      status: 'AVAILABLE',
-      thumbnail: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=800&q=80',
-      matchScore: 98,
-      contact: '0901 234 567'
-    },
-    {
-      id: 'datnen-2',
-      title: 'Đất Dự Án Hòa Xuân Nam',
-      description: 'Đất nền đảo vip Hòa Xuân, 2 mặt tiền hướng sông mát mẻ. Hạ tầng đồng bộ, sổ đỏ chính chủ công chứng ngay.',
-      price: 4900000000,
-      area: 125,
-      bedrooms: 0,
-      bathrooms: 0,
-      address: 'Đảo VIP Hòa Xuân, Cẩm Lệ, Đà Nẵng',
-      city: 'Đà Nẵng',
-      property_type: 'Đất Nền',
-      status: 'AVAILABLE',
-      thumbnail: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=800&q=80',
-      matchScore: 92,
-      contact: '0905 111 222'
-    },
-    {
-      id: 'datnen-3',
-      title: 'Đất Thổ Cư Trảng Bom',
-      description: 'Đất thổ cư giá rẻ gần khu công nghiệp Trảng Bom, đường nhựa 8m xe tải tránh nhau thoải mái. Phù hợp mua xây trọ.',
-      price: 1200000000,
-      area: 100,
-      bedrooms: 0,
-      bathrooms: 0,
-      address: 'Trảng Bom, Đồng Nai',
-      city: 'Đồng Nai',
-      property_type: 'Đất Nền',
-      status: 'AVAILABLE',
-      thumbnail: 'https://images.unsplash.com/photo-1504609773096-104ff2c73ba4?auto=format&fit=crop&w=800&q=80',
-      matchScore: 85,
-      contact: '0912 345 678'
-    }
-  ],
-  'Biệt Thự': [
-    {
-      id: 'biethu-1',
-      title: 'The Glass Horizon Villa',
-      description: 'Biệt thự kính phong cách Địa Trung Hải tối giản, view đồi Beverly Hills lộng lẫy về đêm. Tích hợp bể bơi tràn bờ nước mặn và rạp chiếu phim gia đình.',
-      price: 195000000000, // 8.5M USD approx
-      area: 740, // 8k sqft approx
-      bedrooms: 5,
-      bathrooms: 6.5,
-      address: 'Beverly Hills, Los Angeles, CA',
-      city: 'California',
-      property_type: 'Biệt Thự',
-      status: 'AVAILABLE',
-      thumbnail: 'https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=1200&q=80',
-      matchScore: 99,
-      contact: '0988 777 999'
-    },
-    {
-      id: 'biethu-2',
-      title: 'Ocean Edge Cliffside Mansion',
-      description: 'Biệt thự triệu đô tọa lạc đỉnh vách đá Sơn Trà, view biển rộng mở 270 độ. Thiết kế nội thất nhập khẩu trực tiếp từ Ý.',
-      price: 85000000000,
-      area: 550,
-      bedrooms: 4,
-      bathrooms: 5,
-      address: 'Bán đảo Sơn Trà, Thọ Quang, Đà Nẵng',
-      city: 'Đà Nẵng',
-      property_type: 'Biệt Thự',
-      status: 'AVAILABLE',
-      thumbnail: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80',
-      matchScore: 95,
-      contact: '0909 000 111'
-    },
-    {
-      id: 'biethu-3',
-      title: 'Vinhomes Riverside Lake Villa',
-      description: 'Biệt thự đơn lập ven hồ sinh thái khu Bằng Lăng. Sân vườn rộng lớn, an ninh 3 lớp bảo vệ 24/7 khép kín hoàn toàn.',
-      price: 52000000000,
-      area: 380,
-      bedrooms: 4,
-      bathrooms: 4,
-      address: 'Vinhomes Riverside, Long Biên, Hà Nội',
-      city: 'Hà Nội',
-      property_type: 'Biệt Thự',
-      status: 'AVAILABLE',
-      thumbnail: 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=800&q=80',
-      matchScore: 90,
-      contact: '0903 888 777'
-    }
-  ],
-  'Nhà Ở': [
-    {
-      id: 'nhao-1',
-      title: 'Nhà Phố Cổ Điển Trần Hưng Đạo',
-      description: 'Nhà phố trung tâm Quận 1 mặt tiền rộng 6m. Thiết kế phong cách Đông Dương (Indochine) thanh lịch, thích hợp mở showroom thời trang hoặc spa cao cấp.',
-      price: 29500000000,
-      area: 95,
-      bedrooms: 3,
-      bathrooms: 3,
-      address: 'Trần Hưng Đạo, Cô Giang, Quận 1, TP.HCM',
-      city: 'TP.HCM',
-      property_type: 'Nhà Ở',
-      status: 'AVAILABLE',
-      thumbnail: 'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=800&q=80',
-      matchScore: 96,
-      contact: '0918 222 333'
-    },
-    {
-      id: 'nhao-2',
-      title: 'Nhà Phố Sân Vườn Melosa Garden',
-      description: 'Nhà phố liền kề Khang Điền, đã hoàn thiện nội thất hiện đại. Có khoảng sân nhỏ trồng hoa hồng cổ tuyệt đẹp.',
-      price: 11800000000,
-      area: 120,
-      bedrooms: 3,
-      bathrooms: 4,
-      address: 'Võ Chí Công, Phú Hữu, Quận 9, TP.HCM',
-      city: 'TP.HCM',
-      property_type: 'Nhà Ở',
-      status: 'AVAILABLE',
-      thumbnail: 'https://images.unsplash.com/photo-1605276374104-dee2a0ed3cd6?auto=format&fit=crop&w=800&q=80',
-      matchScore: 91,
-      contact: '0934 555 666'
-    },
-    {
-      id: 'nhao-3',
-      title: 'Nhà Riêng Hẻm Nhựa Phú Nhuận',
-      description: 'Nhà riêng kết cấu 1 trệt 2 lầu đúc bê tông cốt thép kiên cố. Hẻm nhựa 6m thông thoáng xe hơi quay đầu.',
-      price: 8900000000,
-      area: 68,
-      bedrooms: 3,
-      bathrooms: 3,
-      address: 'Phan Xích Long, Phường 2, Phú Nhuận, TP.HCM',
-      city: 'TP.HCM',
-      property_type: 'Nhà Ở',
-      status: 'AVAILABLE',
-      thumbnail: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80',
-      matchScore: 88,
-      contact: '0979 999 888'
-    }
-  ],
-  'Chung Cư': [
-    {
-      id: 'chungcu-1',
-      title: 'Masteri Thảo Điền Sky View',
-      description: 'Căn hộ chung cư cao cấp tầng 32 Masteri Thảo Điền. View trọn vẹn sông Sài Gòn và bán đảo Thanh Đa xanh mát.',
-      price: 4600000000,
-      area: 72,
-      bedrooms: 2,
-      bathrooms: 2,
-      address: 'Masteri Thảo Điền, Quận 2, TP.HCM',
-      city: 'TP.HCM',
-      property_type: 'Chung Cư',
-      status: 'AVAILABLE',
-      thumbnail: 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800&q=80',
-      matchScore: 94,
-      contact: '0912 888 999'
-    },
-    {
-      id: 'chungcu-2',
-      title: 'Sun Grand City Horizon Loft',
-      description: 'Căn hộ thiết kế duplex thông tầng Sun Grand City Thụy Khuê. View Hồ Tây tuyệt đẹp, ngắm hoàng hôn lãng mạn.',
-      price: 9800000000,
-      area: 110,
-      bedrooms: 3,
-      bathrooms: 2,
-      address: 'Sun Grand City, Thụy Khuê, Tây Hồ, Hà Nội',
-      city: 'Hà Nội',
-      property_type: 'Chung Cư',
-      status: 'AVAILABLE',
-      thumbnail: 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80',
-      matchScore: 90,
-      contact: '0944 555 777'
-    },
-    {
-      id: 'chungcu-3',
-      title: 'Chung Cư Sunview Town Giá Rẻ',
-      description: 'Căn hộ chung cư ấm cúng thích hợp cho gia đình trẻ. Nội thất cơ bản bàn giao đẹp đẽ sạch sẽ đón tết.',
-      price: 1950000000,
-      area: 58,
-      bedrooms: 2,
-      bathrooms: 1,
-      address: 'Sunview Town, Hiệp Bình Phước, Thủ Đức, TP.HCM',
-      city: 'TP.HCM',
-      property_type: 'Chung Cư',
-      status: 'AVAILABLE',
-      thumbnail: 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=800&q=80',
-      matchScore: 82,
-      contact: '0909 333 444'
-    }
-  ],
-  'Căn Hộ': [
-    {
-      id: 'canho-1',
-      title: 'Landmark 81 Grand Penthouse',
-      description: 'Căn hộ siêu sang tọa lạc tầng cao nhất Landmark 81. Tận hưởng đặc quyền câu lạc bộ cư dân thượng lưu và hồ bơi vô cực trên không.',
-      price: 38000000000,
-      area: 165,
-      bedrooms: 3,
-      bathrooms: 3,
-      address: 'Landmark 81, Vinhomes Central Park, Bình Thạnh, TP.HCM',
-      city: 'TP.HCM',
-      property_type: 'Căn Hộ',
-      status: 'AVAILABLE',
-      thumbnail: 'https://images.unsplash.com/photo-1567496898669-ee935f5f647a?auto=format&fit=crop&w=800&q=80',
-      matchScore: 97,
-      contact: '0911 222 333'
-    },
-    {
-      id: 'canho-2',
-      title: 'Căn Hộ Studio Minimalist Thảo Điền',
-      description: 'Căn hộ studio phong cách Bắc Âu hiện đại, tối giản, đầy đủ ánh sáng tự nhiên. Rất thích hợp cho người độc thân hoặc chuyên gia nước ngoài.',
-      price: 2400000000,
-      area: 45,
-      bedrooms: 1,
-      bathrooms: 1,
-      address: 'Phường Thảo Điền, Quận 2, TP.HCM',
-      city: 'TP.HCM',
-      property_type: 'Căn Hộ',
-      status: 'AVAILABLE',
-      thumbnail: 'https://images.unsplash.com/photo-1536376072261-38c75010e6c9?auto=format&fit=crop&w=800&q=80',
-      matchScore: 93,
-      contact: '0989 555 999'
-    },
-    {
-      id: 'canho-3',
-      title: 'Căn Hộ Estella Heights Luxury',
-      description: 'Căn hộ Estella Heights Quận 2, dự án resort chuẩn quốc tế. Căn hộ ban công cực rộng, view công viên nội khu rợp bóng cây.',
-      price: 7500000000,
-      area: 104,
-      bedrooms: 2,
-      bathrooms: 2,
-      address: 'Estella Heights, An Phú, Quận 2, TP.HCM',
-      city: 'TP.HCM',
-      property_type: 'Căn Hộ',
-      status: 'AVAILABLE',
-      thumbnail: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80',
-      matchScore: 89,
-      contact: '0916 333 777'
-    }
-  ]
-};
+const mockProperties = {};
+
 
 // Map original names to normalized standard keys
 const getCategoryKey = (name) => {
@@ -305,6 +55,7 @@ const categorySuggestionDetails = {
 const Swipe = () => {
   const { categoryName } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [dbProperties, setDbProperties] = useState([]);
   const [currentProperties, setCurrentProperties] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -321,10 +72,50 @@ const Swipe = () => {
   const [minPrice, setMinPrice] = useState('');
   const [maxPrice, setMaxPrice] = useState('');
 
-  const [activeView, setActiveView] = useState('swipe'); // 'swipe' or 'saved'
+  const [activeView, setActiveView] = useState(() => location.state?.activeView || 'swipe'); // 'swipe' or 'saved'
+
+  useEffect(() => {
+    if (location.state?.activeView) {
+      setActiveView(location.state.activeView);
+    }
+  }, [location.state]);
   const [selectedSavedCategory, setSelectedSavedCategory] = useState('Tất cả');
   const [sortBy, setSortBy] = useState('recent');
   const [selectedSavedProperty, setSelectedSavedProperty] = useState(null);
+
+  const [user, setUser] = useState(null);
+  const [dbFavorites, setDbFavorites] = useState([]);
+
+  // Check login session on mount
+  useEffect(() => {
+    const sessionUser = localStorage.getItem('user');
+    if (sessionUser) {
+      setUser(JSON.parse(sessionUser));
+    } else {
+      navigate('/login');
+    }
+  }, [navigate]);
+
+  const fetchFavorites = async () => {
+    const sessionUser = localStorage.getItem('user');
+    if (!sessionUser) return;
+    const parsedUser = JSON.parse(sessionUser);
+    try {
+      const response = await fetch(`http://localhost:3000/api/favorites?userId=${parsedUser.id}`);
+      if (response.ok) {
+        const data = await response.json();
+        setDbFavorites(data.favorites || []);
+      }
+    } catch (err) {
+      console.error('Error fetching database favorites:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (activeView === 'saved') {
+      fetchFavorites();
+    }
+  }, [activeView]);
 
   useEffect(() => {
     try {
@@ -405,6 +196,8 @@ const Swipe = () => {
 
   const swipeCard = async (direction) => {
     const exitX = direction === 'right' ? 500 : -500;
+    
+    // Animate current card flying out
     await cardController.start({ 
       x: exitX, 
       opacity: 0, 
@@ -420,11 +213,26 @@ const Swipe = () => {
           ...filtered
         ].slice(0, 100);
       });
+
+      // Synchronize with database favorites if swiped right (like)
+      if (direction === 'right' && user?.id) {
+        fetch('http://localhost:3000/api/favorites', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: user.id, propertyId: currentProperty.id })
+        }).catch(err => console.error('Error adding favorite to DB:', err));
+      }
     }
     
-    setCurrentIndex(prev => prev + 1);
+    // Reset values silently at center with opacity 0
     x.set(0);
-    cardController.set({ x: 0, y: 0, rotate: 0, opacity: 1 });
+    cardController.set({ x: 0, y: 0, rotate: 0, opacity: 0 });
+    
+    // Switch to next card
+    setCurrentIndex(prev => prev + 1);
+    
+    // Smoothly fade in the new card
+    cardController.start({ opacity: 1, transition: { duration: 0.2 } });
   };
 
   const resetSwipes = () => {
@@ -454,22 +262,24 @@ const Swipe = () => {
     setShowFilterModal(false);
   };
 
-  // Get unique liked properties from history
-  const uniqueLikedProperties = [];
-  const seenIds = new Set();
-  swipeHistory.forEach(item => {
-    if (item.swipeType === 'right' && !seenIds.has(item.id)) {
-      seenIds.add(item.id);
-      uniqueLikedProperties.push(item);
-    }
-  });
-
-  const handleUnsave = (propertyId) => {
+  const handleUnsave = async (propertyId) => {
     setSwipeHistory(prev => prev.filter(item => item.id !== propertyId));
+    setDbFavorites(prev => prev.filter(item => item.id !== propertyId));
+    if (user?.id) {
+      try {
+        await fetch('http://localhost:3000/api/favorites/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: user.id, propertyId })
+        });
+      } catch (err) {
+        console.error('Error removing favorite from DB:', err);
+      }
+    }
   };
 
   const getFilteredLikedProperties = () => {
-    let list = [...uniqueLikedProperties];
+    let list = [...dbFavorites];
     
     // Filter by Category
     if (selectedSavedCategory === 'Biệt thự') {
@@ -495,9 +305,9 @@ const Swipe = () => {
     return list;
   };
 
-  const savedVillasCount = uniqueLikedProperties.filter(p => getCategoryKey(p.property_type) === 'Biệt Thự').length;
-  const savedApartmentsCount = uniqueLikedProperties.filter(p => getCategoryKey(p.property_type) === 'Căn Hộ' || getCategoryKey(p.property_type) === 'Chung Cư').length;
-  const savedBeachCount = uniqueLikedProperties.filter(p => 
+  const savedVillasCount = dbFavorites.filter(p => getCategoryKey(p.property_type) === 'Biệt Thự').length;
+  const savedApartmentsCount = dbFavorites.filter(p => getCategoryKey(p.property_type) === 'Căn Hộ' || getCategoryKey(p.property_type) === 'Chung Cư').length;
+  const savedBeachCount = dbFavorites.filter(p => 
     p.address?.toLowerCase().includes('biển') || 
     p.address?.toLowerCase().includes('beach') ||
     p.description?.toLowerCase().includes('biển') ||
@@ -524,7 +334,7 @@ const Swipe = () => {
           </div>
           <div className={`header-nav-item ${activeView === 'saved' ? 'active' : ''}`} onClick={() => setActiveView('saved')}>
             <Heart size={18} />
-            <span>SAVED</span>
+            <span>YÊU THÍCH</span>
           </div>
           <div className="header-nav-item">
             <Map size={18} />
@@ -739,14 +549,14 @@ const Swipe = () => {
           {/* Left Sidebar */}
           <aside className="saved-sidebar">
             <div className="saved-sidebar-section">
-              <h3>Danh mục lưu trữ</h3>
+              <h3>Danh mục yêu thích</h3>
               <div className="saved-category-list">
                 <button 
                   className={`saved-category-item ${selectedSavedCategory === 'Tất cả' ? 'active' : ''}`}
                   onClick={() => setSelectedSavedCategory('Tất cả')}
                 >
                   <span>Tất cả</span>
-                  <span className="saved-category-badge">{uniqueLikedProperties.length}</span>
+                  <span className="saved-category-badge">{dbFavorites.length}</span>
                 </button>
                 <button 
                   className={`saved-category-item ${selectedSavedCategory === 'Biệt thự' ? 'active' : ''}`}
@@ -811,15 +621,15 @@ const Swipe = () => {
 
           {/* Right Main Grid */}
           <main className="saved-content-area">
-            <h1 className="saved-title">Bộ sưu tập cá nhân</h1>
+            <h1 className="saved-title">Bất động sản yêu thích</h1>
             <p className="saved-subtitle">
-              Các bất động sản bạn đã chọn lọc. Xem xét lại những lựa chọn hàng đầu của bạn và tiến hành các bước tiếp theo khi bạn đã sẵn sàng.
+              Các bất động sản bạn đã thích. Xem xét lại các lựa chọn của bạn và tiến hành các bước tiếp theo khi bạn đã sẵn sàng.
             </p>
 
             {getFilteredLikedProperties().length === 0 ? (
               <div className="saved-empty-state">
                 <Heart size={48} className="heart-pulse-icon" />
-                <h3>Chưa có bất động sản nào trong mục này</h3>
+                <h3>Chưa có bất động sản nào trong danh sách yêu thích</h3>
                 <p>Nhấp vào DISCOVER để lướt và thích các bất động sản phù hợp.</p>
                 <button className="back-to-swipe-btn" onClick={() => setActiveView('swipe')}>
                   Bắt đầu tìm kiếm
@@ -863,7 +673,7 @@ const Swipe = () => {
                           e.stopPropagation();
                           handleUnsave(property.id);
                         }}
-                        title="Bỏ lưu"
+                        title="Bỏ yêu thích"
                       >
                         <Heart size={16} fill="#1a42b8" color="#1a42b8" />
                       </button>

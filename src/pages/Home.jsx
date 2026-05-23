@@ -1,36 +1,79 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Menu, Search, MapPin, Home as HomeIcon, 
   Bed, Bath, Maximize, LogOut, User, 
-  ChevronDown, ArrowRight 
+  ChevronDown, ArrowRight, Heart
 } from 'lucide-react';
 import './Home.css';
 import heroImage from '../assets/hero.png'; // Fallback or imported hero asset
+
+const fallbackProperties = [
+  {
+    id: 1,
+    title: 'The Azure Signature Villa',
+    description: 'Biệt thự sân vườn cao cấp với view hồ bơi tràn bờ cực đẹp tại khu Thảo Điền.',
+    price: 24500000000,
+    area: 350,
+    bedrooms: 4,
+    bathrooms: 5,
+    address: 'Thảo Điền, Quận 2, TP.HCM',
+    property_type: 'Biệt Thự',
+    status: 'AVAILABLE',
+    thumbnail: 'https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=1200&q=80',
+  },
+  {
+    id: 2,
+    title: 'Skyrise Penthouse',
+    description: 'Căn Penthouse sang trọng tầng cao nhất của tháp Landmark với tầm nhìn panorama toàn thành phố.',
+    price: 12800000000,
+    area: 100,
+    bedrooms: 3,
+    bathrooms: 2,
+    address: 'Vinhomes Central Park, Bình Thạnh, TP.HCM',
+    property_type: 'Căn Hộ',
+    status: 'AVAILABLE',
+    thumbnail: 'https://images.unsplash.com/photo-1567496898669-ee935f5f647a?auto=format&fit=crop&w=800&q=80',
+    is_highlighted: true,
+  },
+  {
+    id: 3,
+    title: 'Minimalist Studio',
+    description: 'Căn hộ studio phong cách tối giản Nhật Bản, nội thất thông minh tối ưu không gian.',
+    price: 4200000000,
+    area: 65,
+    bedrooms: 1,
+    bathrooms: 1,
+    address: 'Phường Bến Nghé, Quận 1, TP.HCM',
+    property_type: 'Căn Hộ',
+    status: 'AVAILABLE',
+    thumbnail: 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=800&q=80',
+  }
+];
+
+const categoryImages = {
+  'Apartment': 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=400&q=80',
+  'Căn Hộ': 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=400&q=80',
+  'Studio': 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=400&q=80',
+  'Villa': 'https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=400&q=80',
+  'Biệt Thự': 'https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=400&q=80',
+  'Townhouse': 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=400&q=80',
+  'Nhà Phố': 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=400&q=80',
+  'Condo': 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=400&q=80',
+  'Đất Nền': 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=400&q=80',
+  'Land': 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=400&q=80'
+};
 
 const Home = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [showDropdown, setShowDropdown] = useState(false);
-  const [properties, setProperties] = useState([]);
+  const [properties, setProperties] = useState(fallbackProperties);
   const [searchLoc, setSearchLoc] = useState('');
   const [searchType, setSearchType] = useState('ALL');
-  const [filteredProperties, setFilteredProperties] = useState([]);
+  const [filteredProperties, setFilteredProperties] = useState(fallbackProperties);
 
-  const categoryImages = {
-    'Apartment': 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=400&q=80',
-    'Căn Hộ': 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=400&q=80',
-    'Studio': 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=400&q=80',
-    'Villa': 'https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=400&q=80',
-    'Biệt Thự': 'https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=400&q=80',
-    'Townhouse': 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=400&q=80',
-    'Nhà Phố': 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=400&q=80',
-    'Condo': 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=400&q=80',
-    'Đất Nền': 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=400&q=80',
-    'Land': 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=400&q=80'
-  };
-
-  const getCategories = () => {
+  const categories = useMemo(() => {
     const counts = {};
     properties.forEach(p => {
       const type = p.property_type || 'Khác';
@@ -42,7 +85,7 @@ const Home = () => {
       count: counts[type],
       image: categoryImages[type] || 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=400&q=80'
     }));
-  };
+  }, [properties]);
 
   // Check login session on mount
   useEffect(() => {
@@ -205,6 +248,13 @@ const Home = () => {
                   <div className="dropdown-item" style={{ fontWeight: 600, borderBottom: '1px solid #f1f5f9' }}>
                     {user.email}
                   </div>
+                  <button 
+                    className="dropdown-item" 
+                    onClick={() => navigate('/swipe/Căn Hộ', { state: { activeView: 'saved' } })}
+                  >
+                    <Heart size={14} style={{ marginRight: '8px', display: 'inline-block', verticalAlign: 'middle' }} />
+                    Tin đã yêu thích
+                  </button>
                   <button className="dropdown-item logout-btn" onClick={handleLogout}>
                     <LogOut size={14} style={{ marginRight: '8px', display: 'inline-block', verticalAlign: 'middle' }} />
                     Đăng xuất
@@ -269,7 +319,7 @@ const Home = () => {
       <section className="categories-section">
         <h2>Danh Mục Phổ Biến</h2>
         <div className="categories-grid">
-          {getCategories().map((category) => (
+          {categories.map((category) => (
             <div 
               className="category-card" 
               key={category.name}
