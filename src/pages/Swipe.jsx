@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
   Search, Heart, Map, User, X, Info, MapPin, 
-  Bed, Bath, Maximize, SlidersHorizontal, RefreshCw, ChevronLeft
+  Bed, Bath, Maximize, SlidersHorizontal, RefreshCw, ChevronLeft,
+  Compass, MessageSquare
 } from 'lucide-react';
 import { motion, useMotionValue, useTransform, useAnimation } from 'framer-motion';
 import './Swipe.css';
@@ -307,11 +308,31 @@ const Swipe = () => {
   const [dbProperties, setDbProperties] = useState([]);
   const [currentProperties, setCurrentProperties] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [swipeHistory, setSwipeHistory] = useState([]);
+  const [swipeHistory, setSwipeHistory] = useState(() => {
+    try {
+      const saved = localStorage.getItem('swipeHistory');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [minPrice, setMinPrice] = useState('');
   const [maxPrice, setMaxPrice] = useState('');
+
+  const [activeView, setActiveView] = useState('swipe'); // 'swipe' or 'saved'
+  const [selectedSavedCategory, setSelectedSavedCategory] = useState('Tất cả');
+  const [sortBy, setSortBy] = useState('recent');
+  const [selectedSavedProperty, setSelectedSavedProperty] = useState(null);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('swipeHistory', JSON.stringify(swipeHistory));
+    } catch (e) {
+      console.error('Error saving to localStorage:', e);
+    }
+  }, [swipeHistory]);
 
   // Framer Motion controllers
   const cardController = useAnimation();
@@ -343,19 +364,15 @@ const Swipe = () => {
 
   // Filter properties based on current category
   useEffect(() => {
-    // 1. Get properties from DB matching this category type
-    const matchingDb = dbProperties.filter(p => getCategoryKey(p.property_type) === activeCategoryKey);
+    let combined = [];
     
-    // 2. Get static mock properties matching this category type
-    const matchingMock = mockProperties[activeCategoryKey] || [];
-    
-    // Combine them to make a rich list, removing potential ID duplicates
-    const combined = [...matchingDb];
-    matchingMock.forEach(mockItem => {
-      if (!combined.some(dbItem => dbItem.title.toLowerCase() === mockItem.title.toLowerCase())) {
-        combined.push(mockItem);
-      }
-    });
+    if (dbProperties && dbProperties.length > 0) {
+      // Get properties from DB matching this category type
+      combined = dbProperties.filter(p => getCategoryKey(p.property_type) === activeCategoryKey);
+    } else {
+      // Get static mock properties matching this category type
+      combined = mockProperties[activeCategoryKey] || [];
+    }
 
     setCurrentProperties(combined);
     setCurrentIndex(0);
@@ -396,10 +413,13 @@ const Swipe = () => {
     });
 
     if (currentProperty) {
-      setSwipeHistory(prev => [
-        { ...currentProperty, swipeType: direction },
-        ...prev
-      ]);
+      setSwipeHistory(prev => {
+        const filtered = prev.filter(item => item.id !== currentProperty.id);
+        return [
+          { ...currentProperty, swipeType: direction },
+          ...filtered
+        ].slice(0, 100);
+      });
     }
     
     setCurrentIndex(prev => prev + 1);
@@ -414,15 +434,13 @@ const Swipe = () => {
 
   const applyFilter = (e) => {
     e.preventDefault();
-    let filtered = [...(mockProperties[activeCategoryKey] || [])];
+    let filtered = [];
     
-    // Add DB properties
-    const matchingDb = dbProperties.filter(p => getCategoryKey(p.property_type) === activeCategoryKey);
-    matchingDb.forEach(dbItem => {
-      if (!filtered.some(mockItem => mockItem.title.toLowerCase() === dbItem.title.toLowerCase())) {
-        filtered.push(dbItem);
-      }
-    });
+    if (dbProperties && dbProperties.length > 0) {
+      filtered = dbProperties.filter(p => getCategoryKey(p.property_type) === activeCategoryKey);
+    } else {
+      filtered = [...(mockProperties[activeCategoryKey] || [])];
+    }
 
     if (minPrice) {
       filtered = filtered.filter(p => p.price >= parseFloat(minPrice));
@@ -436,6 +454,58 @@ const Swipe = () => {
     setShowFilterModal(false);
   };
 
+  // Get unique liked properties from history
+  const uniqueLikedProperties = [];
+  const seenIds = new Set();
+  swipeHistory.forEach(item => {
+    if (item.swipeType === 'right' && !seenIds.has(item.id)) {
+      seenIds.add(item.id);
+      uniqueLikedProperties.push(item);
+    }
+  });
+
+  const handleUnsave = (propertyId) => {
+    setSwipeHistory(prev => prev.filter(item => item.id !== propertyId));
+  };
+
+  const getFilteredLikedProperties = () => {
+    let list = [...uniqueLikedProperties];
+    
+    // Filter by Category
+    if (selectedSavedCategory === 'Biệt thự') {
+      list = list.filter(p => getCategoryKey(p.property_type) === 'Biệt Thự');
+    } else if (selectedSavedCategory === 'Căn hộ') {
+      list = list.filter(p => getCategoryKey(p.property_type) === 'Căn Hộ' || getCategoryKey(p.property_type) === 'Chung Cư');
+    } else if (selectedSavedCategory === 'Gần biển') {
+      list = list.filter(p => 
+        p.address?.toLowerCase().includes('biển') || 
+        p.address?.toLowerCase().includes('beach') ||
+        p.description?.toLowerCase().includes('biển') ||
+        p.description?.toLowerCase().includes('beach')
+      );
+    }
+
+    // Sort by
+    if (sortBy === 'price-desc') {
+      list.sort((a, b) => b.price - a.price);
+    } else if (sortBy === 'price-asc') {
+      list.sort((a, b) => a.price - b.price);
+    }
+    
+    return list;
+  };
+
+  const savedVillasCount = uniqueLikedProperties.filter(p => getCategoryKey(p.property_type) === 'Biệt Thự').length;
+  const savedApartmentsCount = uniqueLikedProperties.filter(p => getCategoryKey(p.property_type) === 'Căn Hộ' || getCategoryKey(p.property_type) === 'Chung Cư').length;
+  const savedBeachCount = uniqueLikedProperties.filter(p => 
+    p.address?.toLowerCase().includes('biển') || 
+    p.address?.toLowerCase().includes('beach') ||
+    p.description?.toLowerCase().includes('biển') ||
+    p.description?.toLowerCase().includes('beach')
+  ).length;
+
+  const activePropertyForModal = selectedSavedProperty || currentProperty;
+
   return (
     <div className="swipe-page-container">
       {/* Premium Header */}
@@ -448,264 +518,451 @@ const Swipe = () => {
         </div>
         
         <div className="swipe-header-right">
-          <div className="header-nav-item">
-            <Search size={18} />
-            <span>Tìm kiếm</span>
+          <div className={`header-nav-item ${activeView === 'swipe' ? 'active' : ''}`} onClick={() => setActiveView('swipe')}>
+            <Compass size={18} />
+            <span>DISCOVER</span>
           </div>
-          <div className="header-nav-item">
+          <div className={`header-nav-item ${activeView === 'saved' ? 'active' : ''}`} onClick={() => setActiveView('saved')}>
             <Heart size={18} />
-            <span>Đã lưu</span>
+            <span>SAVED</span>
           </div>
           <div className="header-nav-item">
             <Map size={18} />
-            <span>Bản đồ</span>
+            <span>MAP</span>
           </div>
           <div className="header-nav-item">
             <User size={18} />
-            <span>Hồ sơ</span>
+            <span>PROFILE</span>
           </div>
         </div>
       </header>
 
       {/* Main Content Layout */}
-      <div className="swipe-main-layout">
-        
-        {/* Left Sidebar - Lịch sử vuốt */}
-        <aside className="swipe-history-sidebar">
-          <h3>Lịch sử vuốt</h3>
-          <div className="history-list">
-            {swipeHistory.length === 0 ? (
-              <div className="empty-history">
-                <p>Chưa có bài đăng nào được vuốt qua.</p>
-              </div>
-            ) : (
-              swipeHistory.map((item, idx) => (
-                <div 
-                  key={`${item.id}-${idx}`} 
-                  className={`history-card-item ${item.swipeType}`}
-                  onClick={() => {
-                    // Quick review of details
-                    setCurrentIndex(currentProperties.findIndex(p => p.id === item.id) !== -1 
-                      ? currentProperties.findIndex(p => p.id === item.id) 
-                      : currentIndex
-                    );
-                  }}
-                >
-                  <img src={item.thumbnail} alt={item.title} className="history-thumb" />
-                  <div className="history-badge">
-                    {item.swipeType === 'right' ? <Heart size={10} fill="white" /> : <X size={10} />}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </aside>
-
-        {/* Center Container - Swipe Card area */}
-        <main className="swipe-card-center-container">
+      {activeView === 'swipe' && (
+        <div className="swipe-main-layout">
           
-          {/* Blur Background for premium depth effect */}
-          {currentProperty && (
-            <div 
-              className="blurry-bg-image" 
-              style={{ backgroundImage: `url(${currentProperty.thumbnail})` }}
-            />
-          )}
-
-          {/* Filter button */}
-          <button 
-            className="floating-filter-btn"
-            onClick={() => setShowFilterModal(true)}
-          >
-            <SlidersHorizontal size={16} />
-            <span>Lọc</span>
-          </button>
-
-          {/* Tinder Card Container */}
-          <div className="swipe-deck">
-            {currentProperty ? (
-              <motion.div
-                className="tinder-card"
-                drag="x"
-                dragConstraints={{ left: 0, right: 0 }}
-                style={{ x, rotate, opacity }}
-                onDragEnd={handleDragEnd}
-                animate={cardController}
-                whileDrag={{ scale: 1.02 }}
-              >
-                {/* Property Main Image */}
-                <div className="tinder-img-wrapper">
-                  <img 
-                    src={currentProperty.thumbnail} 
-                    alt={currentProperty.title} 
-                    className="tinder-card-img"
-                    draggable="false"
-                  />
-                  
-                  {/* High Match Badge */}
-                  <span className="high-match-badge">
-                    <span className="star-icon">★</span> HIGH MATCH
-                  </span>
-
-                  {/* Glassmorphic Info Card Overlay at the bottom */}
-                  <div className="tinder-overlay-content">
-                    <div className="tinder-main-details">
-                      <div className="title-address-wrapper">
-                        <h2 className="tinder-prop-title">{currentProperty.title}</h2>
-                        <div className="tinder-prop-address">
-                          <MapPin size={16} />
-                          <span>{currentProperty.address}</span>
-                        </div>
-                      </div>
-                      <div className="tinder-price-tag">
-                        {formatPrice(currentProperty.price)}
-                      </div>
+          {/* Left Sidebar - Lịch sử vuốt */}
+          <aside className="swipe-history-sidebar">
+            <h3>Lịch sử vuốt</h3>
+            <div className="history-list">
+              {swipeHistory.length === 0 ? (
+                <div className="empty-history">
+                  <p>Chưa có bài đăng nào được vuốt qua.</p>
+                </div>
+              ) : (
+                swipeHistory.map((item) => (
+                  <div 
+                    key={item.id} 
+                    className={`history-card-item ${item.swipeType}`}
+                    onClick={() => {
+                      // Quick review of details
+                      setCurrentIndex(currentProperties.findIndex(p => p.id === item.id) !== -1 
+                        ? currentProperties.findIndex(p => p.id === item.id) 
+                        : currentIndex
+                      );
+                    }}
+                  >
+                    <img src={item.thumbnail} alt={item.title} className="history-thumb" />
+                    <div className="history-badge">
+                      {item.swipeType === 'right' ? <Heart size={10} fill="white" /> : <X size={10} />}
                     </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </aside>
 
-                    {/* Features list */}
-                    <div className="tinder-prop-features">
-                      <div className="feature-spec">
-                        <span className="spec-label">BEDS</span>
-                        <div className="spec-value">
-                          <span>{currentProperty.bedrooms}</span>
-                          <Bed size={15} />
+          {/* Center Container - Swipe Card area */}
+          <main className="swipe-card-center-container">
+            
+            {/* Blur Background for premium depth effect */}
+            {currentProperty && (
+              <div 
+                className="blurry-bg-image" 
+                style={{ backgroundImage: `url(${currentProperty.thumbnail})` }}
+              />
+            )}
+
+            {/* Filter button */}
+            <button 
+              className="floating-filter-btn"
+              onClick={() => setShowFilterModal(true)}
+            >
+              <SlidersHorizontal size={16} />
+              <span>Lọc</span>
+            </button>
+
+            {/* Tinder Card Container */}
+            <div className="swipe-deck">
+              {currentProperty ? (
+                <motion.div
+                  className="tinder-card"
+                  drag="x"
+                  dragConstraints={{ left: 0, right: 0 }}
+                  style={{ x, rotate, opacity }}
+                  onDragEnd={handleDragEnd}
+                  animate={cardController}
+                  whileDrag={{ scale: 1.02 }}
+                >
+                  {/* Property Main Image */}
+                  <div className="tinder-img-wrapper">
+                    <img 
+                      src={currentProperty.thumbnail} 
+                      alt={currentProperty.title} 
+                      className="tinder-card-img"
+                      draggable="false"
+                    />
+                    
+                    {/* High Match Badge */}
+                    <span className="high-match-badge">
+                      <span className="star-icon">★</span> HIGH MATCH
+                    </span>
+
+                    {/* Glassmorphic Info Card Overlay at the bottom */}
+                    <div className="tinder-overlay-content">
+                      <div className="tinder-main-details">
+                        <div className="title-address-wrapper">
+                          <h2 className="tinder-prop-title">{currentProperty.title}</h2>
+                          <div className="tinder-prop-address">
+                            <MapPin size={16} />
+                            <span>{currentProperty.address}</span>
+                          </div>
+                        </div>
+                        <div className="tinder-price-tag">
+                          {formatPrice(currentProperty.price)}
                         </div>
                       </div>
-                      <div className="feature-divider" />
-                      <div className="feature-spec">
-                        <span className="spec-label">BATHS</span>
-                        <div className="spec-value">
-                          <span>{currentProperty.bathrooms}</span>
-                          <Bath size={15} />
+
+                      {/* Features list */}
+                      <div className="tinder-prop-features">
+                        <div className="feature-spec">
+                          <span className="spec-label">BEDS</span>
+                          <div className="spec-value">
+                            <span>{currentProperty.bedrooms}</span>
+                            <Bed size={15} />
+                          </div>
                         </div>
-                      </div>
-                      <div className="feature-divider" />
-                      <div className="feature-spec">
-                        <span className="spec-label">AREA</span>
-                        <div className="spec-value">
-                          <span>{currentProperty.area}m²</span>
-                          <Maximize size={15} />
+                        <div className="feature-divider" />
+                        <div className="feature-spec">
+                          <span className="spec-label">BATHS</span>
+                          <div className="spec-value">
+                            <span>{currentProperty.bathrooms}</span>
+                            <Bath size={15} />
+                          </div>
+                        </div>
+                        <div className="feature-divider" />
+                        <div className="feature-spec">
+                          <span className="spec-label">AREA</span>
+                          <div className="spec-value">
+                            <span>{currentProperty.area}m²</span>
+                            <Maximize size={15} />
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
+                </motion.div>
+              ) : (
+                <div className="no-more-cards">
+                  <RefreshCw size={48} className="spin-on-hover" onClick={resetSwipes} />
+                  <h3>Không còn bài đăng nào</h3>
+                  <p>Bạn đã vuốt qua tất cả các bài viết trong danh mục này.</p>
+                  <button className="restart-btn" onClick={resetSwipes}>Vuốt lại từ đầu</button>
                 </div>
-              </motion.div>
-            ) : (
-              <div className="no-more-cards">
-                <RefreshCw size={48} className="spin-on-hover" onClick={resetSwipes} />
-                <h3>Không còn bài đăng nào</h3>
-                <p>Bạn đã vuốt qua tất cả các bài viết trong danh mục này.</p>
-                <button className="restart-btn" onClick={resetSwipes}>Vuốt lại từ đầu</button>
+              )}
+            </div>
+
+            {/* Action Buttons Under the Card */}
+            {currentProperty && (
+              <div className="swipe-action-buttons">
+                <button 
+                  className="swipe-btn dislike" 
+                  onClick={() => swipeCard('left')}
+                  aria-label="Bỏ qua"
+                >
+                  <X size={26} />
+                </button>
+                
+                <button 
+                  className="swipe-btn info" 
+                  onClick={() => setShowDetailModal(true)}
+                  aria-label="Thông tin chi tiết"
+                >
+                  <Info size={22} />
+                </button>
+
+                <button 
+                  className="swipe-btn like" 
+                  onClick={() => swipeCard('right')}
+                  aria-label="Thích"
+                >
+                  <Heart size={26} fill="white" />
+                </button>
               </div>
             )}
-          </div>
 
-          {/* Action Buttons Under the Card */}
-          {currentProperty && (
-            <div className="swipe-action-buttons">
-              <button 
-                className="swipe-btn dislike" 
-                onClick={() => swipeCard('left')}
-                aria-label="Bỏ qua"
-              >
-                <X size={26} />
-              </button>
-              
-              <button 
-                className="swipe-btn info" 
-                onClick={() => setShowDetailModal(true)}
-                aria-label="Thông tin chi tiết"
-              >
-                <Info size={22} />
-              </button>
+          </main>
 
-              <button 
-                className="swipe-btn like" 
-                onClick={() => swipeCard('right')}
-                aria-label="Thích"
-              >
-                <Heart size={26} fill="white" />
-              </button>
-            </div>
-          )}
-
-        </main>
-
-        {/* Right Sidebar - Gợi ý cho bạn */}
-        <aside className="swipe-suggestions-sidebar">
-          <h3>Gợi ý cho bạn</h3>
-          <div className="suggestions-list">
-            {suggestedCategories.map((cat) => {
-              const details = categorySuggestionDetails[cat];
-              return (
-                <div 
-                  key={cat} 
-                  className="suggestion-card"
-                  onClick={() => navigate(`/swipe/${encodeURIComponent(cat)}`)}
-                >
-                  <img src={details.image} alt={details.title} className="suggestion-img" />
-                  <div className="suggestion-gradient" />
-                  <div className="suggestion-info">
-                    <h4>{details.title}</h4>
-                    <p className="suggestion-loc">
-                      <MapPin size={12} style={{ marginRight: '4px', verticalAlign: 'middle' }} />
-                      {details.location}
-                    </p>
+          {/* Right Sidebar - Gợi ý cho bạn */}
+          <aside className="swipe-suggestions-sidebar">
+            <h3>Gợi ý cho bạn</h3>
+            <div className="suggestions-list">
+              {suggestedCategories.map((cat) => {
+                const details = categorySuggestionDetails[cat];
+                return (
+                  <div 
+                    key={cat} 
+                    className="suggestion-card"
+                    onClick={() => navigate(`/swipe/${encodeURIComponent(cat)}`)}
+                  >
+                    <img src={details.image} alt={details.title} className="suggestion-img" />
+                    <div className="suggestion-gradient" />
+                    <div className="suggestion-info">
+                      <h4>{details.title}</h4>
+                      <p className="suggestion-loc">
+                        <MapPin size={12} style={{ marginRight: '4px', verticalAlign: 'middle' }} />
+                        {details.location}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        </aside>
+                );
+              })}
+            </div>
+          </aside>
 
-      </div>
+        </div>
+      )}
+
+      {/* Saved View Content */}
+      {activeView === 'saved' && (
+        <div className="saved-main-layout">
+          {/* Left Sidebar */}
+          <aside className="saved-sidebar">
+            <div className="saved-sidebar-section">
+              <h3>Danh mục lưu trữ</h3>
+              <div className="saved-category-list">
+                <button 
+                  className={`saved-category-item ${selectedSavedCategory === 'Tất cả' ? 'active' : ''}`}
+                  onClick={() => setSelectedSavedCategory('Tất cả')}
+                >
+                  <span>Tất cả</span>
+                  <span className="saved-category-badge">{uniqueLikedProperties.length}</span>
+                </button>
+                <button 
+                  className={`saved-category-item ${selectedSavedCategory === 'Biệt thự' ? 'active' : ''}`}
+                  onClick={() => setSelectedSavedCategory('Biệt thự')}
+                >
+                  <span>Biệt thự</span>
+                  <span className="saved-category-badge">{savedVillasCount}</span>
+                </button>
+                <button 
+                  className={`saved-category-item ${selectedSavedCategory === 'Căn hộ' ? 'active' : ''}`}
+                  onClick={() => setSelectedSavedCategory('Căn hộ')}
+                >
+                  <span>Căn hộ</span>
+                  <span className="saved-category-badge">{savedApartmentsCount}</span>
+                </button>
+                <button 
+                  className={`saved-category-item ${selectedSavedCategory === 'Gần biển' ? 'active' : ''}`}
+                  onClick={() => setSelectedSavedCategory('Gần biển')}
+                >
+                  <span>Gần biển</span>
+                  <span className="saved-category-badge">{savedBeachCount}</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="saved-sidebar-section">
+              <h3>Sắp xếp theo</h3>
+              <div className="saved-sort-list">
+                <label className="saved-sort-item">
+                  <input 
+                    type="radio" 
+                    name="sortBy" 
+                    checked={sortBy === 'recent'} 
+                    onChange={() => setSortBy('recent')} 
+                  />
+                  <span className="custom-radio"></span>
+                  <span>Thêm gần đây</span>
+                </label>
+                <label className="saved-sort-item">
+                  <input 
+                    type="radio" 
+                    name="sortBy" 
+                    checked={sortBy === 'price-desc'} 
+                    onChange={() => setSortBy('price-desc')} 
+                  />
+                  <span className="custom-radio"></span>
+                  <span>Giá: Cao đến Thấp</span>
+                </label>
+                <label className="saved-sort-item">
+                  <input 
+                    type="radio" 
+                    name="sortBy" 
+                    checked={sortBy === 'price-asc'} 
+                    onChange={() => setSortBy('price-asc')} 
+                  />
+                  <span className="custom-radio"></span>
+                  <span>Giá: Thấp đến Cao</span>
+                </label>
+              </div>
+            </div>
+          </aside>
+
+          {/* Right Main Grid */}
+          <main className="saved-content-area">
+            <h1 className="saved-title">Bộ sưu tập cá nhân</h1>
+            <p className="saved-subtitle">
+              Các bất động sản bạn đã chọn lọc. Xem xét lại những lựa chọn hàng đầu của bạn và tiến hành các bước tiếp theo khi bạn đã sẵn sàng.
+            </p>
+
+            {getFilteredLikedProperties().length === 0 ? (
+              <div className="saved-empty-state">
+                <Heart size={48} className="heart-pulse-icon" />
+                <h3>Chưa có bất động sản nào trong mục này</h3>
+                <p>Nhấp vào DISCOVER để lướt và thích các bất động sản phù hợp.</p>
+                <button className="back-to-swipe-btn" onClick={() => setActiveView('swipe')}>
+                  Bắt đầu tìm kiếm
+                </button>
+              </div>
+            ) : (
+              <div className="saved-grid">
+                {getFilteredLikedProperties().map((property) => (
+                  <div 
+                    key={property.id} 
+                    className="saved-property-card"
+                    onClick={() => {
+                      setSelectedSavedProperty(property);
+                      setShowDetailModal(true);
+                    }}
+                  >
+                    <div className="saved-card-img-wrapper">
+                      <img src={property.thumbnail} alt={property.title} className="saved-card-img" />
+                      
+                      {property.matchScore && (
+                        <span className="saved-card-badge match">
+                          ★ {property.matchScore}% Match
+                        </span>
+                      )}
+
+                      {property.property_type === 'Biệt Thự' && property.price > 10000000000 && (
+                        <span className="saved-card-badge premium">
+                          ↗ Yêu thích nhất
+                        </span>
+                      )}
+
+                      {(property.address?.toLowerCase().includes('biển') || property.description?.toLowerCase().includes('biển')) && (
+                        <span className="saved-card-badge beach">
+                          ≈ Gần biển
+                        </span>
+                      )}
+
+                      <button 
+                        className="saved-card-heart-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleUnsave(property.id);
+                        }}
+                        title="Bỏ lưu"
+                      >
+                        <Heart size={16} fill="#1a42b8" color="#1a42b8" />
+                      </button>
+
+                      <div className="saved-card-price-tag">
+                        {formatPrice(property.price)}
+                      </div>
+                    </div>
+
+                    <div className="saved-card-info">
+                      <h3 className="saved-card-title">{property.title}</h3>
+                      <div className="saved-card-address">
+                        <MapPin size={14} />
+                        <span>{property.address}</span>
+                      </div>
+
+                      <div className="saved-card-features">
+                        <div className="saved-spec">
+                          <Bed size={14} />
+                          <span>{property.bedrooms || 0} BEDS</span>
+                        </div>
+                        <div className="saved-spec-divider" />
+                        <div className="saved-spec">
+                          <Bath size={14} />
+                          <span>{property.bathrooms || 0} BATHS</span>
+                        </div>
+                        <div className="saved-spec-divider" />
+                        <div className="saved-spec">
+                          <Maximize size={14} />
+                          <span>{property.area}m² AREA</span>
+                        </div>
+                      </div>
+
+                      <div className="saved-card-footer">
+                        <button 
+                          className="saved-card-chat-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedSavedProperty(property);
+                            setShowDetailModal(true);
+                          }}
+                        >
+                          <MessageSquare size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </main>
+        </div>
+      )}
 
       {/* Property Details Modal */}
-      {showDetailModal && currentProperty && (
-        <div className="modal-backdrop" onClick={() => setShowDetailModal(false)}>
+      {showDetailModal && activePropertyForModal && (
+        <div className="modal-backdrop" onClick={() => { setShowDetailModal(false); setSelectedSavedProperty(null); }}>
           <div className="detail-modal-content" onClick={(e) => e.stopPropagation()}>
-            <button className="modal-close-btn" onClick={() => setShowDetailModal(false)}>
+            <button className="modal-close-btn" onClick={() => { setShowDetailModal(false); setSelectedSavedProperty(null); }}>
               <X size={24} />
             </button>
             <div className="modal-body">
-              <img src={currentProperty.thumbnail} alt={currentProperty.title} className="modal-hero-img" />
+              <img src={activePropertyForModal.thumbnail} alt={activePropertyForModal.title} className="modal-hero-img" />
               <div className="modal-details-container">
-                <span className="modal-match-badge">★ {currentProperty.matchScore}% MATCH SCORE</span>
-                <h2>{currentProperty.title}</h2>
+                <span className="modal-match-badge">★ {activePropertyForModal.matchScore || 95}% MATCH SCORE</span>
+                <h2>{activePropertyForModal.title}</h2>
                 <div className="modal-location">
                   <MapPin size={16} />
-                  <span>{currentProperty.address}</span>
+                  <span>{activePropertyForModal.address}</span>
                 </div>
-                <div className="modal-price">Giá: {currentProperty.price.toLocaleString('vi-VN')} VNĐ</div>
+                <div className="modal-price">Giá: {activePropertyForModal.price ? activePropertyForModal.price.toLocaleString('vi-VN') : 'Liên hệ'} VNĐ</div>
                 
                 <div className="modal-specs">
-                  {currentProperty.bedrooms > 0 && (
+                  {activePropertyForModal.bedrooms > 0 && (
                     <div className="modal-spec-item">
                       <Bed size={18} />
-                      <span>{currentProperty.bedrooms} Phòng ngủ</span>
+                      <span>{activePropertyForModal.bedrooms} Phòng ngủ</span>
                     </div>
                   )}
-                  {currentProperty.bathrooms > 0 && (
+                  {activePropertyForModal.bathrooms > 0 && (
                     <div className="modal-spec-item">
                       <Bath size={18} />
-                      <span>{currentProperty.bathrooms} Phòng tắm</span>
+                      <span>{activePropertyForModal.bathrooms} Phòng tắm</span>
                     </div>
                   )}
                   <div className="modal-spec-item">
                     <Maximize size={18} />
-                    <span>{currentProperty.area} m²</span>
+                    <span>{activePropertyForModal.area} m²</span>
                   </div>
                 </div>
 
                 <div className="modal-description">
                   <h3>Mô tả chi tiết</h3>
-                  <p>{currentProperty.description}</p>
+                  <p>{activePropertyForModal.description}</p>
                 </div>
 
                 <div className="modal-contact">
                   <h3>Liên hệ chính chủ</h3>
-                  <div className="contact-tel">{currentProperty.contact || '0901 234 567'}</div>
+                  <div className="contact-tel">{activePropertyForModal.contact || activePropertyForModal.contact_phone || '0901 234 567'}</div>
                 </div>
               </div>
             </div>
