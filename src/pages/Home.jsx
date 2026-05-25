@@ -8,48 +8,7 @@ import {
 import './Home.css';
 import heroImage from '../assets/hero.png'; // Fallback or imported hero asset
 
-const fallbackProperties = [
-  {
-    id: 1,
-    title: 'The Azure Signature Villa',
-    description: 'Biệt thự sân vườn cao cấp với view hồ bơi tràn bờ cực đẹp tại khu Thảo Điền.',
-    price: 24500000000,
-    area: 350,
-    bedrooms: 4,
-    bathrooms: 5,
-    address: 'Thảo Điền, Quận 2, TP.HCM',
-    property_type: 'Biệt Thự',
-    status: 'AVAILABLE',
-    thumbnail: 'https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=1200&q=80',
-  },
-  {
-    id: 2,
-    title: 'Skyrise Penthouse',
-    description: 'Căn Penthouse sang trọng tầng cao nhất của tháp Landmark với tầm nhìn panorama toàn thành phố.',
-    price: 12800000000,
-    area: 100,
-    bedrooms: 3,
-    bathrooms: 2,
-    address: 'Vinhomes Central Park, Bình Thạnh, TP.HCM',
-    property_type: 'Căn Hộ',
-    status: 'AVAILABLE',
-    thumbnail: 'https://images.unsplash.com/photo-1567496898669-ee935f5f647a?auto=format&fit=crop&w=800&q=80',
-    is_highlighted: true,
-  },
-  {
-    id: 3,
-    title: 'Minimalist Studio',
-    description: 'Căn hộ studio phong cách tối giản Nhật Bản, nội thất thông minh tối ưu không gian.',
-    price: 4200000000,
-    area: 65,
-    bedrooms: 1,
-    bathrooms: 1,
-    address: 'Phường Bến Nghé, Quận 1, TP.HCM',
-    property_type: 'Căn Hộ',
-    status: 'AVAILABLE',
-    thumbnail: 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=800&q=80',
-  }
-];
+
 
 const categoryImages = {
   'Apartment': 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=400&q=80',
@@ -68,10 +27,10 @@ const Home = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [showDropdown, setShowDropdown] = useState(false);
-  const [properties, setProperties] = useState(fallbackProperties);
+  const [properties, setProperties] = useState([]);
   const [searchLoc, setSearchLoc] = useState('');
   const [searchType, setSearchType] = useState('ALL');
-  const [filteredProperties, setFilteredProperties] = useState(fallbackProperties);
+  const [filteredProperties, setFilteredProperties] = useState([]);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState(null);
 
@@ -107,68 +66,17 @@ const Home = () => {
         if (!response.ok) throw new Error('Failed to fetch properties');
         const data = await response.json();
         
-        if (data.properties && data.properties.length > 0) {
+        if (data.properties) {
           setProperties(data.properties);
           setFilteredProperties(data.properties);
-        } else {
-          // Empty DB, load fallback properties
-          loadFallbackProperties();
         }
       } catch (error) {
-        console.warn('API error, loading fallback properties:', error);
-        loadFallbackProperties();
+        console.error('Error fetching properties from DB:', error);
       }
     };
 
     fetchProperties();
   }, []);
-
-  const loadFallbackProperties = () => {
-    const fallback = [
-      {
-        id: 1,
-        title: 'The Azure Signature Villa',
-        description: 'Biệt thự sân vườn cao cấp với view hồ bơi tràn bờ cực đẹp tại khu Thảo Điền.',
-        price: 24500000000,
-        area: 350,
-        bedrooms: 4,
-        bathrooms: 5,
-        address: 'Thảo Điền, Quận 2, TP.HCM',
-        property_type: 'Biệt Thự',
-        status: 'AVAILABLE',
-        thumbnail: 'https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=1200&q=80',
-      },
-      {
-        id: 2,
-        title: 'Skyrise Penthouse',
-        description: 'Căn Penthouse sang trọng tầng cao nhất của tháp Landmark với tầm nhìn panorama toàn thành phố.',
-        price: 12800000000,
-        area: 100,
-        bedrooms: 3,
-        bathrooms: 2,
-        address: 'Vinhomes Central Park, Bình Thạnh, TP.HCM',
-        property_type: 'Căn Hộ',
-        status: 'AVAILABLE',
-        thumbnail: 'https://images.unsplash.com/photo-1567496898669-ee935f5f647a?auto=format&fit=crop&w=800&q=80',
-        is_highlighted: true,
-      },
-      {
-        id: 3,
-        title: 'Minimalist Studio',
-        description: 'Căn hộ studio phong cách tối giản Nhật Bản, nội thất thông minh tối ưu không gian.',
-        price: 4200000000,
-        area: 65,
-        bedrooms: 1,
-        bathrooms: 1,
-        address: 'Phường Bến Nghé, Quận 1, TP.HCM',
-        property_type: 'Căn Hộ',
-        status: 'AVAILABLE',
-        thumbnail: 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=800&q=80',
-      }
-    ];
-    setProperties(fallback);
-    setFilteredProperties(fallback);
-  };
 
   const handleSearch = (e) => {
     e.preventDefault();
