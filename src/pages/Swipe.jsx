@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { 
   Search, Heart, Map, User, X, Info, MapPin, 
@@ -85,6 +85,7 @@ const Swipe = () => {
 
   const [user, setUser] = useState(null);
   const [dbFavorites, setDbFavorites] = useState([]);
+  const [isLoadingSaved, setIsLoadingSaved] = useState(false);
 
   // Check login session on mount
   useEffect(() => {
@@ -100,6 +101,7 @@ const Swipe = () => {
     const sessionUser = localStorage.getItem('user');
     if (!sessionUser) return;
     const parsedUser = JSON.parse(sessionUser);
+    setIsLoadingSaved(true);
     try {
       const response = await fetch(`http://localhost:3000/api/favorites?userId=${parsedUser.id}`);
       if (response.ok) {
@@ -108,6 +110,10 @@ const Swipe = () => {
       }
     } catch (err) {
       console.error('Error fetching database favorites:', err);
+    } finally {
+      setTimeout(() => {
+        setIsLoadingSaved(false);
+      }, 600);
     }
   };
 
@@ -170,17 +176,20 @@ const Swipe = () => {
   }, [activeCategoryKey, dbProperties]);
 
   const currentProperty = currentProperties[currentIndex];
+  const isAlreadyFavorite = currentProperty && dbFavorites.some(fav => fav.id === currentProperty.id);
 
   const formatPrice = (price) => {
     if (!price || price === 0) return 'Liên hệ';
-    if (price < 1000000) {
-      return `$${(price / 1000).toFixed(0)}k`;
-    }
     const billion = 1000000000;
+    const million = 1000000;
+    
     if (price >= billion) {
-      return `$${(price / billion).toFixed(1).replace('.0', '')}M`;
+      return `${(price / billion).toFixed(1).replace('.0', '')} Tỷ`;
     }
-    return `$${(price / 1000000).toFixed(0)}k`;
+    if (price >= million) {
+      return `${(price / million).toFixed(1).replace('.0', '')} Triệu`;
+    }
+    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
   };
 
   const handleDragEnd = async (event, info) => {
@@ -278,21 +287,12 @@ const Swipe = () => {
     }
   };
 
-  const getFilteredLikedProperties = () => {
+  const filteredLikedProperties = useMemo(() => {
     let list = [...dbFavorites];
     
     // Filter by Category
-    if (selectedSavedCategory === 'Biệt thự') {
-      list = list.filter(p => getCategoryKey(p.property_type) === 'Biệt Thự');
-    } else if (selectedSavedCategory === 'Căn hộ') {
-      list = list.filter(p => getCategoryKey(p.property_type) === 'Căn Hộ' || getCategoryKey(p.property_type) === 'Chung Cư');
-    } else if (selectedSavedCategory === 'Gần biển') {
-      list = list.filter(p => 
-        p.address?.toLowerCase().includes('biển') || 
-        p.address?.toLowerCase().includes('beach') ||
-        p.description?.toLowerCase().includes('biển') ||
-        p.description?.toLowerCase().includes('beach')
-      );
+    if (selectedSavedCategory !== 'Tất cả') {
+      list = list.filter(p => getCategoryKey(p.property_type) === selectedSavedCategory);
     }
 
     // Sort by
@@ -303,16 +303,12 @@ const Swipe = () => {
     }
     
     return list;
-  };
+  }, [dbFavorites, selectedSavedCategory, sortBy]);
 
-  const savedVillasCount = dbFavorites.filter(p => getCategoryKey(p.property_type) === 'Biệt Thự').length;
-  const savedApartmentsCount = dbFavorites.filter(p => getCategoryKey(p.property_type) === 'Căn Hộ' || getCategoryKey(p.property_type) === 'Chung Cư').length;
-  const savedBeachCount = dbFavorites.filter(p => 
-    p.address?.toLowerCase().includes('biển') || 
-    p.address?.toLowerCase().includes('beach') ||
-    p.description?.toLowerCase().includes('biển') ||
-    p.description?.toLowerCase().includes('beach')
-  ).length;
+  const getSavedCategoryCount = (category) => {
+    if (category === 'Tất cả') return dbFavorites.length;
+    return dbFavorites.filter(p => getCategoryKey(p.property_type) === category).length;
+  };
 
   const activePropertyForModal = selectedSavedProperty || currentProperty;
 
@@ -428,6 +424,12 @@ const Swipe = () => {
                       <span className="star-icon">★</span> HIGH MATCH
                     </span>
 
+                    {isAlreadyFavorite && (
+                      <span className="already-liked-badge">
+                        <Heart size={12} fill="white" /> ĐÃ YÊU THÍCH
+                      </span>
+                    )}
+
                     {/* Glassmorphic Info Card Overlay at the bottom */}
                     <div className="tinder-overlay-content">
                       <div className="tinder-main-details">
@@ -502,7 +504,7 @@ const Swipe = () => {
                 </button>
 
                 <button 
-                  className="swipe-btn like" 
+                  className={`swipe-btn like ${isAlreadyFavorite ? 'already-liked' : ''}`}
                   onClick={() => swipeCard('right')}
                   aria-label="Thích"
                 >
@@ -551,34 +553,16 @@ const Swipe = () => {
             <div className="saved-sidebar-section">
               <h3>Danh mục yêu thích</h3>
               <div className="saved-category-list">
-                <button 
-                  className={`saved-category-item ${selectedSavedCategory === 'Tất cả' ? 'active' : ''}`}
-                  onClick={() => setSelectedSavedCategory('Tất cả')}
-                >
-                  <span>Tất cả</span>
-                  <span className="saved-category-badge">{dbFavorites.length}</span>
-                </button>
-                <button 
-                  className={`saved-category-item ${selectedSavedCategory === 'Biệt thự' ? 'active' : ''}`}
-                  onClick={() => setSelectedSavedCategory('Biệt thự')}
-                >
-                  <span>Biệt thự</span>
-                  <span className="saved-category-badge">{savedVillasCount}</span>
-                </button>
-                <button 
-                  className={`saved-category-item ${selectedSavedCategory === 'Căn hộ' ? 'active' : ''}`}
-                  onClick={() => setSelectedSavedCategory('Căn hộ')}
-                >
-                  <span>Căn hộ</span>
-                  <span className="saved-category-badge">{savedApartmentsCount}</span>
-                </button>
-                <button 
-                  className={`saved-category-item ${selectedSavedCategory === 'Gần biển' ? 'active' : ''}`}
-                  onClick={() => setSelectedSavedCategory('Gần biển')}
-                >
-                  <span>Gần biển</span>
-                  <span className="saved-category-badge">{savedBeachCount}</span>
-                </button>
+                {['Tất cả', 'Biệt Thự', 'Đất Nền', 'Nhà Ở', 'Chung Cư', 'Căn Hộ'].map((cat) => (
+                  <button 
+                    key={cat}
+                    className={`saved-category-item ${selectedSavedCategory === cat ? 'active' : ''}`}
+                    onClick={() => setSelectedSavedCategory(cat)}
+                  >
+                    <span>{cat}</span>
+                    <span className="saved-category-badge">{getSavedCategoryCount(cat)}</span>
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -626,7 +610,20 @@ const Swipe = () => {
               Các bất động sản bạn đã thích. Xem xét lại các lựa chọn của bạn và tiến hành các bước tiếp theo khi bạn đã sẵn sàng.
             </p>
 
-            {getFilteredLikedProperties().length === 0 ? (
+            {isLoadingSaved ? (
+              <div className="saved-grid">
+                {[1, 2, 3].map((n) => (
+                  <div key={n} className="saved-skeleton-card">
+                    <div className="saved-skeleton-img" />
+                    <div className="saved-skeleton-info">
+                      <div className="saved-skeleton-title" />
+                      <div className="saved-skeleton-address" />
+                      <div className="saved-skeleton-features" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : filteredLikedProperties.length === 0 ? (
               <div className="saved-empty-state">
                 <Heart size={48} className="heart-pulse-icon" />
                 <h3>Chưa có bất động sản nào trong danh sách yêu thích</h3>
@@ -637,7 +634,7 @@ const Swipe = () => {
               </div>
             ) : (
               <div className="saved-grid">
-                {getFilteredLikedProperties().map((property) => (
+                {filteredLikedProperties.map((property) => (
                   <div 
                     key={property.id} 
                     className="saved-property-card"
@@ -647,7 +644,7 @@ const Swipe = () => {
                     }}
                   >
                     <div className="saved-card-img-wrapper">
-                      <img src={property.thumbnail} alt={property.title} className="saved-card-img" />
+                      <img src={property.thumbnail} alt={property.title} className="saved-card-img" loading="lazy" decoding="async" />
                       
                       {property.matchScore && (
                         <span className="saved-card-badge match">

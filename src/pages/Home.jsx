@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Menu, Search, MapPin, Home as HomeIcon, 
   Bed, Bath, Maximize, LogOut, User, 
-  ChevronDown, ArrowRight, Heart
+  ChevronDown, ArrowRight, Heart, X
 } from 'lucide-react';
 import './Home.css';
 import heroImage from '../assets/hero.png'; // Fallback or imported hero asset
@@ -72,6 +72,8 @@ const Home = () => {
   const [searchLoc, setSearchLoc] = useState('');
   const [searchType, setSearchType] = useState('ALL');
   const [filteredProperties, setFilteredProperties] = useState(fallbackProperties);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedProperty, setSelectedProperty] = useState(null);
 
   const categories = useMemo(() => {
     const counts = {};
@@ -214,7 +216,7 @@ const Home = () => {
           <button className="menu-btn" aria-label="Menu">
             <Menu size={20} />
           </button>
-          <span className="logo-text">The Curator</span>
+          <span className="logo-text">Swipe Nest</span>
         </div>
 
         <nav className="nav-middle">
@@ -354,7 +356,14 @@ const Home = () => {
         <div className="properties-layout">
           {/* Left Column - Large Property Card */}
           {mainVilla && (
-            <div className="large-property-card">
+            <div 
+              className="large-property-card"
+              onClick={() => {
+                setSelectedProperty(mainVilla);
+                setShowDetailModal(true);
+              }}
+              style={{ cursor: 'pointer' }}
+            >
               <div className="large-card-img-wrapper">
                 <img src={mainVilla.thumbnail} alt={mainVilla.title} className="large-card-img" />
                 <span className="status-badge">
@@ -390,7 +399,15 @@ const Home = () => {
           {/* Right Column - Small Stacked Cards */}
           <div className="properties-stack">
             {otherProperties.map((property) => (
-              <div className="small-property-card" key={property.id}>
+              <div 
+                className="small-property-card" 
+                key={property.id}
+                onClick={() => {
+                  setSelectedProperty(property);
+                  setShowDetailModal(true);
+                }}
+                style={{ cursor: 'pointer' }}
+              >
                 <div className="small-card-img-wrapper">
                   <img src={property.thumbnail} alt={property.title} className="small-card-img" />
                   {property.is_highlighted && (
@@ -425,7 +442,7 @@ const Home = () => {
       <footer className="footer">
         <div className="footer-grid">
           <div className="footer-col">
-            <span className="footer-logo">The Curator</span>
+            <span className="footer-logo">Swipe Nest</span>
             <p className="footer-desc">
               Nâng tầm trải nghiệm bất động sản qua lăng kính của sự tinh tế và chuyên nghiệp.
             </p>
@@ -459,9 +476,61 @@ const Home = () => {
         </div>
 
         <div className="footer-bottom">
-          © 2024 The Curator. All rights reserved.
+          © 2024 Swipe Nest. All rights reserved.
         </div>
       </footer>
+
+      {/* Property Details Modal */}
+      {showDetailModal && selectedProperty && (
+        <div className="modal-backdrop" onClick={() => { setShowDetailModal(false); setSelectedProperty(null); }}>
+          <div className="detail-modal-content" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close-btn" onClick={() => { setShowDetailModal(false); setSelectedProperty(null); }}>
+              <X size={24} />
+            </button>
+            <div className="modal-body">
+              <img src={selectedProperty.thumbnail} alt={selectedProperty.title} className="modal-hero-img" />
+              <div className="modal-details-container">
+                <span className="modal-match-badge">★ 95% MATCH SCORE</span>
+                <h2>{selectedProperty.title}</h2>
+                <div className="modal-location">
+                  <MapPin size={16} />
+                  <span>{selectedProperty.address}</span>
+                </div>
+                <div className="modal-price">Giá: {selectedProperty.price ? selectedProperty.price.toLocaleString('vi-VN') : 'Liên hệ'} VNĐ</div>
+                
+                <div className="modal-specs">
+                  {selectedProperty.bedrooms > 0 && (
+                    <div className="modal-spec-item">
+                      <Bed size={18} />
+                      <span>{selectedProperty.bedrooms} Phòng ngủ</span>
+                    </div>
+                  )}
+                  {selectedProperty.bathrooms > 0 && (
+                    <div className="modal-spec-item">
+                      <Bath size={18} />
+                      <span>{selectedProperty.bathrooms} Phòng tắm</span>
+                    </div>
+                  )}
+                  <div className="modal-spec-item">
+                    <Maximize size={18} />
+                    <span>{selectedProperty.area} m²</span>
+                  </div>
+                </div>
+
+                <div className="modal-description">
+                  <h3>Mô tả chi tiết</h3>
+                  <p>{selectedProperty.description}</p>
+                </div>
+
+                <div className="modal-contact">
+                  <h3>Liên hệ chính chủ</h3>
+                  <div className="contact-tel">{selectedProperty.contact || selectedProperty.contact_phone || '0901 234 567'}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
