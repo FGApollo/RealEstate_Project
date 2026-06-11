@@ -24,6 +24,26 @@ const getCategoryKey = (name) => {
   return 'Căn Hộ';
 };
 
+const getLowResBlurUrl = (url) => {
+  if (!url) return '';
+  if (url.includes('unsplash.com')) {
+    let optimized = url;
+    if (optimized.includes('w=')) {
+      optimized = optimized.replace(/w=\d+/, 'w=80');
+    } else {
+      optimized += '&w=80';
+    }
+    if (optimized.includes('q=')) {
+      optimized = optimized.replace(/q=\d+/, 'q=30');
+    } else {
+      optimized += '&q=30';
+    }
+    return optimized;
+  }
+  return url;
+};
+
+
 const categorySuggestionDetails = {
   'Đất Nền': {
     title: 'Đất Nền Dự Án',
@@ -175,6 +195,17 @@ const Swipe = () => {
     setCurrentIndex(0);
   }, [activeCategoryKey, dbProperties]);
 
+  // Preload next property image for buttery-smooth transition
+  useEffect(() => {
+    if (currentIndex + 1 < currentProperties.length) {
+      const nextProp = currentProperties[currentIndex + 1];
+      if (nextProp && nextProp.thumbnail) {
+        const img = new Image();
+        img.src = nextProp.thumbnail;
+      }
+    }
+  }, [currentIndex, currentProperties]);
+
   const currentProperty = currentProperties[currentIndex];
   const isAlreadyFavorite = currentProperty && dbFavorites.some(fav => fav.id === currentProperty.id);
 
@@ -220,7 +251,7 @@ const Swipe = () => {
         return [
           { ...currentProperty, swipeType: direction },
           ...filtered
-        ].slice(0, 100);
+        ].slice(0, 15);
       });
 
       // Synchronize with database favorites if swiped right (like)
@@ -310,11 +341,8 @@ const Swipe = () => {
     return dbFavorites.filter(p => getCategoryKey(p.property_type) === category).length;
   };
 
-  const activePropertyForModal = selectedSavedProperty || currentProperty;
-
-  return (
-    <div className="swipe-page-container">
-      {/* Premium Header */}
+  const headerElement = useMemo(() => {
+    return (
       <header className="swipe-header">
         <div className="swipe-header-left">
           <Link to="/" className="back-home-btn">
@@ -342,6 +370,45 @@ const Swipe = () => {
           </div>
         </div>
       </header>
+    );
+  }, [activeView, navigate]);
+
+  const suggestionsSidebar = useMemo(() => {
+    return (
+      <aside className="swipe-suggestions-sidebar">
+        <h3>Gợi ý cho bạn</h3>
+        <div className="suggestions-list">
+          {suggestedCategories.map((cat) => {
+            const details = categorySuggestionDetails[cat];
+            return (
+              <div 
+                key={cat} 
+                className="suggestion-card"
+                onClick={() => navigate(`/swipe/${encodeURIComponent(cat)}`)}
+              >
+                <img src={details.image} alt={details.title} className="suggestion-img" />
+                <div className="suggestion-gradient" />
+                <div className="suggestion-info">
+                  <h4>{details.title}</h4>
+                  <p className="suggestion-loc">
+                    <MapPin size={12} style={{ marginRight: '4px', verticalAlign: 'middle' }} />
+                    {details.location}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </aside>
+    );
+  }, [suggestedCategories, navigate]);
+
+  const activePropertyForModal = selectedSavedProperty || currentProperty;
+
+  return (
+    <div className="swipe-page-container">
+      {/* Premium Header */}
+      {headerElement}
 
       {/* Main Content Layout */}
       {activeView === 'swipe' && (
@@ -385,7 +452,7 @@ const Swipe = () => {
             {currentProperty && (
               <div 
                 className="blurry-bg-image" 
-                style={{ backgroundImage: `url(${currentProperty.thumbnail})` }}
+                style={{ backgroundImage: `url(${getLowResBlurUrl(currentProperty.thumbnail)})` }}
               />
             )}
 
@@ -404,7 +471,9 @@ const Swipe = () => {
                 <motion.div
                   className="tinder-card"
                   drag="x"
-                  dragConstraints={{ left: 0, right: 0 }}
+                  dragConstraints={{ left: -1000, right: 1000 }}
+                  dragElastic={1}
+                  dragTransition={{ bounceStiffness: 600, bounceDamping: 30 }}
                   style={{ x, rotate, opacity }}
                   onDragEnd={handleDragEnd}
                   animate={cardController}
@@ -515,32 +584,7 @@ const Swipe = () => {
 
           </main>
 
-          {/* Right Sidebar - Gợi ý cho bạn */}
-          <aside className="swipe-suggestions-sidebar">
-            <h3>Gợi ý cho bạn</h3>
-            <div className="suggestions-list">
-              {suggestedCategories.map((cat) => {
-                const details = categorySuggestionDetails[cat];
-                return (
-                  <div 
-                    key={cat} 
-                    className="suggestion-card"
-                    onClick={() => navigate(`/swipe/${encodeURIComponent(cat)}`)}
-                  >
-                    <img src={details.image} alt={details.title} className="suggestion-img" />
-                    <div className="suggestion-gradient" />
-                    <div className="suggestion-info">
-                      <h4>{details.title}</h4>
-                      <p className="suggestion-loc">
-                        <MapPin size={12} style={{ marginRight: '4px', verticalAlign: 'middle' }} />
-                        {details.location}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </aside>
+          {suggestionsSidebar}
 
         </div>
       )}
