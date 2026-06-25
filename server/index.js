@@ -5,6 +5,7 @@ const cors = require('cors');
 const authRoutes = require('./routes/authRoutes');
 const propertyRoutes = require('./routes/propertyRoutes');
 const favoritesRoutes = require('./routes/favoritesRoutes');
+const agentRoutes = require('./routes/agentRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -16,6 +17,7 @@ app.use(express.json());
 app.use('/api', authRoutes);
 app.use('/api/properties', propertyRoutes);
 app.use('/api/favorites', favoritesRoutes);
+app.use('/api/agent', agentRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
