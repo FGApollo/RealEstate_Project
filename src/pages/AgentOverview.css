@@ -1,0 +1,382 @@
+/* AgentOverview.css */
+.agent-dashboard {
+  display: flex;
+  height: 100vh;
+  background-color: #f8fafc;
+  font-family: 'Inter', sans-serif;
+  text-align: left;
+}
+
+.agent-dashboard .sidebar {
+  width: 260px;
+  background-color: white;
+  border-right: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+}
+
+.agent-dashboard .sidebar-logo {
+  font-weight: 800;
+  font-size: 20px;
+  color: #2563eb;
+  margin-bottom: 40px;
+  letter-spacing: 1px;
+}
+
+.agent-dashboard .sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+}
+
+.agent-dashboard .nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  color: #64748b;
+  text-decoration: none;
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.agent-dashboard .nav-item:hover, .agent-dashboard .nav-item.active {
+  background-color: #eff6ff;
+  color: #2563eb;
+}
+
+.agent-dashboard .sidebar-bottom {
+  margin-top: auto;
+}
+
+.agent-dashboard .main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.agent-dashboard .topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 40px;
+  background-color: white;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.agent-dashboard .search-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background-color: #f1f5f9;
+  padding: 10px 16px;
+  border-radius: 20px;
+  width: 300px;
+}
+
+.agent-dashboard .search-bar input {
+  border: none;
+  background: transparent;
+  outline: none;
+  width: 100%;
+  color: #334155;
+  font-size: 14px;
+}
+
+.agent-dashboard .profile-badge {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background-color: #dcfce7;
+  padding: 8px 16px;
+  border-radius: 20px;
+  color: #166534;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.agent-dashboard .profile-avatar {
+  background-color: #22c55e;
+  color: white;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+
+.agent-dashboard .dashboard-content {
+  padding: 40px;
+  max-width: 1200px;
+}
+
+.agent-dashboard .dashboard-content h1 {
+  margin: 0 0 8px 0;
+  font-size: 28px;
+  color: #0f172a;
+}
+
+.agent-dashboard .subtitle {
+  color: #64748b;
+  margin-bottom: 32px;
+}
+
+.agent-dashboard .stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+  margin-bottom: 40px;
+}
+
+.agent-dashboard .stat-card {
+  background-color: white;
+  padding: 24px;
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  border: 1px solid #e2e8f0;
+}
+
+.agent-dashboard .stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.agent-dashboard .properties-icon {
+  background-color: #eff6ff;
+  color: #2563eb;
+}
+
+.agent-dashboard .views-icon {
+  background-color: #f0fdf4;
+  color: #16a34a;
+}
+
+.agent-dashboard .favorites-icon {
+  background-color: #fdf2f8;
+  color: #db2777;
+}
+
+.agent-dashboard .stat-label {
+  color: #64748b;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.agent-dashboard .stat-value {
+  font-size: 32px;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 8px;
+}
+
+.agent-dashboard .stat-trend {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.agent-dashboard .active-listings-section {
+  background-color: white;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  border: 1px solid #e2e8f0;
+}
+
+.agent-dashboard .section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.agent-dashboard .section-header h2 {
+  font-size: 18px;
+  color: #0f172a;
+  margin: 0;
+}
+
+.agent-dashboard .view-all {
+  color: #2563eb;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.agent-dashboard .listings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.agent-dashboard .listing-item {
+  display: flex;
+  align-items: center;
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+
+.agent-dashboard .listing-item:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+}
+
+.agent-dashboard .listing-image {
+  width: 80px;
+  height: 60px;
+  border-radius: 8px;
+  object-fit: cover;
+  margin-right: 20px;
+}
+
+.agent-dashboard .listing-info {
+  flex: 1;
+}
+
+.agent-dashboard .listing-info h3 {
+  margin: 0 0 4px 0;
+  font-size: 16px;
+  color: #1e293b;
+}
+
+.agent-dashboard .listing-info p {
+  margin: 0;
+  font-size: 14px;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.agent-dashboard .agent-status-badge {
+  background-color: #dcfce7;
+  color: #166534;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  display: inline-block;
+}
+
+.agent-dashboard .listing-stats {
+  display: flex;
+  gap: 24px;
+  margin-right: 24px;
+}
+
+.agent-dashboard .listing-stat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.agent-dashboard .action-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.agent-dashboard .action-btn:hover {
+  background-color: #f1f5f9;
+  color: #0f172a;
+}
+
+/* Dashboard Header & Placeholder Banners */
+.agent-dashboard .dashboard-header-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+}
+
+/* Grey Unverified Banner Placeholder (in header topbar) */
+.agent-dashboard .unverified-banner-placeholder {
+  background-color: #f1f5f9;
+  color: #475569;
+  padding: 8px 18px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+  margin-right: auto;
+  margin-left: 24px;
+}
+
+.agent-dashboard .unverified-banner-placeholder a {
+  color: #0f172a;
+  font-weight: 700;
+  text-decoration: underline;
+  margin-left: 12px;
+}
+
+.agent-dashboard .unverified-banner-placeholder a:hover {
+  color: #2563eb;
+}
+
+/* Green Verified Broker Placeholder Card */
+.agent-dashboard .verified-broker-placeholder {
+  background-color: #a7f3d0; /* light aquamarine */
+  border: 1px solid #6ee7b7;
+  border-radius: 12px;
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #064e3b;
+  font-family: 'Inter', sans-serif;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+}
+
+.agent-dashboard .verified-badge-icon {
+  background-color: #065f46; /* dark green circle */
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.agent-dashboard .verified-badge-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+}
+
+.agent-dashboard .verified-status-title {
+  font-weight: 700;
+  font-size: 14px;
+  color: #065f46;
+}
+
+.agent-dashboard .verified-score-subtitle {
+  font-size: 12px;
+  color: #047857;
+  margin-top: 1px;
+}
