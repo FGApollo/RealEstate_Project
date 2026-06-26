@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Home, Eye, Heart, Search, LayoutDashboard, Settings, LogOut, ChevronRight, ShieldCheck } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Home, Eye, Heart, Search, LayoutDashboard, Settings, LogOut, ChevronRight, ShieldAlert } from 'lucide-react';
 import './AgentOverview.css';
 
 const AgentOverview = () => {
@@ -37,12 +37,12 @@ const AgentOverview = () => {
           SWIPE NEST
         </div>
         <nav className="sidebar-nav">
-          <a href="#" className="nav-item active"><LayoutDashboard size={20}/> Tổng quan</a>
-          <a href="#" className="nav-item"><Home size={20}/> Quản lý tin</a>
-          <a href="#" className="nav-item"><Settings size={20}/> Cài đặt</a>
+          <a href="#" className="nav-item active"><LayoutDashboard size={20} /> Tổng quan</a>
+          <a href="#" className="nav-item"><Home size={20} /> Quản lý tin</a>
+          <a href="#" className="nav-item"><Settings size={20} /> Cài đặt</a>
         </nav>
         <div className="sidebar-bottom">
-          <a href="#" className="nav-item"><LogOut size={20}/> Đăng xuất</a>
+          <a href="#" className="nav-item"><LogOut size={20} /> Đăng xuất</a>
         </div>
       </aside>
 
@@ -50,11 +50,7 @@ const AgentOverview = () => {
         <header className="topbar">
           <div className="search-bar">
             <Search size={20} color="#888" />
-            <input type="text" placeholder="Tìm kiếm tin đăng..." />
-          </div>
-          
-          <div className="unverified-banner-placeholder">
-            Tài khoản của bạn chưa được xác minh. <a href="#" onClick={(e) => e.preventDefault()}>Xác minh ngay</a>
+            <input type="text" placeholder="Nhập địa chỉ bất động sản" />
           </div>
 
           <div className="profile-badge">
@@ -69,14 +65,22 @@ const AgentOverview = () => {
               <h1>Xin chào, Zăn Cao</h1>
               <p className="subtitle">Theo dõi hiệu suất các tin đăng của bạn trong hôm nay.</p>
             </div>
-            
-            <div className="verified-broker-placeholder">
-              <div className="verified-badge-icon">
-                <ShieldCheck size={20} color="#ffffff" strokeWidth={2.5} />
+
+            <div className="unverified-status-container">
+              <div className="verified-broker-placeholder unverified">
+                <div className="verified-badge-icon warning">
+                  <ShieldAlert size={20} color="#ffffff" strokeWidth={2.5} />
+                </div>
+                <div className="verified-badge-text">
+                  <div className="verified-status-title">Status: Chưa Verified</div>
+                  <div className="verified-score-subtitle">Cần xác minh ngay</div>
+                </div>
               </div>
-              <div className="verified-badge-text">
-                <div className="verified-status-title">Status: Verified Broker</div>
-                <div className="verified-score-subtitle">Trust Score: 98/100</div>
+              <div className="notification-tooltip dashboard-tooltip">
+                <div className="tooltip-content">
+                  <span className="tooltip-text">Tài khoản của bạn chưa được xác minh.</span>
+                  <a href="#" className="tooltip-action" onClick={(e) => e.preventDefault()}>Xác minh ngay!</a>
+                </div>
               </div>
             </div>
           </div>
@@ -90,7 +94,7 @@ const AgentOverview = () => {
               <div className="stat-value">{loading ? '-' : data.totalProperties}</div>
               <div className="stat-trend">Cập nhật lúc {new Date().toLocaleTimeString()}</div>
             </div>
-            
+
             <div className="stat-card">
               <div className="stat-icon views-icon">
                 <Eye size={24} />
@@ -115,7 +119,7 @@ const AgentOverview = () => {
               <h2>Danh sách tin đang hoạt động</h2>
               <a href="#" className="view-all">Xem tất cả</a>
             </div>
-            
+
             <div className="listings-list">
               {loading ? (
                 <p>Đang tải dữ liệu...</p>
