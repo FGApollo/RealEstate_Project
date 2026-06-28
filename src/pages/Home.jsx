@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Menu, Search, MapPin, Home as HomeIcon, 
   Bed, Bath, Maximize, LogOut, User, 
-  ChevronDown, ArrowRight, Heart, X, SlidersHorizontal
+  ChevronDown, ArrowRight, Heart, X, SlidersHorizontal,
+  ChevronLeft, ChevronRight, MessageSquare, Calendar, Eye, ShieldCheck, Phone, Shield, Share2, Sparkles
 } from 'lucide-react';
 import './Home.css';
 import { API_BASE_URL } from '../config';
@@ -131,6 +132,8 @@ const Home = () => {
   const [filteredProperties, setFilteredProperties] = useState([]);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState(null);
+  const [activeSliderIdx, setActiveSliderIdx] = useState(0);
+  const [dbFavorites, setDbFavorites] = useState([]);
 
   const categories = useMemo(() => {
     const counts = {};
@@ -155,6 +158,31 @@ const Home = () => {
       setUser(JSON.parse(sessionUser));
     }
   }, [navigate]);
+
+  const fetchFavorites = async () => {
+    const sessionUser = localStorage.getItem('user');
+    if (!sessionUser) return;
+    const parsedUser = JSON.parse(sessionUser);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/favorites?userId=${parsedUser.id}`);
+      if (response.ok) {
+        const data = await response.json();
+        setDbFavorites(data.favorites || []);
+      }
+    } catch (err) {
+      console.error('Error fetching database favorites:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (user?.id) {
+      fetchFavorites();
+    }
+  }, [user]);
+
+  useEffect(() => {
+    setActiveSliderIdx(0);
+  }, [selectedProperty?.id]);
 
   // Fetch properties from backend API
   useEffect(() => {
@@ -822,56 +850,256 @@ const Home = () => {
       </footer>
 
       {/* Property Details Modal */}
-      {showDetailModal && selectedProperty && (
-        <div className="modal-backdrop" onClick={() => { setShowDetailModal(false); setSelectedProperty(null); }}>
-          <div className="detail-modal-content" onClick={(e) => e.stopPropagation()}>
-            <button className="modal-close-btn" onClick={() => { setShowDetailModal(false); setSelectedProperty(null); }}>
-              <X size={24} />
-            </button>
-            <div className="modal-body">
-              <img src={selectedProperty.thumbnail} alt={selectedProperty.title} className="modal-hero-img" />
-              <div className="modal-details-container">
-                <span className="modal-match-badge">★ 95% MATCH SCORE</span>
-                <h2>{selectedProperty.title}</h2>
-                <div className="modal-location">
-                  <MapPin size={16} />
-                  <span>{selectedProperty.address}</span>
-                </div>
-                <div className="modal-price">Giá: {selectedProperty.price ? selectedProperty.price.toLocaleString('vi-VN') : 'Liên hệ'} VNĐ</div>
-                
-                <div className="modal-specs">
-                  {selectedProperty.bedrooms > 0 && (
-                    <div className="modal-spec-item">
-                      <Bed size={18} />
-                      <span>{selectedProperty.bedrooms} Phòng ngủ</span>
-                    </div>
-                  )}
-                  {selectedProperty.bathrooms > 0 && (
-                    <div className="modal-spec-item">
-                      <Bath size={18} />
-                      <span>{selectedProperty.bathrooms} Phòng tắm</span>
-                    </div>
-                  )}
-                  <div className="modal-spec-item">
-                    <Maximize size={18} />
-                    <span>{selectedProperty.area} m²</span>
+      {showDetailModal && selectedProperty && (() => {
+        const sliderImages = (selectedProperty.property_images && selectedProperty.property_images.length > 0)
+          ? selectedProperty.property_images.map(img => img.image_url)
+          : [selectedProperty.thumbnail];
+
+        const lifestyleChips = selectedProperty.lifestyle_tags && selectedProperty.lifestyle_tags.length > 0
+          ? selectedProperty.lifestyle_tags.map(t => t.tag_name)
+          : [];
+        const amenityChips = selectedProperty.property_features && selectedProperty.property_features.length > 0
+          ? selectedProperty.property_features.map(f => f.feature_name)
+          : [];
+        const ownerDetails = selectedProperty.owner || {
+          name: 'Nguyễn Văn Minh',
+          role: 'Chính chủ',
+          avatar: 'https://i.pravatar.cc/150?img=67',
+          trust_score: 92,
+          created_at: selectedProperty.created_at
+        };
+
+        const isFav = dbFavorites.some(fav => fav.id === selectedProperty.id);
+
+        return (
+          <div className="modal-backdrop" onClick={() => { setShowDetailModal(false); setSelectedProperty(null); }}>
+            <div className="detail-modal-content premium-detail-modal" onClick={(e) => e.stopPropagation()}>
+              <button className="modal-close-btn circular-close" onClick={() => { setShowDetailModal(false); setSelectedProperty(null); }}>
+                <X size={20} />
+              </button>
+              
+              <div className="modal-body premium-body">
+                {/* 1. Top Media Slider */}
+                <div className="detail-media-slider">
+                  <div className="main-image-container">
+                    <img src={sliderImages[activeSliderIdx]} alt={selectedProperty.title} className="slider-main-img" />
+                    
+                    {sliderImages.length > 1 && (
+                      <>
+                        <button 
+                          className="slider-nav-btn prev" 
+                          onClick={() => setActiveSliderIdx(prev => (prev - 1 + sliderImages.length) % sliderImages.length)}
+                        >
+                          <ChevronLeft size={24} />
+                        </button>
+                        <button 
+                          className="slider-nav-btn next" 
+                          onClick={() => setActiveSliderIdx(prev => (prev + 1) % sliderImages.length)}
+                        >
+                          <ChevronRight size={24} />
+                        </button>
+                      </>
+                    )}
                   </div>
+                  
+                  {sliderImages.length > 1 && (
+                    <div className="slider-thumbnails">
+                      {sliderImages.map((img, idx) => (
+                        <div 
+                          key={idx} 
+                          className={`thumb-wrapper ${idx === activeSliderIdx ? 'active' : ''}`}
+                          onClick={() => setActiveSliderIdx(idx)}
+                        >
+                          <img src={img} alt={`thumbnail-${idx}`} />
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
-                <div className="modal-description">
-                  <h3>Mô tả chi tiết</h3>
-                  <p>{selectedProperty.description}</p>
-                </div>
+                <div className="detail-content-wrapper">
+                  {/* 2. Rating & Match Score */}
+                  <div className="detail-meta-row">
+                    <span className="match-score-tag">
+                      <Sparkles size={12} /> {selectedProperty.matchScore || 95}% MATCH SCORE
+                    </span>
+                    
+                    <div className="detail-rating">
+                      <span className="rating-num">{selectedProperty.average_rating ? selectedProperty.average_rating.toFixed(1) : '0'}</span>
+                      <div className="rating-stars">
+                        {[1, 2, 3, 4, 5].map(star => (
+                          <span key={star} className={star <= Math.round(selectedProperty.average_rating || 0) ? 'star-filled' : 'star-empty'}>★</span>
+                        ))}
+                      </div>
+                      <span className="rating-count">({selectedProperty.review_count || 0} đánh giá)</span>
+                    </div>
+                  </div>
 
-                <div className="modal-contact">
-                  <h3>Liên hệ chính chủ</h3>
-                  <div className="contact-tel">{selectedProperty.contact || selectedProperty.contact_phone || '0901 234 567'}</div>
+                  {/* 3. Header Section */}
+                  <div className="detail-header-block">
+                    <div className="title-section">
+                      <h2>{selectedProperty.title}</h2>
+                      <div className="detail-address-row">
+                        <MapPin size={16} />
+                        <span>{selectedProperty.address}</span>
+                      </div>
+                    </div>
+                    
+                    <div className="detail-action-buttons">
+                      <button 
+                        className={`action-btn fav-btn ${isFav ? 'active' : ''}`}
+                        onClick={async () => {
+                          if (!user?.id) return;
+                          if (isFav) {
+                            setDbFavorites(prev => prev.filter(fav => fav.id !== selectedProperty.id));
+                            fetch(`${API_BASE_URL}/api/favorites/delete`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ userId: user.id, propertyId: selectedProperty.id })
+                            }).catch(err => console.error(err));
+                          } else {
+                            setDbFavorites(prev => [...prev, selectedProperty]);
+                            fetch(`${API_BASE_URL}/api/favorites`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ userId: user.id, propertyId: selectedProperty.id })
+                            }).catch(err => console.error(err));
+                          }
+                        }}
+                      >
+                        <Heart size={16} fill={isFav ? "white" : "none"} />
+                        <span>{isFav ? 'Đã lưu' : 'Lưu'}</span>
+                      </button>
+                      
+                      <button className="action-btn share-btn" onClick={() => {
+                        navigator.clipboard.writeText(window.location.href);
+                        alert('Đã sao chép liên kết bài đăng!');
+                      }}>
+                        <Share2 size={16} />
+                        <span>Chia sẻ</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="detail-price-tag">
+                    {selectedProperty.price ? selectedProperty.price.toLocaleString('vi-VN') : 'Liên hệ'} VNĐ
+                  </div>
+
+                  {/* 4. Specs Grid */}
+                  <div className="detail-specs-grid">
+                    <div className="spec-card">
+                      <div className="spec-icon-box"><Maximize size={20} /></div>
+                      <div className="spec-info">
+                        <span>Diện tích</span>
+                        <p>{selectedProperty.area} m²</p>
+                      </div>
+                    </div>
+                    <div className="spec-card">
+                      <div className="spec-icon-box"><Bath size={20} /></div>
+                      <div className="spec-info">
+                        <span>Phòng tắm</span>
+                        <p>{selectedProperty.bathrooms || 0}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 5. Lifestyle & Amenities Columns */}
+                  <div className="detail-columns-row">
+                    <div className="detail-column">
+                      <h3>Lối sống phù hợp</h3>
+                      <div className="chips-list">
+                        {lifestyleChips.length > 0 ? (
+                          lifestyleChips.map((chip, idx) => (
+                            <span key={idx} className="feature-chip lifestyle-chip-style">{chip}</span>
+                          ))
+                        ) : (
+                          <span className="no-features-text">Đang cập nhật...</span>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="detail-column">
+                      <h3>Tiện ích</h3>
+                      <div className="chips-list">
+                        {amenityChips.length > 0 ? (
+                          amenityChips.map((chip, idx) => (
+                            <span key={idx} className="feature-chip amenity-chip-style">{chip}</span>
+                          ))
+                        ) : (
+                          <span className="no-features-text">Đang cập nhật...</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 6. Description & Images Grid */}
+                  <div className="detail-columns-row text-image-row">
+                    <div className="detail-column description-column">
+                      <h3>Mô tả chi tiết</h3>
+                      <p className="description-text">{selectedProperty.description}</p>
+                    </div>
+                    
+                    <div className="detail-column detail-images-column">
+                      <h3>Hình ảnh chi tiết</h3>
+                      <div className="detail-images-grid-box">
+                        {sliderImages.slice(0, 4).map((img, idx) => (
+                          <div key={idx} className="grid-image-wrapper" onClick={() => setActiveSliderIdx(idx)}>
+                            <img src={img} alt={`detail-${idx}`} />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 7. Poster info */}
+                  <div className="detail-poster-block">
+                    <h3>Thông tin người đăng</h3>
+                    <div className="poster-card">
+                      <div className="poster-left">
+                        <img src={ownerDetails.avatar || 'https://i.pravatar.cc/150?img=67'} alt={ownerDetails.name} className="poster-avatar" />
+                        <div className="poster-name-info">
+                          <div className="name-row">
+                            <h4>{ownerDetails.name}</h4>
+                            <span className="role-verified-badge">
+                              <ShieldCheck size={12} /> {ownerDetails.role === 'AGENT' ? 'Chính chủ' : 'Môi giới'}
+                            </span>
+                          </div>
+                          <p>Thành viên từ {new Date(ownerDetails.created_at || selectedProperty.created_at).toLocaleDateString('vi-VN')}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="poster-right">
+                        <div className="trust-score-wrapper">
+                          <span>Trust Score</span>
+                          <p>{ownerDetails.trust_score || 92}</p>
+                          <small>Rất uy tín</small>
+                        </div>
+                        
+                        <div className="poster-contact-buttons">
+                          <a href={`sms:${selectedProperty.contact_phone || '0901234567'}`} className="contact-btn message-btn">
+                            <MessageSquare size={16} /> Nhắn tin
+                          </a>
+                          <a href={`tel:${selectedProperty.contact_phone || '0901234567'}`} className="contact-btn call-btn">
+                            <Phone size={16} /> Gọi ngay
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 8. Footer Info */}
+                  <div className="detail-footer-bar">
+                    <div className="footer-item"><Calendar size={14} /> <span>Đăng tin: {new Date(selectedProperty.created_at).toLocaleDateString('vi-VN')}</span></div>
+                    <div className="footer-item"><Eye size={14} /> <span>Lượt xem: {selectedProperty.views || 0}</span></div>
+                    <div className="footer-item"><Shield size={14} /> <span>Mã tin: {selectedProperty.property_type === 'Mặt Bằng' ? 'MBKD' : 'CHCH'}-{124000 + selectedProperty.id}</span></div>
+                  </div>
+
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Advanced Filter Modal */}
       {showAdvModal && (

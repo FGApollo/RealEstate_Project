@@ -85,7 +85,7 @@ const Register = () => {
   return (
     <AuthLayout 
       title="Tạo tài khoản mới" 
-      subtitle="Gia nhập cộng đồng Estate Horizon ngay hôm nay."
+      subtitle="Gia nhập cộng đồng Swipe Nest ngay hôm nay."
     >
       <form onSubmit={handleSubmit}>
         {error && <div style={{ color: 'red', marginBottom: '1rem', fontSize: '0.875rem', textAlign: 'center' }}>{error}</div>}
