@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Home, Eye, Heart, Search, LayoutDashboard, Settings, LogOut, ChevronRight, ShieldCheck } from 'lucide-react';
 import './AgentOverview.css';
+import { API_BASE_URL } from '../config';
 
 const AgentOverview = () => {
   const [data, setData] = useState({
@@ -14,7 +15,7 @@ const AgentOverview = () => {
   useEffect(() => {
     const fetchOverview = async () => {
       try {
-        const response = await fetch('http://localhost:3000/api/agent/overview?userId=12');
+        const response = await fetch(`${API_BASE_URL}/api/agent/overview?userId=12`);
         if (response.ok) {
           const result = await response.json();
           setData(result);
