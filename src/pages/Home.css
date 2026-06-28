@@ -282,6 +282,7 @@
   color: var(--text-primary);
   width: 100%;
   cursor: pointer;
+  padding-right: 1.75rem;
 }
 
 .search-btn {
@@ -872,3 +873,474 @@
   color: #1a42b8;
   letter-spacing: 0.5px;
 }
+
+/* Upgraded Home Search Bar and Filters */
+.hero-title-main {
+  font-size: 3.25rem;
+  font-weight: 800;
+  text-align: center;
+  color: white;
+  margin-bottom: 0.5rem;
+  text-shadow: 0 4px 15px rgba(15, 41, 99, 0.45);
+}
+
+.search-bar-container {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(16px);
+  padding: 0.75rem 1rem;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  box-shadow: 0 15px 35px rgba(15, 41, 99, 0.15);
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.location-field-wrapper {
+  position: relative;
+  flex: 1.5 !important;
+}
+
+.selected-wards-inline {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  width: 100%;
+}
+
+.selected-wards-inline input {
+  flex: 1;
+  min-width: 120px;
+}
+
+.ward-pill-badge {
+  background-color: #e0e7ff;
+  color: #3730a3;
+  font-size: 0.75rem;
+  font-weight: 650;
+  padding: 0.25rem 0.5rem;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.remove-ward-pill-btn {
+  background: none;
+  border: none;
+  color: #4f46e5;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+}
+
+.remove-ward-pill-btn:hover {
+  color: #ef4444;
+}
+
+.clear-search-btn {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.clear-search-btn:hover {
+  background-color: #f1f5f9;
+  color: #64748b;
+}
+
+/* Autocomplete Dropdown List */
+.location-autocomplete-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  width: 100%;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  list-style: none;
+  padding: 0.5rem 0;
+  margin: 0;
+  max-height: 280px;
+  overflow-y: auto;
+  z-index: 1000;
+  border: 1px solid #e2e8f0;
+}
+
+.location-autocomplete-dropdown li {
+  padding: 0.75rem 1.25rem;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  transition: background-color 0.15s ease;
+}
+
+.location-autocomplete-dropdown li:hover {
+  background-color: #f8fafc;
+}
+
+.location-autocomplete-dropdown .sug-name {
+  font-size: 0.925rem;
+  font-weight: 700;
+  color: #0f2963;
+}
+
+.location-autocomplete-dropdown .sug-subtext {
+  font-size: 0.775rem;
+  color: #64748b;
+}
+
+/* Dropdown icons and price text */
+.price-icon-text {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.home-adv-filter-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: none;
+  border: none;
+  color: #475569;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  padding: 0.5rem 0.75rem;
+  border-radius: 10px;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.home-adv-filter-btn:hover {
+  background-color: #f1f5f9;
+  color: #0f2963;
+}
+
+.home-adv-filter-btn.active {
+  color: #0f2963;
+  background-color: #e0e7ff;
+}
+
+.home-filter-badge {
+  background-color: #3b82f6;
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 700;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Modal Body elements for advanced filters */
+.home-filter-modal-content {
+  max-width: 580px !important;
+}
+
+.filter-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding-right: 0.5rem;
+  margin: 0.5rem 0;
+}
+
+.filter-section-title {
+  font-size: 0.95rem !important;
+  font-weight: 700 !important;
+  color: #0f2963 !important;
+  margin-bottom: 0.25rem;
+}
+
+/* Area Filter Styles */
+.area-filter-inputs {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.area-filter-inputs select {
+  flex: 1;
+  padding: 0.75rem;
+  border-radius: 12px;
+  border: 1px solid #cbd5e1;
+  outline: none;
+  font-size: 0.925rem;
+}
+
+.area-filter-inputs .ward-search-wrapper {
+  flex: 2;
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* Chips Grid for Categories and Bedrooms */
+.chips-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.filter-chip {
+  padding: 0.5rem 1rem;
+  border-radius: 10px;
+  background-color: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.filter-chip:hover {
+  background-color: #e2e8f0;
+  color: #0f172a;
+}
+
+.filter-chip.active {
+  background-color: #0f2963;
+  color: white;
+  border-color: #0f2963;
+}
+
+/* Range Input fields */
+.range-inputs {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.range-inputs input {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  border: 1px solid #cbd5e1;
+  outline: none;
+  font-size: 0.925rem;
+}
+
+.range-divider {
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+/* Lifestyle filters in Home Page Advanced Filter */
+.lifestyle-subgroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-top: 0.5rem;
+}
+
+.lifestyle-subgroup-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.lifestyle-chips-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.lifestyle-chip {
+  padding: 0.45rem 0.85rem;
+  border-radius: 10px;
+  background-color: #f8fafc;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+  font-size: 0.825rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.lifestyle-chip:hover {
+  background-color: #e2e8f0;
+  color: #0f172a;
+}
+
+.lifestyle-chip.active {
+  background-color: #0284c7;
+  color: white;
+  border-color: #0284c7;
+}
+
+/* Checklist Ward modal */
+.sub-modal-backdrop {
+  z-index: 1100 !important;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.ward-list-modal-content {
+  background-color: white;
+  width: 95%;
+  max-width: 500px;
+  max-height: 80vh;
+  border-radius: 20px;
+  padding: 2rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  animation: modalSlideUp 0.3s ease-out;
+}
+
+@keyframes modalSlideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.region-tabs {
+  display: flex;
+  border-bottom: 2px solid #e2e8f0;
+  gap: 1.5rem;
+}
+
+.region-tab-btn {
+  background: none;
+  border: none;
+  padding: 0.5rem 0;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  position: relative;
+  transition: color 0.2s;
+}
+
+.region-tab-btn.active {
+  color: #0f2963;
+}
+
+.region-tab-btn.active::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background-color: #0f2963;
+}
+
+.list-search-container input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  border: 1px solid #cbd5e1;
+  outline: none;
+}
+
+.ward-checklist-container {
+  flex: 1;
+  overflow-y: auto;
+  max-height: 35vh;
+  padding-right: 0.25rem;
+}
+
+.ward-checklist-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+}
+
+.ward-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: #334155;
+  padding: 0.25rem 0;
+}
+
+.ward-checkbox-label input {
+  display: none;
+}
+
+.custom-checkbox {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #cbd5e1;
+  border-radius: 4px;
+  display: inline-block;
+  position: relative;
+  transition: all 0.2s;
+}
+
+.ward-checkbox-label input:checked + .custom-checkbox {
+  background-color: #0f2963;
+  border-color: #0f2963;
+}
+
+.ward-checkbox-label input:checked + .custom-checkbox::after {
+  content: '✓';
+  color: white;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 0.75rem;
+  font-weight: bold;
+}
+
+.ward-name-text {
+  font-weight: 550;
+}
+
+/* Wards search suggestions in advanced modal */
+.ward-suggestions {
+  list-style: none;
+  padding: 0;
+  margin: 0.25rem 0 0 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.ward-suggestions li {
+  padding: 0.65rem 1rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.ward-suggestions li:hover {
+  background-color: #f1f5f9;
+}
+
+/* Responsive adjustments */
+@media (max-width: 900px) {
+  .search-bar-container {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 1rem;
+    gap: 0.75rem;
+  }
+  .search-field-divider {
+    display: none;
+  }
+  .hero-title-main {
+    font-size: 2.25rem;
+  }
+}
+
