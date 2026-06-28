@@ -6,6 +6,7 @@ import {
   ChevronDown, ArrowRight, Heart, X, SlidersHorizontal
 } from 'lucide-react';
 import './Home.css';
+import { API_BASE_URL } from '../config';
 
 const categoryImages = {
   'Apartment': 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=400&q=80',
@@ -159,7 +160,7 @@ const Home = () => {
   useEffect(() => {
     const fetchProperties = async () => {
       try {
-        const response = await fetch('http://localhost:3000/api/properties');
+        const response = await fetch(`${API_BASE_URL}/api/properties`);
         if (!response.ok) throw new Error('Failed to fetch properties');
         const data = await response.json();
         

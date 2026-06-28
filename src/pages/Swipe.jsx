@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { motion, useMotionValue, useTransform, useAnimation } from 'framer-motion';
 import './Swipe.css';
+import { API_BASE_URL } from '../config';
 
 const WARDS_BY_REGION = {
   'TP.HCM': [
@@ -213,7 +214,7 @@ const Swipe = () => {
     const parsedUser = JSON.parse(sessionUser);
     setIsLoadingSaved(true);
     try {
-      const response = await fetch(`http://localhost:3000/api/favorites?userId=${parsedUser.id}`);
+      const response = await fetch(`${API_BASE_URL}/api/favorites?userId=${parsedUser.id}`);
       if (response.ok) {
         const data = await response.json();
         setDbFavorites(data.favorites || []);
@@ -374,7 +375,7 @@ const Swipe = () => {
   useEffect(() => {
     const fetchProperties = async () => {
       try {
-        const response = await fetch('http://localhost:3000/api/properties');
+        const response = await fetch(`${API_BASE_URL}/api/properties`);
         if (response.ok) {
           const data = await response.json();
           if (data.properties && data.properties.length > 0) {
@@ -541,7 +542,7 @@ const Swipe = () => {
           if (prev.some(f => f.id === currentProperty.id)) return prev;
           return [...prev, currentProperty];
         });
-        fetch('http://localhost:3000/api/favorites', {
+        fetch(`${API_BASE_URL}/api/favorites`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId: user.id, propertyId: currentProperty.id })
@@ -551,7 +552,7 @@ const Swipe = () => {
       // Remove from database favorites if swiped left (dislike)
       if (direction === 'left' && user?.id) {
         setDbFavorites(prev => prev.filter(f => f.id !== currentProperty.id));
-        fetch('http://localhost:3000/api/favorites/delete', {
+        fetch(`${API_BASE_URL}/api/favorites/delete`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId: user.id, propertyId: currentProperty.id })
@@ -582,7 +583,7 @@ const Swipe = () => {
     if (isFav) {
       setDbFavorites(prev => prev.filter(fav => fav.id !== currentProperty.id));
       try {
-        await fetch('http://localhost:3000/api/favorites/delete', {
+        await fetch(`${API_BASE_URL}/api/favorites/delete`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId: user.id, propertyId: currentProperty.id })
@@ -593,7 +594,7 @@ const Swipe = () => {
     } else {
       setDbFavorites(prev => [...prev, currentProperty]);
       try {
-        await fetch('http://localhost:3000/api/favorites', {
+        await fetch(`${API_BASE_URL}/api/favorites`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId: user.id, propertyId: currentProperty.id })
@@ -637,7 +638,7 @@ const Swipe = () => {
     setDbFavorites(prev => prev.filter(item => item.id !== propertyId));
     if (user?.id) {
       try {
-        await fetch('http://localhost:3000/api/favorites/delete', {
+        await fetch(`${API_BASE_URL}/api/favorites/delete`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId: user.id, propertyId })
@@ -1225,14 +1226,14 @@ const Swipe = () => {
                           if (!user?.id) return;
                           if (isFav) {
                             setDbFavorites(prev => prev.filter(fav => fav.id !== activePropertyForModal.id));
-                            fetch('http://localhost:3000/api/favorites/delete', {
+                            fetch(`${API_BASE_URL}/api/favorites/delete`, {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
                               body: JSON.stringify({ userId: user.id, propertyId: activePropertyForModal.id })
                             }).catch(err => console.error(err));
                           } else {
                             setDbFavorites(prev => [...prev, activePropertyForModal]);
-                            fetch('http://localhost:3000/api/favorites', {
+                            fetch(`${API_BASE_URL}/api/favorites`, {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
                               body: JSON.stringify({ userId: user.id, propertyId: activePropertyForModal.id })
