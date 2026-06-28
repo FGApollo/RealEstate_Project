@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { 
   Search, Heart, Map, User, X, Info, MapPin, 
   Bed, Bath, Maximize, SlidersHorizontal, RefreshCw, ChevronLeft, ChevronRight,
-  Compass, MessageSquare
+  Compass, MessageSquare, Calendar, Eye, ShieldCheck, Phone, Shield, Share2, Sparkles, Home as HomeIcon
 } from 'lucide-react';
 import { motion, useMotionValue, useTransform, useAnimation } from 'framer-motion';
 import './Swipe.css';
@@ -61,6 +61,7 @@ const mockProperties = {};
 const getCategoryKey = (name) => {
   if (!name) return 'Căn Hộ';
   const lower = name.toLowerCase();
+  if (lower === 'tất cả' || lower === 'all') return 'Tất cả';
   if (lower.includes('văn phòng') || lower.includes('office')) return 'Văn Phòng';
   if (lower.includes('mặt bằng') || lower.includes('mặt') || lower.includes('retail') || lower.includes('ground') || lower.includes('commercial')) return 'Mặt Bằng';
   if (lower.includes('phòng trọ') || lower.includes('trọ') || lower.includes('room')) return 'Phòng Trọ';
@@ -129,6 +130,9 @@ const Swipe = () => {
   const { categoryName } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+
+  const initialFilters = useMemo(() => location.state?.filters || {}, [location.state]);
+
   const [dbProperties, setDbProperties] = useState([]);
   const [currentProperties, setCurrentProperties] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -141,22 +145,40 @@ const Swipe = () => {
     }
   });
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [activeSliderIdx, setActiveSliderIdx] = useState(0);
   const [showFilterModal, setShowFilterModal] = useState(false);
-  const [minPrice, setMinPrice] = useState('');
-  const [maxPrice, setMaxPrice] = useState('');
-  const [tempMinPrice, setTempMinPrice] = useState('');
-  const [tempMaxPrice, setTempMaxPrice] = useState('');
+  // Price filters
+  const [minPrice, setMinPrice] = useState(initialFilters.minPrice || '');
+  const [maxPrice, setMaxPrice] = useState(initialFilters.maxPrice || '');
+  const [tempMinPrice, setTempMinPrice] = useState(initialFilters.minPrice || '');
+  const [tempMaxPrice, setTempMaxPrice] = useState(initialFilters.maxPrice || '');
   
-  const [selectedWards, setSelectedWards] = useState([]);
-  const [tempSelectedWards, setTempSelectedWards] = useState([]);
+  // Ward filters
+  const [selectedWards, setSelectedWards] = useState(initialFilters.wards || []);
+  const [tempSelectedWards, setTempSelectedWards] = useState(initialFilters.wards || []);
   const [wardSearchQuery, setWardSearchQuery] = useState('');
   const [showWardListModal, setShowWardListModal] = useState(false);
   const [listModalSearchQuery, setListModalSearchQuery] = useState('');
   const [activeRegionTab, setActiveRegionTab] = useState('TP.HCM');
   const [subTempSelectedWards, setSubTempSelectedWards] = useState([]);
 
-  const [selectedLifestyles, setSelectedLifestyles] = useState([]);
-  const [tempSelectedLifestyles, setTempSelectedLifestyles] = useState([]);
+  // Lifestyle filters
+  const [selectedLifestyles, setSelectedLifestyles] = useState(initialFilters.lifestyles || []);
+  const [tempSelectedLifestyles, setTempSelectedLifestyles] = useState(initialFilters.lifestyles || []);
+
+  // Area filters
+  const [minArea, setMinArea] = useState(initialFilters.minArea || '');
+  const [maxArea, setMaxArea] = useState(initialFilters.maxArea || '');
+  const [tempMinArea, setTempMinArea] = useState(initialFilters.minArea || '');
+  const [tempMaxArea, setTempMaxArea] = useState(initialFilters.maxArea || '');
+
+  // Bedrooms filters
+  const [selectedBedrooms, setSelectedBedrooms] = useState(initialFilters.bedrooms || []);
+  const [tempSelectedBedrooms, setTempSelectedBedrooms] = useState(initialFilters.bedrooms || []);
+
+  // Categories filters (multiple categories for 'Tất cả' category view)
+  const [selectedCategories, setSelectedCategories] = useState(initialFilters.categories || []);
+  const [tempSelectedCategories, setTempSelectedCategories] = useState(initialFilters.categories || []);
 
 
 
@@ -206,10 +228,10 @@ const Swipe = () => {
   };
 
   useEffect(() => {
-    if (activeView === 'saved') {
+    if (user?.id) {
       fetchFavorites();
     }
-  }, [activeView]);
+  }, [user, activeView]);
 
   useEffect(() => {
     try {
@@ -218,6 +240,18 @@ const Swipe = () => {
       console.error('Error saving to localStorage:', e);
     }
   }, [swipeHistory]);
+
+  useEffect(() => {
+    if (location.state?.selectPropertyId) {
+      navigate(location.pathname, {
+        replace: true,
+        state: {
+          ...location.state,
+          selectPropertyId: undefined
+        }
+      });
+    }
+  }, [currentIndex, location.state?.selectPropertyId, location.pathname, navigate]);
 
   // Framer Motion controllers
   const cardController = useAnimation();
@@ -231,12 +265,14 @@ const Swipe = () => {
 
   const activeFiltersCount = useMemo(() => {
     let count = 0;
-    if (minPrice) count++;
-    if (maxPrice) count++;
+    if (minPrice || maxPrice) count++;
     if (selectedWards.length > 0) count += selectedWards.length;
     if (selectedLifestyles.length > 0) count += selectedLifestyles.length;
+    if (minArea || maxArea) count++;
+    if (selectedBedrooms.length > 0) count += selectedBedrooms.length;
+    if (selectedCategories.length > 0) count += selectedCategories.length;
     return count;
-  }, [minPrice, maxPrice, selectedWards, selectedLifestyles]);
+  }, [minPrice, maxPrice, selectedWards, selectedLifestyles, minArea, maxArea, selectedBedrooms, selectedCategories]);
 
 
   // Extract and categorize features dynamically from DB
@@ -357,9 +393,25 @@ const Swipe = () => {
     let combined = [];
     
     if (dbProperties && dbProperties.length > 0) {
-      combined = dbProperties.filter(p => getCategoryKey(p.property_type) === activeCategoryKey);
+      if (activeCategoryKey === 'Tất cả') {
+        if (selectedCategories.length > 0) {
+          combined = dbProperties.filter(p => selectedCategories.includes(getCategoryKey(p.property_type)));
+        } else {
+          combined = dbProperties;
+        }
+      } else {
+        combined = dbProperties.filter(p => getCategoryKey(p.property_type) === activeCategoryKey);
+      }
     } else {
-      combined = mockProperties[activeCategoryKey] || [];
+      if (activeCategoryKey === 'Tất cả') {
+        if (selectedCategories.length > 0) {
+          combined = Object.values(mockProperties).flat().filter(p => selectedCategories.includes(getCategoryKey(p.property_type)));
+        } else {
+          combined = Object.values(mockProperties).flat();
+        }
+      } else {
+        combined = mockProperties[activeCategoryKey] || [];
+      }
     }
 
     if (minPrice) {
@@ -382,10 +434,47 @@ const Swipe = () => {
         return selectedLifestyles.every(tag => pFeats.includes(tag.toLowerCase()));
       });
     }
+    if (minArea) {
+      combined = combined.filter(p => p.area >= parseFloat(minArea));
+    }
+    if (maxArea) {
+      combined = combined.filter(p => p.area <= parseFloat(maxArea));
+    }
+    if (selectedBedrooms.length > 0) {
+      combined = combined.filter(p => {
+        return selectedBedrooms.some(b => {
+          if (b === '4+') return p.bedrooms >= 4;
+          return p.bedrooms === parseInt(b, 10);
+        });
+      });
+    }
+
+    // Check if there is a pre-selected property from navigation state
+    let targetIndex = 0;
+    if (location.state?.selectPropertyId) {
+      const selectId = location.state.selectPropertyId;
+      let idx = combined.findIndex(p => p.id === selectId);
+      
+      if (idx === -1) {
+        // Bypassed by filters. Find it in unfiltered properties and add it
+        const targetProp = (dbProperties && dbProperties.length > 0)
+          ? dbProperties.find(p => p.id === selectId)
+          : Object.values(mockProperties).flat().find(p => p.id === selectId);
+        
+        if (targetProp) {
+          combined = [targetProp, ...combined];
+          idx = 0;
+        }
+      }
+      
+      if (idx !== -1) {
+        targetIndex = idx;
+      }
+    }
 
     setCurrentProperties(combined);
-    setCurrentIndex(0);
-  }, [activeCategoryKey, dbProperties, minPrice, maxPrice, selectedWards, selectedLifestyles]);
+    setCurrentIndex(targetIndex);
+  }, [activeCategoryKey, dbProperties, minPrice, maxPrice, selectedWards, selectedLifestyles, minArea, maxArea, selectedBedrooms, selectedCategories, location.state?.selectPropertyId]);
 
   // Preload next property image for buttery-smooth transition
   useEffect(() => {
@@ -448,11 +537,25 @@ const Swipe = () => {
 
       // Synchronize with database favorites if swiped right (like)
       if (direction === 'right' && user?.id) {
+        setDbFavorites(prev => {
+          if (prev.some(f => f.id === currentProperty.id)) return prev;
+          return [...prev, currentProperty];
+        });
         fetch('http://localhost:3000/api/favorites', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId: user.id, propertyId: currentProperty.id })
         }).catch(err => console.error('Error adding favorite to DB:', err));
+      }
+
+      // Remove from database favorites if swiped left (dislike)
+      if (direction === 'left' && user?.id) {
+        setDbFavorites(prev => prev.filter(f => f.id !== currentProperty.id));
+        fetch('http://localhost:3000/api/favorites/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: user.id, propertyId: currentProperty.id })
+        }).catch(err => console.error('Error removing favorite from DB:', err));
       }
     }
     
@@ -472,12 +575,60 @@ const Swipe = () => {
     setSwipeHistory([]);
   };
 
+  const toggleFavorite = async () => {
+    if (!currentProperty || !user?.id) return;
+    
+    const isFav = dbFavorites.some(fav => fav.id === currentProperty.id);
+    if (isFav) {
+      setDbFavorites(prev => prev.filter(fav => fav.id !== currentProperty.id));
+      try {
+        await fetch('http://localhost:3000/api/favorites/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: user.id, propertyId: currentProperty.id })
+        });
+      } catch (err) {
+        console.error('Error removing favorite:', err);
+      }
+    } else {
+      setDbFavorites(prev => [...prev, currentProperty]);
+      try {
+        await fetch('http://localhost:3000/api/favorites', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: user.id, propertyId: currentProperty.id })
+        });
+      } catch (err) {
+        console.error('Error adding favorite:', err);
+      }
+    }
+  };
+
+  const handleHistoryCardClick = (item) => {
+    const idx = currentProperties.findIndex(p => p.id === item.id);
+    if (idx !== -1) {
+      setCurrentIndex(idx);
+    } else {
+      const targetCategory = getCategoryKey(item.property_type);
+      navigate(`/swipe/${targetCategory}`, {
+        state: {
+          selectPropertyId: item.id,
+          filters: location.state?.filters
+        }
+      });
+    }
+  };
+
   const applyFilter = (e) => {
     e.preventDefault();
     setMinPrice(tempMinPrice);
     setMaxPrice(tempMaxPrice);
     setSelectedWards(tempSelectedWards);
     setSelectedLifestyles(tempSelectedLifestyles);
+    setMinArea(tempMinArea);
+    setMaxArea(tempMaxArea);
+    setSelectedBedrooms(tempSelectedBedrooms);
+    setSelectedCategories(tempSelectedCategories);
     setShowFilterModal(false);
   };
 
@@ -584,6 +735,20 @@ const Swipe = () => {
 
   const activePropertyForModal = selectedSavedProperty || currentProperty;
 
+  useEffect(() => {
+    setActiveSliderIdx(0);
+  }, [activePropertyForModal?.id]);
+
+  const getLifestyleChips = (property) => {
+    if (!property?.lifestyle_tags || property.lifestyle_tags.length === 0) return [];
+    return property.lifestyle_tags.map(t => t.tag_name);
+  };
+
+  const getAmenityChips = (property) => {
+    if (!property?.property_features || property.property_features.length === 0) return [];
+    return property.property_features.map(f => f.feature_name);
+  };
+
   return (
     <div className="swipe-page-container">
       {/* Premium Header */}
@@ -602,24 +767,21 @@ const Swipe = () => {
                   <p>Chưa có bài đăng nào được vuốt qua.</p>
                 </div>
               ) : (
-                swipeHistory.map((item) => (
-                  <div 
-                    key={item.id} 
-                    className={`history-card-item ${item.swipeType}`}
-                    onClick={() => {
-                      // Quick review of details
-                      setCurrentIndex(currentProperties.findIndex(p => p.id === item.id) !== -1 
-                        ? currentProperties.findIndex(p => p.id === item.id) 
-                        : currentIndex
-                      );
-                    }}
-                  >
-                    <img src={item.thumbnail} alt={item.title} className="history-thumb" />
-                    <div className="history-badge">
-                      {item.swipeType === 'right' ? <Heart size={10} fill="white" /> : <X size={10} />}
+                swipeHistory.map((item) => {
+                  const isFav = dbFavorites.some(fav => fav.id === item.id);
+                  return (
+                    <div 
+                      key={item.id} 
+                      className={`history-card-item ${isFav ? 'right' : 'left'}`}
+                      onClick={() => handleHistoryCardClick(item)}
+                    >
+                      <img src={item.thumbnail} alt={item.title} className="history-thumb" />
+                      <div className="history-badge">
+                        {isFav ? <Heart size={10} fill="white" /> : <X size={10} />}
+                      </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </aside>
@@ -657,7 +819,7 @@ const Swipe = () => {
 
             {/* Discovery Title */}
             <div className="swipe-discovery-title">
-              Khám phá {categoryName || 'Bất Động Sản'}
+              Khám phá <span className="category-accent">{categoryName || 'Bất Động Sản'}</span>
             </div>
 
             {/* Tinder Card Container */}
@@ -769,10 +931,10 @@ const Swipe = () => {
 
                 <button 
                   className={`swipe-btn like ${isAlreadyFavorite ? 'already-liked' : ''}`}
-                  onClick={() => swipeCard('right')}
+                  onClick={toggleFavorite}
                   aria-label="Thích"
                 >
-                  <Heart size={26} fill="white" />
+                  <Heart size={26} fill={isAlreadyFavorite ? "white" : "none"} />
                 </button>
               </div>
             )}
@@ -965,56 +1127,253 @@ const Swipe = () => {
       )}
 
       {/* Property Details Modal */}
-      {showDetailModal && activePropertyForModal && (
-        <div className="modal-backdrop" onClick={() => { setShowDetailModal(false); setSelectedSavedProperty(null); }}>
-          <div className="detail-modal-content" onClick={(e) => e.stopPropagation()}>
-            <button className="modal-close-btn" onClick={() => { setShowDetailModal(false); setSelectedSavedProperty(null); }}>
-              <X size={24} />
-            </button>
-            <div className="modal-body">
-              <img src={activePropertyForModal.thumbnail} alt={activePropertyForModal.title} className="modal-hero-img" />
-              <div className="modal-details-container">
-                <span className="modal-match-badge">★ {activePropertyForModal.matchScore || 95}% MATCH SCORE</span>
-                <h2>{activePropertyForModal.title}</h2>
-                <div className="modal-location">
-                  <MapPin size={16} />
-                  <span>{activePropertyForModal.address}</span>
-                </div>
-                <div className="modal-price">Giá: {activePropertyForModal.price ? activePropertyForModal.price.toLocaleString('vi-VN') : 'Liên hệ'} VNĐ</div>
-                
-                <div className="modal-specs">
-                  {activePropertyForModal.bedrooms > 0 && (
-                    <div className="modal-spec-item">
-                      <Bed size={18} />
-                      <span>{activePropertyForModal.bedrooms} Phòng ngủ</span>
-                    </div>
-                  )}
-                  {activePropertyForModal.bathrooms > 0 && (
-                    <div className="modal-spec-item">
-                      <Bath size={18} />
-                      <span>{activePropertyForModal.bathrooms} Phòng tắm</span>
-                    </div>
-                  )}
-                  <div className="modal-spec-item">
-                    <Maximize size={18} />
-                    <span>{activePropertyForModal.area} m²</span>
+      {showDetailModal && activePropertyForModal && (() => {
+        const sliderImages = (activePropertyForModal.property_images && activePropertyForModal.property_images.length > 0)
+          ? activePropertyForModal.property_images.map(img => img.image_url)
+          : [activePropertyForModal.thumbnail];
+
+        const lifestyleChips = getLifestyleChips(activePropertyForModal);
+        const amenityChips = getAmenityChips(activePropertyForModal);
+        const ownerDetails = activePropertyForModal.owner || {
+          name: 'Nguyễn Văn Minh',
+          role: 'Chính chủ',
+          avatar: 'https://i.pravatar.cc/150?img=67',
+          trust_score: 92,
+          created_at: activePropertyForModal.created_at
+        };
+
+        const isFav = dbFavorites.some(fav => fav.id === activePropertyForModal.id);
+
+        return (
+          <div className="modal-backdrop" onClick={() => { setShowDetailModal(false); setSelectedSavedProperty(null); }}>
+            <div className="detail-modal-content premium-detail-modal" onClick={(e) => e.stopPropagation()}>
+              <button className="modal-close-btn circular-close" onClick={() => { setShowDetailModal(false); setSelectedSavedProperty(null); }}>
+                <X size={20} />
+              </button>
+              
+              <div className="modal-body premium-body">
+                {/* 1. Top Media Slider */}
+                <div className="detail-media-slider">
+                  <div className="main-image-container">
+                    <img src={sliderImages[activeSliderIdx]} alt={activePropertyForModal.title} className="slider-main-img" />
+                    
+                    {sliderImages.length > 1 && (
+                      <>
+                        <button 
+                          className="slider-nav-btn prev" 
+                          onClick={() => setActiveSliderIdx(prev => (prev - 1 + sliderImages.length) % sliderImages.length)}
+                        >
+                          <ChevronLeft size={24} />
+                        </button>
+                        <button 
+                          className="slider-nav-btn next" 
+                          onClick={() => setActiveSliderIdx(prev => (prev + 1) % sliderImages.length)}
+                        >
+                          <ChevronRight size={24} />
+                        </button>
+                      </>
+                    )}
                   </div>
+                  
+                  {sliderImages.length > 1 && (
+                    <div className="slider-thumbnails">
+                      {sliderImages.map((img, idx) => (
+                        <div 
+                          key={idx} 
+                          className={`thumb-wrapper ${idx === activeSliderIdx ? 'active' : ''}`}
+                          onClick={() => setActiveSliderIdx(idx)}
+                        >
+                          <img src={img} alt={`thumbnail-${idx}`} />
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
-                <div className="modal-description">
-                  <h3>Mô tả chi tiết</h3>
-                  <p>{activePropertyForModal.description}</p>
-                </div>
+                <div className="detail-content-wrapper">
+                  {/* 2. Rating & Match Score */}
+                  <div className="detail-meta-row">
+                    <span className="match-score-tag">
+                      <Sparkles size={12} /> {activePropertyForModal.matchScore || 95}% MATCH SCORE
+                    </span>
+                    
+                    <div className="detail-rating">
+                      <span className="rating-num">{activePropertyForModal.average_rating ? activePropertyForModal.average_rating.toFixed(1) : '0'}</span>
+                      <div className="rating-stars">
+                        {[1, 2, 3, 4, 5].map(star => (
+                          <span key={star} className={star <= Math.round(activePropertyForModal.average_rating || 0) ? 'star-filled' : 'star-empty'}>★</span>
+                        ))}
+                      </div>
+                      <span className="rating-count">({activePropertyForModal.review_count || 0} đánh giá)</span>
+                    </div>
+                  </div>
 
-                <div className="modal-contact">
-                  <h3>Liên hệ chính chủ</h3>
-                  <div className="contact-tel">{activePropertyForModal.contact || activePropertyForModal.contact_phone || '0901 234 567'}</div>
+                  {/* 3. Header Section */}
+                  <div className="detail-header-block">
+                    <div className="title-section">
+                      <h2>{activePropertyForModal.title}</h2>
+                      <div className="detail-address-row">
+                        <MapPin size={16} />
+                        <span>{activePropertyForModal.address}</span>
+                      </div>
+                    </div>
+                    
+                    <div className="detail-action-buttons">
+                      <button 
+                        className={`action-btn fav-btn ${isFav ? 'active' : ''}`}
+                        onClick={async () => {
+                          if (!user?.id) return;
+                          if (isFav) {
+                            setDbFavorites(prev => prev.filter(fav => fav.id !== activePropertyForModal.id));
+                            fetch('http://localhost:3000/api/favorites/delete', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ userId: user.id, propertyId: activePropertyForModal.id })
+                            }).catch(err => console.error(err));
+                          } else {
+                            setDbFavorites(prev => [...prev, activePropertyForModal]);
+                            fetch('http://localhost:3000/api/favorites', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ userId: user.id, propertyId: activePropertyForModal.id })
+                            }).catch(err => console.error(err));
+                          }
+                        }}
+                      >
+                        <Heart size={16} fill={isFav ? "white" : "none"} />
+                        <span>{isFav ? 'Đã lưu' : 'Lưu'}</span>
+                      </button>
+                      
+                      <button className="action-btn share-btn" onClick={() => {
+                        navigator.clipboard.writeText(window.location.href);
+                        alert('Đã sao chép liên kết bài đăng!');
+                      }}>
+                        <Share2 size={16} />
+                        <span>Chia sẻ</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="detail-price-tag">
+                    {activePropertyForModal.price ? activePropertyForModal.price.toLocaleString('vi-VN') : 'Liên hệ'} VNĐ
+                  </div>
+
+                  {/* 4. Specs Grid */}
+                  <div className="detail-specs-grid">
+                    <div className="spec-card">
+                      <div className="spec-icon-box"><Maximize size={20} /></div>
+                      <div className="spec-info">
+                        <span>Diện tích</span>
+                        <p>{activePropertyForModal.area} m²</p>
+                      </div>
+                    </div>
+                    <div className="spec-card">
+                      <div className="spec-icon-box"><Bath size={20} /></div>
+                      <div className="spec-info">
+                        <span>Phòng tắm</span>
+                        <p>{activePropertyForModal.bathrooms || 0}</p>
+                      </div>
+                    </div>
+
+                  </div>
+
+                  {/* 5. Lifestyle & Amenities Columns */}
+                  <div className="detail-columns-row">
+                    <div className="detail-column">
+                      <h3>Lối sống phù hợp</h3>
+                      <div className="chips-list">
+                        {lifestyleChips.length > 0 ? (
+                          lifestyleChips.map((chip, idx) => (
+                            <span key={idx} className="feature-chip lifestyle-chip-style">{chip}</span>
+                          ))
+                        ) : (
+                          <span className="no-features-text">Đang cập nhật...</span>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="detail-column">
+                      <h3>Tiện ích</h3>
+                      <div className="chips-list">
+                        {amenityChips.length > 0 ? (
+                          amenityChips.map((chip, idx) => (
+                            <span key={idx} className="feature-chip amenity-chip-style">{chip}</span>
+                          ))
+                        ) : (
+                          <span className="no-features-text">Đang cập nhật...</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 6. Description & Images Grid */}
+                  <div className="detail-columns-row text-image-row">
+                    <div className="detail-column description-column">
+                      <h3>Mô tả chi tiết</h3>
+                      <p className="description-text">{activePropertyForModal.description}</p>
+                    </div>
+                    
+                    <div className="detail-column detail-images-column">
+                      <h3>Hình ảnh chi tiết</h3>
+                      <div className="detail-images-grid-box">
+                        {sliderImages.slice(0, 4).map((img, idx) => (
+                          <div key={idx} className="grid-image-wrapper" onClick={() => setActiveSliderIdx(idx)}>
+                            <img src={img} alt={`detail-${idx}`} />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 7. Poster info */}
+                  <div className="detail-poster-block">
+                    <h3>Thông tin người đăng</h3>
+                    <div className="poster-card">
+                      <div className="poster-left">
+                        <img src={ownerDetails.avatar || 'https://i.pravatar.cc/150?img=67'} alt={ownerDetails.name} className="poster-avatar" />
+                        <div className="poster-name-info">
+                          <div className="name-row">
+                            <h4>{ownerDetails.name}</h4>
+                            <span className="role-verified-badge">
+                              <ShieldCheck size={12} /> {ownerDetails.role === 'AGENT' ? 'Chính chủ' : 'Môi giới'}
+                            </span>
+                          </div>
+                          <p>Thành viên từ {new Date(ownerDetails.created_at || activePropertyForModal.created_at).toLocaleDateString('vi-VN')}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="poster-right">
+                        <div className="trust-score-wrapper">
+                          <span>Trust Score</span>
+                          <p>{ownerDetails.trust_score || 92}</p>
+                          <small>Rất uy tín</small>
+                        </div>
+                        
+                        <div className="poster-contact-buttons">
+                          <a href={`sms:${activePropertyForModal.contact_phone || '0901234567'}`} className="contact-btn message-btn">
+                            <MessageSquare size={16} /> Nhắn tin
+                          </a>
+                          <a href={`tel:${activePropertyForModal.contact_phone || '0901234567'}`} className="contact-btn call-btn">
+                            <Phone size={16} /> Gọi ngay
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 8. Footer Info */}
+                  <div className="detail-footer-bar">
+                    <div className="footer-item"><Calendar size={14} /> <span>Đăng tin: {new Date(activePropertyForModal.created_at).toLocaleDateString('vi-VN')}</span></div>
+                    <div className="footer-item"><Eye size={14} /> <span>Lượt xem: {activePropertyForModal.views || 0}</span></div>
+                    <div className="footer-item"><Shield size={14} /> <span>Mã tin: {activePropertyForModal.property_type === 'Mặt Bằng' ? 'MBKD' : 'CHCH'}-{124000 + activePropertyForModal.id}</span></div>
+                  </div>
+
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Filter Modal */}
       {showFilterModal && (
@@ -1025,33 +1384,108 @@ const Swipe = () => {
             </button>
             <h3>Bộ lọc bài đăng</h3>
             <form onSubmit={applyFilter}>
+              {/* Category chips for 'Tất cả' view */}
+              {activeCategoryKey === 'Tất cả' && (
+                <div className="filter-group">
+                  <label className="filter-section-title">Loại bất động sản</label>
+                  <div className="chips-grid">
+                    {['Căn Hộ', 'Nhà Ở', 'Chung Cư', 'Biệt Thự', 'Đất Nền'].map(cat => {
+                      const isSelected = tempSelectedCategories.includes(cat);
+                      return (
+                        <button
+                          key={cat}
+                          type="button"
+                          className={`filter-chip ${isSelected ? 'active' : ''}`}
+                          onClick={() => {
+                            if (tempSelectedCategories.includes(cat)) {
+                              setTempSelectedCategories(tempSelectedCategories.filter(c => c !== cat));
+                            } else {
+                              setTempSelectedCategories([...tempSelectedCategories, cat]);
+                            }
+                          }}
+                        >
+                          {cat === 'Nhà Ở' ? 'Nhà ở' : cat === 'Căn Hộ' ? 'Căn hộ' : cat}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Price Range */}
               <div className="filter-group">
-                <label>Giá tối thiểu (VNĐ)</label>
-                <input 
-                  type="number" 
-                  placeholder="Ví dụ: 2000000000" 
-                  value={tempMinPrice} 
-                  onChange={(e) => setTempMinPrice(e.target.value)} 
-                />
+                <label className="filter-section-title">Khoảng giá (VNĐ)</label>
+                <div className="range-inputs">
+                  <input 
+                    type="number" 
+                    placeholder="Từ (VNĐ)" 
+                    value={tempMinPrice}
+                    onChange={(e) => setTempMinPrice(e.target.value)}
+                  />
+                  <span className="range-divider">-</span>
+                  <input 
+                    type="number" 
+                    placeholder="Đến (VNĐ)" 
+                    value={tempMaxPrice}
+                    onChange={(e) => setTempMaxPrice(e.target.value)}
+                  />
+                </div>
               </div>
+
+              {/* Area Range */}
               <div className="filter-group">
-                <label>Giá tối đa (VNĐ)</label>
-                <input 
-                  type="number" 
-                  placeholder="Ví dụ: 10000000000" 
-                  value={tempMaxPrice} 
-                  onChange={(e) => setTempMaxPrice(e.target.value)} 
-                />
+                <label className="filter-section-title">Diện tích (m²)</label>
+                <div className="range-inputs">
+                  <input 
+                    type="number" 
+                    placeholder="Từ m²" 
+                    value={tempMinArea}
+                    onChange={(e) => setTempMinArea(e.target.value)}
+                  />
+                  <span className="range-divider">-</span>
+                  <input 
+                    type="number" 
+                    placeholder="Đến m²" 
+                    value={tempMaxArea}
+                    onChange={(e) => setTempMaxArea(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Number of bedrooms */}
+              <div className="filter-group">
+                <label className="filter-section-title">Số phòng ngủ</label>
+                <div className="chips-grid">
+                  {['1', '2', '3', '4+'].map(room => {
+                    const isSelected = tempSelectedBedrooms.includes(room);
+                    return (
+                      <button
+                        key={room}
+                        type="button"
+                        className={`filter-chip ${isSelected ? 'active' : ''}`}
+                        onClick={() => {
+                          if (tempSelectedBedrooms.includes(room)) {
+                            setTempSelectedBedrooms(tempSelectedBedrooms.filter(r => r !== room));
+                          } else {
+                            setTempSelectedBedrooms([...tempSelectedBedrooms, room]);
+                          }
+                        }}
+                      >
+                        {room === '4+' ? '4+ PN' : `${room} PN`}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Ward Filtering UI */}
               <div className="filter-group ward-filter-group">
-                <label>Tìm theo phường</label>
+                <label className="filter-section-title">Khu vực phường</label>
                 <div className="ward-search-wrapper">
                   <div className="ward-search-input-container">
                     <input 
                       type="text" 
-                      placeholder="Nhập tên phường, ví dụ: Sài Gòn, Tân Bình, Dĩ An..." 
+                      placeholder="Nhập tên phường..." 
                       value={wardSearchQuery} 
                       onChange={(e) => setWardSearchQuery(e.target.value)} 
                     />
@@ -1164,7 +1598,7 @@ const Swipe = () => {
               </div>
 
               <div className="filter-actions">
-                <button type="button" className="btn-secondary" onClick={() => { setTempMinPrice(''); setTempMaxPrice(''); setTempSelectedWards([]); setTempSelectedLifestyles([]); }}>Xóa bộ lọc</button>
+                <button type="button" className="btn-secondary" onClick={() => { setTempMinPrice(''); setTempMaxPrice(''); setTempSelectedWards([]); setTempSelectedLifestyles([]); setTempMinArea(''); setTempMaxArea(''); setTempSelectedBedrooms([]); setTempSelectedCategories([]); }}>Xóa bộ lọc</button>
                 <button type="submit" className="btn-primary">Áp dụng</button>
               </div>
             </form>

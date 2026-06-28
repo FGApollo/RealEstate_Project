@@ -21,7 +21,9 @@ const getFavorites = async (userId) => {
     .select(`
       *,
       property_features(feature_name),
-      property_images(image_url)
+      property_images(image_url),
+      lifestyle_tags(tag_name),
+      owner:users!owner_id(name, role, avatar, trust_score, created_at)
     `)
     .in('id', propertyIds);
 
