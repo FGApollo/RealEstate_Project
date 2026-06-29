@@ -5,7 +5,7 @@ const MIN_IMAGE_WIDTH = 180;
 const MIN_IMAGE_HEIGHT = 180;
 const MIN_SELFIE_SKIN_RATIO = 0.025;
 const MIN_CARD_SKIN_RATIO = 0.01;
-const MIN_MATCH_SCORE = 0.55;
+const MIN_MATCH_SCORE = 0.8;
 
 const clampRegion = ({ left, top, width, height }, imageWidth, imageHeight) => ({
   left: Math.max(0, Math.min(imageWidth - 1, Math.round(left))),
