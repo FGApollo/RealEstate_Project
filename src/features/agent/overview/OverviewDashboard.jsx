@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { 
   Home, Eye, Heart, ChevronRight, Plus, SlidersHorizontal, 
-  MapPin, Bed, Bath, Maximize, ShieldAlert, Search
+  MapPin, Bed, Bath, Maximize, ShieldAlert, ShieldCheck, Search,
+  Edit3, Trash2, ExternalLink
 } from 'lucide-react';
 import './OverviewDashboard.css';
 
@@ -12,7 +13,8 @@ const OverviewDashboard = ({
   data, 
   loading,
   searchQuery = '',
-  setSearchQuery = () => {}
+  setSearchQuery = () => {},
+  currentUser = {}
 }) => {
   const [filterRegion, setFilterRegion] = useState('ALL');
   const [filterPrice, setFilterPrice] = useState('ALL');
@@ -22,7 +24,7 @@ const OverviewDashboard = ({
   const itemsPerPage = 5;
 
   const regionsList = ['Đà Nẵng', 'Hồ Chí Minh', 'Hà Nội'];
-  const propertyTypesList = ['Căn Hộ', 'Studio', 'Biệt Thự', 'Nhà Phố', 'Đất Nền'];
+  const propertyTypesList = ['Căn Hộ', 'Chung Cư', 'Nhà Ở', 'Mặt Bằng', 'Văn Phòng', 'Phòng Trọ'];
 
   // Filter listings
   const filteredListings = (data.activeListings || []).filter(listing => {
@@ -55,6 +57,20 @@ const OverviewDashboard = ({
     currentPage * itemsPerPage
   );
 
+  const formatPrice = (price) => {
+    if (!price || price === 0) return 'Liên hệ';
+    const billion = 1000000000;
+    const million = 1000000;
+    
+    if (price >= billion) {
+      return `${(price / billion).toFixed(1).replace('.0', '')} Tỷ VND`;
+    }
+    if (price >= million) {
+      return `${(price / million).toFixed(1).replace('.0', '')} Triệu VND`;
+    }
+    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
+  };
+
   return (
     <div className="overview-dashboard-feature">
       {/* VIEW 1: OVERVIEW TAB */}
@@ -62,26 +78,47 @@ const OverviewDashboard = ({
         <>
           <div className="dashboard-header-container">
             <div>
-              <h1>Xin chào, Zăn Cao</h1>
+              <h1>Xin chào, {currentUser?.name || 'Zăn Cao'}</h1>
               <p className="subtitle">Theo dõi hiệu suất các tin đăng của bạn trong hôm nay.</p>
             </div>
 
             <div className="unverified-status-container">
-              <div className="verified-broker-placeholder unverified">
-                <div className="verified-badge-icon warning">
-                  <ShieldAlert size={20} color="#ffffff" strokeWidth={2.5} />
-                </div>
-                <div className="verified-badge-text">
-                  <div className="verified-status-title">Chưa Verified</div>
-                  <div className="verified-score-subtitle">Cần xác minh ngay</div>
-                </div>
-              </div>
-              <div className="notification-tooltip dashboard-tooltip">
-                <div className="tooltip-content">
-                  <span className="tooltip-text">Tài khoản của bạn chưa được xác minh.</span>
-                  <a href="#" className="tooltip-action" onClick={(e) => e.preventDefault()}>Xác minh ngay!</a>
-                </div>
-              </div>
+              {currentUser?.verification_status === 'VERIFIED' ? (
+                <>
+                  <div className="verified-broker-placeholder">
+                    <div className="verified-badge-icon" style={{ backgroundColor: '#065f46' }}>
+                      <ShieldCheck size={20} color="#ffffff" strokeWidth={2.5} />
+                    </div>
+                    <div className="verified-badge-text">
+                      <div className="verified-status-title" style={{ color: '#064e3b' }}>Đã Verified</div>
+                      <div className="verified-score-subtitle" style={{ color: '#047857' }}>Verified Seller</div>
+                    </div>
+                  </div>
+                  <div className="notification-tooltip dashboard-tooltip">
+                    <div className="tooltip-content">
+                      <span className="tooltip-text">Tài khoản của bạn đã được xác minh thành công.</span>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="verified-broker-placeholder unverified">
+                    <div className="verified-badge-icon warning">
+                      <ShieldAlert size={20} color="#ffffff" strokeWidth={2.5} />
+                    </div>
+                    <div className="verified-badge-text">
+                      <div className="verified-status-title">Chưa Verified</div>
+                      <div className="verified-score-subtitle">Cần xác minh ngay</div>
+                    </div>
+                  </div>
+                  <div className="notification-tooltip dashboard-tooltip">
+                    <div className="tooltip-content">
+                      <span className="tooltip-text">Tài khoản của bạn chưa được xác minh.</span>
+                      <a href="#" className="tooltip-action" onClick={(e) => e.preventDefault()}>Xác minh ngay!</a>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
@@ -132,7 +169,7 @@ const OverviewDashboard = ({
                     <div className="listing-info">
                       <h3>{listing.title}</h3>
                       <p>
-                        {listing.price.toLocaleString('vi-VN')} VND
+                        {formatPrice(listing.price)}
                         {listing.status === 'AVAILABLE' && <span className="agent-status-badge">Đang bán</span>}
                       </p>
                     </div>
@@ -160,57 +197,75 @@ const OverviewDashboard = ({
       {/* VIEW 2: LISTINGS TAB (TRANG 1) */}
       {activeTab === 'listings' && (
         <div className="listings-tab-container">
+          {/* Page header */}
           <div className="tab-header-container">
             <div>
-              <h1>Danh sách các tin đăng</h1>
-              <p className="subtitle">Quản lý danh mục ({filteredListings.length}) bất động sản đang hoạt động</p>
-            </div>
-            <div className="header-actions">
-              <div className="listings-search-wrap">
-                <Search size={16} className="search-icon" />
-                <input 
-                  type="text" 
-                  placeholder="Tìm kiếm địa chỉ, tiêu đề..." 
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
-              <button 
-                className={`filter-toggle-btn ${showFilters ? 'active' : ''}`}
-                onClick={() => setShowFilters(!showFilters)}
-              >
-                <SlidersHorizontal size={18} />
-                <span>Bộ lọc</span>
-              </button>
+              <h1>Danh sách tin đăng hoạt động</h1>
+              <p className="subtitle">Quản lý danh mục {filteredListings.length} bất động sản đang hoạt động.</p>
             </div>
           </div>
 
-          {/* Filter Panels */}
+          {/* Search + Filter toggle row */}
+          <div className="search-filter-row">
+            <div className="listings-search-bar">
+              <Search size={16} className="listings-search-icon" />
+              <input 
+                type="text" 
+                placeholder="Tìm kiếm địa chỉ..." 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            <button 
+              className={`filter-green-btn ${showFilters ? 'active' : ''}`}
+              onClick={() => setShowFilters(!showFilters)}
+            >
+              <SlidersHorizontal size={16} />
+              Bộ lọc
+            </button>
+          </div>
+
+          {/* Collapsible filter panel */}
           {showFilters && (
             <div className="filter-dropdown-panel">
               <div className="filter-field">
                 <label>Khu vực</label>
                 <select value={filterRegion} onChange={(e) => setFilterRegion(e.target.value)}>
-                  <option value="ALL">Tất cả khu vực</option>
+                  <option value="ALL">Tất cả quận</option>
                   {regionsList.map(r => <option key={r} value={r}>{r}</option>)}
                 </select>
               </div>
               <div className="filter-field">
                 <label>Khoảng giá</label>
                 <select value={filterPrice} onChange={(e) => setFilterPrice(e.target.value)}>
-                  <option value="ALL">Tất cả khoảng giá</option>
+                  <option value="ALL">Tất cả mức giá</option>
                   <option value="under-1b">Dưới 1 tỷ</option>
-                  <option value="1b-3b">1 tỷ - 3 tỷ</option>
-                  <option value="3b-5b">3 tỷ - 5 tỷ</option>
+                  <option value="1b-3b">1 – 3 tỷ</option>
+                  <option value="3b-5b">3 – 5 tỷ</option>
                   <option value="above-5b">Trên 5 tỷ</option>
                 </select>
               </div>
               <div className="filter-field">
-                <label>Loại căn hộ</label>
+                <label>Loại phòng</label>
                 <select value={filterType} onChange={(e) => setFilterType(e.target.value)}>
                   <option value="ALL">Tất cả loại hình</option>
                   {propertyTypesList.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
+              </div>
+              <div className="filter-field filter-actions">
+                <button
+                  className="filter-apply-btn"
+                  onClick={() => setShowFilters(false)}
+                >
+                  <SlidersHorizontal size={14} /> Áp dụng lọc
+                </button>
+                <button
+                  className="filter-reset-btn"
+                  onClick={() => { setFilterRegion('ALL'); setFilterPrice('ALL'); setFilterType('ALL'); setSearchQuery(''); }}
+                  title="Xoá bộ lọc"
+                >
+                  ↺
+                </button>
               </div>
             </div>
           )}
@@ -232,41 +287,51 @@ const OverviewDashboard = ({
 
             {paginatedListings.map(listing => (
               <div key={listing.id} className="listing-card property-card">
-                <div className="card-image-wrap">
-                  <img src={listing.thumbnail || 'https://via.placeholder.com/400'} alt={listing.title} />
-                  <span className={`status-badge ${listing.status.toLowerCase()}`}>
-                    {listing.status === 'AVAILABLE' ? 'Đang bán' : listing.status}
-                  </span>
-                </div>
-                <div className="card-details">
-                  <h3>{listing.title}</h3>
-                  <p className="card-address">
-                    <MapPin size={14} />
-                    <span>{listing.address || 'Địa chỉ bất động sản'}</span>
-                  </p>
-                  
-                  <div className="card-specs">
-                    <div className="spec-badge">
-                      <Bed size={14} />
-                      <span>{listing.bedrooms || 0} Giường</span>
-                    </div>
-                    <div className="spec-badge">
-                      <Bath size={14} />
-                      <span>{listing.bathrooms || 0} Tắm</span>
-                    </div>
-                    <div className="spec-badge">
-                      <Maximize size={14} />
-                      <span>{listing.area || 0} m²</span>
-                    </div>
-                  </div>
+                {/* Full-image background */}
+                <img 
+                  src={listing.thumbnail || 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800&q=80'} 
+                  alt={listing.title} 
+                  className="property-card-img"
+                />
 
-                  <div className="card-footer">
-                    <span className="card-price">
-                      {(listing.price / 1000000000).toFixed(1)} Tỷ VND
-                    </span>
-                    <div className="card-social-stats">
-                      <span><Eye size={14} /> {listing.views || 0}</span>
-                      <span><Heart size={14} color="#db2777" /> {listing.favoritesCount || 0}</span>
+                {/* Verification badge */}
+                <div className={`property-verified-badge ${listing.verification_status === 'VERIFIED' ? 'verified' : 'unverified'}`}>
+                  {listing.verification_status === 'VERIFIED' ? (
+                    <><ShieldCheck size={11} /> Đã xác thực</>
+                  ) : (
+                    <><ShieldAlert size={11} /> Chưa xác thực</>
+                  )}
+                </div>
+
+                {/* Hover overlay with agent actions */}
+                <div className="property-card-actions-overlay">
+                  <button className="card-action-icon" title="Xem chi tiết">
+                    <ExternalLink size={16} />
+                  </button>
+                  <button className="card-action-icon" title="Chỉnh sửa">
+                    <Edit3 size={16} />
+                  </button>
+                  <button className="card-action-icon danger" title="Xoá tin đăng">
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+
+                {/* Bottom gradient info overlay */}
+                <div className="property-card-overlay">
+                  <h3 className="property-card-title">{listing.title}</h3>
+                  <p className="property-card-address">
+                    <MapPin size={12} />
+                    <span>{listing.district ? `${listing.district}, ${listing.city}` : (listing.address || 'Địa chỉ bất động sản')}</span>
+                  </p>
+                  <div className="property-card-bottom">
+                    <div className="property-card-price">
+                      <span className="price-amount">{formatPrice(listing.price)}</span>
+                      <span className="price-unit">/tháng</span>
+                    </div>
+                    <div className="property-card-specs">
+                      <span><Bed size={13} /> {listing.bedrooms || 0}</span>
+                      <span><Bath size={13} /> {listing.bathrooms || 0}</span>
+                      <span><Maximize size={13} /> {listing.area || 0}m²</span>
                     </div>
                   </div>
                 </div>

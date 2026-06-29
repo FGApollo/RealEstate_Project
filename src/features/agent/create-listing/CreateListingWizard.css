@@ -260,6 +260,71 @@
   box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 }
 
+/* Leaflet Map Picker & Address Styles */
+.map-container-wrapper {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #cbd5e1;
+  margin-top: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+#listing-map {
+  height: 280px;
+  width: 100%;
+  z-index: 1;
+  background-color: #f8fafc;
+}
+
+.map-search-row {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.map-search-row input {
+  flex: 1;
+}
+
+.map-search-btn {
+  background-color: #3b82f6;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.map-search-btn:hover {
+  background-color: #2563eb;
+}
+
+.map-coordinates-badge {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  background-color: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(4px);
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #334155;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  z-index: 1000;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
 /* Utilities selector grid */
 .utilities-toggle-grid {
   display: grid;
