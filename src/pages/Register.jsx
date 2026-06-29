@@ -5,6 +5,7 @@ import { useGoogleLogin } from '@react-oauth/google';
 import AuthLayout from '../components/AuthLayout';
 import Input from '../components/ui/Input';
 import Button from '../components/ui/Button';
+import { API_BASE_URL } from '../config';
 
 // Google Icon Component
 const GoogleIcon = ({ size = 20 }) => (
@@ -37,7 +38,7 @@ const Register = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://localhost:3000/api/register', {
+      const response = await fetch(`${API_BASE_URL}/api/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
@@ -61,7 +62,7 @@ const Register = () => {
     onSuccess: async (codeResponse) => {
       try {
         setIsLoading(true);
-        const response = await fetch('http://localhost:3000/api/google-login', {
+        const response = await fetch(`${API_BASE_URL}/api/google-login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ credential: codeResponse.access_token }) 
@@ -84,7 +85,7 @@ const Register = () => {
   return (
     <AuthLayout 
       title="Tạo tài khoản mới" 
-      subtitle="Gia nhập cộng đồng Estate Horizon ngay hôm nay."
+      subtitle="Gia nhập cộng đồng Swipe Nest ngay hôm nay."
     >
       <form onSubmit={handleSubmit}>
         {error && <div style={{ color: 'red', marginBottom: '1rem', fontSize: '0.875rem', textAlign: 'center' }}>{error}</div>}

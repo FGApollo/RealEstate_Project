@@ -5,6 +5,7 @@ import { useGoogleLogin } from '@react-oauth/google';
 import AuthLayout from '../components/AuthLayout';
 import Input from '../components/ui/Input';
 import Button from '../components/ui/Button';
+import { API_BASE_URL } from '../config';
 
 // Google Icon Component
 const GoogleIcon = ({ size = 20 }) => (
@@ -40,7 +41,7 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://localhost:3000/api/login', {
+      const response = await fetch(`${API_BASE_URL}/api/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
@@ -73,7 +74,7 @@ const Login = () => {
         // Actually, @react-oauth/google useGoogleLogin returns an access token. 
         // We should send the access token to backend, or use GoogleLogin component which returns id_token.
         // Let's use the codeResponse.access_token as a placeholder for now.
-        const response = await fetch('http://localhost:3000/api/google-login', {
+        const response = await fetch(`${API_BASE_URL}/api/google-login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ credential: codeResponse.access_token }) 

@@ -18,7 +18,7 @@ const AuthLayout = ({ children, title, subtitle }) => {
         transition={{ duration: 0.5, ease: "easeOut" }}
       >
         <div className="auth-header">
-          <h1 className="brand-title">Estate Horizon</h1>
+          <h1 className="brand-title">Swipe Nest</h1>
           {title && <h2 className="auth-title">{title}</h2>}
           {subtitle && <p className="auth-subtitle">{subtitle}</p>}
         </div>

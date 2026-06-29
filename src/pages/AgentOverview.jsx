@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { 
+import {
   Home, Search, LayoutDashboard, Settings, LogOut
 } from 'lucide-react';
 import OverviewDashboard from '../features/agent/overview/OverviewDashboard';
 import CreateListingWizard from '../features/agent/create-listing/CreateListingWizard';
 import './AgentOverview.css';
+import { API_BASE_URL } from '../config';
 
 const AgentOverview = () => {
   const [currentUser] = useState(() => {
@@ -33,7 +34,7 @@ const AgentOverview = () => {
   useEffect(() => {
     const fetchOverview = async () => {
       try {
-        const response = await fetch(`http://localhost:3000/api/agent/overview?userId=${currentUser.id}`);
+        const response = await fetch(`${API_BASE_URL}/api/agent/overview?userId=12`);
         if (response.ok) {
           const result = await response.json();
           setData(result);
@@ -56,19 +57,19 @@ const AgentOverview = () => {
           SWIPE NEST
         </div>
         <nav className="sidebar-nav">
-          <button 
+          <button
             className={`nav-btn ${activeTab === 'overview' ? 'active' : ''}`}
             onClick={() => setActiveTab('overview')}
           >
             <LayoutDashboard size={20} /> Tổng quan
           </button>
-          <button 
+          <button
             className={`nav-btn ${activeTab === 'listings' || activeTab === 'create-listing' ? 'active' : ''}`}
             onClick={() => setActiveTab('listings')}
           >
             <Home size={20} /> Quản lý tin
           </button>
-          <button 
+          <button
             className={`nav-btn ${activeTab === 'settings' ? 'active' : ''}`}
             onClick={() => setActiveTab('overview')}
           >
@@ -84,9 +85,9 @@ const AgentOverview = () => {
         <header className="topbar">
           <div className="search-bar">
             <Search size={20} color="#888" />
-            <input 
-              type="text" 
-              placeholder="Nhập địa chỉ bất động sản" 
+            <input
+              type="text"
+              placeholder="Nhập địa chỉ bất động sản"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -101,7 +102,7 @@ const AgentOverview = () => {
         <div className="dashboard-content">
           {/* TAB 1 & 2: OVERVIEW / LISTINGS */}
           {(activeTab === 'overview' || activeTab === 'listings') && (
-            <OverviewDashboard 
+            <OverviewDashboard
               activeTab={activeTab}
               setActiveTab={setActiveTab}
               data={data}
@@ -113,7 +114,7 @@ const AgentOverview = () => {
 
           {/* TAB 3: CREATE LISTING FLOW */}
           {activeTab === 'create-listing' && (
-            <CreateListingWizard 
+            <CreateListingWizard
               setActiveTab={setActiveTab}
               setData={setData}
               currentUser={currentUser}
