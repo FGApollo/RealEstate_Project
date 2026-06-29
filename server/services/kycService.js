@@ -8,18 +8,38 @@ const PENDING_STATUS = 'PENDING';
 const REJECTED_STATUS = 'REJECTED';
 const APPROVED_STATUS = 'APPROVED';
 const MAX_SELFIE_ATTEMPTS = 5;
+const SELFIE_ATTEMPT_TTL_MS = 30 * 60 * 1000;
 const selfieAttemptFailures = new Map();
 
 const getSelfieAttemptKey = (userId, verificationId) => `${userId}:${verificationId}`;
 
-const getSelfieAttemptsUsed = (userId, verificationId) => (
-  selfieAttemptFailures.get(getSelfieAttemptKey(userId, verificationId)) || 0
-);
+const cleanupExpiredSelfieAttempts = () => {
+  const now = Date.now();
+
+  for (const [key, value] of selfieAttemptFailures.entries()) {
+    if (!value?.updatedAt || now - value.updatedAt > SELFIE_ATTEMPT_TTL_MS) {
+      selfieAttemptFailures.delete(key);
+    }
+  }
+};
+
+const getSelfieAttemptsUsed = (userId, verificationId) => {
+  cleanupExpiredSelfieAttempts();
+
+  const attemptState = selfieAttemptFailures.get(getSelfieAttemptKey(userId, verificationId));
+  return attemptState?.count || 0;
+};
 
 const recordSelfieAttemptFailure = (userId, verificationId) => {
+  cleanupExpiredSelfieAttempts();
+
   const key = getSelfieAttemptKey(userId, verificationId);
-  const attempts = (selfieAttemptFailures.get(key) || 0) + 1;
-  selfieAttemptFailures.set(key, attempts);
+  const currentState = selfieAttemptFailures.get(key);
+  const attempts = (currentState?.count || 0) + 1;
+  selfieAttemptFailures.set(key, {
+    count: attempts,
+    updatedAt: Date.now()
+  });
   return attempts;
 };
 
