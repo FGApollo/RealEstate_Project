@@ -10,6 +10,17 @@ const getProperties = async (req, res) => {
   }
 };
 
+const createProperty = async (req, res) => {
+  try {
+    const property = await propertyService.createProperty(req.body);
+    res.status(201).json({ success: true, property });
+  } catch (error) {
+    console.error('Error creating property:', error);
+    res.status(500).json({ error: error.message || 'Internal server error' });
+  }
+};
+
 module.exports = {
-  getProperties
+  getProperties,
+  createProperty
 };

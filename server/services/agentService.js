@@ -4,7 +4,7 @@ const getOverview = async (userId) => {
   // 1. Get properties owned by the agent
   const { data: properties, error: propertiesError } = await supabase
     .from('properties')
-    .select('id, title, price, thumbnail, views, status')
+    .select('id, title, price, thumbnail, views, status, bedrooms, bathrooms, area, city, district, ward, address')
     .eq('owner_id', userId)
     .eq('status', 'AVAILABLE');
 
