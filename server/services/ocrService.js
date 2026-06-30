@@ -3,8 +3,11 @@ const Tesseract = require('tesseract.js');
 
 const MIN_WIDTH = 700;
 const MIN_HEIGHT = 450;
-const MIN_KEYWORD_MATCHES = 2;
+const OCR_ROTATION_DEGREES = [0, 90, 180, 270];
+const DEFAULT_MIN_VALID_FIELDS = 5;
+const DEFAULT_REQUIRED_FIELDS = ['idNumber', 'fullName', 'dob'];
 const ID_NUMBER_PATTERN = /\b\d{12}\b/;
+const DATE_PATTERN = /\b(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})\b/;
 
 const QUALITY_LIMITS = {
   maxBrightPixelRatio: 0.35,
@@ -14,20 +17,19 @@ const QUALITY_LIMITS = {
   maxTiltRatio: 0.18
 };
 
-const FRONT_KEYWORDS = [
-  'CAN CUOC CONG DAN',
-  'CONG HOA XA HOI CHU NGHIA VIET NAM',
-  'HO VA TEN',
-  'NGAY SINH',
-  'QUOC TICH',
-  'SO'
-];
-
-const BACK_KEYWORDS = [
+const BACK_SIDE_KEYWORDS = [
   'DAC DIEM NHAN DANG',
+  'PERSONAL IDENTIFICATION CHARACTERISTICS',
   'NGAY CAP',
+  'DATE OF ISSUE',
   'NOI CAP',
-  'CUC CANH SAT'
+  'CUC CANH SAT',
+  'FINGERPRINTS',
+  'VAN TAY',
+  'LEFT INDEX',
+  'RIGHT INDEX',
+  'DATE OF EXPIRY',
+  'NGAY HET HAN'
 ];
 
 const normalizeText = (text = '') => text
@@ -38,6 +40,31 @@ const normalizeText = (text = '') => text
   .toUpperCase()
   .replace(/\s+/g, ' ')
   .trim();
+
+const normalizeLine = (line = '') => normalizeText(line)
+  .replace(/[|:;]+/g, ' ')
+  .replace(/\s+/g, ' ')
+  .trim();
+
+const normalizeDate = (dateValue) => {
+  const match = dateValue?.match(DATE_PATTERN);
+  if (!match) return null;
+
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  const year = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  if (
+    date.getUTCFullYear() !== year
+    || date.getUTCMonth() !== month - 1
+    || date.getUTCDate() !== day
+  ) {
+    return null;
+  }
+
+  return `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
+};
 
 const average = (values) => {
   if (!values.length) return 0;
@@ -107,34 +134,46 @@ const getImageStats = async (imageBuffer) => {
     darkPixelRatio: darkPixels / pixels.length,
     contrast,
     sharpness,
-    tiltRatio
+    tiltRatio,
+    analysisHeight
   };
 };
 
-const validateImageQuality = async (imageBuffer, label) => {
+const getImageQualityResult = async (imageBuffer, label) => {
   const stats = await getImageStats(imageBuffer);
+  const warnings = [];
+  const longSide = Math.max(stats.width, stats.height);
+  const shortSide = Math.min(stats.width, stats.height);
 
-  if (stats.width < MIN_WIDTH || stats.height < MIN_HEIGHT) {
-    return `${label} co do phan giai qua thap, vui long chup ro hon`;
+  if (longSide < MIN_WIDTH || shortSide < MIN_HEIGHT) {
+    return {
+      hardError: `${label} co do phan giai qua thap, vui long chup ro hon`,
+      warnings,
+      stats
+    };
   }
 
   if (stats.brightPixelRatio > QUALITY_LIMITS.maxBrightPixelRatio && stats.darkPixelRatio < QUALITY_LIMITS.minDarkPixelRatio) {
-    return `${label} bi loa sang, vui long chup lai`;
+    warnings.push(`${label} hoi bi loa sang nhung van se thu doc OCR`);
   }
 
   if (stats.contrast < QUALITY_LIMITS.minContrast) {
-    return `${label} qua mo hoac thieu tuong phan, vui long chup lai`;
+    warnings.push(`${label} hoi mo hoac thieu tuong phan nhung van se thu doc OCR`);
   }
 
   if (stats.sharpness < QUALITY_LIMITS.minSharpness) {
-    return `${label} bi mo, vui long chup lai`;
+    warnings.push(`${label} hoi mo nhung van se thu doc OCR`);
   }
 
   if (stats.tiltRatio > QUALITY_LIMITS.maxTiltRatio) {
-    return `${label} bi nghieng qua nhieu, vui long chup thang lai`;
+    warnings.push(`${label} hoi nghieng nhung van se thu doc OCR`);
   }
 
-  return null;
+  return {
+    hardError: null,
+    warnings,
+    stats
+  };
 };
 
 const runOcr = async (imageBuffer) => {
@@ -145,80 +184,474 @@ const runOcr = async (imageBuffer) => {
   return result?.data?.text || '';
 };
 
-const countKeywordMatches = (text, keywords) => keywords.reduce((count, keyword) => (
-  text.includes(keyword) ? count + 1 : count
-), 0);
+const rotateImageBuffer = async (imageBuffer, degrees) => {
+  if (degrees === 0) {
+    return sharp(imageBuffer).rotate().toBuffer();
+  }
+
+  return sharp(imageBuffer).rotate().rotate(degrees).toBuffer();
+};
+
+const scoreFrontOcrText = (text) => {
+  const normalizedText = normalizeText(text);
+  let score = 0;
+
+  if (ID_NUMBER_PATTERN.test(normalizedText)) score += 8;
+  if (DATE_PATTERN.test(normalizedText)) score += 4;
+  if (normalizedText.includes('CAN CUOC CONG DAN')) score += 3;
+  if (normalizedText.includes('CITIZEN IDENTITY CARD')) score += 3;
+  if (normalizedText.includes('HO VA TEN') || normalizedText.includes('FULL NAME')) score += 3;
+  if (normalizedText.includes('NGAY SINH') || normalizedText.includes('DATE OF BIRTH')) score += 3;
+  if (normalizedText.includes('QUOC TICH') || normalizedText.includes('NATIONALITY')) score += 2;
+  if (extractNameCandidate(normalizedText)) score += 3;
+
+  return score;
+};
+
+const scoreBackOcrText = (text) => {
+  const backSideEvidence = getBackSideEvidence(text);
+  const normalizedText = normalizeText(text);
+  let score = backSideEvidence.count * 4;
+
+  if (DATE_PATTERN.test(normalizedText)) score += 2;
+  if (normalizedText.includes('CONG HOA XA HOI CHU NGHIA VIET NAM')) score += 1;
+
+  return score;
+};
+
+const runOcrBestRotation = async (imageBuffer, scoreText) => {
+  const attempts = await Promise.all(OCR_ROTATION_DEGREES.map(async (degrees) => {
+    const rotatedBuffer = await rotateImageBuffer(imageBuffer, degrees);
+    const text = await runOcr(rotatedBuffer);
+
+    return {
+      degrees,
+      text,
+      score: scoreText(text)
+    };
+  }));
+
+  return attempts.sort((first, second) => second.score - first.score)[0];
+};
+
+const getRequiredFields = () => {
+  const configured = process.env.KYC_OCR_REQUIRED_FIELDS;
+  if (!configured) return DEFAULT_REQUIRED_FIELDS;
+
+  const fields = configured
+    .split(',')
+    .map((field) => field.trim())
+    .filter(Boolean);
+
+  return fields.length ? fields : DEFAULT_REQUIRED_FIELDS;
+};
+
+const getMinValidFields = () => {
+  const configured = Number(process.env.KYC_OCR_MIN_VALID_FIELDS);
+  if (!Number.isFinite(configured) || configured < DEFAULT_REQUIRED_FIELDS.length) {
+    return DEFAULT_MIN_VALID_FIELDS;
+  }
+
+  return configured;
+};
+
+const getLines = (text) => text
+  .split(/\r?\n/)
+  .map((line) => line.trim())
+  .filter(Boolean);
+
+const findLineIndex = (normalizedLines, predicates) => normalizedLines.findIndex((line) => (
+  predicates.some((predicate) => line.includes(predicate))
+));
+
+const cleanFieldValue = (value = '') => value
+  .replace(/^(FULL NAME|HO VA TEN|DATE OF BIRTH|NGAY SINH|SEX|GIOI TINH|NATIONALITY|QUOC TICH|PLACE OF ORIGIN|QUE QUAN|PLACE OF RESIDENCE|NOI THUONG TRU|DATE OF EXPIRY|NGAY HET HAN|SO|NO)\s*/i, '')
+  .replace(/[|:;]+/g, ' ')
+  .replace(/\s+/g, ' ')
+  .trim();
+
+const COMMON_VIETNAMESE_SURNAMES = new Set([
+  'NGUYEN',
+  'TRAN',
+  'LE',
+  'PHAM',
+  'HOANG',
+  'HUYNH',
+  'PHAN',
+  'VU',
+  'VO',
+  'DANG',
+  'BUI',
+  'DO',
+  'HO',
+  'NGO',
+  'DUONG',
+  'LY',
+  'TRUONG',
+  'DINH',
+  'MAI',
+  'CAO',
+  'TRINH',
+  'LUU',
+  'DANH'
+]);
+
+const extractNameCandidate = (value = '') => {
+  const normalizedValue = normalizeLine(value)
+    .replace(/\bHO VA TEN\b/g, ' ')
+    .replace(/\bFULL NAME\b/g, ' ')
+    .replace(/[^A-Z\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const tokens = normalizedValue
+    .split(' ')
+    .filter((token) => token.length >= 2);
+  const surnameIndex = tokens.findIndex((token) => COMMON_VIETNAMESE_SURNAMES.has(token));
+
+  if (surnameIndex === -1) {
+    return null;
+  }
+
+  const nameTokens = [];
+  for (let index = surnameIndex; index < tokens.length; index += 1) {
+    const token = tokens[index];
+    if ([
+      'NGAY',
+      'SINH',
+      'DATE',
+      'BIRTH',
+      'GIOI',
+      'TINH',
+      'SEX',
+      'QUOC',
+      'TICH',
+      'NATIONALITY'
+    ].includes(token)) {
+      break;
+    }
+
+    nameTokens.push(token);
+    if (nameTokens.length >= 6) break;
+  }
+
+  return nameTokens.length >= 2 ? nameTokens.join(' ') : null;
+};
+
+const getValueAfterLabel = (rawLines, normalizedLines, labelPredicates, options = {}) => {
+  const index = findLineIndex(normalizedLines, labelPredicates);
+  if (index === -1) return null;
+
+  const labelLine = normalizedLines[index];
+  const rawLine = rawLines[index] || '';
+  const labelPositions = labelPredicates
+    .map((label) => labelLine.indexOf(label))
+    .filter((position) => position >= 0);
+  const startPosition = labelPositions.length ? Math.min(...labelPositions) : -1;
+  const inlineValue = startPosition >= 0
+    ? cleanFieldValue(rawLine.slice(startPosition + labelPredicates[0].length))
+    : '';
+
+  if (inlineValue && (!options.rejectInline || !options.rejectInline(inlineValue))) {
+    return inlineValue;
+  }
+
+  for (let offset = 1; offset <= (options.maxNextLines || 2); offset += 1) {
+    const candidate = cleanFieldValue(rawLines[index + offset] || '');
+    const normalizedCandidate = normalizeLine(candidate);
+    if (!candidate || labelPredicates.some((label) => normalizedCandidate.includes(label))) {
+      continue;
+    }
+
+    if (!options.rejectInline || !options.rejectInline(candidate)) {
+      return candidate;
+    }
+  }
+
+  return null;
+};
+
+const parseFullName = (rawLines, normalizedLines) => {
+  const labelIndex = findLineIndex(normalizedLines, ['HO VA TEN', 'FULL NAME']);
+  if (labelIndex === -1) return null;
+
+  for (let offset = 0; offset <= 3; offset += 1) {
+    const line = rawLines[labelIndex + offset] || '';
+    const candidate = offset === 0
+      ? cleanFieldValue(line)
+      : line;
+    const extractedName = extractNameCandidate(candidate);
+
+    if (extractedName) {
+      return extractedName;
+    }
+  }
+
+  return null;
+};
+
+const parseDateNearLabel = (rawLines, normalizedLines, labels) => {
+  const index = findLineIndex(normalizedLines, labels);
+  if (index === -1) return null;
+
+  const candidates = [
+    rawLines[index],
+    rawLines[index + 1],
+    rawLines[index - 1]
+  ].filter(Boolean);
+
+  for (const candidate of candidates) {
+    const normalizedDate = normalizeDate(candidate);
+    if (normalizedDate) return normalizedDate;
+  }
+
+  return null;
+};
+
+const parseSex = (combinedText) => {
+  if (/\b(NAM|MALE)\b/.test(combinedText)) return 'Nam';
+  if (/\b(NU|Nữ|FEMALE)\b/i.test(combinedText)) return 'Nu';
+  return null;
+};
+
+const parseNationality = (combinedText) => {
+  if (combinedText.includes('VIET NAM') || combinedText.includes('VIETNAM')) {
+    return 'Viet Nam';
+  }
+
+  return null;
+};
+
+const parseTextAfterLabelUntilNextLabel = (rawLines, normalizedLines, labels, stopLabels) => {
+  const index = findLineIndex(normalizedLines, labels);
+  if (index === -1) return null;
+
+  const values = [];
+  for (let offset = 0; offset <= 3; offset += 1) {
+    const lineIndex = index + offset;
+    const rawLine = rawLines[lineIndex] || '';
+    const normalizedLine = normalizedLines[lineIndex] || '';
+
+    if (!rawLine) continue;
+    if (offset > 0 && stopLabels.some((label) => normalizedLine.includes(label))) break;
+
+    if (offset === 0) {
+      const value = getValueAfterLabel(rawLines, normalizedLines, labels, { maxNextLines: 0 });
+      if (value) values.push(value);
+    } else {
+      values.push(cleanFieldValue(rawLine));
+    }
+  }
+
+  const result = values.join(' ').replace(/\s+/g, ' ').trim();
+  return result.length >= 3 ? result : null;
+};
+
+const parseCitizenIdFields = (frontText, backText) => {
+  const rawLines = getLines(`${frontText}\n${backText}`);
+  const normalizedLines = rawLines.map(normalizeLine);
+  const combinedText = normalizeText(`${frontText} ${backText}`);
+  const idNumber = combinedText.match(ID_NUMBER_PATTERN)?.[0] || null;
+  const fullName = parseFullName(rawLines, normalizedLines);
+  const dob = parseDateNearLabel(rawLines, normalizedLines, ['NGAY SINH', 'DATE OF BIRTH']);
+  const sex = parseSex(combinedText);
+  const nationality = parseNationality(combinedText);
+  const expiry = parseDateNearLabel(rawLines, normalizedLines, ['NGAY HET HAN', 'DATE OF EXPIRY', 'CO GIA TRI DEN']);
+  const stopLabels = [
+    'NOI THUONG TRU',
+    'PLACE OF RESIDENCE',
+    'GIOI TINH',
+    'SEX',
+    'QUOC TICH',
+    'NATIONALITY',
+    'NGAY SINH',
+    'DATE OF BIRTH'
+  ];
+  const placeOfOrigin = parseTextAfterLabelUntilNextLabel(
+    rawLines,
+    normalizedLines,
+    ['QUE QUAN', 'PLACE OF ORIGIN'],
+    stopLabels
+  );
+  const placeOfResidence = parseTextAfterLabelUntilNextLabel(
+    rawLines,
+    normalizedLines,
+    ['NOI THUONG TRU', 'PLACE OF RESIDENCE'],
+    stopLabels
+  );
+
+  return {
+    idNumber,
+    fullName,
+    dob,
+    sex,
+    nationality,
+    expiry,
+    placeOfOrigin,
+    placeOfResidence
+  };
+};
+
+const countValidFields = (data) => Object.values(data).filter(Boolean).length;
+
+const getMissingFields = (data, requiredFields) => requiredFields.filter((field) => !data[field]);
+
+const getBackSideEvidence = (backText) => {
+  const normalizedBackText = normalizeText(backText);
+  const keywordMatches = BACK_SIDE_KEYWORDS.filter((keyword) => normalizedBackText.includes(keyword));
+  const hasMrzLikeLine = /[A-Z0-9<]{20,}/.test(normalizedBackText);
+
+  return {
+    count: keywordMatches.length + (hasMrzLikeLine ? 1 : 0),
+    keywordMatches,
+    hasMrzLikeLine
+  };
+};
 
 const analyzeCitizenId = async (frontImageBuffer, backImageBuffer) => {
   if (!frontImageBuffer || !backImageBuffer) {
     return {
       isValid: false,
-      errorMessage: 'Vui long tai du anh mat truoc va mat sau CCCD'
+      errorMessage: 'Vui long tai du anh mat truoc va mat sau CCCD',
+      data: {},
+      warnings: [],
+      debug: {
+        validFieldCount: 0,
+        missingFields: getRequiredFields(),
+        warnings: []
+      }
     };
   }
 
   try {
-    const frontQualityError = await validateImageQuality(frontImageBuffer, 'Anh mat truoc CCCD');
-    if (frontQualityError) {
-      return {
-        isValid: false,
-        errorMessage: frontQualityError
-      };
-    }
-
-    const backQualityError = await validateImageQuality(backImageBuffer, 'Anh mat sau CCCD');
-    if (backQualityError) {
-      return {
-        isValid: false,
-        errorMessage: backQualityError
-      };
-    }
-
-    const [frontText, backText] = await Promise.all([
-      runOcr(frontImageBuffer),
-      runOcr(backImageBuffer)
+    const [frontQuality, backQuality] = await Promise.all([
+      getImageQualityResult(frontImageBuffer, 'Anh mat truoc CCCD'),
+      getImageQualityResult(backImageBuffer, 'Anh mat sau CCCD')
     ]);
+    const warnings = [...frontQuality.warnings, ...backQuality.warnings];
 
-    const normalizedFrontText = normalizeText(frontText);
-    const normalizedBackText = normalizeText(backText);
-    const combinedText = `${normalizedFrontText} ${normalizedBackText}`.trim();
+    if (frontQuality.hardError || backQuality.hardError) {
+      const hardError = frontQuality.hardError || backQuality.hardError;
+      return {
+        isValid: false,
+        errorMessage: hardError,
+        data: {},
+        warnings,
+        debug: {
+          validFieldCount: 0,
+          missingFields: getRequiredFields(),
+          warnings
+        }
+      };
+    }
 
+    const [frontOcr, backOcr] = await Promise.all([
+      runOcrBestRotation(frontImageBuffer, scoreFrontOcrText),
+      runOcrBestRotation(backImageBuffer, scoreBackOcrText)
+    ]);
+    const frontText = frontOcr.text;
+    const backText = backOcr.text;
+
+    if (frontOcr.degrees !== 0) {
+      warnings.push(`Anh mat truoc CCCD bi xoay ${frontOcr.degrees} do, he thong da tu xoay de doc OCR`);
+    }
+
+    if (backOcr.degrees !== 0) {
+      warnings.push(`Anh mat sau CCCD bi xoay ${backOcr.degrees} do, he thong da tu xoay de doc OCR`);
+    }
+
+    const combinedText = normalizeText(`${frontText} ${backText}`);
     if (!combinedText) {
       return {
         isValid: false,
-        errorMessage: 'Khong the doc thong tin tu anh CCCD, vui long chup ro hon'
+        errorMessage: 'Khong the doc thong tin tu anh CCCD, vui long chup ro hon',
+        data: {},
+        warnings,
+        debug: {
+          validFieldCount: 0,
+          missingFields: getRequiredFields(),
+          warnings,
+          ocrRotation: {
+            front: frontOcr.degrees,
+            back: backOcr.degrees
+          }
+        }
       };
     }
 
-    const idNumberMatch = combinedText.match(ID_NUMBER_PATTERN);
-    if (!idNumberMatch) {
+    const data = parseCitizenIdFields(frontText, backText);
+    const requiredFields = getRequiredFields();
+    const minValidFields = getMinValidFields();
+    const validFieldCount = countValidFields(data);
+    const missingFields = getMissingFields(data, requiredFields);
+    const backSideEvidence = getBackSideEvidence(backText);
+
+    if (backSideEvidence.count < 1) {
       return {
         isValid: false,
-        errorMessage: 'Khong tim thay so CCCD hop le'
+        errorMessage: 'Khong doc du thong tin mat sau CCCD, vui long chup lai ro hon',
+        data,
+        warnings,
+        debug: {
+          validFieldCount,
+          missingFields: ['backSideEvidence'],
+          warnings,
+          ocrRotation: {
+            front: frontOcr.degrees,
+            back: backOcr.degrees
+          },
+          backSideEvidence
+        }
       };
     }
 
-    const frontKeywordMatches = countKeywordMatches(normalizedFrontText, FRONT_KEYWORDS);
-    const backKeywordMatches = countKeywordMatches(normalizedBackText, BACK_KEYWORDS);
-    const totalKeywordMatches = frontKeywordMatches + backKeywordMatches;
-
-    if (totalKeywordMatches < MIN_KEYWORD_MATCHES) {
+    if (missingFields.length || validFieldCount < minValidFields) {
       return {
         isValid: false,
-        errorMessage: 'Anh khong co du dau hieu la CCCD Viet Nam'
+        errorMessage: 'Khong doc du thong tin CCCD, vui long chup lai ro hon',
+        data,
+        warnings,
+        debug: {
+          validFieldCount,
+          missingFields,
+          warnings,
+          ocrRotation: {
+            front: frontOcr.degrees,
+            back: backOcr.degrees
+          },
+          backSideEvidence
+        }
       };
     }
 
     return {
       isValid: true,
-      errorMessage: null
+      errorMessage: null,
+      data,
+      warnings,
+      debug: {
+        validFieldCount,
+        missingFields: [],
+        warnings,
+        ocrRotation: {
+          front: frontOcr.degrees,
+          back: backOcr.degrees
+        },
+        backSideEvidence
+      }
     };
   } catch (error) {
     console.error('Citizen ID OCR failed:', error);
 
     return {
       isValid: false,
-      errorMessage: 'Khong the doc thong tin tu anh CCCD, vui long chup ro hon'
+      errorMessage: 'Khong the doc thong tin tu anh CCCD, vui long chup ro hon',
+      data: {},
+      warnings: [],
+      debug: {
+        validFieldCount: 0,
+        missingFields: getRequiredFields(),
+        warnings: []
+      }
     };
   }
 };

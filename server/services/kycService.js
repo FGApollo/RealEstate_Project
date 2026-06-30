@@ -47,6 +47,24 @@ const clearSelfieAttemptFailures = (userId, verificationId) => {
   selfieAttemptFailures.delete(getSelfieAttemptKey(userId, verificationId));
 };
 
+const buildFaceCompareDebug = (faceResult = {}) => {
+  const debug = {};
+
+  [
+    'provider',
+    'confidence',
+    'threshold',
+    'cardFaceCropUsed',
+    'cardRotationApplied'
+  ].forEach((key) => {
+    if (faceResult[key] !== undefined && faceResult[key] !== null) {
+      debug[key] = faceResult[key];
+    }
+  });
+
+  return Object.keys(debug).length ? debug : null;
+};
+
 const ensureUserCanUseKyc = async (userId) => {
   const { data: user, error } = await supabase
     .from('users')
@@ -251,7 +269,10 @@ const uploadCard = async ({ userId, fullName, phone, frontImage, backImage }) =>
   if (!ocrResult.isValid) {
     return {
       success: false,
-      error: ocrResult.errorMessage || 'ID card OCR validation failed'
+      error: ocrResult.errorMessage || 'ID card OCR validation failed',
+      data: ocrResult.data || {},
+      warnings: ocrResult.warnings || [],
+      debug: ocrResult.debug || null
     };
   }
 
@@ -274,6 +295,8 @@ const uploadCard = async ({ userId, fullName, phone, frontImage, backImage }) =>
   return {
     success: true,
     nextStep: 'SELFIE',
+    data: ocrResult.data || {},
+    warnings: ocrResult.warnings || [],
     verification
   };
 };
@@ -350,10 +373,13 @@ const uploadSelfie = async ({ userId, selfieImage }) => {
   );
 
   if (!faceResult.isMatch) {
+    const faceDebug = buildFaceCompareDebug(faceResult);
+
     if (faceResult.errorMessage === 'Khong the xac minh khuon mat, vui long thu lai') {
       return {
         success: false,
-        error: faceResult.errorMessage
+        error: faceResult.errorMessage,
+        debug: faceDebug
       };
     }
 
@@ -368,7 +394,8 @@ const uploadSelfie = async ({ userId, selfieImage }) => {
         attemptsUsed,
         attemptsLeft,
         message: 'Khuon mat khong khop voi CCCD, vui long chup lai.',
-        error: faceResult.errorMessage || 'Khuon mat khong khop voi CCCD'
+        error: faceResult.errorMessage || 'Khuon mat khong khop voi CCCD',
+        debug: faceDebug
       };
     }
 
@@ -382,7 +409,8 @@ const uploadSelfie = async ({ userId, selfieImage }) => {
       attemptsUsed: MAX_SELFIE_ATTEMPTS,
       attemptsLeft: 0,
       message: reason,
-      error: reason
+      error: reason,
+      debug: faceDebug
     };
   }
 
@@ -394,7 +422,8 @@ const uploadSelfie = async ({ userId, selfieImage }) => {
 
   return {
     success: true,
-    verificationStatus: VERIFIED_STATUS
+    verificationStatus: VERIFIED_STATUS,
+    debug: buildFaceCompareDebug(faceResult)
   };
 };
 
