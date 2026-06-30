@@ -7,6 +7,7 @@ const propertyRoutes = require('./routes/propertyRoutes');
 const favoritesRoutes = require('./routes/favoritesRoutes');
 const agentRoutes = require('./routes/agentRoutes');
 const kycRoutes = require('./routes/kycRoutes');
+const phoneOtpRoutes = require('./routes/phoneOtpRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -20,6 +21,7 @@ app.use('/api/properties', propertyRoutes);
 app.use('/api/favorites', favoritesRoutes);
 app.use('/api/agent', agentRoutes);
 app.use('/api/kyc', kycRoutes);
+app.use('/api/phone', phoneOtpRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
