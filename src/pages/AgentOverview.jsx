@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Home, Search, LayoutDashboard, Settings, LogOut, BarChart2, HelpCircle
 } from 'lucide-react';
@@ -8,7 +9,8 @@ import './AgentOverview.css';
 import { API_BASE_URL } from '../config';
 
 const AgentOverview = () => {
-  const [currentUser] = useState(() => {
+  const navigate = useNavigate();
+  const [currentUser, setCurrentUser] = useState(() => {
     try {
       const saved = localStorage.getItem('user');
       return saved ? JSON.parse(saved) : { id: 12, name: 'Zăn Cao', role: 'AGENT', verification_status: 'UNVERIFIED' };
@@ -16,6 +18,26 @@ const AgentOverview = () => {
       return { id: 12, name: 'Zăn Cao', role: 'AGENT', verification_status: 'UNVERIFIED' };
     }
   });
+
+  useEffect(() => {
+    const sessionUser = localStorage.getItem('user');
+    if (!sessionUser) {
+      navigate('/login/agent');
+    } else {
+      const parsedUser = JSON.parse(sessionUser);
+      if (parsedUser.role !== 'AGENT') {
+        navigate('/');
+      } else {
+        setCurrentUser(parsedUser);
+      }
+    }
+  }, [navigate]);
+
+  const handleLogout = (e) => {
+    e.preventDefault();
+    localStorage.removeItem('user');
+    navigate('/login/agent');
+  };
 
   const [data, setData] = useState({
     totalProperties: 0,
@@ -92,7 +114,7 @@ const AgentOverview = () => {
         {/* Bottom: Help Center + logout */}
         <div className="sidebar-bottom">
           <a href="#" className="nav-item"><HelpCircle size={16} /> Help Center</a>
-          <a href="#" className="nav-item"><LogOut size={16} /> Log Out</a>
+          <a href="#" className="nav-item" onClick={handleLogout}><LogOut size={16} /> Log Out</a>
         </div>
       </aside>
 

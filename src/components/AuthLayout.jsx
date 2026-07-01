@@ -2,9 +2,9 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import './AuthLayout.css';
 
-const AuthLayout = ({ children, title, subtitle }) => {
+const AuthLayout = ({ children, title, subtitle, theme = 'user' }) => {
   return (
-    <div className="auth-container">
+    <div className={`auth-container ${theme === 'agent' ? 'agent-theme' : ''}`}>
       <div className="auth-background">
         {/* Abstract shapes or image could go here for larger screens */}
         <div className="auth-shape shape-1"></div>

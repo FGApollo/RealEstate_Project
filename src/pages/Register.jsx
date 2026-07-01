@@ -148,7 +148,10 @@ const Register = () => {
       </div>
 
       <div className="auth-footer">
-        Đã có tài khoản? <Link to="/login">Đăng nhập</Link>
+        <div>Đã có tài khoản? <Link to="/login">Đăng nhập</Link></div>
+        <div style={{ marginTop: '1rem', fontSize: '0.85rem' }}>
+          Bạn muốn đăng ký làm Môi giới? <Link to="/register/agent">Đăng ký tại đây</Link>
+        </div>
       </div>
     </AuthLayout>
   );
