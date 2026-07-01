@@ -1,81 +1,175 @@
-/* AgentOverview.css */
+/* AgentOverview.css – Light gray sidebar matching design */
+
+/* ── Layout ── */
 .agent-dashboard {
   display: flex;
   height: 100vh;
-  background-color: #f8fafc;
+  background-color: #f0f4f8;
   font-family: 'Inter', sans-serif;
   text-align: left;
 }
 
+/* ════════════════════════════════════════
+   SIDEBAR – Light gray like the design
+   ════════════════════════════════════════ */
 .agent-dashboard .sidebar {
   width: 260px;
-  background-color: white;
-  border-right: 1px solid #e2e8f0;
+  flex-shrink: 0;
+  background-color: #eef0f5;
   display: flex;
   flex-direction: column;
-  padding: 24px;
+  padding: 0;
+  border-right: none;
 }
 
+/* Logo */
 .agent-dashboard .sidebar-logo {
-  font-weight: 800;
+  padding: 28px 24px 20px;
+  font-weight: 900;
   font-size: 20px;
-  color: #2563eb;
-  margin-bottom: 40px;
   letter-spacing: 1px;
+  color: #2563eb;
+  line-height: 1.2;
 }
 
+/* Section label — hidden, no label needed */
+.agent-dashboard .sidebar-section-label {
+  display: none;
+}
+
+/* Nav */
 .agent-dashboard .sidebar-nav {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 4px;
   flex: 1;
+  padding: 8px 16px;
 }
 
-.agent-dashboard .nav-item {
+/* Nav buttons */
+.agent-dashboard .nav-btn {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 16px;
-  color: #64748b;
-  text-decoration: none;
-  border-radius: 8px;
-  font-weight: 500;
-  transition: all 0.2s ease;
+  padding: 13px 16px;
+  color: #1e293b;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0.3px;
+  transition: all 0.18s ease;
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  text-transform: uppercase;
 }
 
-.agent-dashboard .nav-item:hover, .agent-dashboard .nav-item.active {
-  background-color: #eff6ff;
+.agent-dashboard .nav-btn svg {
+  flex-shrink: 0;
+  color: #334155;
+}
+
+.agent-dashboard .nav-btn:hover {
+  background-color: rgba(37, 99, 235, 0.08);
   color: #2563eb;
 }
 
-.agent-dashboard .sidebar-bottom {
-  margin-top: auto;
+.agent-dashboard .nav-btn:hover svg {
+  color: #2563eb;
 }
 
+/* Active: solid blue pill */
+.agent-dashboard .nav-btn.active {
+  background-color: #2563eb;
+  color: #ffffff;
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+
+.agent-dashboard .nav-btn.active svg {
+  color: #ffffff;
+}
+
+/* Sidebar bottom */
+.agent-dashboard .sidebar-bottom {
+  padding: 16px;
+  border-top: 1px solid #dde1ea;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Hide sidebar user card */
+.agent-dashboard .sidebar-user-card {
+  display: none;
+}
+
+/* Legacy nav-item (Help Center, Log Out) */
+.agent-dashboard .nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 16px;
+  color: #475569;
+  text-decoration: none;
+  border-radius: 10px;
+  font-weight: 500;
+  font-size: 14px;
+  transition: all 0.18s ease;
+}
+
+.agent-dashboard .nav-item:hover {
+  background-color: rgba(0,0,0,0.05);
+  color: #1e293b;
+}
+
+/* ════════════════════════════════════════
+   MAIN CONTENT
+   ════════════════════════════════════════ */
 .agent-dashboard .main-content {
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
+  overflow: hidden;
 }
 
+/* ── Top bar – light blue header ── */
 .agent-dashboard .topbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 40px;
-  background-color: white;
-  border-bottom: 1px solid #e2e8f0;
+  padding: 14px 36px;
+  background: linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%);
+  border-bottom: 1px solid #bfdbfe;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  gap: 20px;
 }
 
+/* Search bar – wide pill */
 .agent-dashboard .search-bar {
   display: flex;
   align-items: center;
-  gap: 12px;
-  background-color: #f1f5f9;
-  padding: 10px 16px;
-  border-radius: 20px;
-  width: 300px;
+  gap: 10px;
+  background-color: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(8px);
+  border: 1.5px solid rgba(147, 197, 253, 0.6);
+  padding: 10px 20px;
+  border-radius: 50px;
+  flex: 1;
+  max-width: 640px;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 4px rgba(59, 130, 246, 0.08);
+}
+
+.agent-dashboard .search-bar:focus-within {
+  border-color: #3b82f6;
+  background-color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
 }
 
 .agent-dashboard .search-bar input {
@@ -83,300 +177,81 @@
   background: transparent;
   outline: none;
   width: 100%;
-  color: #334155;
+  color: #1e3a5f;
   font-size: 14px;
+  font-family: inherit;
 }
 
+.agent-dashboard .search-bar input::placeholder {
+  color: #7cb3f5;
+}
+
+/* Topbar right profile */
 .agent-dashboard .profile-badge {
   display: flex;
   align-items: center;
-  gap: 12px;
-  background-color: #dcfce7;
-  padding: 8px 16px;
-  border-radius: 20px;
-  color: #166534;
+  gap: 10px;
+  padding: 6px 14px 6px 6px;
+  border-radius: 30px;
   font-weight: 600;
   font-size: 14px;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.agent-dashboard .profile-badge.verified {
+  background-color: #f0fdf4;
+  color: #166534;
+  border: 1.5px solid #bbf7d0;
+}
+
+.agent-dashboard .profile-badge.unverified {
+  background-color: #fffbeb;
+  color: #b45309;
+  border: 1.5px solid #fef3c7;
 }
 
 .agent-dashboard .profile-avatar {
-  background-color: #22c55e;
   color: white;
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 12px;
+  font-weight: 800;
 }
 
-.agent-dashboard .dashboard-content {
-  padding: 40px;
-  max-width: 1200px;
+.agent-dashboard .profile-badge.verified .profile-avatar {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
 }
 
-.agent-dashboard .dashboard-content h1 {
-  margin: 0 0 8px 0;
-  font-size: 28px;
-  color: #0f172a;
+.agent-dashboard .profile-badge.unverified .profile-avatar {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
 }
 
-.agent-dashboard .subtitle {
-  color: #64748b;
-  margin-bottom: 32px;
-}
-
-.agent-dashboard .stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 24px;
-  margin-bottom: 40px;
-}
-
-.agent-dashboard .stat-card {
-  background-color: white;
-  padding: 24px;
-  border-radius: 16px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-  border: 1px solid #e2e8f0;
-}
-
-.agent-dashboard .stat-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 16px;
-}
-
-.agent-dashboard .properties-icon {
-  background-color: #eff6ff;
-  color: #2563eb;
-}
-
-.agent-dashboard .views-icon {
-  background-color: #f0fdf4;
-  color: #16a34a;
-}
-
-.agent-dashboard .favorites-icon {
-  background-color: #fdf2f8;
-  color: #db2777;
-}
-
-.agent-dashboard .stat-label {
-  color: #64748b;
-  font-size: 14px;
-  font-weight: 500;
-  margin-bottom: 8px;
-}
-
-.agent-dashboard .stat-value {
-  font-size: 32px;
-  font-weight: 700;
-  color: #0f172a;
-  margin-bottom: 8px;
-}
-
-.agent-dashboard .stat-trend {
-  font-size: 12px;
-  color: #94a3b8;
-}
-
-.agent-dashboard .active-listings-section {
-  background-color: white;
-  border-radius: 16px;
-  padding: 24px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-  border: 1px solid #e2e8f0;
-}
-
-.agent-dashboard .section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
-}
-
-.agent-dashboard .section-header h2 {
-  font-size: 18px;
-  color: #0f172a;
-  margin: 0;
-}
-
-.agent-dashboard .view-all {
-  color: #2563eb;
-  text-decoration: none;
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.agent-dashboard .listings-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.agent-dashboard .listing-item {
-  display: flex;
-  align-items: center;
-  padding: 16px;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  transition: all 0.2s ease;
-}
-
-.agent-dashboard .listing-item:hover {
-  border-color: #cbd5e1;
-  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
-}
-
-.agent-dashboard .listing-image {
-  width: 80px;
-  height: 60px;
-  border-radius: 8px;
-  object-fit: cover;
-  margin-right: 20px;
-}
-
-.agent-dashboard .listing-info {
-  flex: 1;
-}
-
-.agent-dashboard .listing-info h3 {
-  margin: 0 0 4px 0;
-  font-size: 16px;
-  color: #1e293b;
-}
-
-.agent-dashboard .listing-info p {
-  margin: 0;
-  font-size: 14px;
-  color: #64748b;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.agent-dashboard .agent-status-badge {
-  background-color: #dcfce7;
-  color: #166534;
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 500;
-  display: inline-block;
-}
-
-.agent-dashboard .listing-stats {
-  display: flex;
-  gap: 24px;
-  margin-right: 24px;
-}
-
-.agent-dashboard .listing-stat {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: #64748b;
-  font-weight: 500;
-}
-
-.agent-dashboard .action-btn {
-  background: transparent;
-  border: none;
-  color: #94a3b8;
-  cursor: pointer;
-  padding: 8px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-}
-
-.agent-dashboard .action-btn:hover {
-  background-color: #f1f5f9;
-  color: #0f172a;
-}
-
-/* Dashboard Header & Placeholder Banners */
-.agent-dashboard .dashboard-header-container {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 32px;
-}
-
-/* Grey Unverified Banner Placeholder (in header topbar) */
-.agent-dashboard .unverified-banner-placeholder {
-  background-color: #f1f5f9;
-  color: #475569;
-  padding: 8px 18px;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.02);
-  margin-right: auto;
-  margin-left: 24px;
-}
-
-.agent-dashboard .unverified-banner-placeholder a {
-  color: #0f172a;
-  font-weight: 700;
-  text-decoration: underline;
-  margin-left: 12px;
-}
-
-.agent-dashboard .unverified-banner-placeholder a:hover {
-  color: #2563eb;
-}
-
-/* Green Verified Broker Placeholder Card */
-.agent-dashboard .verified-broker-placeholder {
-  background-color: #a7f3d0; /* light aquamarine */
-  border: 1px solid #6ee7b7;
-  border-radius: 12px;
-  padding: 10px 20px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  color: #064e3b;
-  font-family: 'Inter', sans-serif;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
-}
-
-.agent-dashboard .verified-badge-icon {
-  background-color: #065f46; /* dark green circle */
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.agent-dashboard .verified-badge-text {
+.agent-dashboard .profile-info-wrapper {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  text-align: left;
 }
 
-.agent-dashboard .verified-status-title {
+.agent-dashboard .profile-name {
+  font-size: 13px;
   font-weight: 700;
-  font-size: 14px;
-  color: #065f46;
+  line-height: 1.2;
 }
 
-.agent-dashboard .verified-score-subtitle {
-  font-size: 12px;
-  color: #047857;
-  margin-top: 1px;
+.agent-dashboard .verification-status-tag {
+  font-size: 10px;
+  font-weight: 600;
+  opacity: 0.75;
+}
+
+/* ── Dashboard content ── */
+.agent-dashboard .dashboard-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 32px 36px;
 }

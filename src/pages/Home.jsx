@@ -155,7 +155,12 @@ const Home = () => {
     if (!sessionUser) {
       navigate('/login');
     } else {
-      setUser(JSON.parse(sessionUser));
+      const parsedUser = JSON.parse(sessionUser);
+      if (parsedUser.role === 'AGENT') {
+        navigate('/sale/overview');
+      } else {
+        setUser(parsedUser);
+      }
     }
   }, [navigate]);
 
