@@ -2753,6 +2753,34 @@
   color: #94a3b8;
 }
 
+/* Responsive Navbar overrides for Swipe.css */
+.swipe-menu-btn {
+  display: none;
+  background: none;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+  align-items: center;
+  justify-content: center;
+}
+
+.swipe-menu-btn:hover {
+  background-color: #f1f5f9;
+  color: #0f172a;
+}
+
+@media (max-width: 768px) {
+  .swipe-menu-btn {
+    display: flex;
+  }
+  .swipe-header-right {
+    display: none;
+  }
+}
+
 
 
 

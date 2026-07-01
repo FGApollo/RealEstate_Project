@@ -7,6 +7,7 @@ const propertyRoutes = require('./routes/propertyRoutes');
 const favoritesRoutes = require('./routes/favoritesRoutes');
 const agentRoutes = require('./routes/agentRoutes');
 const kycRoutes = require('./routes/kycRoutes');
+const chatRoutes = require('./routes/chatRoutes');
 const phoneOtpRoutes = require('./routes/phoneOtpRoutes');
 
 const app = express();
@@ -25,6 +26,7 @@ app.use('/api/properties', propertyRoutes);
 app.use('/api/favorites', favoritesRoutes);
 app.use('/api/agent', agentRoutes);
 app.use('/api/kyc', kycRoutes);
+app.use('/api/chat', chatRoutes);
 app.use('/api/phone', phoneOtpRoutes);
 
 app.listen(PORT, () => {
