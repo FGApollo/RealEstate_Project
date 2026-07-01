@@ -173,7 +173,8 @@ const getPropertyById = async (id) => {
       *,
       property_features(feature_name),
       property_images(image_url),
-      lifestyle_tags(tag_name)
+      lifestyle_tags(tag_name),
+      owner:users!owner_id(name, role, avatar, trust_score, created_at)
     `)
     .eq('id', id)
     .single();

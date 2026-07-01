@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Home, Search, LayoutDashboard, Settings, LogOut, BarChart2, HelpCircle
+  Home, Search, LayoutDashboard, Settings, LogOut, BarChart2, HelpCircle, MessageSquare
 } from 'lucide-react';
 import OverviewDashboard from '../features/agent/overview/OverviewDashboard';
 import CreateListingWizard from '../features/agent/create-listing/CreateListingWizard';
 import EditListingWizard from '../features/agent/edit-listing/EditListingWizard';
+import AgentChat from '../features/agent/chat/AgentChat';
 import './AgentOverview.css';
 import { API_BASE_URL } from '../config';
 
@@ -56,9 +57,31 @@ const AgentOverview = () => {
   
   const [editingPropertyId, setEditingPropertyId] = useState(null);
 
+  const [funnelStats, setFunnelStats] = useState({
+    AWARENESS: 0,
+    CONSIDERATION: 0,
+    INTENT: 0,
+    ACTION: 0
+  });
+
+  const fetchFunnelStats = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/chat/funnel/stats?agentId=${currentUser.id}`);
+      if (res.ok) {
+        const result = await res.json();
+        setFunnelStats(result.stats || { AWARENESS: 0, CONSIDERATION: 0, INTENT: 0, ACTION: 0 });
+      }
+    } catch (err) {
+      console.error('Error fetching funnel stats:', err);
+    }
+  };
+
   const handleTabChange = (tabName) => {
     setActiveTab(tabName);
     setEditingPropertyId(null);
+    if (tabName === 'analytics') {
+      fetchFunnelStats();
+    }
   };
 
   const handleEditProperty = (id) => {
@@ -125,14 +148,20 @@ const AgentOverview = () => {
             <LayoutDashboard size={18} /> Tổng quan
           </button>
           <button
-            className={`nav-btn ${activeTab === 'listings' || activeTab === 'create-listing' ? 'active' : ''}`}
+            className={`nav-btn ${activeTab === 'listings' || activeTab === 'create-listing' || activeTab === 'edit-listing' ? 'active' : ''}`}
             onClick={() => handleTabChange('listings')}
           >
             <Home size={18} /> Bất động sản
           </button>
           <button
+            className={`nav-btn ${activeTab === 'chat' ? 'active' : ''}`}
+            onClick={() => handleTabChange('chat')}
+          >
+            <MessageSquare size={18} /> Tin nhắn
+          </button>
+          <button
             className={`nav-btn ${activeTab === 'analytics' ? 'active' : ''}`}
-            onClick={() => handleTabChange('overview')}
+            onClick={() => handleTabChange('analytics')}
           >
             <BarChart2 size={18} /> Phân tích
           </button>
@@ -211,6 +240,77 @@ const AgentOverview = () => {
               currentUser={currentUser}
             />
           )}
+
+          {/* TAB 5: CHAT PANEL */}
+          {activeTab === 'chat' && (
+            <AgentChat
+              currentUser={currentUser}
+            />
+          )}
+
+          {/* TAB 6: ANALYTICS PANEL */}
+          {activeTab === 'analytics' && (() => {
+            const total = funnelStats.AWARENESS + funnelStats.CONSIDERATION + funnelStats.INTENT + funnelStats.ACTION;
+            const maxVal = Math.max(1, funnelStats.AWARENESS, funnelStats.CONSIDERATION, funnelStats.INTENT, funnelStats.ACTION);
+            
+            const stages = [
+              { key: 'AWARENESS', label: 'Nhận biết & Quan tâm', desc: 'Khách hàng mới nhắn tin, tìm hiểu thông tin', color: '#6366f1' },
+              { key: 'CONSIDERATION', label: 'Cân nhắc', desc: 'Khách hàng so sánh, cân nhắc kỹ lưỡng', color: '#f59e0b' },
+              { key: 'INTENT', label: 'Ý định / Thương lượng', desc: 'Khách hàng thương lượng giá, đàm phán hợp đồng', color: '#2563eb' },
+              { key: 'ACTION', label: 'Hành động / Chốt', desc: 'Khách hàng đã ký hợp đồng chốt giao dịch', color: '#10b981' }
+            ];
+
+            return (
+              <div className="analytics-panel">
+                <h2 className="analytics-title">Phễu phân loại khách hàng (CRM Funnel)</h2>
+                <p className="analytics-subtitle">
+                  Theo dõi tiến độ chuyển đổi của khách hàng từ khi tiếp cận đến khi chốt giao dịch thành công.
+                </p>
+
+                <div className="funnel-container">
+                  {stages.map((stage, idx) => {
+                    const count = funnelStats[stage.key] || 0;
+                    const pctWidth = maxVal > 0 ? Math.max(25, (count / maxVal) * 100) : 25;
+                    
+                    return (
+                      <div key={stage.key} className="funnel-row">
+                        <div className="funnel-stage-label">
+                          <span className="funnel-stage-name">{stage.label}</span>
+                          <span className="funnel-stage-desc">{stage.desc}</span>
+                        </div>
+                        <div className="funnel-bar-outer">
+                          <div 
+                            className="funnel-bar-inner"
+                            style={{ 
+                              width: `${pctWidth}%`,
+                              backgroundColor: stage.color
+                            }}
+                          >
+                            <span className="funnel-count">{count}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="funnel-summary">
+                  <div className="summary-card">
+                    <span>Tổng khách hàng</span>
+                    <h4>{total}</h4>
+                  </div>
+                  <div className="summary-card">
+                    <span>Tỷ lệ chốt (Action)</span>
+                    <h4>{total > 0 ? ((funnelStats.ACTION / total) * 100).toFixed(1) : '0.0'}%</h4>
+                  </div>
+                  <div className="summary-card">
+                    <span>Mức độ tiềm năng (Intent)</span>
+                    <h4>{total > 0 ? (((funnelStats.INTENT + funnelStats.ACTION) / total) * 100).toFixed(1) : '0.0'}%</h4>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </main>
     </div>

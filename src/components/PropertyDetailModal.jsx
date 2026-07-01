@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   X, ChevronLeft, ChevronRight, Sparkles, MapPin, 
   Heart, Share2, Maximize, Bath, Calendar, Eye, Shield, 
@@ -8,6 +9,7 @@ import './PropertyDetailModal.css';
 
 const PropertyDetailModal = ({ property, onClose, showFavoriteActions = false, isFavorite = false, onToggleFavorite }) => {
   const [activeSliderIdx, setActiveSliderIdx] = useState(0);
+  const navigate = useNavigate();
 
   useEffect(() => {
     setActiveSliderIdx(0);
@@ -227,9 +229,18 @@ const PropertyDetailModal = ({ property, onClose, showFavoriteActions = false, i
                   </div>
                   
                   <div className="poster-contact-buttons">
-                    <a href={`sms:${property.contact_phone || '0901234567'}`} className="contact-btn message-btn">
+                    <button 
+                      className="contact-btn message-btn"
+                      onClick={() => {
+                        if (property.owner_id) {
+                          navigate(`/chat?agentId=${property.owner_id}&propertyId=${property.id}`);
+                        } else {
+                          alert('Bất động sản này không có thông tin chủ sở hữu.');
+                        }
+                      }}
+                    >
                       <MessageSquare size={16} /> Nhắn tin
-                    </a>
+                    </button>
                     <a href={`tel:${property.contact_phone || '0901234567'}`} className="contact-btn call-btn">
                       <Phone size={16} /> Gọi ngay
                     </a>

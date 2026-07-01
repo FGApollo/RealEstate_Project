@@ -117,8 +117,20 @@ const googleLogin = async (credential) => {
   }
 };
 
+const getUserById = async (id) => {
+  const { data, error } = await supabase
+    .from('users')
+    .select('id, name, email, avatar, role, phone')
+    .eq('id', id)
+    .single();
+
+  if (error) throw new Error(error.message);
+  return data;
+};
+
 module.exports = {
   registerUser,
   loginUser,
-  googleLogin
+  googleLogin,
+  getUserById
 };

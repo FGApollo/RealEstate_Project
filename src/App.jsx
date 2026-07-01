@@ -6,6 +6,7 @@ import RegisterAgent from './pages/RegisterAgent'
 import Home from './pages/Home'
 import Swipe from './pages/Swipe'
 import AgentOverview from './pages/AgentOverview'
+import Chat from './pages/Chat'
 import './App.css'
 
 function App() {
@@ -18,6 +19,7 @@ function App() {
       <Route path="/register/agent" element={<RegisterAgent />} />
       <Route path="/swipe/:categoryName" element={<Swipe />} />
       <Route path="/sale/overview" element={<AgentOverview />} />
+      <Route path="/chat" element={<Chat />} />
     </Routes>
   )
 }

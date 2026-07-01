@@ -100,6 +100,7 @@ const Home = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(false);
   const [properties, setProperties] = useState([]);
   
   // Search parameters
@@ -516,16 +517,17 @@ const Home = () => {
       {/* Navbar */}
       <header className="navbar">
         <div className="nav-left">
-          <button className="menu-btn" aria-label="Menu">
+          <button className="menu-btn" aria-label="Menu" onClick={() => setShowSidebar(true)}>
             <Menu size={20} />
           </button>
           <span className="logo-text">Swipe Nest</span>
         </div>
 
         <nav className="nav-middle">
-          <a href="#" className="nav-link active">Trang Chủ</a>
-          <a href="#" className="nav-link">Khám Phá</a>
-          <a href="#" className="nav-link">Dịch Vụ</a>
+          <button className="nav-link active" onClick={() => navigate('/')}>Trang Chủ</button>
+          <button className="nav-link" onClick={() => navigate('/swipe/Tất cả')}>Khám Phá</button>
+          <button className="nav-link" onClick={() => navigate('/swipe/Tất cả', { state: { activeView: 'saved' } })}>Yêu thích</button>
+          <button className="nav-link" onClick={() => navigate('/chat')}>Chat</button>
         </nav>
 
         <div className="nav-right">
@@ -553,13 +555,6 @@ const Home = () => {
                   <div className="dropdown-item" style={{ fontWeight: 600, borderBottom: '1px solid #f1f5f9' }}>
                     {user.email}
                   </div>
-                  <button 
-                    className="dropdown-item" 
-                    onClick={() => navigate('/swipe/Căn Hộ', { state: { activeView: 'saved' } })}
-                  >
-                    <Heart size={14} style={{ marginRight: '8px', display: 'inline-block', verticalAlign: 'middle' }} />
-                    Tin đã yêu thích
-                  </button>
                   <button className="dropdown-item logout-btn" onClick={handleLogout}>
                     <LogOut size={14} style={{ marginRight: '8px', display: 'inline-block', verticalAlign: 'middle' }} />
                     Đăng xuất
@@ -570,6 +565,26 @@ const Home = () => {
           )}
         </div>
       </header>
+
+      {/* Mobile Sidebar Drawer */}
+      {showSidebar && (
+        <div className="mobile-sidebar-backdrop" onClick={() => setShowSidebar(false)}>
+          <div className="mobile-sidebar-drawer" onClick={(e) => e.stopPropagation()}>
+            <div className="mobile-sidebar-header">
+              <span className="logo-text">Swipe Nest</span>
+              <button className="close-sidebar-btn" onClick={() => setShowSidebar(false)}>
+                <X size={20} />
+              </button>
+            </div>
+            <nav className="mobile-sidebar-nav">
+              <button className="mobile-nav-link active" onClick={() => { navigate('/'); setShowSidebar(false); }}>Trang Chủ</button>
+              <button className="mobile-nav-link" onClick={() => { navigate('/swipe/Tất cả'); setShowSidebar(false); }}>Khám Phá</button>
+              <button className="mobile-nav-link" onClick={() => { navigate('/swipe/Tất cả', { state: { activeView: 'saved' } }); setShowSidebar(false); }}>Yêu thích</button>
+              <button className="mobile-nav-link" onClick={() => { navigate('/chat'); setShowSidebar(false); }}>Chat</button>
+            </nav>
+          </div>
+        </div>
+      )}
 
       {/* Hero Section */}
       <section className="hero-section">
