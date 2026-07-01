@@ -1,5 +1,24 @@
 /* CreateListingWizard.css */
 
+.back-to-listings-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: #475569;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 12px;
+  transition: color 0.2s;
+}
+
+.back-to-listings-btn:hover {
+  color: #0f172a;
+}
+
 /* Stepper Display */
 .stepper-wrapper {
   display: flex;

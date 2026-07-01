@@ -5,8 +5,8 @@ import {
   Megaphone, Info, ShieldCheck, Trash2, Image as ImageIcon, CheckCircle,
   LayoutDashboard, Compass, Home, SlidersHorizontal, Send
 } from 'lucide-react';
-import './CreateListingWizard.css';
-import useListingForm from './useListingForm';
+import '../create-listing/CreateListingWizard.css'; // Reuse CSS from create-listing
+import useListingForm from '../create-listing/useListingForm';
 
 const propertyTypesList = ['Căn Hộ', 'Chung Cư', 'Nhà Ở', 'Mặt Bằng', 'Văn Phòng', 'Phòng Trọ'];
 const lifestyleTagsList = ['Gần trường học', 'Gần đại học', 'Gần trung tâm', 'Gần phòng gym', 'Khu yên tĩnh', 'Khu an ninh', 'Gần trạm xe buýt', 'Khu nhiều tiện ích'];
@@ -25,8 +25,8 @@ const amenitiesList = [
   { name: 'Cho nuôi thú cưng', icon: <Cat size={18} /> }
 ];
 
-// ponytail: create-only wizard — edit logic lives in EditListingWizard
-const CreateListingWizard = ({ setActiveTab, setData, currentUser }) => {
+// ponytail: edit-only wizard
+const EditListingWizard = ({ propertyId, setActiveTab, setData, currentUser }) => {
   const {
     listing, setListing,
     currentStep, setCurrentStep,
@@ -41,7 +41,8 @@ const CreateListingWizard = ({ setActiveTab, setData, currentUser }) => {
     toggleAmenity, toggleLifestyleTag, toggleChannel,
     handleSubmitListing, resetForm
   } = useListingForm({
-    mode: 'create',
+    mode: 'edit',
+    editingPropertyId: propertyId,
     currentUser,
     setData,
     onSuccess: () => setActiveTab('listings')
@@ -61,10 +62,10 @@ const CreateListingWizard = ({ setActiveTab, setData, currentUser }) => {
             <span>Quay lại danh sách</span>
           </button>
           <h1 style={{ fontSize: '28px', fontWeight: '700', color: '#0f172a', marginBottom: '8px' }}>
-            Tạo tin đăng mới
+            Sửa tin đăng
           </h1>
           <p style={{ fontSize: '14px', color: '#475569', margin: '0' }}>
-            Hoàn tất các thông tin bên dưới để đăng tải tài sản có giá trị của bạn lên nền tảng giao dịch.
+            Hoàn tất các thay đổi bên dưới để cập nhật thông tin bất động sản của bạn.
           </p>
         </div>
       )}
@@ -366,8 +367,8 @@ const CreateListingWizard = ({ setActiveTab, setData, currentUser }) => {
             <div className="success-animated-checkmark">
               <CheckCircle size={64} color="#22c55e" />
             </div>
-            <h1>Đăng tin thành công</h1>
-            <p className="success-subtext">Chúc mừng! Tin đăng của bạn đã được kiểm duyệt và hiển thị công khai trên Swipe Nest.</p>
+            <h1>Cập nhật tin thành công</h1>
+            <p className="success-subtext">Chúc mừng! Tin đăng của bạn đã được cập nhật thành công trên Swipe Nest.</p>
           </div>
 
           <div className="success-preview-listing">
@@ -414,8 +415,8 @@ const CreateListingWizard = ({ setActiveTab, setData, currentUser }) => {
             </button>
           ) : (
             <button type="button" className="nav-primary-btn submit-action" onClick={handleSubmitListing}>
-              <span>Hoàn tất &amp; Đăng tin</span>
-              <CheckCircle2 size={16} />
+              <span>Lưu thông tin thay đổi</span>
+              <Send size={16} />
             </button>
           )}
         </div>
@@ -424,4 +425,4 @@ const CreateListingWizard = ({ setActiveTab, setData, currentUser }) => {
   );
 };
 
-export default CreateListingWizard;
+export default EditListingWizard;

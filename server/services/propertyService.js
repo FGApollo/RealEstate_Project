@@ -29,6 +29,16 @@ const saveBase64Image = (base64Str) => {
   return mockUnsplashImages[randomIndex];
 };
 
+// Sync a child table: delete all rows for this property then re-insert.
+const syncRelatedRows = async (table, idField, propertyId, rows) => {
+  const { error: delErr } = await supabase.from(table).delete().eq(idField, propertyId);
+  if (delErr) throw new Error(delErr.message);
+  if (rows && rows.length > 0) {
+    const { error: insErr } = await supabase.from(table).insert(rows);
+    if (insErr) throw new Error(insErr.message);
+  }
+};
+
 const getProperties = async () => {
   const { data, error } = await supabase
     .from('properties')
@@ -156,7 +166,76 @@ const createProperty = async (propertyData) => {
   return property;
 };
 
+const getPropertyById = async (id) => {
+  const { data, error } = await supabase
+    .from('properties')
+    .select(`
+      *,
+      property_features(feature_name),
+      property_images(image_url),
+      lifestyle_tags(tag_name)
+    `)
+    .eq('id', id)
+    .single();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+  return data;
+};
+
+const updateProperty = async (id, propertyData) => {
+
+  const { features, images, lifestyle_tags, ...fields } = propertyData;
+
+  const { data: property, error: propertyError } = await supabase
+    .from('properties')
+    .update({
+      ...fields,
+      price: parseFloat(fields.price) || 0,
+      area: parseFloat(fields.area) || 0,
+      bedrooms: parseInt(fields.bedrooms) || 0,
+      bathrooms: parseInt(fields.bathrooms) || 0,
+      status: fields.status || 'AVAILABLE',
+      thumbnail: saveBase64Image(fields.thumbnail),
+      latitude: parseFloat(fields.latitude) || null,
+      longitude: parseFloat(fields.longitude) || null
+    })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (propertyError) {
+    console.error('Supabase Properties Table Update Error:', propertyError);
+    throw new Error(propertyError.message);
+  }
+
+  await syncRelatedRows('property_features', 'property_id', id,
+    features?.map(name => ({ property_id: id, feature_name: name })));
+
+  await syncRelatedRows('property_images', 'property_id', id,
+    images?.map(url => ({ property_id: id, image_url: saveBase64Image(url) })));
+
+  await syncRelatedRows('lifestyle_tags', 'property_id', id,
+    lifestyle_tags?.map(tag => ({ property_id: id, tag_name: tag })));
+
+  return property;
+};
+
+const deleteProperty = async (id) => {
+  // Delete child records first (cascade)
+  await supabase.from('property_features').delete().eq('property_id', id);
+  await supabase.from('property_images').delete().eq('property_id', id);
+  await supabase.from('lifestyle_tags').delete().eq('property_id', id);
+
+  const { error } = await supabase.from('properties').delete().eq('id', id);
+  if (error) throw new Error(error.message);
+};
+
 module.exports = {
   getProperties,
-  createProperty
+  createProperty,
+  getPropertyById,
+  updateProperty,
+  deleteProperty
 };

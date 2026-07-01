@@ -4,6 +4,8 @@ import {
   MapPin, Bed, Bath, Maximize, ShieldAlert, ShieldCheck, Search,
   Edit3, Trash2, ExternalLink
 } from 'lucide-react';
+import PropertyDetailModal from '../../../components/PropertyDetailModal';
+import DeleteConfirmModal from './DeleteConfirmModal';
 import './OverviewDashboard.css';
 
 // ponytail: extract overview and listings tab components into a single dashboard component
@@ -14,13 +16,17 @@ const OverviewDashboard = ({
   loading,
   searchQuery = '',
   setSearchQuery = () => {},
-  currentUser = {}
+  currentUser = {},
+  onEditProperty,
+  onDeleteProperty
 }) => {
   const [filterRegion, setFilterRegion] = useState('ALL');
   const [filterPrice, setFilterPrice] = useState('ALL');
   const [filterType, setFilterType] = useState('ALL');
   const [showFilters, setShowFilters] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [previewProperty, setPreviewProperty] = useState(null);
+  const [deletingProperty, setDeletingProperty] = useState(null);
   const itemsPerPage = 5;
 
   const regionsList = ['Đà Nẵng', 'Hồ Chí Minh', 'Hà Nội'];
@@ -305,13 +311,25 @@ const OverviewDashboard = ({
 
                 {/* Hover overlay with agent actions */}
                 <div className="property-card-actions-overlay">
-                  <button className="card-action-icon" title="Xem chi tiết">
+                  <button 
+                    className="card-action-icon" 
+                    title="Xem chi tiết"
+                    onClick={() => setPreviewProperty(listing)}
+                  >
                     <ExternalLink size={16} />
                   </button>
-                  <button className="card-action-icon" title="Chỉnh sửa">
+                  <button 
+                    className="card-action-icon" 
+                    title="Chỉnh sửa"
+                    onClick={() => onEditProperty && onEditProperty(listing.id)}
+                  >
                     <Edit3 size={16} />
                   </button>
-                  <button className="card-action-icon danger" title="Xoá tin đăng">
+                  <button 
+                    className="card-action-icon danger" 
+                    title="Xoá tin đăng"
+                    onClick={() => setDeletingProperty(listing)}
+                  >
                     <Trash2 size={16} />
                   </button>
                 </div>
@@ -366,6 +384,27 @@ const OverviewDashboard = ({
             </div>
           )}
         </div>
+      )}
+
+      {/* Property Details Modal */}
+      {previewProperty && (
+        <PropertyDetailModal 
+          property={previewProperty} 
+          onClose={() => setPreviewProperty(null)} 
+          showFavoriteActions={false}
+        />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deletingProperty && (
+        <DeleteConfirmModal 
+          property={deletingProperty} 
+          onConfirm={(id) => {
+            onDeleteProperty && onDeleteProperty(id);
+            setDeletingProperty(null);
+          }}
+          onCancel={() => setDeletingProperty(null)}
+        />
       )}
     </div>
   );

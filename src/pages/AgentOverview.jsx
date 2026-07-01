@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import OverviewDashboard from '../features/agent/overview/OverviewDashboard';
 import CreateListingWizard from '../features/agent/create-listing/CreateListingWizard';
+import EditListingWizard from '../features/agent/edit-listing/EditListingWizard';
 import './AgentOverview.css';
 import { API_BASE_URL } from '../config';
 
@@ -52,6 +53,38 @@ const AgentOverview = () => {
 
   // Filter query state (passed down to sync topbar with the listing panel)
   const [searchQuery, setSearchQuery] = useState('');
+  
+  const [editingPropertyId, setEditingPropertyId] = useState(null);
+
+  const handleTabChange = (tabName) => {
+    setActiveTab(tabName);
+    setEditingPropertyId(null);
+  };
+
+  const handleEditProperty = (id) => {
+    setEditingPropertyId(id);
+    setActiveTab('edit-listing');
+  };
+
+  const handleDeleteProperty = async (id) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/properties/${id}`, {
+        method: 'DELETE'
+      });
+      if (response.ok) {
+        setData(prev => ({
+          ...prev,
+          totalProperties: Math.max(0, prev.totalProperties - 1),
+          activeListings: (prev.activeListings || []).filter(listing => listing.id !== id)
+        }));
+      } else {
+        alert('Xoá tin đăng thất bại.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Lỗi kết nối server.');
+    }
+  };
 
   useEffect(() => {
     const fetchOverview = async () => {
@@ -87,25 +120,25 @@ const AgentOverview = () => {
         <nav className="sidebar-nav">
           <button
             className={`nav-btn ${activeTab === 'overview' ? 'active' : ''}`}
-            onClick={() => setActiveTab('overview')}
+            onClick={() => handleTabChange('overview')}
           >
             <LayoutDashboard size={18} /> Tổng quan
           </button>
           <button
             className={`nav-btn ${activeTab === 'listings' || activeTab === 'create-listing' ? 'active' : ''}`}
-            onClick={() => setActiveTab('listings')}
+            onClick={() => handleTabChange('listings')}
           >
             <Home size={18} /> Bất động sản
           </button>
           <button
             className={`nav-btn ${activeTab === 'analytics' ? 'active' : ''}`}
-            onClick={() => setActiveTab('overview')}
+            onClick={() => handleTabChange('overview')}
           >
             <BarChart2 size={18} /> Phân tích
           </button>
           <button
             className={`nav-btn ${activeTab === 'settings' ? 'active' : ''}`}
-            onClick={() => setActiveTab('overview')}
+            onClick={() => handleTabChange('overview')}
           >
             <Settings size={18} /> Cài đặt
           </button>
@@ -149,19 +182,31 @@ const AgentOverview = () => {
           {(activeTab === 'overview' || activeTab === 'listings') && (
             <OverviewDashboard
               activeTab={activeTab}
-              setActiveTab={setActiveTab}
+              setActiveTab={handleTabChange}
               data={data}
               loading={loading}
               searchQuery={searchQuery}
               setSearchQuery={setSearchQuery}
               currentUser={currentUser}
+              onEditProperty={handleEditProperty}
+              onDeleteProperty={handleDeleteProperty}
             />
           )}
 
           {/* TAB 3: CREATE LISTING FLOW */}
           {activeTab === 'create-listing' && (
             <CreateListingWizard
-              setActiveTab={setActiveTab}
+              setActiveTab={handleTabChange}
+              setData={setData}
+              currentUser={currentUser}
+            />
+          )}
+
+          {/* TAB 4: EDIT LISTING FLOW */}
+          {activeTab === 'edit-listing' && (
+            <EditListingWizard
+              propertyId={editingPropertyId}
+              setActiveTab={handleTabChange}
               setData={setData}
               currentUser={currentUser}
             />
