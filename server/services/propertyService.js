@@ -9,24 +9,43 @@ const crypto = require('crypto');
 const saveBase64Image = (base64Str) => {
   const isPlaceholder = !base64Str || base64Str === 'https://via.placeholder.com/400';
   
-  if (!isPlaceholder && (typeof base64Str !== 'string' || !base64Str.startsWith('data:image/'))) {
+  if (isPlaceholder) {
     return base64Str;
   }
 
-  // Discard the base64 data and return a random beautiful Unsplash house image URL
-  const mockUnsplashImages = [
-    'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=1200&q=80',
-    'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80',
-    'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80',
-    'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1200&q=80',
-    'https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80',
-    'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1200&q=80',
-    'https://images.unsplash.com/photo-1613977257363-707ba9348227?auto=format&fit=crop&w=1200&q=80',
-    'https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=1200&q=80'
-  ];
+  if (typeof base64Str === 'string' && (base64Str.startsWith('http://') || base64Str.startsWith('https://') || base64Str.startsWith('/uploads/'))) {
+    return base64Str;
+  }
 
-  const randomIndex = Math.floor(Math.random() * mockUnsplashImages.length);
-  return mockUnsplashImages[randomIndex];
+  if (typeof base64Str !== 'string' || !base64Str.startsWith('data:image/')) {
+    return base64Str;
+  }
+
+  try {
+    const matches = base64Str.match(/^data:image\/([A-Za-z-+\/]+);base64,(.+)$/);
+    if (!matches || matches.length !== 3) {
+      return base64Str;
+    }
+
+    const imageType = matches[1];
+    const base64Data = matches[2];
+    const buffer = Buffer.from(base64Data, 'base64');
+
+    const filename = `${crypto.randomUUID()}.${imageType}`;
+    const uploadDir = path.join(__dirname, '../public/uploads');
+    
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+
+    const filepath = path.join(uploadDir, filename);
+    fs.writeFileSync(filepath, buffer);
+
+    return `http://localhost:3000/uploads/${filename}`;
+  } catch (err) {
+    console.error('Error saving base64 image:', err);
+    return base64Str;
+  }
 };
 
 // Sync a child table: delete all rows for this property then re-insert.

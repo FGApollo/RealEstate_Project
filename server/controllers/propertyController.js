@@ -1,4 +1,5 @@
 const propertyService = require('../services/propertyService');
+const reviewService = require('../services/reviewService');
 
 const getProperties = async (req, res) => {
   try {
@@ -56,10 +57,40 @@ const deleteProperty = async (req, res) => {
   }
 };
 
+const getPropertyReviews = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const reviews = await reviewService.getPropertyReviews(id);
+    res.status(200).json({ reviews });
+  } catch (error) {
+    console.error('Error fetching property reviews:', error);
+    res.status(500).json({ error: error.message || 'Internal server error' });
+  }
+};
+
+const createPropertyReview = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userId, rating, comment, isVerifiedReview, images } = req.body;
+    
+    if (!userId || !rating) {
+      return res.status(400).json({ error: 'Missing userId or rating' });
+    }
+
+    const review = await reviewService.createPropertyReview(id, userId, rating, comment, isVerifiedReview, images);
+    res.status(201).json({ success: true, review });
+  } catch (error) {
+    console.error('Error creating property review:', error);
+    res.status(500).json({ error: error.message || 'Internal server error' });
+  }
+};
+
 module.exports = {
   getProperties,
   createProperty,
   getPropertyById,
   updateProperty,
-  deleteProperty
+  deleteProperty,
+  getPropertyReviews,
+  createPropertyReview
 };
