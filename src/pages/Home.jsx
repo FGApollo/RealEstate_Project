@@ -910,11 +910,13 @@ const Home = () => {
                 <div className="property-card-gradient-overlay"></div>
               </div>
 
-              <div className="property-card-badge-container">
-                <span className="property-card-badge-verified">
-                  ĐÃ XÁC THỰC
-                </span>
-              </div>
+              {mainVilla.is_highlighted && (
+                <div className="property-card-badge-container">
+                  <span className="property-card-badge-verified highlight">
+                    NỔI BẬT
+                  </span>
+                </div>
+              )}
 
               <div className="property-card-info-container">
                 <div className="property-card-text-block">
@@ -969,11 +971,13 @@ const Home = () => {
                   <div className="property-card-gradient-overlay"></div>
                 </div>
 
-                <div className="property-card-badge-container">
-                  <span className={`property-card-badge-verified ${property.is_highlighted ? 'highlight' : ''}`}>
-                    {property.is_highlighted ? 'NỔI BẬT' : 'ĐÃ XÁC THỰC'}
-                  </span>
-                </div>
+                {property.is_highlighted && (
+                  <div className="property-card-badge-container">
+                    <span className="property-card-badge-verified highlight">
+                      NỔI BẬT
+                    </span>
+                  </div>
+                )}
 
                 <div className="property-card-info-container small-card-info-container">
                   <div className="property-card-text-block">
