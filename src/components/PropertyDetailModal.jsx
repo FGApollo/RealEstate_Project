@@ -395,11 +395,28 @@ const PropertyDetailModal = ({ property, onClose, showFavoriteActions = false, i
                 </div>
                 
                 <div className="poster-right">
-                  <div className="trust-score-wrapper">
-                    <span>Trust Score</span>
-                    <p>{ownerDetails.trust_score || 92}</p>
-                    <small>Rất uy tín</small>
-                  </div>
+                  {(() => {
+                    const score = ownerDetails.trust_score !== undefined ? Number(ownerDetails.trust_score) : 92;
+                    let text = 'Rất uy tín';
+                    let color = '#d97706'; // gold
+                    if (score <= 39) {
+                      text = 'Rủi ro cao';
+                      color = '#dc2626'; // red
+                    } else if (score <= 59) {
+                      text = 'Bình thường';
+                      color = '#6b7280'; // grey
+                    } else if (score <= 79) {
+                      text = 'Đáng tin';
+                      color = '#10b981'; // green
+                    }
+                    return (
+                      <div className="trust-score-wrapper" style={{ borderColor: color }}>
+                        <span style={{ color: '#94a3b8' }}>Trust Score</span>
+                        <p style={{ color }}>{score}</p>
+                        <small style={{ color }}>{text}</small>
+                      </div>
+                    );
+                  })()}
                   
                   <div className="poster-contact-buttons">
                     <button 

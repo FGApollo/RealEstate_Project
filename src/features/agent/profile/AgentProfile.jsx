@@ -585,19 +585,36 @@ const AgentProfile = ({
           </div>
         </div>
 
-        <div className="verification-score-card">
-          <div className="score-icon-wrapper">
-            <ShieldCheck size={28} color="#047857" strokeWidth={2} />
-          </div>
-          <div className="score-texts">
-            <div className="status-label">
-              Status: <span className="highlight">{currentUser.verification_status === 'VERIFIED' ? 'Verified Broker' : 'Unverified Broker'}</span>
+        {(() => {
+          const score = currentUser.trust_score !== undefined ? Number(currentUser.trust_score) : 98;
+          let trustText = 'Rất uy tín';
+          let trustColor = '#d97706'; // gold
+          if (score <= 39) {
+            trustText = 'Rủi ro cao';
+            trustColor = '#dc2626'; // red
+          } else if (score <= 59) {
+            trustText = 'Bình thường';
+            trustColor = '#6b7280'; // grey
+          } else if (score <= 79) {
+            trustText = 'Đáng tin';
+            trustColor = '#10b981'; // green
+          }
+          return (
+            <div className="verification-score-card" style={{ borderLeft: `4px solid ${trustColor}` }}>
+              <div className="score-icon-wrapper">
+                <ShieldCheck size={28} color={trustColor} strokeWidth={2} />
+              </div>
+              <div className="score-texts">
+                <div className="status-label">
+                  Status: <span className="highlight">{currentUser.verification_status === 'VERIFIED' ? 'Verified Broker' : 'Unverified Broker'}</span>
+                </div>
+                <div className="score-label">
+                  Trust Score: <span style={{ color: trustColor, fontWeight: 'bold' }}>{score}/100</span> <span style={{ fontSize: '12px', color: '#64748b' }}>({trustText})</span>
+                </div>
+              </div>
             </div>
-            <div className="score-label">
-              Trust Score: <span className="highlight">{currentUser.trust_score || 98}/100</span>
-            </div>
-          </div>
-        </div>
+          );
+        })()}
       </div>
 
       {/* 2. SUB NAVIGATION TABS */}
@@ -903,10 +920,27 @@ const AgentProfile = ({
                     </div>
                   </div>
                   <div className="summary-desc">Dựa trên {reviews.length} đánh giá</div>
-                  <div className="trust-badge-banner">
-                    <ShieldCheck size={16} color="#10b981" />
-                    <span>TRẠNG THÁI: Tin cậy</span>
-                  </div>
+                  {(() => {
+                    const score = currentUser.trust_score !== undefined ? Number(currentUser.trust_score) : 98;
+                    let text = 'Rất uy tín';
+                    let color = '#d97706'; // gold
+                    if (score <= 39) {
+                      text = 'Rủi ro cao';
+                      color = '#dc2626'; // red
+                    } else if (score <= 59) {
+                      text = 'Bình thường';
+                      color = '#6b7280'; // grey
+                    } else if (score <= 79) {
+                      text = 'Đáng tin';
+                      color = '#10b981'; // green
+                    }
+                    return (
+                      <div className="trust-badge-banner" style={{ borderColor: color, backgroundColor: `${color}0b` }}>
+                        <ShieldCheck size={16} color={color} />
+                        <span style={{ color }}>TRẠNG THÁI: {text}</span>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Right Area: Filters and List */}
