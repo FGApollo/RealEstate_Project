@@ -187,67 +187,52 @@
 }
 
 /* Topbar right profile */
-.agent-dashboard .profile-badge {
+.agent-dashboard .topbar-right {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 6px 14px 6px 6px;
-  border-radius: 30px;
-  font-weight: 600;
-  font-size: 14px;
-  transition: all 0.3s ease;
+  gap: 16px;
+}
+
+.agent-dashboard .topbar-icon-btn {
+  background: none;
+  border: none;
+  color: #64748b;
   cursor: pointer;
-}
-
-.agent-dashboard .profile-badge.verified {
-  background-color: #f0fdf4;
-  color: #166534;
-  border: 1.5px solid #bbf7d0;
-}
-
-.agent-dashboard .profile-badge.unverified {
-  background-color: #fffbeb;
-  color: #b45309;
-  border: 1.5px solid #fef3c7;
-}
-
-.agent-dashboard .profile-avatar {
-  color: white;
-  width: 34px;
-  height: 34px;
+  padding: 8px;
   border-radius: 50%;
+  transition: all 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
-  font-weight: 800;
 }
 
-.agent-dashboard .profile-badge.verified .profile-avatar {
-  background: linear-gradient(135deg, #22c55e, #16a34a);
+.agent-dashboard .topbar-icon-btn:hover {
+  background-color: rgba(37, 99, 235, 0.08);
+  color: #2563eb;
 }
 
-.agent-dashboard .profile-badge.unverified .profile-avatar {
-  background: linear-gradient(135deg, #f59e0b, #d97706);
+.agent-dashboard .topbar-avatar-wrapper {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  overflow: hidden;
+  cursor: pointer;
+  border: 2px solid white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
 }
 
-.agent-dashboard .profile-info-wrapper {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+.agent-dashboard .topbar-avatar-wrapper:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
 }
 
-.agent-dashboard .profile-name {
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1.2;
+.agent-dashboard .topbar-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
-.agent-dashboard .verification-status-tag {
-  font-size: 10px;
-  font-weight: 600;
-  opacity: 0.75;
-}
 
 /* ── Dashboard content ── */
 .agent-dashboard .dashboard-content {

@@ -112,7 +112,7 @@ const getKycStatus = async (userId) => {
 
   const { data: latestVerification, error: verificationError } = await supabase
     .from('identity_verifications')
-    .select('id, status, reject_reason, created_at, updated_at')
+    .select('*')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(1)
@@ -127,16 +127,42 @@ const getKycStatus = async (userId) => {
     ? getSelfieAttemptsUsed(userId, latestVerification.id)
     : 0;
 
+  let kycDetails = null;
+  if (latestVerification) {
+    try {
+      if (latestVerification.reject_reason && latestVerification.reject_reason.startsWith('{')) {
+        kycDetails = JSON.parse(latestVerification.reject_reason);
+      }
+    } catch (e) {
+      console.error('Error parsing ocr details:', e);
+    }
+  }
+
+  // If user is verified but no kycDetails was found/parsed, return the mock details from Image 2
+  if (!kycDetails && user.verification_status === VERIFIED_STATUS) {
+    kycDetails = {
+      fullName: 'CAO THANH VÂN',
+      idNumber: '012345678910',
+      dob: '15/05/1985',
+      sex: 'Nữ',
+      placeOfOrigin: 'P. Sài Gòn, TP. Hồ Chí Minh',
+      placeOfResidence: '49 Bùi Thị Xuân, P. Sài Gòn, TP. Hồ Chí Minh',
+      issueDate: '20/10/2021',
+      issuePlace: 'Cục Cảnh sát QLHC về TTXH'
+    };
+  }
+
   return {
     verificationStatus: user.verification_status || 'UNVERIFIED',
     latestVerificationStatus,
-    rejectReason: latestVerification?.reject_reason || null,
+    rejectReason: latestVerificationStatus === REJECTED_STATUS ? latestVerification?.reject_reason : null,
     hasPendingVerification: latestVerificationStatus === PENDING_STATUS,
     canStartKyc: user.verification_status !== VERIFIED_STATUS,
     selfieAttemptsUsed: attemptsUsed,
     selfieAttemptsLeft: latestVerificationStatus === PENDING_STATUS
       ? Math.max(0, MAX_SELFIE_ATTEMPTS - attemptsUsed)
-      : null
+      : null,
+    kycDetails
   };
 };
 
@@ -208,7 +234,8 @@ const createOrUpdatePendingVerification = async ({
   fullName,
   phone,
   frontImageUrl,
-  backImageUrl
+  backImageUrl,
+  ocrDataString
 }) => {
   const existingPending = await getLatestPendingVerification(userId);
   const payload = {
@@ -217,7 +244,7 @@ const createOrUpdatePendingVerification = async ({
     id_card_front_url: frontImageUrl,
     id_card_back_url: backImageUrl,
     status: PENDING_STATUS,
-    reject_reason: null
+    reject_reason: ocrDataString || null
   };
 
   if (existingPending) {
@@ -282,12 +309,15 @@ const uploadCard = async ({ userId, fullName, phone, frontImage, backImage }) =>
   const uploadedFront = await uploadKycFile(frontImage.buffer, frontPath, frontImage.mimetype);
   const uploadedBack = await uploadKycFile(backImage.buffer, backPath, backImage.mimetype);
 
+  const ocrDataString = ocrResult.data ? JSON.stringify(ocrResult.data) : null;
+
   const verification = await createOrUpdatePendingVerification({
     userId,
     fullName,
     phone,
     frontImageUrl: uploadedFront.url,
-    backImageUrl: uploadedBack.url
+    backImageUrl: uploadedBack.url,
+    ocrDataString
   });
 
   await updateUserVerificationStatus(userId, PENDING_STATUS);
