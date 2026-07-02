@@ -1,6 +1,7 @@
 const { supabase } = require('../config/supabase');
 const ocrService = require('./ocrService');
 const faceCompareService = require('./faceCompareService');
+const trustScoreService = require('./trustScoreService');
 
 const KYC_BUCKET = 'kyc-documents';
 const VERIFIED_STATUS = 'VERIFIED';
@@ -86,6 +87,28 @@ const ensureUserCanUseKyc = async (userId) => {
 
   if (user.verification_status === VERIFIED_STATUS) {
     throw new Error('User is already verified');
+  }
+
+  return user;
+};
+
+const getUserVerificationStatus = async (userId) => {
+  const { data: user, error } = await supabase
+    .from('users')
+    .select('id, verification_status')
+    .eq('id', userId)
+    .single();
+
+  if (error) {
+    if (error.code === 'PGRST116') {
+      throw new Error('User not found');
+    }
+
+    throw new Error(error.message || 'Failed to fetch user');
+  }
+
+  if (!user) {
+    throw new Error('User not found');
   }
 
   return user;
@@ -335,6 +358,8 @@ const rejectVerification = async (userId, verificationId, rejectReason) => {
 };
 
 const approveVerification = async (userId, verificationId, selfieUrl) => {
+  const currentUser = await getUserVerificationStatus(userId);
+
   const { error: verificationError } = await supabase
     .from('identity_verifications')
     .update({
@@ -349,6 +374,15 @@ const approveVerification = async (userId, verificationId, selfieUrl) => {
   }
 
   await updateUserVerificationStatus(userId, VERIFIED_STATUS);
+
+  if (currentUser.verification_status !== VERIFIED_STATUS) {
+    await trustScoreService.applyOneTimeBonus(
+      userId,
+      'KYC_APPROVED',
+      20,
+      'KYC/ID card verification approved'
+    );
+  }
 };
 
 const uploadSelfie = async ({ userId, selfieImage }) => {
