@@ -11,6 +11,7 @@ const chatRoutes = require('./routes/chatRoutes');
 const phoneOtpRoutes = require('./routes/phoneOtpRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const trustScoreRoutes = require('./routes/trustScoreRoutes');
+const userProfileRoutes = require('./routes/userProfileRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -32,6 +33,7 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/phone', phoneOtpRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/trust-score', trustScoreRoutes);
+app.use('/api/users', userProfileRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
