@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const { supabase } = require('../config/supabase');
+const trustScoreService = require('./trustScoreService');
 
 const OTP_TTL_MS = 5 * 60 * 1000;
 const OTP_COOLDOWN_MS = 60 * 1000;
@@ -38,6 +39,28 @@ const ensureUserExists = async (userId) => {
   const { data: user, error } = await supabase
     .from('users')
     .select('id')
+    .eq('id', userId)
+    .single();
+
+  if (error) {
+    if (error.code === 'PGRST116') {
+      throw createServiceError('User not found', 404);
+    }
+
+    throw new Error(error.message);
+  }
+
+  if (!user) {
+    throw createServiceError('User not found', 404);
+  }
+
+  return user;
+};
+
+const getUserPhoneVerificationState = async (userId) => {
+  const { data: user, error } = await supabase
+    .from('users')
+    .select('id, phone_verified')
     .eq('id', userId)
     .single();
 
@@ -174,6 +197,16 @@ const verifyOtp = async ({ userId, phone, otp }) => {
   if (otpRecord.otp_code !== normalizedOtp) {
     await incrementAttemptCount(otpRecord);
     throw createServiceError('Invalid OTP');
+  }
+
+  const currentUser = await getUserPhoneVerificationState(userId);
+  if (currentUser.phone_verified !== true) {
+    await trustScoreService.applyOneTimeBonus(
+      userId,
+      'PHONE_VERIFIED',
+      10,
+      'Phone number verified successfully'
+    );
   }
 
   const verifiedAt = new Date().toISOString();
