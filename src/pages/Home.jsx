@@ -1338,7 +1338,7 @@ const Home = () => {
                           <div className="name-row">
                             <h4>{ownerDetails.name}</h4>
                             <span className="role-verified-badge">
-                              <ShieldCheck size={12} /> {ownerDetails.role === 'AGENT' ? 'Chính chủ' : 'Môi giới'}
+                              <ShieldCheck size={12} /> {ownerDetails.role === 'AGENT' ? 'Môi giới' : 'Chính chủ'}
                             </span>
                           </div>
                           <p>Thành viên từ {new Date(ownerDetails.created_at || selectedProperty.created_at).toLocaleDateString('vi-VN')}</p>

@@ -8,7 +8,10 @@ import {
 import './PropertyDetailModal.css';
 import { API_BASE_URL } from '../config';
 
-const PropertyDetailModal = ({ property, onClose, showFavoriteActions = false, isFavorite = false, onToggleFavorite, onSelectProperty }) => {
+const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = false, isFavorite = false, onToggleFavorite, onSelectProperty }) => {
+  const [fetchedProperty, setFetchedProperty] = useState(null);
+  const property = fetchedProperty || prop;
+
   const [activeSliderIdx, setActiveSliderIdx] = useState(0);
   const [similarProperties, setSimilarProperties] = useState([]);
   const [isLoadingSimilar, setIsLoadingSimilar] = useState(false);
@@ -45,9 +48,23 @@ const PropertyDetailModal = ({ property, onClose, showFavoriteActions = false, i
   }, [property?.id, property?.average_rating, property?.review_count]);
 
   useEffect(() => {
-    if (property?.id) {
+    if (prop?.id) {
+      // If property does not have owner information or full description/specs, fetch details by ID
+      if (!prop.owner || !prop.description) {
+        fetch(`${API_BASE_URL}/api/properties/${prop.id}`)
+          .then(res => res.json())
+          .then(data => {
+            if (data.property) {
+              setFetchedProperty(data.property);
+            }
+          })
+          .catch(err => console.error('Error fetching full property details:', err));
+      } else {
+        setFetchedProperty(null);
+      }
+
       setIsLoadingReviews(true);
-      fetch(`${API_BASE_URL}/api/properties/${property.id}/reviews`)
+      fetch(`${API_BASE_URL}/api/properties/${prop.id}/reviews`)
         .then(res => res.json())
         .then(data => {
           setReviews(data.reviews || []);
@@ -59,7 +76,7 @@ const PropertyDetailModal = ({ property, onClose, showFavoriteActions = false, i
         });
 
       setIsLoadingSimilar(true);
-      fetch(`${API_BASE_URL}/api/properties/${property.id}/similar`)
+      fetch(`${API_BASE_URL}/api/properties/${prop.id}/similar`)
         .then(res => res.json())
         .then(data => {
           setSimilarProperties(data.properties || []);
