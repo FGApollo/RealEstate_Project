@@ -490,6 +490,13 @@ const Swipe = () => {
     }
   }, [currentIndex, currentProperties]);
 
+  // Open detail modal immediately when selectPropertyId is specified in navigation state
+  useEffect(() => {
+    if (location.state?.selectPropertyId) {
+      setShowDetailModal(true);
+    }
+  }, [location.state?.selectPropertyId]);
+
   const currentProperty = currentProperties[currentIndex];
   const isAlreadyFavorite = currentProperty && dbFavorites.some(fav => fav.id === currentProperty.id);
 
@@ -1160,6 +1167,22 @@ const Swipe = () => {
         <PropertyDetailModal
           property={activePropertyForModal}
           onClose={() => { setShowDetailModal(false); setSelectedSavedProperty(null); }}
+          onSelectProperty={(simProp) => {
+            if (selectedSavedProperty) {
+              setSelectedSavedProperty(simProp);
+            } else {
+              const idx = currentProperties.findIndex(p => p.id === simProp.id);
+              if (idx !== -1) {
+                setCurrentIndex(idx);
+              } else {
+                setCurrentProperties(prev => {
+                  const copy = [...prev];
+                  copy.splice(currentIndex, 0, simProp);
+                  return copy;
+                });
+              }
+            }
+          }}
           showFavoriteActions={true}
           isFavorite={dbFavorites.some(fav => fav.id === activePropertyForModal.id)}
           onToggleFavorite={async () => {

@@ -27,6 +27,53 @@ const AgentChat = ({ currentUser }) => {
     scrollToBottom();
   }, [messages]);
 
+  const [showPropertySelector, setShowPropertySelector] = useState(false);
+  const [agentProperties, setAgentProperties] = useState([]);
+  const [isLoadingProperties, setIsLoadingProperties] = useState(false);
+
+  const openPropertySelector = async () => {
+    setShowPropertySelector(true);
+    setIsLoadingProperties(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/properties`);
+      if (res.ok) {
+        const data = await res.json();
+        const filtered = (data.properties || []).filter(
+          p => p.owner_id === currentUser.id && p.status === 'AVAILABLE'
+        );
+        setAgentProperties(filtered);
+      }
+    } catch (err) {
+      console.error('Error fetching agent properties:', err);
+    } finally {
+      setIsLoadingProperties(false);
+    }
+  };
+
+  const sendPropertyCard = async (property) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/chat/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          senderId: currentUser.id,
+          receiverId: activeConversation.partner.id,
+          propertyId: property.id,
+          message: `[Bất động sản] ${property.title}`
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setMessages(prev => [...prev, data.message]);
+        fetchConversations();
+        setShowPropertySelector(false);
+      }
+    } catch (err) {
+      console.error('Error sending property card message:', err);
+    }
+  };
+
   // Fetch conversations
   const fetchConversations = async () => {
     if (!currentUser) return;
@@ -273,16 +320,32 @@ const AgentChat = ({ currentUser }) => {
                         </div>
                       )}
                       <div className="msg-bubble">
-                        {msg.property && (
-                          <div className="msg-property-wrap">
-                            <img src={msg.property.thumbnail} alt="Prop" />
-                            <div className="msg-prop-details">
-                              <h6>{msg.property.title}</h6>
-                              <p>{(msg.property.price || 0).toLocaleString('vi-VN')} VND/tháng</p>
+                        {msg.property ? (
+                          <div 
+                            className="chat-property-card" 
+                            style={{ 
+                              border: '1px solid #e2e8f0', 
+                              borderRadius: '12px', 
+                              overflow: 'hidden', 
+                              backgroundColor: 'white',
+                              width: '260px',
+                              boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
+                              display: 'flex',
+                              flexDirection: 'column'
+                            }}
+                          >
+                            <img src={msg.property.thumbnail} alt={msg.property.title} style={{ width: '100%', height: '140px', objectFit: 'cover' }} />
+                            <div style={{ padding: '12px', textAlign: 'left' }}>
+                              <h5 style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: '700', color: '#1e293b', lineHeight: '1.4' }}>{msg.property.title}</h5>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                                <span style={{ fontSize: '13px', fontWeight: '700', color: '#2563eb' }}>{(msg.property.price || 0).toLocaleString('vi-VN')} VND/tháng</span>
+                                <span style={{ fontSize: '12px', color: '#64748b' }}>{msg.property.area || 0} m²</span>
+                              </div>
                             </div>
                           </div>
+                        ) : (
+                          <p className="msg-txt">{msg.message}</p>
                         )}
-                        <p className="msg-txt">{msg.message}</p>
                         <span className="msg-time">{formattedTime}</span>
                       </div>
                     </div>
@@ -294,6 +357,26 @@ const AgentChat = ({ currentUser }) => {
 
             {/* Input Bar */}
             <form className="agent-chat-input-form" onSubmit={handleSendMessage}>
+              <button 
+                type="button" 
+                className="attach-property-btn" 
+                onClick={openPropertySelector}
+                style={{ 
+                  background: 'none', 
+                  border: 'none', 
+                  color: '#2563eb', 
+                  padding: '8px 12px', 
+                  cursor: 'pointer', 
+                  fontWeight: '600', 
+                  fontSize: '14px', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '4px',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                [+] Gửi Bất Động Sản
+              </button>
               <input
                 type="text"
                 placeholder="Nhập phản hồi..."
@@ -313,6 +396,50 @@ const AgentChat = ({ currentUser }) => {
           </div>
         )}
       </main>
+
+      {showPropertySelector && (
+        <div className="modal-backdrop property-selector-backdrop" style={{ zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(15, 23, 42, 0.5)' }}>
+          <div className="filter-modal-content property-selector-content" style={{ width: '450px', maxHeight: '500px', padding: '25px', backgroundColor: 'white', borderRadius: '16px', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: '#0f172a' }}>Danh sách bất động sản của bạn</h3>
+              <button onClick={() => setShowPropertySelector(false)} style={{ border: 'none', background: 'none', fontSize: '20px', cursor: 'pointer', color: '#64748b' }}>×</button>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', paddingRight: '5px' }}>
+              {isLoadingProperties ? (
+                <p style={{ textAlign: 'center', color: '#64748b' }}>Đang tải...</p>
+              ) : agentProperties.length === 0 ? (
+                <p style={{ textAlign: 'center', color: '#64748b', padding: '20px 0' }}>Bạn chưa có bất động sản nào đang hoạt động.</p>
+              ) : (
+                agentProperties.map(p => (
+                  <div 
+                    key={p.id} 
+                    onClick={() => sendPropertyCard(p)}
+                    style={{ 
+                      display: 'flex', 
+                      gap: '12px', 
+                      padding: '10px', 
+                      border: '1px solid #e2e8f0', 
+                      borderRadius: '8px', 
+                      cursor: 'pointer',
+                      transition: 'background-color 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f1f5f9'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                  >
+                    <img src={p.thumbnail} alt={p.title} style={{ width: '60px', height: '60px', borderRadius: '6px', objectFit: 'cover' }} />
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                      <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: '600', color: '#1e293b', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{p.title}</h4>
+                      <p style={{ margin: 0, fontSize: '12px', color: '#2563eb', fontWeight: '700' }}>
+                        {(p.price || 0).toLocaleString('vi-VN')} VND/tháng • {p.area} m²
+                      </p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

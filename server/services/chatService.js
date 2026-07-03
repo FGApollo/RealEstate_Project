@@ -6,7 +6,7 @@ const getMessages = async (userId, otherId) => {
     .from('messages')
     .select(`
       *,
-      property:properties(id, title, price, thumbnail)
+      property:properties(id, title, price, thumbnail, area)
     `)
     .or(`and(sender_id.eq.${userId},receiver_id.eq.${otherId}),and(sender_id.eq.${otherId},receiver_id.eq.${userId})`)
     .order('created_at', { ascending: true });
@@ -28,7 +28,7 @@ const sendMessage = async (senderId, receiverId, propertyId, message) => {
     }])
     .select(`
       *,
-      property:properties(id, title, price, thumbnail)
+      property:properties(id, title, price, thumbnail, area)
     `)
     .single();
 

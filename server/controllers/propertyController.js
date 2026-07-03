@@ -1,5 +1,6 @@
 const propertyService = require('../services/propertyService');
 const reviewService = require('../services/reviewService');
+const geminiService = require('../services/geminiService');
 
 const getProperties = async (req, res) => {
   try {
@@ -85,6 +86,47 @@ const createPropertyReview = async (req, res) => {
   }
 };
 
+const checkBeforeSave = async (req, res) => {
+  try {
+    const { excludeId } = req.query;
+    const propertyData = req.body;
+
+    // 1. Check similarity in DB
+    const similarityResult = await propertyService.checkSimilarity(propertyData, excludeId);
+
+    // 2. Scan with Gemini if description is provided
+    let isMultiListing = false;
+    let geminiReason = '';
+    if (propertyData.description) {
+      const geminiResult = await geminiService.checkDescriptionIsMultiListing(propertyData.description);
+      isMultiListing = geminiResult.is_multi_listing;
+      geminiReason = geminiResult.reason;
+    }
+
+    res.status(200).json({
+      success: true,
+      similarOwn: similarityResult.similarOwn,
+      similarOther: similarityResult.similarOther,
+      isMultiListing,
+      geminiReason
+    });
+  } catch (error) {
+    console.error('Error in checkBeforeSave:', error);
+    res.status(500).json({ error: error.message || 'Internal server error' });
+  }
+};
+
+const getSimilarProperties = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const similar = await propertyService.getSimilarProperties(id);
+    res.status(200).json({ success: true, properties: similar });
+  } catch (error) {
+    console.error('Error in getSimilarProperties:', error);
+    res.status(500).json({ error: error.message || 'Internal server error' });
+  }
+};
+
 module.exports = {
   getProperties,
   createProperty,
@@ -92,5 +134,7 @@ module.exports = {
   updateProperty,
   deleteProperty,
   getPropertyReviews,
-  createPropertyReview
+  createPropertyReview,
+  checkBeforeSave,
+  getSimilarProperties
 };

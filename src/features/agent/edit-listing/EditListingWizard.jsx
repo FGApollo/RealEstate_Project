@@ -39,7 +39,8 @@ const EditListingWizard = ({ propertyId, setActiveTab, setData, currentUser }) =
     handleImageFileChange, handleDragOver, handleDrop,
     toggleSelectImage, setFeaturedImage, deleteSelectedImages,
     toggleAmenity, toggleLifestyleTag, toggleChannel,
-    handleSubmitListing, resetForm
+    handleSubmitListing, resetForm,
+    warnings, showWarningsModal, setShowWarningsModal, isCheckingSave, executeSaveListing
   } = useListingForm({
     mode: 'edit',
     editingPropertyId: propertyId,
@@ -155,6 +156,17 @@ const EditListingWizard = ({ propertyId, setActiveTab, setData, currentUser }) =
                   <input type="number" placeholder="Số tắm" value={listing.bathrooms} onChange={(e) => setListing(prev => ({ ...prev, bathrooms: e.target.value }))} />
                 </div>
               </div>
+              {(listing.property_type === 'Chung Cư' || listing.property_type === 'Căn Hộ') && (
+                <div className="input-group" style={{ marginTop: '15px' }}>
+                  <label>Khoảng tầng</label>
+                  <select value={listing.floor_range} onChange={(e) => setListing(prev => ({ ...prev, floor_range: e.target.value }))}>
+                    <option value="">Chọn khoảng tầng</option>
+                    <option value="Thấp">Thấp</option>
+                    <option value="Trung">Trung</option>
+                    <option value="Cao">Cao</option>
+                  </select>
+                </div>
+              )}
             </div>
 
             <div className="form-card">
@@ -414,11 +426,46 @@ const EditListingWizard = ({ propertyId, setActiveTab, setData, currentUser }) =
               <span>Tiếp theo</span><ArrowRight size={16} />
             </button>
           ) : (
-            <button type="button" className="nav-primary-btn submit-action" onClick={handleSubmitListing}>
-              <span>Lưu thông tin thay đổi</span>
+            <button type="button" className="nav-primary-btn submit-action" onClick={handleSubmitListing} disabled={isCheckingSave}>
+              <span>{isCheckingSave ? 'Đang kiểm tra...' : 'Lưu thông tin thay đổi'}</span>
               <Send size={16} />
             </button>
           )}
+        </div>
+      )}
+
+      {showWarningsModal && (
+        <div className="modal-backdrop warning-modal-backdrop" style={{ zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(4px)' }}>
+          <div className="filter-modal-content warning-modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px', width: '90%', padding: '30px', backgroundColor: 'white', borderRadius: '16px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)' }}>
+            <h2 style={{ color: '#ea580c', display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px', fontSize: '20px', fontWeight: '700' }}>
+              <Info size={24} /> Lưu ý trước khi lưu tin
+            </h2>
+            <div className="warnings-list" style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginBottom: '25px' }}>
+              {warnings.map((warn, i) => (
+                <div key={i} className="warning-item" style={{ padding: '15px', borderRadius: '10px', backgroundColor: '#fff7ed', borderLeft: '4px solid #ea580c' }}>
+                  <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.6', color: '#7c2d12', fontWeight: '500' }}>{warn.text}</p>
+                </div>
+              ))}
+            </div>
+            <div className="filter-actions" style={{ display: 'flex', gap: '15px', justifyContent: 'flex-end' }}>
+              <button 
+                type="button" 
+                className="btn-secondary" 
+                onClick={() => setShowWarningsModal(false)}
+                style={{ padding: '10px 20px', borderRadius: '8px', border: '1px solid #d1d5db', cursor: 'pointer', backgroundColor: 'transparent', fontWeight: '600', color: '#4b5563' }}
+              >
+                Chỉnh sửa thêm
+              </button>
+              <button 
+                type="button" 
+                className="btn-primary" 
+                onClick={executeSaveListing}
+                style={{ padding: '10px 20px', borderRadius: '8px', backgroundColor: '#ea580c', color: 'white', border: 'none', cursor: 'pointer', fontWeight: '600' }}
+              >
+                Vẫn đăng tin
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -89,6 +89,7 @@ const createProperty = async (propertyData) => {
     city,
     district,
     ward,
+    floor_range,
     address,
     address_detail,
     thumbnail,
@@ -124,6 +125,7 @@ const createProperty = async (propertyData) => {
       city,
       district,
       ward,
+      floor_range,
       address,
       address_detail,
       thumbnail: savedThumbnail,
@@ -180,6 +182,15 @@ const createProperty = async (propertyData) => {
       .insert(tagRecords);
 
     if (tagsError) throw new Error(tagsError.message);
+  }
+
+  // Recalculate similarity and link
+  try {
+    const { similarProperties } = await checkSimilarity(property, property.id);
+    const differentOwnerProperties = similarProperties.filter(p => p.owner_id !== property.owner_id);
+    await createSimilarityLinks(property.id, differentOwnerProperties);
+  } catch (err) {
+    console.error('Failed to link similar properties on creation:', err);
   }
 
   return property;
@@ -239,6 +250,20 @@ const updateProperty = async (id, propertyData) => {
   await syncRelatedRows('lifestyle_tags', 'property_id', id,
     lifestyle_tags?.map(tag => ({ property_id: id, tag_name: tag })));
 
+  // Recalculate similarity and link on update
+  try {
+    await supabase
+      .from('property_links')
+      .delete()
+      .or(`property_id_1.eq.${id},property_id_2.eq.${id}`);
+
+    const { similarProperties } = await checkSimilarity(property, property.id);
+    const differentOwnerProperties = similarProperties.filter(p => p.owner_id !== property.owner_id);
+    await createSimilarityLinks(property.id, differentOwnerProperties);
+  } catch (err) {
+    console.error('Failed to link similar properties on update:', err);
+  }
+
   return property;
 };
 
@@ -252,10 +277,141 @@ const deleteProperty = async (id) => {
   if (error) throw new Error(error.message);
 };
 
+const checkSimilarity = async (propertyData, excludeId = null) => {
+  const {
+    latitude,
+    longitude,
+    property_type,
+    bedrooms,
+    bathrooms,
+    area,
+    floor_range,
+    owner_id
+  } = propertyData;
+
+  if (!latitude || !longitude) {
+    return { similarOwn: false, similarOther: false, similarProperties: [] };
+  }
+
+  const lat = parseFloat(latitude);
+  const lng = parseFloat(longitude);
+  const propArea = parseFloat(area);
+
+  // Search properties with coordinates ±0.00045, same type, bedrooms, bathrooms, and area ±5%
+  const { data: candidates, error } = await supabase
+    .from('properties')
+    .select('*')
+    .gte('latitude', lat - 0.00045)
+    .lte('latitude', lat + 0.00045)
+    .gte('longitude', lng - 0.00045)
+    .lte('longitude', lng + 0.00045)
+    .eq('property_type', property_type)
+    .eq('bedrooms', parseInt(bedrooms) || 0)
+    .eq('bathrooms', parseInt(bathrooms) || 0)
+    .gte('area', propArea * 0.95)
+    .lte('area', propArea * 1.05);
+
+  if (error) {
+    console.error('Error in checkSimilarity:', error);
+    return { similarOwn: false, similarOther: false, similarProperties: [] };
+  }
+
+  let filteredCandidates = candidates || [];
+
+  if (excludeId) {
+    filteredCandidates = filteredCandidates.filter(p => p.id !== Number(excludeId));
+  }
+
+  // If property type is 'Chung Cư' or 'Căn Hộ', check floor_range (Khoảng tầng)
+  if (property_type === 'Chung Cư' || property_type === 'Căn Hộ') {
+    filteredCandidates = filteredCandidates.filter(p => {
+      const f1 = (p.floor_range || '').trim().toLowerCase();
+      const f2 = (floor_range || '').trim().toLowerCase();
+      return f1 === f2;
+    });
+  }
+
+  const similarOwn = filteredCandidates.some(p => p.owner_id === Number(owner_id));
+  const similarOther = filteredCandidates.some(p => p.owner_id !== Number(owner_id));
+
+  return {
+    similarOwn,
+    similarOther,
+    similarProperties: filteredCandidates
+  };
+};
+
+const createSimilarityLinks = async (propertyId, similarProperties) => {
+  if (!similarProperties || similarProperties.length === 0) return;
+
+  const propId = Number(propertyId);
+  const linkInserts = similarProperties.map(p => {
+    const id1 = Math.min(propId, p.id);
+    const id2 = Math.max(propId, p.id);
+    return { property_id_1: id1, property_id_2: id2 };
+  });
+
+  const uniqueInserts = [];
+  const seenKeys = new Set();
+  linkInserts.forEach(link => {
+    const key = `${link.property_id_1}-${link.property_id_2}`;
+    if (!seenKeys.has(key)) {
+      seenKeys.add(key);
+      uniqueInserts.push(link);
+    }
+  });
+
+  const { error } = await supabase
+    .from('property_links')
+    .upsert(uniqueInserts, { onConflict: 'property_id_1,property_id_2' });
+
+  if (error) {
+    console.error('Error inserting similarity links:', error);
+  }
+};
+
+const getSimilarProperties = async (propertyId) => {
+  const propId = Number(propertyId);
+
+  const { data: links, error } = await supabase
+    .from('property_links')
+    .select('property_id_1, property_id_2')
+    .or(`property_id_1.eq.${propId},property_id_2.eq.${propId}`);
+
+  if (error) {
+    console.error('Error getting property links:', error);
+    return [];
+  }
+
+  if (!links || links.length === 0) return [];
+
+  const similarIds = links.map(l => l.property_id_1 === propId ? l.property_id_2 : l.property_id_1);
+
+  const { data: properties, error: propsError } = await supabase
+    .from('properties')
+    .select(`
+      *,
+      property_features(feature_name),
+      property_images(image_url),
+      lifestyle_tags(tag_name),
+      owner:users!owner_id(name, role, avatar, trust_score, created_at)
+    `)
+    .in('id', similarIds);
+
+  if (propsError) {
+    console.error('Error fetching similar properties details:', propsError);
+    return [];
+  }
+
+  return properties || [];
+};
+
 module.exports = {
   getProperties,
   createProperty,
   getPropertyById,
   updateProperty,
-  deleteProperty
+  deleteProperty,
+  checkSimilarity,
+  getSimilarProperties
 };

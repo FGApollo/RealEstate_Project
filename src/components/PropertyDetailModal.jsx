@@ -8,8 +8,10 @@ import {
 import './PropertyDetailModal.css';
 import { API_BASE_URL } from '../config';
 
-const PropertyDetailModal = ({ property, onClose, showFavoriteActions = false, isFavorite = false, onToggleFavorite }) => {
+const PropertyDetailModal = ({ property, onClose, showFavoriteActions = false, isFavorite = false, onToggleFavorite, onSelectProperty }) => {
   const [activeSliderIdx, setActiveSliderIdx] = useState(0);
+  const [similarProperties, setSimilarProperties] = useState([]);
+  const [isLoadingSimilar, setIsLoadingSimilar] = useState(false);
   const [showRatingForm, setShowRatingForm] = useState(false);
   const [ratingVal, setRatingVal] = useState(5);
   const [reviewText, setReviewText] = useState('');
@@ -55,8 +57,21 @@ const PropertyDetailModal = ({ property, onClose, showFavoriteActions = false, i
           console.error('Error fetching reviews:', err);
           setIsLoadingReviews(false);
         });
+
+      setIsLoadingSimilar(true);
+      fetch(`${API_BASE_URL}/api/properties/${property.id}/similar`)
+        .then(res => res.json())
+        .then(data => {
+          setSimilarProperties(data.properties || []);
+          setIsLoadingSimilar(false);
+        })
+        .catch(err => {
+          console.error('Error fetching similar properties:', err);
+          setIsLoadingSimilar(false);
+        });
     } else {
       setReviews([]);
+      setSimilarProperties([]);
     }
   }, [property?.id]);
 
@@ -376,6 +391,56 @@ const PropertyDetailModal = ({ property, onClose, showFavoriteActions = false, i
                 </div>
               </div>
             </div>
+
+            {/* 6.5. Similar Properties from other agents */}
+            {!isLoadingSimilar && similarProperties.length > 0 && (
+              <div className="detail-similar-properties-section" style={{ padding: '20px', marginTop: '20px', borderTop: '1px solid #e2e8f0' }}>
+                <h3 style={{ fontSize: '16px', fontWeight: '700', color: '#0f172a', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Sparkles size={16} color="#2563eb" /> Các căn hộ tương tự từ các môi giới khác
+                </h3>
+                <div className="similar-properties-grid" style={{ display: 'flex', gap: '15px', overflowX: 'auto', paddingBottom: '10px' }}>
+                  {similarProperties.map(sim => (
+                    <div 
+                      key={sim.id} 
+                      className="similar-property-card-small" 
+                      onClick={() => {
+                        if (onSelectProperty) {
+                          onSelectProperty(sim);
+                        }
+                      }}
+                      style={{ 
+                        minWidth: '220px', 
+                        border: '1px solid #e2e8f0', 
+                        borderRadius: '12px', 
+                        overflow: 'hidden', 
+                        cursor: 'pointer', 
+                        backgroundColor: '#f8fafc',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                        transition: 'transform 0.2s, box-shadow 0.2s' 
+                      }}
+                    >
+                      <img src={sim.thumbnail} alt={sim.title} style={{ width: '100%', height: '120px', objectFit: 'cover' }} />
+                      <div style={{ padding: '12px' }}>
+                        <h4 style={{ fontSize: '13px', fontWeight: '600', color: '#1e293b', margin: '0 0 4px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sim.title}</h4>
+                        <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 8px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          <MapPin size={10} style={{ marginRight: '2px', verticalAlign: 'middle' }} /> {sim.district}, {sim.city}
+                        </p>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '13px', fontWeight: '700', color: '#2563eb' }}>
+                            {sim.price ? (sim.price / 1000000).toFixed(1).replace('.0', '') + ' Triệu/tháng' : 'Liên hệ'}
+                          </span>
+                          <span style={{ fontSize: '11px', color: '#64748b' }}>{sim.area} m²</span>
+                        </div>
+                        <div style={{ marginTop: '8px', borderTop: '1px solid #e2e8f0', paddingTop: '6px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span style={{ fontSize: '11px', color: '#475569', fontWeight: '500' }}>Sale: {sim.owner?.name || 'Môi giới'}</span>
+                          <span style={{ fontSize: '10px', color: '#d97706', backgroundColor: '#fef3c7', padding: '2px 6px', borderRadius: '4px', fontWeight: '600' }}>★ {sim.owner?.trust_score || 90}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* 7. Poster info */}
             <div className="detail-poster-block">
