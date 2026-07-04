@@ -421,7 +421,12 @@ const CreateListingWizard = ({ setActiveTab, setData, currentUser }) => {
           ) : <div />}
 
           {currentStep < 3 ? (
-            <button type="button" className="nav-primary-btn" onClick={() => setCurrentStep(prev => prev + 1)}>
+            <button 
+              type="button" 
+              className="nav-primary-btn" 
+              onClick={() => setCurrentStep(prev => prev + 1)}
+              disabled={currentStep === 2 && listing.images.length === 0}
+            >
               <span>Tiếp theo</span><ArrowRight size={16} />
             </button>
           ) : (

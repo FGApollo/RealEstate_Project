@@ -3,10 +3,9 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-// TODO: TEMPORARY MOCK - This function currently mocks image uploads by returning a random Unsplash image URL.
-// This is a temporary solution to bypass database varchar(500) limit for base64 string inserts,
-// until the PM configures a dedicated Supabase Storage bucket.
-const saveBase64Image = (base64Str) => {
+// Upload base64 image to Supabase Storage "property-images" bucket if configured,
+// or fallback to saving locally in public/uploads directory.
+const saveBase64Image = async (base64Str) => {
   const isPlaceholder = !base64Str || base64Str === 'https://via.placeholder.com/400';
   
   if (isPlaceholder) {
@@ -30,10 +29,34 @@ const saveBase64Image = (base64Str) => {
     const imageType = matches[1];
     const base64Data = matches[2];
     const buffer = Buffer.from(base64Data, 'base64');
-
     const filename = `${crypto.randomUUID()}.${imageType}`;
+
+    // 1. Try uploading to Supabase Storage "property-images" bucket first
+    try {
+      const PROPERTIES_BUCKET = 'property-images';
+      const filePath = `listings/${filename}`;
+      const { data, error: uploadError } = await supabase.storage
+        .from(PROPERTIES_BUCKET)
+        .upload(filePath, buffer, {
+          contentType: `image/${imageType}`,
+          upsert: true
+        });
+
+      if (!uploadError) {
+        const { data: urlData } = supabase.storage
+          .from(PROPERTIES_BUCKET)
+          .getPublicUrl(filePath);
+        console.log('Successfully uploaded listing image to Supabase Storage:', urlData.publicUrl);
+        return urlData.publicUrl;
+      } else {
+        console.warn('Supabase storage upload failed, falling back to local file storage:', uploadError.message);
+      }
+    } catch (storageErr) {
+      console.warn('Supabase storage error, falling back to local file storage:', storageErr.message);
+    }
+
+    // 2. Local file fallback if Supabase bucket isn't configured/accessible
     const uploadDir = path.join(__dirname, '../public/uploads');
-    
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
@@ -103,10 +126,22 @@ const createProperty = async (propertyData) => {
   } = propertyData;
 
   console.log('createProperty service called. Title:', title);
+  
+  // Verify owner is an AGENT
+  const { data: ownerUser, error: ownerError } = await supabase
+    .from('users')
+    .select('role')
+    .eq('id', owner_id)
+    .single();
+
+  if (ownerError || !ownerUser || ownerUser.role !== 'AGENT') {
+    throw new Error('Chỉ tài khoản có vai trò Môi giới (AGENT) mới có quyền đăng tin.');
+  }
+
   console.log('thumbnail input length:', thumbnail ? thumbnail.length : 'empty');
   
-  // Save thumbnail locally if base64
-  const savedThumbnail = saveBase64Image(thumbnail);
+  // Save thumbnail locally/storage if base64
+  const savedThumbnail = await saveBase64Image(thumbnail);
   console.log('savedThumbnail output length:', savedThumbnail ? savedThumbnail.length : 'empty');
 
   // Insert into properties table
@@ -160,10 +195,10 @@ const createProperty = async (propertyData) => {
 
   // Insert images if provided
   if (images && images.length > 0) {
-    const imageRecords = images.map(url => ({
+    const imageRecords = await Promise.all(images.map(async (url) => ({
       property_id: propertyId,
-      image_url: saveBase64Image(url)
-    }));
+      image_url: await saveBase64Image(url)
+    })));
     const { error: imagesError } = await supabase
       .from('property_images')
       .insert(imageRecords);
@@ -216,8 +251,33 @@ const getPropertyById = async (id) => {
 };
 
 const updateProperty = async (id, propertyData) => {
-
   const { features, images, lifestyle_tags, ...fields } = propertyData;
+
+  // 1. Get the current property to check existing ownership
+  const { data: existingProp, error: getPropError } = await supabase
+    .from('properties')
+    .select('owner_id')
+    .eq('id', id)
+    .single();
+
+  if (getPropError || !existingProp) {
+    throw new Error('Không tìm thấy tin đăng.');
+  }
+
+  if (existingProp.owner_id !== Number(fields.owner_id)) {
+    throw new Error('Bạn không có quyền chỉnh sửa tin đăng của người khác.');
+  }
+
+  // 2. Verify role of the updater is AGENT
+  const { data: ownerUser, error: ownerError } = await supabase
+    .from('users')
+    .select('role')
+    .eq('id', fields.owner_id)
+    .single();
+
+  if (ownerError || !ownerUser || ownerUser.role !== 'AGENT') {
+    throw new Error('Chỉ tài khoản có vai trò Môi giới (AGENT) mới có quyền chỉnh sửa tin đăng.');
+  }
 
   const { data: property, error: propertyError } = await supabase
     .from('properties')
@@ -228,7 +288,7 @@ const updateProperty = async (id, propertyData) => {
       bedrooms: parseInt(fields.bedrooms) || 0,
       bathrooms: parseInt(fields.bathrooms) || 0,
       status: fields.status || 'AVAILABLE',
-      thumbnail: saveBase64Image(fields.thumbnail),
+      thumbnail: await saveBase64Image(fields.thumbnail),
       latitude: parseFloat(fields.latitude) || null,
       longitude: parseFloat(fields.longitude) || null
     })
@@ -244,8 +304,11 @@ const updateProperty = async (id, propertyData) => {
   await syncRelatedRows('property_features', 'property_id', id,
     features?.map(name => ({ property_id: id, feature_name: name })));
 
-  await syncRelatedRows('property_images', 'property_id', id,
-    images?.map(url => ({ property_id: id, image_url: saveBase64Image(url) })));
+  const savedImages = images ? await Promise.all(images.map(async (url) => ({
+    property_id: id,
+    image_url: await saveBase64Image(url)
+  }))) : [];
+  await syncRelatedRows('property_images', 'property_id', id, savedImages);
 
   await syncRelatedRows('lifestyle_tags', 'property_id', id,
     lifestyle_tags?.map(tag => ({ property_id: id, tag_name: tag })));
@@ -267,7 +330,22 @@ const updateProperty = async (id, propertyData) => {
   return property;
 };
 
-const deleteProperty = async (id) => {
+const deleteProperty = async (id, userId) => {
+  // 1. Verify ownership
+  const { data: existingProp, error: getPropError } = await supabase
+    .from('properties')
+    .select('owner_id')
+    .eq('id', id)
+    .single();
+
+  if (getPropError || !existingProp) {
+    throw new Error('Không tìm thấy tin đăng.');
+  }
+
+  if (existingProp.owner_id !== Number(userId)) {
+    throw new Error('Bạn không có quyền xoá tin đăng của người khác.');
+  }
+
   // Delete child records first (cascade)
   await supabase.from('property_features').delete().eq('property_id', id);
   await supabase.from('property_images').delete().eq('property_id', id);

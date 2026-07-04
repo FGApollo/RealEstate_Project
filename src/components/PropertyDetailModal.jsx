@@ -224,13 +224,7 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
   const lifestyleChips = property.lifestyle_tags?.map(t => t.tag_name) || property.lifestyle_tags || [];
   const amenityChips = property.property_features?.map(f => f.feature_name) || property.features || [];
 
-  const ownerDetails = property.owner || {
-    name: 'Nguyễn Văn Minh',
-    role: 'Chính chủ',
-    avatar: 'https://i.pravatar.cc/150?img=67',
-    trust_score: 92,
-    created_at: property.created_at
-  };
+  const ownerDetails = property.owner;
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -462,63 +456,75 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
             {/* 7. Poster info */}
             <div className="detail-poster-block">
               <h3>Thông tin người đăng</h3>
-              <div className="poster-card">
-                <div className="poster-left">
-                  <img src={ownerDetails.avatar || 'https://i.pravatar.cc/150?img=67'} alt={ownerDetails.name} className="poster-avatar" />
-                  <div className="poster-name-info">
-                    <div className="name-row">
-                      <h4>{ownerDetails.name}</h4>
-                      <span className="role-verified-badge">
-                        <ShieldCheck size={12} /> {ownerDetails.role === 'AGENT' ? 'Môi giới' : 'Chính chủ'}
-                      </span>
-                    </div>
-                    <p>Thành viên từ {new Date(ownerDetails.created_at || property.created_at || new Date()).toLocaleDateString('vi-VN')}</p>
-                  </div>
-                </div>
-                
-                <div className="poster-right">
-                  {(() => {
-                    const score = ownerDetails.trust_score !== undefined ? Number(ownerDetails.trust_score) : 92;
-                    let text = 'Rất uy tín';
-                    let color = '#d97706'; // gold
-                    if (score <= 39) {
-                      text = 'Rủi ro cao';
-                      color = '#dc2626'; // red
-                    } else if (score <= 59) {
-                      text = 'Bình thường';
-                      color = '#6b7280'; // grey
-                    } else if (score <= 79) {
-                      text = 'Đáng tin';
-                      color = '#10b981'; // green
-                    }
-                    return (
-                      <div className="trust-score-wrapper" style={{ borderColor: color }}>
-                        <span style={{ color: '#94a3b8' }}>Trust Score</span>
-                        <p style={{ color }}>{score}</p>
-                        <small style={{ color }}>{text}</small>
+              {ownerDetails ? (
+                <div className="poster-card">
+                  <div className="poster-left">
+                    <img src={ownerDetails.avatar || 'https://i.pravatar.cc/150?img=67'} alt={ownerDetails.name} className="poster-avatar" />
+                    <div className="poster-name-info">
+                      <div className="name-row">
+                        <h4>{ownerDetails.name}</h4>
+                        <span className="role-verified-badge">
+                          <ShieldCheck size={12} /> {ownerDetails.role === 'AGENT' ? 'Môi giới' : 'Chính chủ'}
+                        </span>
                       </div>
-                    );
-                  })()}
+                      <p>Thành viên từ {new Date(ownerDetails.created_at || property.created_at || new Date()).toLocaleDateString('vi-VN')}</p>
+                    </div>
+                  </div>
                   
-                  <div className="poster-contact-buttons">
-                    <button 
-                      className="contact-btn message-btn"
-                      onClick={() => {
-                        if (property.owner_id) {
-                          navigate(`/chat?agentId=${property.owner_id}&propertyId=${property.id}`);
-                        } else {
-                          alert('Bất động sản này không có thông tin chủ sở hữu.');
-                        }
-                      }}
-                    >
-                      <MessageSquare size={16} /> Nhắn tin
-                    </button>
-                    <a href={`tel:${property.contact_phone || '0901234567'}`} className="contact-btn call-btn">
-                      <Phone size={16} /> Gọi ngay
-                    </a>
+                  <div className="poster-right">
+                    {(() => {
+                      const score = ownerDetails.trust_score !== undefined ? Number(ownerDetails.trust_score) : 92;
+                      let text = 'Rất uy tín';
+                      let color = '#d97706'; // gold
+                      if (score <= 39) {
+                        text = 'Rủi ro cao';
+                        color = '#dc2626'; // red
+                      } else if (score <= 59) {
+                        text = 'Bình thường';
+                        color = '#6b7280'; // grey
+                      } else if (score <= 79) {
+                        text = 'Đáng tin';
+                        color = '#10b981'; // green
+                      }
+                      return (
+                        <div className="trust-score-wrapper" style={{ borderColor: color }}>
+                          <span style={{ color: '#94a3b8' }}>Trust Score</span>
+                          <p style={{ color }}>{score}</p>
+                          <small style={{ color }}>{text}</small>
+                        </div>
+                      );
+                    })()}
+                    
+                    <div className="poster-contact-buttons">
+                      <button 
+                        className="contact-btn message-btn"
+                        onClick={() => {
+                          if (property.owner_id) {
+                            navigate(`/chat?agentId=${property.owner_id}&propertyId=${property.id}`);
+                          } else {
+                            alert('Bất động sản này không có thông tin chủ sở hữu.');
+                          }
+                        }}
+                      >
+                        <MessageSquare size={16} /> Nhắn tin
+                      </button>
+                      {property.contact_phone ? (
+                        <a href={`tel:${property.contact_phone}`} className="contact-btn call-btn">
+                          <Phone size={16} /> Gọi ngay
+                        </a>
+                      ) : (
+                        <button className="contact-btn call-btn" disabled style={{ opacity: 0.5, cursor: 'not-allowed' }}>
+                          <Phone size={16} /> Chưa có SĐT
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
+              ) : (
+                <div className="poster-card" style={{ display: 'flex', justifyContent: 'center', padding: '20px', color: '#94a3b8' }}>
+                  Đang tải thông tin người đăng...
+                </div>
+              )}
             </div>
 
             {/* 8. Footer Info */}

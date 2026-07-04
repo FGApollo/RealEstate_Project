@@ -66,7 +66,7 @@ const Chat = () => {
             } else {
               // Create a temporary conversation object for the UI
               const agentDetailsRes = await fetch(`${API_BASE_URL}/api/auth/user/${agentIdNum}`);
-              let partnerObj = { id: agentIdNum, name: 'Môi giới', role: 'AGENT' };
+              let partnerObj = { id: agentIdNum, name: 'Đang tải...', role: 'AGENT' };
               if (agentDetailsRes.ok) {
                 const partnerData = await agentDetailsRes.json();
                 partnerObj = partnerData.user || partnerObj;

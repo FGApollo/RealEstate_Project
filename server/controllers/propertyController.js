@@ -50,7 +50,11 @@ const updateProperty = async (req, res) => {
 const deleteProperty = async (req, res) => {
   try {
     const { id } = req.params;
-    await propertyService.deleteProperty(id);
+    const { userId } = req.query;
+    if (!userId) {
+      return res.status(400).json({ error: 'Missing userId parameter' });
+    }
+    await propertyService.deleteProperty(id, userId);
     res.status(200).json({ success: true });
   } catch (error) {
     console.error('Error deleting property:', error);
