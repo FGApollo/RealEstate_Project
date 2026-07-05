@@ -71,6 +71,45 @@ const saveBase64Image = async (base64Str) => {
   }
 };
 
+// ponytail: helper to delete image files (Supabase Storage or local fallback)
+const deleteImageFile = async (imageUrl) => {
+  if (!imageUrl || imageUrl.startsWith('https://images.unsplash.com') || imageUrl.startsWith('https://images.pexels.com') || imageUrl === 'https://via.placeholder.com/400') {
+    return; // Don't delete external stock images or placeholder
+  }
+
+  try {
+    const PROPERTIES_BUCKET = 'property-images';
+    // Check if it's Supabase Storage URL
+    const publicUrlPrefix = `/storage/v1/object/public/${PROPERTIES_BUCKET}/`;
+    const prefixIndex = imageUrl.indexOf(publicUrlPrefix);
+
+    if (prefixIndex !== -1) {
+      const filePath = imageUrl.substring(prefixIndex + publicUrlPrefix.length);
+      console.log(`Deleting storage file: ${filePath}`);
+      const { error } = await supabase.storage
+        .from(PROPERTIES_BUCKET)
+        .remove([filePath]);
+      if (error) {
+        console.warn(`Failed to delete file from Supabase storage (${filePath}):`, error.message);
+      }
+    } else {
+      // Local fallback file deletion
+      const match = imageUrl.match(/\/uploads\/([^/?#]+)/);
+      if (match) {
+        const filename = match[1];
+        const filepath = path.join(__dirname, '../public/uploads', filename);
+        if (fs.existsSync(filepath)) {
+          fs.unlinkSync(filepath);
+          console.log(`Deleted local file: ${filename}`);
+        }
+      }
+    }
+  } catch (err) {
+    console.error(`Error deleting image file (${imageUrl}):`, err);
+  }
+};
+
+
 // Sync a child table: delete all rows for this property then re-insert.
 const syncRelatedRows = async (table, idField, propertyId, rows) => {
   const { error: delErr } = await supabase.from(table).delete().eq(idField, propertyId);
@@ -331,10 +370,10 @@ const updateProperty = async (id, propertyData) => {
 };
 
 const deleteProperty = async (id, userId) => {
-  // 1. Verify ownership
+  // 1. Verify ownership and get old images
   const { data: existingProp, error: getPropError } = await supabase
     .from('properties')
-    .select('owner_id')
+    .select('owner_id, thumbnail, property_images(image_url)')
     .eq('id', id)
     .single();
 
@@ -346,6 +385,12 @@ const deleteProperty = async (id, userId) => {
     throw new Error('Bạn không có quyền xoá tin đăng của người khác.');
   }
 
+  // Collect all unique image URLs to delete
+  const urlsToDelete = [...new Set([
+    existingProp.thumbnail,
+    ...(existingProp.property_images ? existingProp.property_images.map(img => img.image_url) : [])
+  ].filter(Boolean))];
+
   // Delete child records first (cascade)
   await supabase.from('property_features').delete().eq('property_id', id);
   await supabase.from('property_images').delete().eq('property_id', id);
@@ -353,6 +398,11 @@ const deleteProperty = async (id, userId) => {
 
   const { error } = await supabase.from('properties').delete().eq('id', id);
   if (error) throw new Error(error.message);
+
+  // ponytail: delete physical image files (Supabase Storage or local fallback)
+  for (const url of urlsToDelete) {
+    await deleteImageFile(url);
+  }
 };
 
 const checkSimilarity = async (propertyData, excludeId = null) => {
