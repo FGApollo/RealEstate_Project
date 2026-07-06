@@ -92,7 +92,7 @@ const AgentOverview = () => {
 
   const handleDeleteProperty = async (id) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/properties/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/properties/${id}?userId=${currentUser.id}`, {
         method: 'DELETE'
       });
       if (response.ok) {
