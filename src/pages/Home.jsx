@@ -4,7 +4,8 @@ import {
   Menu, Search, MapPin, Home as HomeIcon, 
   Bed, Bath, Maximize, LogOut, User, 
   ChevronDown, ArrowRight, Heart, X, SlidersHorizontal,
-  ChevronLeft, ChevronRight, MessageSquare, Calendar, Eye, ShieldCheck, Phone, Shield, Share2, Sparkles
+  ChevronLeft, ChevronRight, MessageSquare, Calendar, Eye, ShieldCheck, Phone, Shield, Share2, Sparkles,
+  Ruler, Star
 } from 'lucide-react';
 import './Home.css';
 import { API_BASE_URL } from '../config';
@@ -100,6 +101,7 @@ const Home = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(false);
   const [properties, setProperties] = useState([]);
   
   // Search parameters
@@ -134,6 +136,157 @@ const Home = () => {
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [activeSliderIdx, setActiveSliderIdx] = useState(0);
   const [dbFavorites, setDbFavorites] = useState([]);
+  
+  const [showRatingForm, setShowRatingForm] = useState(false);
+  const [ratingVal, setRatingVal] = useState(5);
+  const [reviewText, setReviewText] = useState('');
+  const [reviews, setReviews] = useState([]);
+  const [isLoadingReviews, setIsLoadingReviews] = useState(false);
+  const [selectedImages, setSelectedImages] = useState([]);
+  const [activeTab, setActiveTab] = useState('all'); // 'all' or 'mine'
+  const [sortOrder, setSortOrder] = useState('newest'); // 'newest', 'oldest', 'highest', 'lowest'
+  const [ratingFilter, setRatingFilter] = useState('all'); // 'all', '5', '4', '3', '2', '1'
+
+  useEffect(() => {
+    if (selectedProperty?.id) {
+      setIsLoadingReviews(true);
+      fetch(`${API_BASE_URL}/api/properties/${selectedProperty.id}/reviews`)
+        .then(res => res.json())
+        .then(data => {
+          setReviews(data.reviews || []);
+          setIsLoadingReviews(false);
+        })
+        .catch(err => {
+          console.error('Error fetching reviews:', err);
+          setIsLoadingReviews(false);
+        });
+    } else {
+      setReviews([]);
+    }
+  }, [selectedProperty?.id]);
+
+  const handleImageSelect = (e) => {
+    const files = Array.from(e.target.files);
+    if (selectedImages.length + files.length > 5) {
+      alert('Chỉ được chọn tối đa 5 ảnh!');
+      return;
+    }
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setSelectedImages(prev => [...prev, reader.result]);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const removeSelectedImage = (idx) => {
+    setSelectedImages(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const avgScore = useMemo(() => {
+    if (reviews.length === 0) return 0;
+    return reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
+  }, [reviews]);
+
+  const ratingLabel = useMemo(() => {
+    if (avgScore >= 4.5) return 'Tuyệt vời!';
+    if (avgScore >= 4.0) return 'Rất tốt!';
+    if (avgScore >= 3.0) return 'Khá tốt!';
+    if (avgScore > 0) return 'Trung bình';
+    return 'Chưa có đánh giá';
+  }, [avgScore]);
+
+  const filteredReviewsList = useMemo(() => {
+    let list = [...reviews];
+    
+    // Tab filter
+    if (activeTab === 'mine' && user?.id) {
+      list = list.filter(r => r.user_id === user.id);
+    }
+    
+    // Star filter
+    if (ratingFilter !== 'all') {
+      const stars = parseInt(ratingFilter);
+      list = list.filter(r => r.rating === stars);
+    }
+    
+    // Sorting
+    list.sort((a, b) => {
+      if (sortOrder === 'newest') {
+        return new Date(b.created_at) - new Date(a.created_at);
+      } else if (sortOrder === 'oldest') {
+        return new Date(a.created_at) - new Date(b.created_at);
+      } else if (sortOrder === 'highest') {
+        return b.rating - a.rating;
+      } else if (sortOrder === 'lowest') {
+        return a.rating - b.rating;
+      }
+      return 0;
+    });
+    
+    return list;
+  }, [reviews, activeTab, sortOrder, ratingFilter, user?.id]);
+
+  const handleRatingSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedProperty) return;
+    if (!user) {
+      alert('Vui lòng đăng nhập để gửi đánh giá!');
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/properties/${selectedProperty.id}/reviews`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          rating: ratingVal,
+          comment: reviewText,
+          isVerifiedReview: true,
+          images: selectedImages
+        })
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        const errMsg = errData.error || 'Gửi đánh giá không thành công';
+        if (errMsg.includes('property_reviews_user_property_unique') || errMsg.includes('already exists')) {
+          throw new Error('Bạn đã đánh giá bất động sản này rồi! Mỗi tài khoản chỉ được đánh giá một lần.');
+        }
+        throw new Error(errMsg);
+      }
+
+      const data = await response.json();
+      if (data.success && data.review) {
+        const newReview = {
+          ...data.review,
+          user: { name: user.name, avatar: user.avatar, role: user.role },
+          images: selectedImages
+        };
+
+        const newReviewsList = [newReview, ...reviews];
+        setReviews(newReviewsList);
+
+        const newCount = newReviewsList.length;
+        const newRating = newReviewsList.reduce((sum, r) => sum + r.rating, 0) / newCount;
+
+        selectedProperty.review_count = newCount;
+        selectedProperty.average_rating = newRating;
+
+        setProperties(prev => prev.map(p => p.id === selectedProperty.id ? { ...p, review_count: newCount, average_rating: newRating } : p));
+        setFilteredProperties(prev => prev.map(p => p.id === selectedProperty.id ? { ...p, review_count: newCount, average_rating: newRating } : p));
+
+        alert(`Cảm ơn bạn đã đánh giá ${ratingVal} sao cho tin đăng này!`);
+        setReviewText('');
+        setSelectedImages([]);
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Lỗi khi gửi đánh giá: ' + err.message);
+    }
+  };
 
   const categories = useMemo(() => {
     const counts = {};
@@ -155,7 +308,12 @@ const Home = () => {
     if (!sessionUser) {
       navigate('/login');
     } else {
-      setUser(JSON.parse(sessionUser));
+      const parsedUser = JSON.parse(sessionUser);
+      if (parsedUser.role === 'AGENT') {
+        navigate('/sale/overview');
+      } else {
+        setUser(parsedUser);
+      }
     }
   }, [navigate]);
 
@@ -511,16 +669,17 @@ const Home = () => {
       {/* Navbar */}
       <header className="navbar">
         <div className="nav-left">
-          <button className="menu-btn" aria-label="Menu">
+          <button className="menu-btn" aria-label="Menu" onClick={() => setShowSidebar(true)}>
             <Menu size={20} />
           </button>
           <span className="logo-text">Swipe Nest</span>
         </div>
 
         <nav className="nav-middle">
-          <a href="#" className="nav-link active">Trang Chủ</a>
-          <a href="#" className="nav-link">Khám Phá</a>
-          <a href="#" className="nav-link">Dịch Vụ</a>
+          <button className="nav-link active" onClick={() => navigate('/')}>Trang Chủ</button>
+          <button className="nav-link" onClick={() => navigate('/swipe/Tất cả')}>Khám Phá</button>
+          <button className="nav-link" onClick={() => navigate('/swipe/Tất cả', { state: { activeView: 'saved' } })}>Yêu thích</button>
+          <button className="nav-link" onClick={() => navigate('/chat')}>Chat</button>
         </nav>
 
         <div className="nav-right">
@@ -548,13 +707,6 @@ const Home = () => {
                   <div className="dropdown-item" style={{ fontWeight: 600, borderBottom: '1px solid #f1f5f9' }}>
                     {user.email}
                   </div>
-                  <button 
-                    className="dropdown-item" 
-                    onClick={() => navigate('/swipe/Căn Hộ', { state: { activeView: 'saved' } })}
-                  >
-                    <Heart size={14} style={{ marginRight: '8px', display: 'inline-block', verticalAlign: 'middle' }} />
-                    Tin đã yêu thích
-                  </button>
                   <button className="dropdown-item logout-btn" onClick={handleLogout}>
                     <LogOut size={14} style={{ marginRight: '8px', display: 'inline-block', verticalAlign: 'middle' }} />
                     Đăng xuất
@@ -565,6 +717,26 @@ const Home = () => {
           )}
         </div>
       </header>
+
+      {/* Mobile Sidebar Drawer */}
+      {showSidebar && (
+        <div className="mobile-sidebar-backdrop" onClick={() => setShowSidebar(false)}>
+          <div className="mobile-sidebar-drawer" onClick={(e) => e.stopPropagation()}>
+            <div className="mobile-sidebar-header">
+              <span className="logo-text">Swipe Nest</span>
+              <button className="close-sidebar-btn" onClick={() => setShowSidebar(false)}>
+                <X size={20} />
+              </button>
+            </div>
+            <nav className="mobile-sidebar-nav">
+              <button className="mobile-nav-link active" onClick={() => { navigate('/'); setShowSidebar(false); }}>Trang Chủ</button>
+              <button className="mobile-nav-link" onClick={() => { navigate('/swipe/Tất cả'); setShowSidebar(false); }}>Khám Phá</button>
+              <button className="mobile-nav-link" onClick={() => { navigate('/swipe/Tất cả', { state: { activeView: 'saved' } }); setShowSidebar(false); }}>Yêu thích</button>
+              <button className="mobile-nav-link" onClick={() => { navigate('/chat'); setShowSidebar(false); }}>Chat</button>
+            </nav>
+          </div>
+        </div>
+      )}
 
       {/* Hero Section */}
       <section className="hero-section">
@@ -733,32 +905,49 @@ const Home = () => {
               }}
               style={{ cursor: 'pointer' }}
             >
-              <div className="large-card-img-wrapper">
-                <img src={mainVilla.thumbnail} alt={mainVilla.title} className="large-card-img" />
-                <span className="status-badge">
-                  <span className="badge-dot"></span>
-                  Đang Mở Bán
-                </span>
-                <span className="price-tag">{formatPrice(mainVilla.price)}</span>
+              <div className="property-card-bg-wrapper">
+                <img src={mainVilla.thumbnail} alt={mainVilla.title} className="property-card-bg-img" />
+                <div className="property-card-gradient-overlay"></div>
               </div>
-              <div className="large-card-info">
-                <h3 className="property-title">{mainVilla.title}</h3>
-                <div className="property-address">
-                  <MapPin size={16} />
-                  <span>{mainVilla.address}</span>
+
+              {mainVilla.is_highlighted && (
+                <div className="property-card-badge-container">
+                  <span className="property-card-badge-verified highlight">
+                    NỔI BẬT
+                  </span>
                 </div>
-                <div className="property-features-list">
-                  <div className="feature-item">
-                    <Bed size={18} />
-                    <span>{mainVilla.bedrooms} Phòng ngủ</span>
+              )}
+
+              <div className="property-card-info-container">
+                <div className="property-card-text-block">
+                  <h3 className="property-card-title">{mainVilla.title}</h3>
+                  <div className="property-card-address">
+                    <MapPin size={16} />
+                    <span>{mainVilla.address}</span>
                   </div>
-                  <div className="feature-item">
-                    <Bath size={18} />
-                    <span>{mainVilla.bathrooms} Phòng tắm</span>
+                </div>
+
+                <div className="property-card-meta-block">
+                  <div className="property-card-price">
+                    <span className="price-val">{formatPrice(mainVilla.price).toLowerCase()}</span>
+                    <span className="price-unit">/tháng</span>
                   </div>
-                  <div className="feature-item">
-                    <Maximize size={18} />
-                    <span>{mainVilla.area} m²</span>
+
+                  <div className="property-card-specs-box">
+                    <div className="spec-col">
+                      <Bed size={18} />
+                      <span className="spec-val">{mainVilla.bedrooms}</span>
+                    </div>
+                    <div className="spec-col-divider"></div>
+                    <div className="spec-col">
+                      <Bath size={18} />
+                      <span className="spec-val">{mainVilla.bathrooms}</span>
+                    </div>
+                    <div className="spec-col-divider"></div>
+                    <div className="spec-col">
+                      <Ruler size={18} />
+                      <span className="spec-val">{mainVilla.area}m²</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -777,27 +966,49 @@ const Home = () => {
                 }}
                 style={{ cursor: 'pointer' }}
               >
-                <div className="small-card-img-wrapper">
-                  <img src={property.thumbnail} alt={property.title} className="small-card-img" />
-                  {property.is_highlighted && (
-                    <span className="status-badge highlight" style={{ top: '10px', left: '10px', padding: '0.2rem 0.6rem', fontSize: '0.65rem' }}>
-                      Nổi bật
-                    </span>
-                  )}
-                  <span className="price-tag" style={{ bottom: '10px', right: '10px', padding: '0.3rem 0.75rem', fontSize: '0.9rem' }}>
-                    {formatPrice(property.price)}
-                  </span>
+                <div className="property-card-bg-wrapper">
+                  <img src={property.thumbnail} alt={property.title} className="property-card-bg-img" />
+                  <div className="property-card-gradient-overlay"></div>
                 </div>
-                <div className="small-card-info">
-                  <h4 className="small-property-title">{property.title}</h4>
-                  <div className="small-property-features">
-                    <div className="feature-item">
-                      <Bed size={14} />
-                      <span>{property.bedrooms}</span>
+
+                {property.is_highlighted && (
+                  <div className="property-card-badge-container">
+                    <span className="property-card-badge-verified highlight">
+                      NỔI BẬT
+                    </span>
+                  </div>
+                )}
+
+                <div className="property-card-info-container small-card-info-container">
+                  <div className="property-card-text-block">
+                    <h4 className="property-card-title small-title">{property.title}</h4>
+                    <div className="property-card-address small-address">
+                      <MapPin size={14} />
+                      <span>{property.address}</span>
                     </div>
-                    <div className="feature-item">
-                      <Maximize size={14} />
-                      <span>{property.area} m²</span>
+                  </div>
+
+                  <div className="property-card-meta-block small-meta-block">
+                    <div className="property-card-price small-price">
+                      <span className="price-val">{formatPrice(property.price).toLowerCase()}</span>
+                      <span className="price-unit">/tháng</span>
+                    </div>
+
+                    <div className="property-card-specs-box small-specs-box">
+                      <div className="spec-col">
+                        <Bed size={14} />
+                        <span className="spec-val">{property.bedrooms}</span>
+                      </div>
+                      <div className="spec-col-divider small-divider"></div>
+                      <div className="spec-col">
+                        <Bath size={14} />
+                        <span className="spec-val">{property.bathrooms}</span>
+                      </div>
+                      <div className="spec-col-divider small-divider"></div>
+                      <div className="spec-col">
+                        <Ruler size={14} />
+                        <span className="spec-val">{property.area}m²</span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -978,6 +1189,11 @@ const Home = () => {
                         <Share2 size={16} />
                         <span>Chia sẻ</span>
                       </button>
+
+                      <button className="action-btn rate-btn" onClick={() => setShowRatingForm(true)}>
+                        <Star size={16} />
+                        <span>Đánh giá</span>
+                      </button>
                     </div>
                   </div>
 
@@ -1067,13 +1283,29 @@ const Home = () => {
                           <p>Thành viên từ {new Date(ownerDetails.created_at || selectedProperty.created_at).toLocaleDateString('vi-VN')}</p>
                         </div>
                       </div>
-                      
                       <div className="poster-right">
-                        <div className="trust-score-wrapper">
-                          <span>Trust Score</span>
-                          <p>{ownerDetails.trust_score || 92}</p>
-                          <small>Rất uy tín</small>
-                        </div>
+                        {(() => {
+                          const score = ownerDetails.trust_score !== undefined ? Number(ownerDetails.trust_score) : 92;
+                          let text = 'Rất uy tín';
+                          let color = '#d97706'; // gold
+                          if (score <= 39) {
+                            text = 'Rủi ro cao';
+                            color = '#dc2626'; // red
+                          } else if (score <= 59) {
+                            text = 'Bình thường';
+                            color = '#6b7280'; // grey
+                          } else if (score <= 79) {
+                            text = 'Đáng tin';
+                            color = '#10b981'; // green
+                          }
+                          return (
+                            <div className="trust-score-wrapper" style={{ borderColor: color }}>
+                              <span style={{ color: '#94a3b8' }}>Trust Score</span>
+                              <p style={{ color }}>{score}</p>
+                              <small style={{ color }}>{text}</small>
+                            </div>
+                          );
+                        })()}
                         
                         <div className="poster-contact-buttons">
                           <a href={`sms:${selectedProperty.contact_phone || '0901234567'}`} className="contact-btn message-btn">
@@ -1097,6 +1329,230 @@ const Home = () => {
                 </div>
               </div>
             </div>
+
+            {showRatingForm && (
+              <div className="rating-modal-backdrop" onClick={(e) => { e.stopPropagation(); setShowRatingForm(false); }}>
+                <div className="rating-modal-content premium-rating-modal" onClick={(e) => e.stopPropagation()}>
+                  <button className="rating-modal-close-btn" onClick={() => setShowRatingForm(false)}>
+                    <X size={20} />
+                  </button>
+                  
+                  <h3 className="rating-modal-title">Đánh giá bất động sản</h3>
+                  
+                  {/* Rating summary row */}
+                  <div className="rating-summary-container">
+                    {reviews.length === 0 ? (
+                      <div className="no-reviews-box-summary">
+                        <p>Chưa có đánh giá cho tin đăng này</p>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="summary-left">
+                          <span className="score-num">{avgScore.toFixed(1)}</span>
+                          <div className="rating-stars">
+                            {[1, 2, 3, 4, 5].map(star => (
+                              <span key={star} className={star <= Math.round(avgScore) ? 'star-filled' : 'star-empty'}>★</span>
+                            ))}
+                          </div>
+                          <span className="rating-desc">{ratingLabel}</span>
+                          <span className="total-ratings-count">Dựa trên {reviews.length} đánh giá</span>
+                        </div>
+                        
+                        <div className="summary-right">
+                          {[5, 4, 3, 2, 1].map((stars) => {
+                            const count = reviews.filter(r => r.rating === stars).length;
+                            const pct = reviews.length > 0 ? (count / reviews.length) * 100 : 0;
+                            return (
+                              <div key={stars} className="star-row">
+                                <span className="star-label">{stars} ★</span>
+                                <div className="bar-outer">
+                                  <div className="bar-inner" style={{ width: `${pct}%` }}></div>
+                                </div>
+                                <span className="star-count">{count}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  
+                  {/* Tabs */}
+                  <div className="rating-tabs">
+                    <button 
+                      className={`rating-tab-btn ${activeTab === 'all' ? 'active' : ''}`}
+                      onClick={() => setActiveTab('all')}
+                    >
+                      Tất cả đánh giá ({reviews.length})
+                    </button>
+                    <button 
+                      className={`rating-tab-btn ${activeTab === 'mine' ? 'active' : ''}`}
+                      onClick={() => setActiveTab('mine')}
+                    >
+                      Đánh giá của tôi
+                    </button>
+                  </div>
+                  
+                  {/* Rating form box */}
+                  <div className="rating-form-card">
+                    <h4>Chia sẻ trải nghiệm của bạn</h4>
+                    <p className="form-subtext">Đánh giá của bạn giúp người khác dễ dàng quyết định hơn.</p>
+                    
+                    <form onSubmit={handleRatingSubmit} className="rating-main-form">
+                      <div className="stars-selector-row">
+                        <span>Chọn số sao</span>
+                        <div className="stars-selector">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <button
+                              key={star}
+                              type="button"
+                              className={`star-select-btn ${star <= ratingVal ? 'active' : ''}`}
+                              onClick={() => setRatingVal(star)}
+                            >
+                              ★
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      
+                      <div className="rating-textarea-wrapper">
+                        <textarea
+                          placeholder="Viết bình luận của bạn..."
+                          value={reviewText}
+                          onChange={(e) => setReviewText(e.target.value.slice(0, 500))}
+                          maxLength={500}
+                          rows={4}
+                        />
+                        <span className="char-counter">{reviewText.length}/500</span>
+                      </div>
+                      
+                      {/* Image Upload Input */}
+                      <div className="image-upload-row">
+                        <label className="upload-btn">
+                          <input 
+                            type="file" 
+                            accept="image/*" 
+                            multiple 
+                            style={{ display: 'none' }} 
+                            onChange={handleImageSelect}
+                          />
+                          <div className="camera-icon-box">📷</div>
+                          <div className="upload-text-block">
+                            <span>Thêm ảnh (tùy chọn)</span>
+                            <small>Tối đa 5 ảnh</small>
+                          </div>
+                        </label>
+                        
+                        {selectedImages.length > 0 && (
+                          <div className="selected-images-preview">
+                            {selectedImages.map((img, idx) => (
+                              <div key={idx} className="preview-img-wrapper">
+                                <img src={img} alt={`uploaded-${idx}`} />
+                                <button type="button" className="remove-img-btn" onClick={() => removeSelectedImage(idx)}>×</button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="form-actions">
+                        <button type="button" className="btn-cancel" onClick={() => setShowRatingForm(false)}>Hủy</button>
+                        <button type="submit" className="btn-submit">Gửi đánh giá</button>
+                      </div>
+                    </form>
+                  </div>
+                  
+                  {/* Reviews List filters */}
+                  <div className="reviews-filter-row">
+                    <div className="select-wrapper">
+                      <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)}>
+                        <option value="newest">Sắp xếp: Mới nhất</option>
+                        <option value="oldest">Sắp xếp: Cũ nhất</option>
+                        <option value="highest">Sắp xếp: Đánh giá cao nhất</option>
+                        <option value="lowest">Sắp xếp: Đánh giá thấp nhất</option>
+                      </select>
+                    </div>
+                    
+                    <div className="select-wrapper">
+                      <select value={ratingFilter} onChange={(e) => setRatingFilter(e.target.value)}>
+                        <option value="all">Tất cả sao</option>
+                        <option value="5">5 sao</option>
+                        <option value="4">4 sao</option>
+                        <option value="3">3 sao</option>
+                        <option value="2">2 sao</option>
+                        <option value="1">1 sao</option>
+                      </select>
+                    </div>
+                  </div>
+                  
+                  {/* Reviews list */}
+                  <div className="reviews-list-box">
+                    {isLoadingReviews ? (
+                      <p className="loading-reviews-text">Đang tải đánh giá...</p>
+                    ) : filteredReviewsList.length === 0 ? (
+                      <p className="no-reviews-text">Chưa có đánh giá nào phù hợp với bộ lọc.</p>
+                    ) : (
+                      filteredReviewsList.map((rev) => {
+                        const avatarInitial = rev.user?.name ? rev.user.name.charAt(0).toUpperCase() : 'U';
+                        const reviewDate = new Date(rev.created_at).toLocaleDateString('vi-VN');
+                        const isVerified = rev.is_verified_review || rev.user_id === selectedProperty.owner_id;
+                        
+                        return (
+                          <div key={rev.id} className="review-item-card">
+                            <div className="review-header">
+                              <div className="reviewer-info">
+                                <div className="reviewer-avatar">
+                                  {rev.user?.avatar ? (
+                                    <img src={rev.user.avatar} alt={rev.user.name} />
+                                  ) : (
+                                    <span className="avatar-letter">{avatarInitial}</span>
+                                  )}
+                                </div>
+                                <div className="reviewer-name-date">
+                                  <div className="reviewer-name-row">
+                                    <span className="reviewer-name">{rev.user?.name || 'Người dùng'}</span>
+                                  </div>
+                                  <span className="review-date">{reviewDate}</span>
+                                </div>
+                              </div>
+                              <button className="dots-menu-btn">•••</button>
+                            </div>
+                            
+                            <div className="review-rating-stars">
+                              {[1, 2, 3, 4, 5].map(star => (
+                                <span key={star} className={star <= rev.rating ? 'star-filled' : 'star-empty'}>★</span>
+                              ))}
+                            </div>
+                            
+                            <p className="review-comment-text">{rev.comment}</p>
+                            
+                            {rev.images && rev.images.length > 0 && (
+                              <div className="review-comment-images">
+                                {rev.images.map((img, idx) => {
+                                  const imgUrl = typeof img === 'string' ? img : img.image_url;
+                                  return (
+                                    <img key={idx} src={imgUrl} alt="review-comment" onClick={() => window.open(imgUrl)} />
+                                  );
+                                })}
+                              </div>
+                            )}
+                            
+                            <div className="review-actions-footer">
+                              <button className="helpful-btn">
+                                <span>👍 Hữu ích ({rev.helpful_count || 0})</span>
+                              </button>
+                              <button className="reply-btn">
+                                <span>💬 Trả lời</span>
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         );
       })()}

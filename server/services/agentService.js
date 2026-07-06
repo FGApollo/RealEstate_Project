@@ -1,10 +1,19 @@
 const { supabase } = require('../config/supabase');
 
 const getOverview = async (userId) => {
-  // 1. Get properties owned by the agent
+  // 1. Get agent profile from users table
+  const { data: agent, error: userError } = await supabase
+    .from('users')
+    .select('id, name, email, avatar, role, phone, trust_score, verification_status')
+    .eq('id', userId)
+    .single();
+
+  if (userError) throw new Error(userError.message);
+
+  // 2. Get properties owned by the agent
   const { data: properties, error: propertiesError } = await supabase
     .from('properties')
-    .select('id, title, price, thumbnail, views, status')
+    .select('id, title, price, thumbnail, views, status, bedrooms, bathrooms, area, city, district, ward, address, property_type')
     .eq('owner_id', userId)
     .eq('status', 'AVAILABLE');
 
@@ -13,7 +22,7 @@ const getOverview = async (userId) => {
   const totalProperties = properties.length;
   const totalViews = properties.reduce((sum, p) => sum + (p.views || 0), 0);
 
-  // 2. Get favorites for these properties
+  // 3. Get favorites for these properties
   const propertyIds = properties.map(p => p.id);
   
   let totalFavorites = 0;
@@ -42,6 +51,7 @@ const getOverview = async (userId) => {
   }
 
   return {
+    agent,
     totalProperties,
     totalViews,
     totalFavorites,
@@ -49,6 +59,56 @@ const getOverview = async (userId) => {
   };
 };
 
-module.exports = {
-  getOverview
+const getAgentReviews = async (agentId) => {
+  // 1. Get properties owned by the agent
+  const { data: properties, error: propError } = await supabase
+    .from('properties')
+    .select('id, title')
+    .eq('owner_id', agentId);
+
+  if (propError) throw new Error(propError.message);
+
+  if (!properties || properties.length === 0) {
+    return [];
+  }
+
+  const propertyIds = properties.map(p => p.id);
+
+  // 2. Get reviews for these properties
+  const { data: reviews, error: revError } = await supabase
+    .from('property_reviews')
+    .select(`
+      id,
+      rating,
+      comment,
+      created_at,
+      status,
+      is_verified_review,
+      user_id,
+      property_id,
+      user:users!user_id(name, avatar, role),
+      images:property_review_images(image_url)
+    `)
+    .in('property_id', propertyIds)
+    .eq('status', 'APPROVED')
+    .order('created_at', { ascending: false });
+
+  if (revError) throw new Error(revError.message);
+
+  // Map property title to reviews
+  const propertyTitleMap = {};
+  properties.forEach(p => {
+    propertyTitleMap[p.id] = p.title;
+  });
+
+  return (reviews || []).map(r => ({
+    ...r,
+    propertyTitle: propertyTitleMap[r.property_id] || ''
+  }));
 };
+
+module.exports = {
+  getOverview,
+  getAgentReviews
+};
+

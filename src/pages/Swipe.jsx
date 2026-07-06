@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { 
-  Search, Heart, Map, User, X, Info, MapPin, 
+  Search, Heart, Map, User, X, Info, MapPin, Menu,
   Bed, Bath, Maximize, SlidersHorizontal, RefreshCw, ChevronLeft, ChevronRight,
   Compass, MessageSquare, Calendar, Eye, ShieldCheck, Phone, Shield, Share2, Sparkles, Home as HomeIcon
 } from 'lucide-react';
 import { motion, useMotionValue, useTransform, useAnimation } from 'framer-motion';
+import PropertyDetailModal from '../components/PropertyDetailModal';
 import './Swipe.css';
 import { API_BASE_URL } from '../config';
 
@@ -193,6 +194,7 @@ const Swipe = () => {
   const [selectedSavedCategory, setSelectedSavedCategory] = useState('Tất cả');
   const [sortBy, setSortBy] = useState('recent');
   const [selectedSavedProperty, setSelectedSavedProperty] = useState(null);
+  const [showSidebar, setShowSidebar] = useState(false);
 
   const [user, setUser] = useState(null);
   const [dbFavorites, setDbFavorites] = useState([]);
@@ -676,6 +678,9 @@ const Swipe = () => {
     return (
       <header className="swipe-header">
         <div className="swipe-header-left">
+          <button className="swipe-menu-btn" onClick={() => setShowSidebar(true)}>
+            <Menu size={20} />
+          </button>
           <Link to="/" className="back-home-btn">
             <ChevronLeft size={20} />
           </Link>
@@ -691,9 +696,9 @@ const Swipe = () => {
             <Heart size={18} />
             <span>YÊU THÍCH</span>
           </div>
-          <div className="header-nav-item">
-            <Map size={18} />
-            <span>MAP</span>
+          <div className="header-nav-item" onClick={() => navigate('/chat')}>
+            <MessageSquare size={18} />
+            <span>CHAT</span>
           </div>
           <div className="header-nav-item">
             <User size={18} />
@@ -754,6 +759,26 @@ const Swipe = () => {
     <div className="swipe-page-container">
       {/* Premium Header */}
       {headerElement}
+
+      {/* Mobile Sidebar Drawer */}
+      {showSidebar && (
+        <div className="mobile-sidebar-backdrop" onClick={() => setShowSidebar(false)}>
+          <div className="mobile-sidebar-drawer" onClick={(e) => e.stopPropagation()}>
+            <div className="mobile-sidebar-header">
+              <span className="logo-text">Swipe Nest</span>
+              <button className="close-sidebar-btn" onClick={() => setShowSidebar(false)}>
+                <X size={20} />
+              </button>
+            </div>
+            <nav className="mobile-sidebar-nav">
+              <button className="mobile-nav-link" onClick={() => { navigate('/'); setShowSidebar(false); }}>Trang Chủ</button>
+              <button className="mobile-nav-link active" onClick={() => { setActiveView('swipe'); setShowSidebar(false); }}>Khám Phá</button>
+              <button className="mobile-nav-link" onClick={() => { setActiveView('saved'); setShowSidebar(false); }}>Yêu thích</button>
+              <button className="mobile-nav-link" onClick={() => { navigate('/chat'); setShowSidebar(false); }}>Chat</button>
+            </nav>
+          </div>
+        </div>
+      )}
 
       {/* Main Content Layout */}
       {activeView === 'swipe' && (
@@ -1111,8 +1136,11 @@ const Swipe = () => {
                           className="saved-card-chat-btn"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setSelectedSavedProperty(property);
-                            setShowDetailModal(true);
+                            if (property.owner_id) {
+                              navigate(`/chat?agentId=${property.owner_id}&propertyId=${property.id}`);
+                            } else {
+                              alert('Bất động sản này không có thông tin chủ sở hữu.');
+                            }
                           }}
                         >
                           <MessageSquare size={16} />
@@ -1128,253 +1156,33 @@ const Swipe = () => {
       )}
 
       {/* Property Details Modal */}
-      {showDetailModal && activePropertyForModal && (() => {
-        const sliderImages = (activePropertyForModal.property_images && activePropertyForModal.property_images.length > 0)
-          ? activePropertyForModal.property_images.map(img => img.image_url)
-          : [activePropertyForModal.thumbnail];
-
-        const lifestyleChips = getLifestyleChips(activePropertyForModal);
-        const amenityChips = getAmenityChips(activePropertyForModal);
-        const ownerDetails = activePropertyForModal.owner || {
-          name: 'Nguyễn Văn Minh',
-          role: 'Chính chủ',
-          avatar: 'https://i.pravatar.cc/150?img=67',
-          trust_score: 92,
-          created_at: activePropertyForModal.created_at
-        };
-
-        const isFav = dbFavorites.some(fav => fav.id === activePropertyForModal.id);
-
-        return (
-          <div className="modal-backdrop" onClick={() => { setShowDetailModal(false); setSelectedSavedProperty(null); }}>
-            <div className="detail-modal-content premium-detail-modal" onClick={(e) => e.stopPropagation()}>
-              <button className="modal-close-btn circular-close" onClick={() => { setShowDetailModal(false); setSelectedSavedProperty(null); }}>
-                <X size={20} />
-              </button>
-              
-              <div className="modal-body premium-body">
-                {/* 1. Top Media Slider */}
-                <div className="detail-media-slider">
-                  <div className="main-image-container">
-                    <img src={sliderImages[activeSliderIdx]} alt={activePropertyForModal.title} className="slider-main-img" />
-                    
-                    {sliderImages.length > 1 && (
-                      <>
-                        <button 
-                          className="slider-nav-btn prev" 
-                          onClick={() => setActiveSliderIdx(prev => (prev - 1 + sliderImages.length) % sliderImages.length)}
-                        >
-                          <ChevronLeft size={24} />
-                        </button>
-                        <button 
-                          className="slider-nav-btn next" 
-                          onClick={() => setActiveSliderIdx(prev => (prev + 1) % sliderImages.length)}
-                        >
-                          <ChevronRight size={24} />
-                        </button>
-                      </>
-                    )}
-                  </div>
-                  
-                  {sliderImages.length > 1 && (
-                    <div className="slider-thumbnails">
-                      {sliderImages.map((img, idx) => (
-                        <div 
-                          key={idx} 
-                          className={`thumb-wrapper ${idx === activeSliderIdx ? 'active' : ''}`}
-                          onClick={() => setActiveSliderIdx(idx)}
-                        >
-                          <img src={img} alt={`thumbnail-${idx}`} />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="detail-content-wrapper">
-                  {/* 2. Rating & Match Score */}
-                  <div className="detail-meta-row">
-                    <span className="match-score-tag">
-                      <Sparkles size={12} /> {activePropertyForModal.matchScore || 95}% MATCH SCORE
-                    </span>
-                    
-                    <div className="detail-rating">
-                      <span className="rating-num">{activePropertyForModal.average_rating ? activePropertyForModal.average_rating.toFixed(1) : '0'}</span>
-                      <div className="rating-stars">
-                        {[1, 2, 3, 4, 5].map(star => (
-                          <span key={star} className={star <= Math.round(activePropertyForModal.average_rating || 0) ? 'star-filled' : 'star-empty'}>★</span>
-                        ))}
-                      </div>
-                      <span className="rating-count">({activePropertyForModal.review_count || 0} đánh giá)</span>
-                    </div>
-                  </div>
-
-                  {/* 3. Header Section */}
-                  <div className="detail-header-block">
-                    <div className="title-section">
-                      <h2>{activePropertyForModal.title}</h2>
-                      <div className="detail-address-row">
-                        <MapPin size={16} />
-                        <span>{activePropertyForModal.address}</span>
-                      </div>
-                    </div>
-                    
-                    <div className="detail-action-buttons">
-                      <button 
-                        className={`action-btn fav-btn ${isFav ? 'active' : ''}`}
-                        onClick={async () => {
-                          if (!user?.id) return;
-                          if (isFav) {
-                            setDbFavorites(prev => prev.filter(fav => fav.id !== activePropertyForModal.id));
-                            fetch(`${API_BASE_URL}/api/favorites/delete`, {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ userId: user.id, propertyId: activePropertyForModal.id })
-                            }).catch(err => console.error(err));
-                          } else {
-                            setDbFavorites(prev => [...prev, activePropertyForModal]);
-                            fetch(`${API_BASE_URL}/api/favorites`, {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ userId: user.id, propertyId: activePropertyForModal.id })
-                            }).catch(err => console.error(err));
-                          }
-                        }}
-                      >
-                        <Heart size={16} fill={isFav ? "white" : "none"} />
-                        <span>{isFav ? 'Đã lưu' : 'Lưu'}</span>
-                      </button>
-                      
-                      <button className="action-btn share-btn" onClick={() => {
-                        navigator.clipboard.writeText(window.location.href);
-                        alert('Đã sao chép liên kết bài đăng!');
-                      }}>
-                        <Share2 size={16} />
-                        <span>Chia sẻ</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="detail-price-tag">
-                    {activePropertyForModal.price ? activePropertyForModal.price.toLocaleString('vi-VN') : 'Liên hệ'} VNĐ
-                  </div>
-
-                  {/* 4. Specs Grid */}
-                  <div className="detail-specs-grid">
-                    <div className="spec-card">
-                      <div className="spec-icon-box"><Maximize size={20} /></div>
-                      <div className="spec-info">
-                        <span>Diện tích</span>
-                        <p>{activePropertyForModal.area} m²</p>
-                      </div>
-                    </div>
-                    <div className="spec-card">
-                      <div className="spec-icon-box"><Bath size={20} /></div>
-                      <div className="spec-info">
-                        <span>Phòng tắm</span>
-                        <p>{activePropertyForModal.bathrooms || 0}</p>
-                      </div>
-                    </div>
-
-                  </div>
-
-                  {/* 5. Lifestyle & Amenities Columns */}
-                  <div className="detail-columns-row">
-                    <div className="detail-column">
-                      <h3>Lối sống phù hợp</h3>
-                      <div className="chips-list">
-                        {lifestyleChips.length > 0 ? (
-                          lifestyleChips.map((chip, idx) => (
-                            <span key={idx} className="feature-chip lifestyle-chip-style">{chip}</span>
-                          ))
-                        ) : (
-                          <span className="no-features-text">Đang cập nhật...</span>
-                        )}
-                      </div>
-                    </div>
-                    
-                    <div className="detail-column">
-                      <h3>Tiện ích</h3>
-                      <div className="chips-list">
-                        {amenityChips.length > 0 ? (
-                          amenityChips.map((chip, idx) => (
-                            <span key={idx} className="feature-chip amenity-chip-style">{chip}</span>
-                          ))
-                        ) : (
-                          <span className="no-features-text">Đang cập nhật...</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 6. Description & Images Grid */}
-                  <div className="detail-columns-row text-image-row">
-                    <div className="detail-column description-column">
-                      <h3>Mô tả chi tiết</h3>
-                      <p className="description-text">{activePropertyForModal.description}</p>
-                    </div>
-                    
-                    <div className="detail-column detail-images-column">
-                      <h3>Hình ảnh chi tiết</h3>
-                      <div className="detail-images-grid-box">
-                        {sliderImages.slice(0, 4).map((img, idx) => (
-                          <div key={idx} className="grid-image-wrapper" onClick={() => setActiveSliderIdx(idx)}>
-                            <img src={img} alt={`detail-${idx}`} />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 7. Poster info */}
-                  <div className="detail-poster-block">
-                    <h3>Thông tin người đăng</h3>
-                    <div className="poster-card">
-                      <div className="poster-left">
-                        <img src={ownerDetails.avatar || 'https://i.pravatar.cc/150?img=67'} alt={ownerDetails.name} className="poster-avatar" />
-                        <div className="poster-name-info">
-                          <div className="name-row">
-                            <h4>{ownerDetails.name}</h4>
-                            <span className="role-verified-badge">
-                              <ShieldCheck size={12} /> {ownerDetails.role === 'AGENT' ? 'Chính chủ' : 'Môi giới'}
-                            </span>
-                          </div>
-                          <p>Thành viên từ {new Date(ownerDetails.created_at || activePropertyForModal.created_at).toLocaleDateString('vi-VN')}</p>
-                        </div>
-                      </div>
-                      
-                      <div className="poster-right">
-                        <div className="trust-score-wrapper">
-                          <span>Trust Score</span>
-                          <p>{ownerDetails.trust_score || 92}</p>
-                          <small>Rất uy tín</small>
-                        </div>
-                        
-                        <div className="poster-contact-buttons">
-                          <a href={`sms:${activePropertyForModal.contact_phone || '0901234567'}`} className="contact-btn message-btn">
-                            <MessageSquare size={16} /> Nhắn tin
-                          </a>
-                          <a href={`tel:${activePropertyForModal.contact_phone || '0901234567'}`} className="contact-btn call-btn">
-                            <Phone size={16} /> Gọi ngay
-                          </a>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 8. Footer Info */}
-                  <div className="detail-footer-bar">
-                    <div className="footer-item"><Calendar size={14} /> <span>Đăng tin: {new Date(activePropertyForModal.created_at).toLocaleDateString('vi-VN')}</span></div>
-                    <div className="footer-item"><Eye size={14} /> <span>Lượt xem: {activePropertyForModal.views || 0}</span></div>
-                    <div className="footer-item"><Shield size={14} /> <span>Mã tin: {activePropertyForModal.property_type === 'Mặt Bằng' ? 'MBKD' : 'CHCH'}-{124000 + activePropertyForModal.id}</span></div>
-                  </div>
-
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+      {showDetailModal && activePropertyForModal && (
+        <PropertyDetailModal
+          property={activePropertyForModal}
+          onClose={() => { setShowDetailModal(false); setSelectedSavedProperty(null); }}
+          showFavoriteActions={true}
+          isFavorite={dbFavorites.some(fav => fav.id === activePropertyForModal.id)}
+          onToggleFavorite={async () => {
+            if (!user?.id) return;
+            const isFav = dbFavorites.some(fav => fav.id === activePropertyForModal.id);
+            if (isFav) {
+              setDbFavorites(prev => prev.filter(fav => fav.id !== activePropertyForModal.id));
+              fetch(`${API_BASE_URL}/api/favorites/delete`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: user.id, propertyId: activePropertyForModal.id })
+              }).catch(err => console.error(err));
+            } else {
+              setDbFavorites(prev => [...prev, activePropertyForModal]);
+              fetch(`${API_BASE_URL}/api/favorites`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: user.id, propertyId: activePropertyForModal.id })
+              }).catch(err => console.error(err));
+            }
+          }}
+        />
+      )}
 
       {/* Filter Modal */}
       {showFilterModal && (

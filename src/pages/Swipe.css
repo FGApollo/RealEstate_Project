@@ -1890,8 +1890,8 @@
   border-radius: 50px;
   padding: 0.5rem 1.35rem;
   margin-bottom: 1.25rem;
-  color: rgba(255, 255, 255, 0.85);
-  font-size: 0.725rem;
+  color: #ffffff;
+  font-size: 0.85rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 2px;
@@ -1902,11 +1902,13 @@
 }
 
 .swipe-discovery-title .category-accent {
-  background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 50%, #f472b6 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  background: none;
+  -webkit-background-clip: unset;
+  -webkit-text-fill-color: #ffffff;
+  color: #ffffff;
   font-weight: 850;
   letter-spacing: 1px;
+  font-size: 1.05em;
 }
 
 /* Premium Full-Image Tinder Card Design */
@@ -2751,6 +2753,34 @@
 
 .footer-item svg {
   color: #94a3b8;
+}
+
+/* Responsive Navbar overrides for Swipe.css */
+.swipe-menu-btn {
+  display: none;
+  background: none;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+  align-items: center;
+  justify-content: center;
+}
+
+.swipe-menu-btn:hover {
+  background-color: #f1f5f9;
+  color: #0f172a;
+}
+
+@media (max-width: 768px) {
+  .swipe-menu-btn {
+    display: flex;
+  }
+  .swipe-header-right {
+    display: none;
+  }
 }
 
 

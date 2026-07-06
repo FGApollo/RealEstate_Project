@@ -4,7 +4,7 @@ const { supabase } = require('../config/supabase');
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-const registerUser = async ({ name, email, password }) => {
+const registerUser = async ({ name, email, password, role = 'USER', phone = null }) => {
   // Check if user exists
   const { data: existingUser } = await supabase
     .from('users')
@@ -23,7 +23,7 @@ const registerUser = async ({ name, email, password }) => {
   // Insert
   const { data, error } = await supabase
     .from('users')
-    .insert([{ name, email, password: hashedPassword }])
+    .insert([{ name, email, password: hashedPassword, role, phone }])
     .select()
     .single();
 
@@ -117,8 +117,20 @@ const googleLogin = async (credential) => {
   }
 };
 
+const getUserById = async (id) => {
+  const { data, error } = await supabase
+    .from('users')
+    .select('id, name, email, avatar, role, phone')
+    .eq('id', id)
+    .single();
+
+  if (error) throw new Error(error.message);
+  return data;
+};
+
 module.exports = {
   registerUser,
   loginUser,
-  googleLogin
+  googleLogin,
+  getUserById
 };

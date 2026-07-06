@@ -15,8 +15,25 @@ const getOverview = async (req, res) => {
     console.error('Error fetching agent overview:', error);
     res.status(500).json({ error: error.message || 'Internal server error' });
   }
+ };
+
+const getAgentReviews = async (req, res) => {
+  const { userId } = req.query;
+
+  if (!userId) {
+    return res.status(400).json({ error: 'Missing userId parameter' });
+  }
+
+  try {
+    const reviews = await agentService.getAgentReviews(userId);
+    res.status(200).json(reviews);
+  } catch (error) {
+    console.error('Error fetching agent reviews:', error);
+    res.status(500).json({ error: error.message || 'Internal server error' });
+  }
 };
 
 module.exports = {
-  getOverview
+  getOverview,
+  getAgentReviews
 };

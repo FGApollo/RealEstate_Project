@@ -54,7 +54,11 @@ const Login = () => {
       }
 
       localStorage.setItem('user', JSON.stringify(data.user));
-      navigate('/');
+      if (data.user.role === 'AGENT') {
+        navigate('/sale/overview');
+      } else {
+        navigate('/');
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -85,7 +89,11 @@ const Login = () => {
         if (!response.ok) throw new Error(data.error || 'Google login failed');
         
         localStorage.setItem('user', JSON.stringify(data.user));
-        navigate('/');
+        if (data.user.role === 'AGENT') {
+          navigate('/sale/overview');
+        } else {
+          navigate('/');
+        }
       } catch (err) {
         setError(err.message);
       } finally {
@@ -158,7 +166,10 @@ const Login = () => {
       </div>
 
       <div className="auth-footer">
-        Chưa có tài khoản? <Link to="/register">Đăng ký ngay</Link>
+        <div>Chưa có tài khoản? <Link to="/register">Đăng ký ngay</Link></div>
+        <div style={{ marginTop: '1rem', fontSize: '0.85rem' }}>
+          Bạn là Môi giới? <Link to="/login/agent">Đăng nhập cổng Môi giới</Link>
+        </div>
       </div>
     </AuthLayout>
   );
