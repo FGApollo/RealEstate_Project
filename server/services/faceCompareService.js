@@ -149,9 +149,9 @@ const getSelfieFaceRegion = (width, height) => clampRegion({
 }, width, height);
 
 const isForcedDemoResult = () => {
-  const mode = (process.env.KYC_FACE_MATCH_DEMO_RESULT || '').toLowerCase();
-  if (mode === 'pass') return true;
-  if (mode === 'fail') return false;
+  const mode = (process.env.KYC_FACE_MATCH_DEMO_RESULT || process.env.KYC_DEMO_MODE || '').toLowerCase();
+  if (mode === 'pass' || mode === 'true') return true;
+  if (mode === 'fail' || mode === 'false') return false;
   return null;
 };
 
