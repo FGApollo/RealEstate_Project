@@ -368,9 +368,17 @@ const AgentProfile = ({
       setKycStatus(prev => ({ ...prev, verificationStatus: 'VERIFIED' }));
       
       if (typeof window !== 'undefined') {
-        const localUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-        localUser.verification_status = 'VERIFIED';
-        localStorage.setItem('currentUser', JSON.stringify(localUser));
+        try {
+          const mainUser = JSON.parse(localStorage.getItem('user') || '{}');
+          mainUser.verification_status = 'VERIFIED';
+          localStorage.setItem('user', JSON.stringify(mainUser));
+
+          const localUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+          localUser.verification_status = 'VERIFIED';
+          localStorage.setItem('currentUser', JSON.stringify(localUser));
+        } catch (e) {
+          console.error('Error saving verification status:', e);
+        }
       }
     } catch (err) {
       console.error(err);
@@ -588,28 +596,49 @@ const AgentProfile = ({
         {(() => {
           const score = currentUser.trust_score !== undefined ? Number(currentUser.trust_score) : 98;
           let trustText = 'Rất uy tín';
-          let trustColor = '#d97706'; // gold
+          let trustColor = '#d97706'; // vàng / xanh đậm
+          let bgColor = '#fffbeb';
+          let borderColor = '#fde68a';
+          let textColor = '#92400e';
+
           if (score <= 39) {
             trustText = 'Rủi ro cao';
-            trustColor = '#dc2626'; // red
+            trustColor = '#dc2626'; // đỏ
+            bgColor = '#fef2f2';
+            borderColor = '#fca5a5';
+            textColor = '#991b1b';
           } else if (score <= 59) {
             trustText = 'Bình thường';
-            trustColor = '#6b7280'; // grey
+            trustColor = '#6b7280'; // xám
+            bgColor = '#f3f4f6';
+            borderColor = '#d1d5db';
+            textColor = '#374151';
           } else if (score <= 79) {
             trustText = 'Đáng tin';
-            trustColor = '#10b981'; // green
+            trustColor = '#10b981'; // xanh
+            bgColor = '#ecfdf5';
+            borderColor = '#a7f3d0';
+            textColor = '#065f46';
           }
+
           return (
-            <div className="verification-score-card" style={{ borderLeft: `4px solid ${trustColor}` }}>
-              <div className="score-icon-wrapper">
+            <div 
+              className="verification-score-card" 
+              style={{ 
+                backgroundColor: bgColor, 
+                border: `1.5px solid ${borderColor}`,
+                borderLeft: `5px solid ${trustColor}` 
+              }}
+            >
+              <div className="score-icon-wrapper" style={{ boxShadow: `0 2px 8px ${trustColor}25` }}>
                 <ShieldCheck size={28} color={trustColor} strokeWidth={2} />
               </div>
               <div className="score-texts">
-                <div className="status-label">
-                  Status: <span className="highlight">{currentUser.verification_status === 'VERIFIED' ? 'Verified Broker' : 'Unverified Broker'}</span>
+                <div className="status-label" style={{ color: textColor }}>
+                  Status: <span className="highlight" style={{ color: trustColor }}>{currentUser.verification_status === 'VERIFIED' ? 'Verified Broker' : 'Unverified Broker'}</span>
                 </div>
-                <div className="score-label">
-                  Trust Score: <span style={{ color: trustColor, fontWeight: 'bold' }}>{score}/100</span> <span style={{ fontSize: '12px', color: '#64748b' }}>({trustText})</span>
+                <div className="score-label" style={{ color: textColor }}>
+                  Trust Score: <span style={{ color: trustColor, fontWeight: 'bold' }}>{score}/100</span> <span style={{ fontSize: '12px', color: textColor, opacity: 0.85 }}>({trustText})</span>
                 </div>
               </div>
             </div>
