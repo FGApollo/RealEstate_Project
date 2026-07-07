@@ -13,6 +13,7 @@ const DEFAULT_LISTING = (currentUser) => ({
   city: '',
   district: '',
   ward: '',
+  floor_range: '',
   address_detail: '',
   address: '',
   latitude: '',
@@ -31,6 +32,9 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
   const [currentStep, setCurrentStep] = useState(1);
   const [listing, setListing] = useState(() => DEFAULT_LISTING(currentUser));
   const [submittedProperty, setSubmittedProperty] = useState(null);
+  const [warnings, setWarnings] = useState([]);
+  const [showWarningsModal, setShowWarningsModal] = useState(false);
+  const [isCheckingSave, setIsCheckingSave] = useState(false);
 
   // Location dropdowns
   const [provinces, setProvinces] = useState([]);
@@ -103,6 +107,7 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
           city: prop.city || '',
           district: prop.district || '',
           ward: prop.ward || '',
+          floor_range: prop.floor_range || '',
           address_detail: prop.address_detail || '',
           address: prop.address || '',
           latitude: prop.latitude || '',
@@ -327,8 +332,9 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
   const toggleLifestyleTag = (tag) => setListing(prev => ({ ...prev, lifestyle_tags: prev.lifestyle_tags.includes(tag) ? prev.lifestyle_tags.filter(t => t !== tag) : [...prev.lifestyle_tags, tag] }));
   const toggleChannel = (channel) => setListing(prev => ({ ...prev, channels: prev.channels.includes(channel) ? prev.channels.filter(c => c !== channel) : [...prev.channels, channel] }));
 
-  // Submit handler (create or edit)
-  const handleSubmitListing = async () => {
+  // Execute direct database save
+  const executeSaveListing = async () => {
+    setShowWarningsModal(false);
     try {
       const payload = {
         owner_id: currentUser.id,
@@ -343,6 +349,7 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
         city: listing.city,
         district: listing.district,
         ward: listing.ward,
+        floor_range: listing.floor_range || '',
         address_detail: listing.address_detail,
         address: `${listing.address_detail}, ${listing.ward}, ${listing.district}, ${listing.city}`,
         thumbnail: listing.thumbnail || (listing.images.find(img => img.isFeatured)?.url || 'https://via.placeholder.com/400'),
@@ -392,6 +399,79 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
     }
   };
 
+  // Submit handler (create or edit) - with validation checks
+  const handleSubmitListing = async () => {
+    setIsCheckingSave(true);
+    setWarnings([]);
+    try {
+      const payload = {
+        owner_id: currentUser.id,
+        title: listing.title,
+        description: listing.description,
+        price: parseFloat(listing.price) || 0,
+        area: parseFloat(listing.area) || 0,
+        bedrooms: parseInt(listing.bedrooms) || 0,
+        bathrooms: parseInt(listing.bathrooms) || 0,
+        property_type: listing.property_type,
+        status: listing.status,
+        city: listing.city,
+        district: listing.district,
+        ward: listing.ward,
+        floor_range: listing.floor_range || '',
+        address_detail: listing.address_detail,
+        address: `${listing.address_detail}, ${listing.ward}, ${listing.district}, ${listing.city}`,
+        thumbnail: listing.thumbnail || (listing.images.find(img => img.isFeatured)?.url || 'https://via.placeholder.com/400'),
+        virtual_tour_url: listing.virtual_tour_url || null,
+        contact_phone: listing.contact_phone,
+        latitude: parseFloat(listing.latitude) || null,
+        longitude: parseFloat(listing.longitude) || null,
+        features: listing.features,
+        images: listing.images.map(img => img.url),
+        lifestyle_tags: listing.lifestyle_tags
+      };
+
+      const checkUrl = mode === 'edit'
+        ? `${API_BASE_URL}/api/properties/check-before-save?excludeId=${editingPropertyId}`
+        : `${API_BASE_URL}/api/properties/check-before-save`;
+
+      const checkRes = await fetch(checkUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (checkRes.ok) {
+        const checkData = await checkRes.json();
+        const activeWarnings = [];
+
+        if (checkData.similarOwn) {
+          activeWarnings.push({
+            type: 'OWN_SPAM',
+            text: 'Trông giống như bạn đã đăng căn này rồi. App tự tối ưu phân phối nên bạn không lo trôi bài. Bạn có chắc muốn đăng tiếp?'
+          });
+        }
+        if (checkData.isMultiListing) {
+          activeWarnings.push({
+            type: 'MULTI_LISTING',
+            text: 'Nền tảng khuyến khích bạn chỉ đăng thông tin của một căn duy nhất để tăng hiệu quả tiếp cận khách hàng. (Phát hiện giỏ hàng: ' + (checkData.geminiReason || 'Nhiều căn hộ') + ')'
+          });
+        }
+
+        if (activeWarnings.length > 0) {
+          setWarnings(activeWarnings);
+          setShowWarningsModal(true);
+          setIsCheckingSave(false);
+          return;
+        }
+      }
+    } catch (err) {
+      console.error('Validation check failed:', err);
+    }
+
+    setIsCheckingSave(false);
+    await executeSaveListing();
+  };
+
   const resetForm = () => {
     setListing(DEFAULT_LISTING(currentUser));
     setCurrentStep(1);
@@ -413,7 +493,12 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
     toggleSelectImage, setFeaturedImage, deleteSelectedImages,
     toggleAmenity, toggleLifestyleTag, toggleChannel,
     handleSubmitListing,
-    resetForm
+    resetForm,
+    warnings,
+    showWarningsModal,
+    setShowWarningsModal,
+    isCheckingSave,
+    executeSaveListing
   };
 };
 

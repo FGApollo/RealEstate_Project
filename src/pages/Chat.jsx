@@ -66,7 +66,7 @@ const Chat = () => {
             } else {
               // Create a temporary conversation object for the UI
               const agentDetailsRes = await fetch(`${API_BASE_URL}/api/auth/user/${agentIdNum}`);
-              let partnerObj = { id: agentIdNum, name: 'Môi giới', role: 'AGENT' };
+              let partnerObj = { id: agentIdNum, name: 'Đang tải...', role: 'AGENT' };
               if (agentDetailsRes.ok) {
                 const partnerData = await agentDetailsRes.json();
                 partnerObj = partnerData.user || partnerObj;
@@ -340,16 +340,34 @@ const Chat = () => {
                           </div>
                         )}
                         <div className="message-bubble-content">
-                          {msg.property && !activeProperty && (
-                            <div className="message-property-context" onClick={() => navigate(`/swipe/Tất cả`, { state: { selectPropertyId: msg.property.id } })}>
-                              <img src={msg.property.thumbnail} alt="Prop" />
-                              <div className="msg-prop-info">
-                                <h6>{msg.property.title}</h6>
-                                <p>{formatPrice(msg.property.price)}/tháng</p>
+                          {msg.property ? (
+                            <div 
+                              className="chat-property-card" 
+                              onClick={() => navigate(`/swipe/Tất cả`, { state: { selectPropertyId: msg.property.id } })}
+                              style={{ 
+                                cursor: 'pointer', 
+                                border: '1px solid #e2e8f0', 
+                                borderRadius: '12px', 
+                                overflow: 'hidden', 
+                                backgroundColor: 'white',
+                                width: '260px',
+                                boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
+                                display: 'flex',
+                                flexDirection: 'column'
+                              }}
+                            >
+                              <img src={msg.property.thumbnail} alt={msg.property.title} style={{ width: '100%', height: '140px', objectFit: 'cover' }} />
+                              <div style={{ padding: '12px', textAlign: 'left' }}>
+                                <h5 style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: '700', color: '#1e293b', lineHeight: '1.4' }}>{msg.property.title}</h5>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                                  <span style={{ fontSize: '13px', fontWeight: '700', color: '#2563eb' }}>{formatPrice(msg.property.price)}/tháng</span>
+                                  <span style={{ fontSize: '12px', color: '#64748b' }}>{msg.property.area || 0} m²</span>
+                                </div>
                               </div>
                             </div>
+                          ) : (
+                            <p className="message-text">{msg.message}</p>
                           )}
-                          <p className="message-text">{msg.message}</p>
                           <span className="message-time">{formattedTime}</span>
                         </div>
                       </div>

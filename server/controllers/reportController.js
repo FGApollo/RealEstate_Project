@@ -56,4 +56,3 @@ module.exports = {
   VALID_REASONS: reportService.VALID_REASONS,
   DEDUCTION_MAP: reportService.DEDUCTION_MAP
 };
-

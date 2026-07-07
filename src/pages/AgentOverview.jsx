@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Home, Search, LayoutDashboard, Settings, LogOut, BarChart2, HelpCircle, MessageSquare
+  Home, Search, LayoutDashboard, Settings, LogOut, BarChart2, HelpCircle, MessageSquare, Shield
 } from 'lucide-react';
 import OverviewDashboard from '../features/agent/overview/OverviewDashboard';
 import CreateListingWizard from '../features/agent/create-listing/CreateListingWizard';
 import EditListingWizard from '../features/agent/edit-listing/EditListingWizard';
 import AgentChat from '../features/agent/chat/AgentChat';
+import AgentProfile from '../features/agent/profile/AgentProfile';
 import './AgentOverview.css';
 import { API_BASE_URL } from '../config';
 
@@ -49,7 +50,7 @@ const AgentOverview = () => {
   });
   const [loading, setLoading] = useState(true);
 
-  // Navigation tabs: 'overview', 'listings', 'create-listing'
+  // Navigation tabs: 'overview', 'listings', 'create-listing', 'profile'
   const [activeTab, setActiveTab] = useState('overview');
 
   // Filter query state (passed down to sync topbar with the listing panel)
@@ -91,7 +92,7 @@ const AgentOverview = () => {
 
   const handleDeleteProperty = async (id) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/properties/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/properties/${id}?userId=${currentUser.id}`, {
         method: 'DELETE'
       });
       if (response.ok) {
@@ -116,6 +117,16 @@ const AgentOverview = () => {
         if (response.ok) {
           const result = await response.json();
           setData(result);
+          if (result.agent) {
+            setCurrentUser(prev => ({
+              ...prev,
+              ...result.agent
+            }));
+            localStorage.setItem('user', JSON.stringify({
+              ...currentUser,
+              ...result.agent
+            }));
+          }
         } else {
           console.error('Failed to fetch overview');
         }
@@ -127,10 +138,6 @@ const AgentOverview = () => {
     };
     fetchOverview();
   }, [currentUser.id]);
-
-  const initials = currentUser.name
-    ? currentUser.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
-    : 'ZC';
 
   return (
     <div className="agent-dashboard">
@@ -181,8 +188,8 @@ const AgentOverview = () => {
       </aside>
 
       <main className="main-content">
-        {/* Topbar only shown on overview — listings has its own search bar */}
-        {activeTab === 'overview' && (
+        {/* Topbar shown on overview and profile page */}
+        {(activeTab === 'overview' || activeTab === 'profile') && (
           <header className="topbar">
             <div className="search-bar">
               <Search size={16} color="#94a3b8" />
@@ -194,13 +201,22 @@ const AgentOverview = () => {
               />
             </div>
 
-            <div className={`profile-badge ${currentUser.verification_status?.toLowerCase() || 'unverified'}`}>
-              <div className="profile-avatar">{initials}</div>
-              <div className="profile-info-wrapper">
-                <span className="profile-name">{currentUser.name || 'Zăn Cao'}</span>
-                <span className="verification-status-tag">
-                  {currentUser.verification_status === 'VERIFIED' ? 'Đã xác minh' : 'Chưa xác minh'}
-                </span>
+            <div className="topbar-right">
+              {currentUser.verification_status === 'VERIFIED' && (
+                <button className="topbar-icon-btn" title="Đã xác thực">
+                  <Shield size={20} color="#10b981" />
+                </button>
+              )}
+              <div 
+                className="topbar-avatar-wrapper"
+                onClick={() => handleTabChange('profile')}
+                title="Hồ sơ cá nhân"
+              >
+                <img 
+                  src={currentUser.avatar || "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=80&h=80&fit=crop&q=80"} 
+                  alt={currentUser.name} 
+                  className="topbar-avatar-img"
+                />
               </div>
             </div>
           </header>
@@ -311,6 +327,17 @@ const AgentOverview = () => {
               </div>
             );
           })()}
+
+          {/* TAB 7: PROFILE PANEL */}
+          {activeTab === 'profile' && (
+            <AgentProfile
+              currentUser={currentUser}
+              data={data}
+              onEditProperty={handleEditProperty}
+              onDeleteProperty={handleDeleteProperty}
+              setActiveTab={handleTabChange}
+            />
+          )}
         </div>
       </main>
     </div>
