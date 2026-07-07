@@ -52,5 +52,7 @@ module.exports = {
   createReport,
   getAdminReports,
   resolveReport,
-  rejectReport
+  rejectReport,
+  VALID_REASONS: reportService.VALID_REASONS,
+  DEDUCTION_MAP: reportService.DEDUCTION_MAP
 };

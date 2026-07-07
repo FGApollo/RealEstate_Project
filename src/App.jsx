@@ -7,6 +7,7 @@ import Home from './pages/Home'
 import Swipe from './pages/Swipe'
 import AgentOverview from './pages/AgentOverview'
 import Chat from './pages/Chat'
+import AdminPage from './pages/AdminPage'
 import './App.css'
 
 function App() {
@@ -20,6 +21,7 @@ function App() {
       <Route path="/swipe/:categoryName" element={<Swipe />} />
       <Route path="/sale/overview" element={<AgentOverview />} />
       <Route path="/chat" element={<Chat />} />
+      <Route path="/admin" element={<AdminPage />} />
     </Routes>
   )
 }

@@ -10,6 +10,7 @@ const kycRoutes = require('./routes/kycRoutes');
 const adminKycRoutes = require('./routes/adminKycRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const phoneOtpRoutes = require('./routes/phoneOtpRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const trustScoreRoutes = require('./routes/trustScoreRoutes');
 const userProfileRoutes = require('./routes/userProfileRoutes');
@@ -33,6 +34,7 @@ app.use('/api/kyc', kycRoutes);
 app.use('/api/admin/kyc', adminKycRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/phone', phoneOtpRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/trust-score', trustScoreRoutes);
 app.use('/api/users', userProfileRoutes);
@@ -40,3 +42,4 @@ app.use('/api/users', userProfileRoutes);
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
+
