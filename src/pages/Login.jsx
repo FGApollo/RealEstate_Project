@@ -56,6 +56,8 @@ const Login = () => {
       localStorage.setItem('user', JSON.stringify(data.user));
       if (data.user.role === 'AGENT') {
         navigate('/sale/overview');
+      } else if (data.user.role === 'ADMIN' || data.user.role === 'admin') {
+        navigate('/admin');
       } else {
         navigate('/');
       }
@@ -91,6 +93,8 @@ const Login = () => {
         localStorage.setItem('user', JSON.stringify(data.user));
         if (data.user.role === 'AGENT') {
           navigate('/sale/overview');
+        } else if (data.user.role === 'ADMIN' || data.user.role === 'admin') {
+          navigate('/admin');
         } else {
           navigate('/');
         }
