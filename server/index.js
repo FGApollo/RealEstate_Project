@@ -14,6 +14,7 @@ const adminRoutes = require('./routes/adminRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const trustScoreRoutes = require('./routes/trustScoreRoutes');
 const userProfileRoutes = require('./routes/userProfileRoutes');
+const subscriptionRoutes = require('./routes/subscriptionRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -38,6 +39,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/trust-score', trustScoreRoutes);
 app.use('/api/users', userProfileRoutes);
+app.use('/api/subscriptions', subscriptionRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);

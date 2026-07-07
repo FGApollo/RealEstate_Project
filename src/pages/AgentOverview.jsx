@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Home, Search, LayoutDashboard, Settings, LogOut, BarChart2, HelpCircle, MessageSquare, Shield,
-  User, Star
+  User, Star, CreditCard
 } from 'lucide-react';
 import OverviewDashboard from '../features/agent/overview/OverviewDashboard';
 import CreateListingWizard from '../features/agent/create-listing/CreateListingWizard';
 import EditListingWizard from '../features/agent/edit-listing/EditListingWizard';
 import AgentChat from '../features/agent/chat/AgentChat';
 import AgentProfile from '../features/agent/profile/AgentProfile';
+import AgentPricing from '../features/agent/pricing/AgentPricing';
 import './AgentOverview.css';
 import { API_BASE_URL } from '../config';
 
@@ -195,14 +196,24 @@ const AgentOverview = () => {
 
         {/* Bottom: Help Center + logout */}
         <div className="sidebar-bottom">
+          <a 
+            href="#" 
+            className={`nav-item ${activeTab === 'pricing' ? 'active' : ''}`}
+            onClick={(e) => {
+              e.preventDefault();
+              handleTabChange('pricing');
+            }}
+          >
+            <CreditCard size={16} /> Subscription Plan
+          </a>
           <a href="#" className="nav-item"><HelpCircle size={16} /> Help Center</a>
           <a href="#" className="nav-item" onClick={handleLogout}><LogOut size={16} /> Log Out</a>
         </div>
       </aside>
 
       <main className="main-content">
-        {/* Topbar shown on overview, profile, and feedback page */}
-        {(activeTab === 'overview' || activeTab === 'profile' || activeTab === 'feedback') && (
+        {/* Topbar shown on overview, profile, feedback, and pricing page */}
+        {(activeTab === 'overview' || activeTab === 'profile' || activeTab === 'feedback' || activeTab === 'pricing') && (
           <header className="topbar">
             <div className="search-bar">
               <Search size={16} color="#94a3b8" />
@@ -363,6 +374,13 @@ const AgentOverview = () => {
               setActiveTab={handleTabChange}
               initialTab="reviews"
               hideHeader={true}
+            />
+          )}
+
+          {/* TAB 9: PRICING PANEL */}
+          {activeTab === 'pricing' && (
+            <AgentPricing
+              currentUser={currentUser}
             />
           )}
         </div>
