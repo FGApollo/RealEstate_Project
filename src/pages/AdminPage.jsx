@@ -72,9 +72,10 @@ const AdminPage = () => {
       const res = await fetch(`${API_BASE_URL}/api/admin/kyc/rejected?adminId=${currentUser.id}`);
       if (res.ok) {
         const data = await res.json();
-        setRejectedList(data || []);
-        if (data && data.length > 0 && !selectedKycId) {
-          setSelectedKycId(data[0].id);
+        const list = Array.isArray(data) ? data : (data.verifications || data.data || []);
+        setRejectedList(list);
+        if (list.length > 0 && !selectedKycId) {
+          setSelectedKycId(list[0].id);
         }
       }
     } catch (err) {
@@ -92,7 +93,8 @@ const AdminPage = () => {
       const res = await fetch(`${API_BASE_URL}/api/admin/kyc/${id}?adminId=${currentUser.id}`);
       if (res.ok) {
         const data = await res.json();
-        setKycDetail(data);
+        const detail = data.verification || data.data || data;
+        setKycDetail(detail);
       } else {
         setKycDetail(null);
       }
@@ -113,9 +115,10 @@ const AdminPage = () => {
       const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
-        setReportList(data || []);
-        if (data && data.length > 0) {
-          setSelectedReportId(data[0].id);
+        const list = Array.isArray(data) ? data : (data.reports || data.data || []);
+        setReportList(list);
+        if (list.length > 0) {
+          setSelectedReportId(list[0].id);
         } else {
           setSelectedReportId(null);
         }
@@ -270,7 +273,7 @@ const AdminPage = () => {
   };
 
   // Filtered lists based on search query
-  const filteredRejectedList = rejectedList.filter(item => {
+  const filteredRejectedList = (Array.isArray(rejectedList) ? rejectedList : []).filter(item => {
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     const name = item.user?.name || item.full_name || '';
@@ -279,7 +282,7 @@ const AdminPage = () => {
     return name.toLowerCase().includes(q) || email.toLowerCase().includes(q) || idStr.includes(q);
   });
 
-  const filteredReportList = reportList.filter(item => {
+  const filteredReportList = (Array.isArray(reportList) ? reportList : []).filter(item => {
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     const propTitle = item.property?.title || '';
