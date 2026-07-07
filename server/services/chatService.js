@@ -121,7 +121,8 @@ const getFunnelStats = async (agentId) => {
   // Fetch funnel statistics for the agent
   const { data, error } = await supabase
     .from('agent_user_funnel')
-    .select('funnel_stage');
+    .select('funnel_stage')
+    .eq('agent_id', agentId);
 
   if (error) {
     throw new Error(error.message);

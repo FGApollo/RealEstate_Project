@@ -61,9 +61,15 @@ const AgentProfile = ({
   data, 
   onEditProperty, 
   onDeleteProperty, 
-  setActiveTab 
+  setActiveTab,
+  initialTab = 'kyc',
+  hideHeader = false
 }) => {
-  const [selectedProfileTab, setSelectedProfileTab] = useState('posts');
+  const [selectedProfileTab, setSelectedProfileTab] = useState(initialTab);
+
+  useEffect(() => {
+    setSelectedProfileTab(initialTab);
+  }, [initialTab]);
   
   // Ward Filtering states (same as buyer page)
   const [selectedWards, setSelectedWards] = useState([]);
@@ -546,104 +552,97 @@ const AgentProfile = ({
   return (
     <div className="agent-profile-view">
       {/* 1. AGENT INFO HEADER CARD */}
-      <div className="agent-profile-header-card">
-        <div className="avatar-section">
-          <div className="profile-avatar-container">
-            <img 
-              src={currentUser.avatar || "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&h=400&fit=crop&q=80"} 
-              alt={currentUser.name} 
-              className="profile-avatar-img"
-            />
-            {currentUser.verification_status === 'VERIFIED' && (
-              <div className="avatar-verified-badge" title="Verified Broker">
-                <ShieldCheck size={20} fill="#10b981" color="#ffffff" strokeWidth={2.5} />
-              </div>
-            )}
-          </div>
-          
-          <div className="agent-text-details">
-            <div className="name-role-row">
-              <h2 className="agent-profile-name">{currentUser.name || 'Zân Cao'}</h2>
-              <span className="role-chip">Saler</span>
+      {!hideHeader && (
+        <div className="agent-profile-header-card">
+          <div className="avatar-section">
+            <div className="profile-avatar-container">
+              <img 
+                src={currentUser.avatar || "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&h=400&fit=crop&q=80"} 
+                alt={currentUser.name} 
+                className="profile-avatar-img"
+              />
+              {currentUser.verification_status === 'VERIFIED' && (
+                <div className="avatar-verified-badge" title="Verified Broker">
+                  <ShieldCheck size={20} fill="#10b981" color="#ffffff" strokeWidth={2.5} />
+                </div>
+              )}
             </div>
             
-            <div className="location-row">
-              <MapPin size={16} color="#64748b" />
-              <span>Hồ Chí Minh City, VN</span>
-            </div>
-
-            <div className="contact-details-grid">
-              <div className="contact-item">
-                <Mail size={16} color="#64748b" />
-                <span>{currentUser.email || 'Zancao@gmail.com'}</span>
+            <div className="agent-text-details">
+              <div className="name-role-row">
+                <h2 className="agent-profile-name">{currentUser.name || 'Zân Cao'}</h2>
+                <span className="role-chip">Saler</span>
               </div>
-              <div className="contact-item">
-                <Phone size={16} color="#64748b" />
-                <span>{maskPhone(currentUser.phone)}</span>
+              
+              <div className="location-row">
+                <MapPin size={16} color="#64748b" />
+                <span>Hồ Chí Minh City, VN</span>
+              </div>
+
+              <div className="contact-details-grid">
+                <div className="contact-item">
+                  <Mail size={16} color="#64748b" />
+                  <span>{currentUser.email || 'Zancao@gmail.com'}</span>
+                </div>
+                <div className="contact-item">
+                  <Phone size={16} color="#64748b" />
+                  <span>{maskPhone(currentUser.phone)}</span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {(() => {
-          const score = currentUser.trust_score !== undefined ? Number(currentUser.trust_score) : 98;
-          let trustText = 'Rất uy tín';
-          let trustColor = '#d97706'; // gold
-          if (score <= 39) {
-            trustText = 'Rủi ro cao';
-            trustColor = '#dc2626'; // red
-          } else if (score <= 59) {
-            trustText = 'Bình thường';
-            trustColor = '#6b7280'; // grey
-          } else if (score <= 79) {
-            trustText = 'Đáng tin';
-            trustColor = '#10b981'; // green
-          }
-          return (
-            <div className="verification-score-card" style={{ borderLeft: `4px solid ${trustColor}` }}>
-              <div className="score-icon-wrapper">
-                <ShieldCheck size={28} color={trustColor} strokeWidth={2} />
-              </div>
-              <div className="score-texts">
-                <div className="status-label">
-                  Status: <span className="highlight">{currentUser.verification_status === 'VERIFIED' ? 'Verified Broker' : 'Unverified Broker'}</span>
+          {(() => {
+            const score = currentUser.trust_score !== undefined ? Number(currentUser.trust_score) : 98;
+            let trustText = 'Rất uy tín';
+            let trustColor = '#d97706'; // gold
+            if (score <= 39) {
+              trustText = 'Rủi ro cao';
+              trustColor = '#dc2626'; // red
+            } else if (score <= 59) {
+              trustText = 'Bình thường';
+              trustColor = '#6b7280'; // grey
+            } else if (score <= 79) {
+              trustText = 'Đáng tin';
+              trustColor = '#10b981'; // green
+            }
+            return (
+              <div className="verification-score-card" style={{ borderLeft: `4px solid ${trustColor}` }}>
+                <div className="score-icon-wrapper">
+                  <ShieldCheck size={28} color={trustColor} strokeWidth={2} />
                 </div>
-                <div className="score-label">
-                  Trust Score: <span style={{ color: trustColor, fontWeight: 'bold' }}>{score}/100</span> <span style={{ fontSize: '12px', color: '#64748b' }}>({trustText})</span>
+                <div className="score-texts">
+                  <div className="status-label">
+                    Status: <span className="highlight">{currentUser.verification_status === 'VERIFIED' ? 'Verified Broker' : 'Unverified Broker'}</span>
+                  </div>
+                  <div className="score-label">
+                    Trust Score: <span style={{ color: trustColor, fontWeight: 'bold' }}>{score}/100</span> <span style={{ fontSize: '12px', color: '#64748b' }}>({trustText})</span>
+                  </div>
                 </div>
               </div>
-            </div>
-          );
-        })()}
-      </div>
+            );
+          })()}
+        </div>
+      )}
 
       {/* 2. SUB NAVIGATION TABS */}
-      <div className="profile-tabs-nav">
-        <button 
-          className={`profile-tab-btn ${selectedProfileTab === 'posts' ? 'active' : ''}`}
-          onClick={() => setSelectedProfileTab('posts')}
-        >
-          Bài đã đăng
-        </button>
-        <button 
-          className={`profile-tab-btn ${selectedProfileTab === 'crm' ? 'active' : ''}`}
-          onClick={() => setSelectedProfileTab('crm')}
-        >
-          CRM
-        </button>
-        <button 
-          className={`profile-tab-btn ${selectedProfileTab === 'reviews' ? 'active' : ''}`}
-          onClick={() => setSelectedProfileTab('reviews')}
-        >
-          Đánh giá
-        </button>
-        <button 
-          className={`profile-tab-btn ${selectedProfileTab === 'kyc' ? 'active' : ''}`}
-          onClick={() => setSelectedProfileTab('kyc')}
-        >
-          Thông tin định danh
-        </button>
-      </div>
+      {/* Hiding tabs since profile page now only shows identity verification (kyc) */}
+      {false && !hideHeader && (
+        <div className="profile-tabs-nav">
+          <button 
+            className={`profile-tab-btn ${selectedProfileTab === 'posts' ? 'active' : ''}`}
+            onClick={() => setSelectedProfileTab('posts')}
+          >
+            Bài đã đăng
+          </button>
+          <button 
+            className={`profile-tab-btn ${selectedProfileTab === 'kyc' ? 'active' : ''}`}
+            onClick={() => setSelectedProfileTab('kyc')}
+          >
+            Thông tin định danh
+          </button>
+        </div>
+      )}
 
       {/* 3. TABS CONTENT */}
       <div className="profile-tab-content">

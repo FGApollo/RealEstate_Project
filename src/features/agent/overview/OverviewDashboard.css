@@ -864,3 +864,162 @@
   color: #047857;
   margin-top: 1px;
 }
+
+/* Ward List Checklist Modal (Sub-Modal) */
+.sub-modal-backdrop {
+  z-index: 1050 !important;
+}
+
+.ward-list-modal-content {
+  background: white;
+  border-radius: 24px;
+  padding: 30px;
+  width: 90%;
+  max-width: 680px;
+  position: relative;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15);
+  animation: modalSlide 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  text-align: left;
+}
+
+@keyframes modalSlide {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.ward-list-modal-content h3 {
+  margin: 0 0 20px 0;
+  font-size: 20px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.region-tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 2px solid #f1f5f9;
+  margin-bottom: 20px;
+}
+
+.region-tab-btn {
+  background: none;
+  border: none;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #64748b;
+  cursor: pointer;
+  position: relative;
+  transition: color 0.15s ease;
+}
+
+.region-tab-btn:hover {
+  color: #0f172a;
+}
+
+.region-tab-btn.active {
+  color: #2563eb;
+}
+
+.region-tab-btn.active::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background-color: #2563eb;
+}
+
+.list-search-container {
+  margin-bottom: 16px;
+}
+
+.list-search-container input {
+  width: 100%;
+  padding: 10px 16px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 12px;
+  font-size: 14px;
+  outline: none;
+  font-weight: 600;
+  background-color: #f8fafc;
+}
+
+.list-search-container input:focus {
+  border-color: #2563eb;
+  background-color: #ffffff;
+}
+
+.ward-checklist-container {
+  max-height: 250px;
+  overflow-y: auto;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px;
+  background-color: #f8fafc;
+  margin-bottom: 24px;
+}
+
+.ward-checklist-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.ward-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+}
+
+.ward-checkbox-label:hover {
+  background-color: #eff6ff;
+  color: #2563eb;
+}
+
+.ward-checkbox-label input {
+  display: none;
+}
+
+.custom-checkbox {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #cbd5e1;
+  border-radius: 4px;
+  display: inline-block;
+  position: relative;
+  transition: all 0.15s ease;
+}
+
+.ward-checkbox-label input:checked + .custom-checkbox {
+  background-color: #2563eb;
+  border-color: #2563eb;
+}
+
+.ward-checkbox-label input:checked + .custom-checkbox::after {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 2px;
+  width: 4px;
+  height: 8px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.empty-checklist {
+  text-align: center;
+  padding: 24px;
+  color: #64748b;
+  font-weight: 600;
+}
+

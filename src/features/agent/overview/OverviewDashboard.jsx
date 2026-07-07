@@ -1,12 +1,57 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { 
   Home, Eye, Heart, ChevronRight, Plus, SlidersHorizontal, 
   MapPin, Bed, Bath, Maximize, ShieldAlert, ShieldCheck, Search,
-  Edit3, Trash2, ExternalLink
+  Edit3, Trash2, ExternalLink, X
 } from 'lucide-react';
 import PropertyDetailModal from '../../../components/PropertyDetailModal';
 import DeleteConfirmModal from './DeleteConfirmModal';
 import './OverviewDashboard.css';
+
+const WARDS_BY_REGION = {
+  'TP.HCM': [
+    'Phường mới', 'Phường Sài Gòn', 'Phường Tân Định', 'Phường Bến Thành', 'Phường Cầu Ông Lãnh', 
+    'Phường Bàn Cờ', 'Phường Xuân Hòa', 'Phường Nhiêu Lộc', 'Phường Xóm Chiếu', 'Phường Khánh Hội', 
+    'Phường Vĩnh Hội', 'Phường Chợ Quán', 'Phường An Đông', 'Phường Chợ Lớn', 'Phường Bình Tây', 
+    'Phường Bình Tiên', 'Phường Bình Phú', 'Phường Phú Lâm', 'Phường Tân Thuận', 'Phường Phú Thuận', 
+    'Phường Tân Mỹ', 'Phường Tân Hưng', 'Phường Chánh Hưng', 'Phường Phú Định', 'Phường Bình Đông', 
+    'Phường Diên Hồng', 'Phường Vườn Lài', 'Phường Hòa Hưng', 'Phường Minh Phụng', 'Phường Bình Thới', 
+    'Phường Hòa Bình', 'Phường Phú Thọ', 'Phường Đông Hưng Thuận', 'Phường Trung Mỹ Tây', 
+    'Phường Tân Thới Hiệp', 'Phường Thới An', 'Phường An Phú Đông', 'Phường An Lạc', 'Phường Bình Tân', 
+    'Phường Tân Tạo', 'Phường Bình Trị Đông', 'Phường Bình Hưng Hòa', 'Phường Gia Định', 
+    'Phường Bình Thạnh', 'Phường Bình Lợi Trung', 'Phường Thạnh Mỹ Tây', 'Phường Bình Quới', 
+    'Phường Hạnh Thông', 'Phường An Nhơn', 'Phường Gò Vấp', 'Phường An Hội Đông', 'Phường Thông Tây Hội', 
+    'Phường An Hội Tây', 'Phường Đức Nhuận', 'Phường Cầu Kiệu', 'Phường Phú Nhuận', 'Phường Tân Sơn Hòa', 
+    'Phường Tân Sơn Nhất', 'Phường Tân Hòa', 'Phường Bảy Hiền', 'Phường Tân Bình', 'Phường Tân Sơn', 
+    'Phường Tây Thạnh', 'Phường Tân Sơn Nhì', 'Phường Phú Thọ Hòa', 'Phường Tân Phú', 'Phường Phú Thạnh', 
+    'Phường Hiệp Bình', 'Phường Thủ Đức', 'Phường Tam Bình', 'Phường Linh Xuân', 'Phường Tăng Nhơn Phú', 
+    'Phường Long Bình', 'Phường Long Phước', 'Phường Long Trường', 'Phường Cát Lái', 'Phường Bình Trưng', 
+    'Phường Phước Long', 'Phường An Khánh'
+  ],
+  'Bình Dương': [
+    'Phường Đông Hòa', 'Phường Dĩ An', 'Phường Tân Đông Hiệp', 'Phường An Phú', 'Phường Bình Hòa', 
+    'Phường Lái Thiêu', 'Phường Thuận An', 'Phường Thuận Giao', 'Phường Thủ Dầu Một', 'Phường Phú Lợi', 
+    'Phường Chánh Hiệp', 'Phường Bình Dương', 'Phường Hòa Lợi', 'Phường Phú An', 'Phường Tây Nam', 
+    'Phường Long Nguyên', 'Phường Bến Cát', 'Phường Chánh Phú Hòa', 'Phường Vĩnh Tân', 'Phường Bình Cơ', 
+    'Phường Tân Uyên', 'Phường Tân Hiệp', 'Phường Tân Khánh'
+  ],
+  'Bà Rịa - Vũng Tàu': [
+    'Phường Vũng Tàu', 'Phường Tam Thắng', 'Phường Rạch Dừa', 'Phường Phước Thắng', 'Phường Long Hương', 
+    'Phường Bà Rịa', 'Phường Tam Long', 'Phường Tân Hải', 'Phường Tân Phước', 'Phường Phú Mỹ', 
+    'Phường Tân Thành'
+  ]
+};
+
+const ALL_WARDS = Object.values(WARDS_BY_REGION).flat();
+
+const normalizeWard = (ward) => {
+  if (!ward) return '';
+  return ward
+    .normalize('NFC')
+    .toLowerCase()
+    .replace(/^(phường|p\.)\s+/i, '')
+    .trim();
+};
 
 // ponytail: extract overview and listings tab components into a single dashboard component
 const OverviewDashboard = ({ 
@@ -20,41 +65,128 @@ const OverviewDashboard = ({
   onEditProperty,
   onDeleteProperty
 }) => {
-  const [filterRegion, setFilterRegion] = useState('ALL');
-  const [filterPrice, setFilterPrice] = useState('ALL');
+  const [wardSearchQuery, setWardSearchQuery] = useState('');
+  const [tempSelectedWards, setTempSelectedWards] = useState([]);
+  const [showWardListModal, setShowWardListModal] = useState(false);
+  const [listModalSearchQuery, setListModalSearchQuery] = useState('');
+  const [activeRegionTab, setActiveRegionTab] = useState('TP.HCM');
+  const [subTempSelectedWards, setSubTempSelectedWards] = useState([]);
+  const [filterPriceSort, setFilterPriceSort] = useState('ALL');
   const [filterType, setFilterType] = useState('ALL');
+  const [appliedWards, setAppliedWards] = useState([]);
+  const [appliedType, setAppliedType] = useState('ALL');
+  const [appliedPriceSort, setAppliedPriceSort] = useState('ALL');
+
   const [showFilters, setShowFilters] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [previewProperty, setPreviewProperty] = useState(null);
   const [deletingProperty, setDeletingProperty] = useState(null);
   const itemsPerPage = 5;
 
-  const regionsList = ['Đà Nẵng', 'Hồ Chí Minh', 'Hà Nội'];
-  const propertyTypesList = ['Căn Hộ', 'Chung Cư', 'Nhà Ở', 'Mặt Bằng', 'Văn Phòng', 'Phòng Trọ'];
+  // Ward suggestions logic
+  const suggestedWards = useMemo(() => {
+    if (!wardSearchQuery.trim()) return [];
+    const query = wardSearchQuery.toLowerCase();
+    return ALL_WARDS.filter(ward => 
+      ward.toLowerCase().includes(query) && 
+      !tempSelectedWards.some(selected => normalizeWard(selected) === normalizeWard(ward))
+    ).slice(0, 5);
+  }, [wardSearchQuery, tempSelectedWards]);
+
+  const filteredListWards = useMemo(() => {
+    const wardsInRegion = WARDS_BY_REGION[activeRegionTab] || [];
+    if (!listModalSearchQuery.trim()) return wardsInRegion;
+    const query = listModalSearchQuery.toLowerCase();
+    return wardsInRegion.filter(ward => ward.toLowerCase().includes(query));
+  }, [activeRegionTab, listModalSearchQuery]);
+
+  const handleSelectWard = (ward) => {
+    if (!tempSelectedWards.includes(ward)) {
+      setTempSelectedWards([...tempSelectedWards, ward]);
+    }
+    setWardSearchQuery('');
+  };
+
+  const handleRemoveTempWard = (ward) => {
+    setTempSelectedWards(tempSelectedWards.filter(w => w !== ward));
+  };
+
+  const handleOpenWardListModal = () => {
+    setSubTempSelectedWards([...tempSelectedWards]);
+    setListModalSearchQuery('');
+    setShowWardListModal(true);
+  };
+
+  const handleSaveWardList = () => {
+    setTempSelectedWards(subTempSelectedWards);
+    setShowWardListModal(false);
+  };
+
+  const handleCancelWardList = () => {
+    setShowWardListModal(false);
+  };
+
+  const handleToggleSubTempWard = (ward) => {
+    if (subTempSelectedWards.includes(ward)) {
+      setSubTempSelectedWards(subTempSelectedWards.filter(w => w !== ward));
+    } else {
+      setSubTempSelectedWards([...subTempSelectedWards, ward]);
+    }
+  };
+
+  const handleApplyFilter = () => {
+    setAppliedWards([...tempSelectedWards]);
+    setAppliedType(filterType);
+    setAppliedPriceSort(filterPriceSort);
+    setShowFilters(false);
+  };
+
+  const handleResetFilter = () => {
+    setTempSelectedWards([]);
+    setAppliedWards([]);
+    setFilterType('ALL');
+    setAppliedType('ALL');
+    setFilterPriceSort('ALL');
+    setAppliedPriceSort('ALL');
+    setWardSearchQuery('');
+  };
 
   // Filter listings
-  const filteredListings = (data.activeListings || []).filter(listing => {
-    const matchesSearch = searchQuery === '' || 
-      (listing.address && listing.address.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (listing.title && listing.title.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filteredListings = useMemo(() => {
+    let result = [...(data.activeListings || [])];
 
-    const matchesRegion = filterRegion === 'ALL' ||
-      (listing.city && listing.city.toLowerCase().includes(filterRegion.toLowerCase())) ||
-      (listing.district && listing.district.toLowerCase().includes(filterRegion.toLowerCase()));
-
-    const matchesType = filterType === 'ALL' || listing.property_type === filterType;
-
-    let matchesPrice = true;
-    if (filterPrice !== 'ALL') {
-      const price = listing.price || 0;
-      if (filterPrice === 'under-1b') matchesPrice = price < 1000000000;
-      else if (filterPrice === '1b-3b') matchesPrice = price >= 1000000000 && price <= 3000000000;
-      else if (filterPrice === '3b-5b') matchesPrice = price >= 3000000000 && price <= 5000000000;
-      else if (filterPrice === 'above-5b') matchesPrice = price > 5000000000;
+    // Filter by Search Query
+    if (searchQuery.trim() !== '') {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(listing => 
+        (listing.address && listing.address.toLowerCase().includes(q)) ||
+        (listing.title && listing.title.toLowerCase().includes(q))
+      );
     }
 
-    return matchesSearch && matchesRegion && matchesType && matchesPrice;
-  });
+    // Filter by Type
+    if (appliedType !== 'ALL') {
+      result = result.filter(p => p.property_type === appliedType);
+    }
+
+    // Filter by Wards
+    if (appliedWards.length > 0) {
+      const normalizedWards = appliedWards.map(w => normalizeWard(w));
+      result = result.filter(p => {
+        if (!p.ward) return false;
+        return normalizedWards.includes(normalizeWard(p.ward));
+      });
+    }
+
+    // Sort by Price Sort
+    if (appliedPriceSort === 'low-high') {
+      result.sort((a, b) => a.price - b.price);
+    } else if (appliedPriceSort === 'high-low') {
+      result.sort((a, b) => b.price - a.price);
+    }
+
+    return result;
+  }, [data.activeListings, appliedWards, appliedType, appliedPriceSort, searchQuery]);
 
   // Paginated listings
   const totalPages = Math.ceil(filteredListings.length / itemsPerPage) || 1;
@@ -233,43 +365,103 @@ const OverviewDashboard = ({
 
           {/* Collapsible filter panel */}
           {showFilters && (
-            <div className="filter-dropdown-panel">
-              <div className="filter-field">
-                <label>Khu vực</label>
-                <select value={filterRegion} onChange={(e) => setFilterRegion(e.target.value)}>
-                  <option value="ALL">Tất cả quận</option>
-                  {regionsList.map(r => <option key={r} value={r}>{r}</option>)}
-                </select>
+            <div className="filter-dropdown-panel new-profile-filter-style" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', padding: '16px' }}>
+              {/* Ward / Khu vực */}
+              <div className="filter-field ward-filter-field" style={{ position: 'relative' }}>
+                <label className="filter-label">Khu vực</label>
+                <div className="ward-search-input-group" style={{ display: 'flex', gap: '8px' }}>
+                  <div className="ward-search-input-wrapper" style={{ position: 'relative', flex: 1 }}>
+                    <input 
+                      type="text" 
+                      placeholder="Tìm phường..." 
+                      value={wardSearchQuery} 
+                      onChange={(e) => setWardSearchQuery(e.target.value)}
+                      style={{ width: '100%' }}
+                    />
+                    {wardSearchQuery && (
+                      <button 
+                        className="clear-search-btn" 
+                        onClick={() => setWardSearchQuery('')}
+                        style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer' }}
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+                  <button 
+                    type="button" 
+                    className="btn-select-ward-list" 
+                    onClick={handleOpenWardListModal}
+                    style={{ padding: '6px 12px', fontSize: '12px', border: '1px solid #cbd5e1', borderRadius: '6px', background: '#f8fafc', cursor: 'pointer' }}
+                  >
+                    Chọn từ danh sách
+                  </button>
+                </div>
+
+                {/* Suggestions List */}
+                {suggestedWards.length > 0 && (
+                  <ul className="ward-dropdown-suggestions" style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', zIndex: 10, padding: '4px 0', margin: '4px 0', listStyle: 'none' }}>
+                    {suggestedWards.map((ward) => (
+                      <li 
+                        key={ward} 
+                        onClick={() => handleSelectWard(ward)}
+                        style={{ padding: '8px 12px', cursor: 'pointer' }}
+                        onMouseEnter={(e) => e.target.style.backgroundColor = '#f1f5f9'}
+                        onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                      >
+                        {ward}
+                      </li>
+                    ))}
+                  </ul>
+                 )}
+
+                {/* Selected Ward Badges */}
+                {tempSelectedWards.length > 0 && (
+                  <div className="filter-ward-badges" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
+                    {tempSelectedWards.map((ward) => (
+                      <span key={ward} className="ward-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '9999px', fontSize: '11px', color: '#334155' }}>
+                        {ward}
+                        <button 
+                          onClick={() => handleRemoveTempWard(ward)}
+                          style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                        >
+                          <X size={10} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
+
+              {/* Price Sort / Khoảng giá */}
               <div className="filter-field">
-                <label>Khoảng giá</label>
-                <select value={filterPrice} onChange={(e) => setFilterPrice(e.target.value)}>
+                <label className="filter-label">Khoảng giá</label>
+                <select value={filterPriceSort} onChange={(e) => setFilterPriceSort(e.target.value)}>
                   <option value="ALL">Tất cả mức giá</option>
-                  <option value="under-1b">Dưới 1 tỷ</option>
-                  <option value="1b-3b">1 – 3 tỷ</option>
-                  <option value="3b-5b">3 – 5 tỷ</option>
-                  <option value="above-5b">Trên 5 tỷ</option>
+                  <option value="low-high">Từ thấp đến cao</option>
+                  <option value="high-low">Từ cao đến thấp</option>
                 </select>
               </div>
+
+              {/* Room Type / Loại phòng */}
               <div className="filter-field">
-                <label>Loại phòng</label>
+                <label className="filter-label">Loại phòng</label>
                 <select value={filterType} onChange={(e) => setFilterType(e.target.value)}>
                   <option value="ALL">Tất cả loại hình</option>
-                  {propertyTypesList.map(t => <option key={t} value={t}>{t}</option>)}
+                  <option value="Phòng Trọ">Phòng trọ</option>
+                  <option value="Chung Cư">Chung cư</option>
+                  <option value="Căn Hộ">Căn hộ</option>
+                  <option value="Nhà Ở">Nhà ở</option>
+                  <option value="Mặt Bằng">Mặt bằng</option>
                 </select>
               </div>
-              <div className="filter-field filter-actions">
-                <button
-                  className="filter-apply-btn"
-                  onClick={() => setShowFilters(false)}
-                >
+
+              {/* Filter Actions */}
+              <div className="filter-field filter-actions" style={{ gridColumn: 'span 3', display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '8px' }}>
+                <button className="filter-apply-btn" onClick={handleApplyFilter}>
                   <SlidersHorizontal size={14} /> Áp dụng lọc
                 </button>
-                <button
-                  className="filter-reset-btn"
-                  onClick={() => { setFilterRegion('ALL'); setFilterPrice('ALL'); setFilterType('ALL'); setSearchQuery(''); }}
-                  title="Xoá bộ lọc"
-                >
+                <button className="filter-reset-btn" onClick={handleResetFilter} title="Xóa bộ lọc">
                   ↺
                 </button>
               </div>
@@ -299,15 +491,6 @@ const OverviewDashboard = ({
                   alt={listing.title} 
                   className="property-card-img"
                 />
-
-                {/* Verification badge */}
-                <div className={`property-verified-badge ${listing.verification_status === 'VERIFIED' ? 'verified' : 'unverified'}`}>
-                  {listing.verification_status === 'VERIFIED' ? (
-                    <><ShieldCheck size={11} /> Đã xác thực</>
-                  ) : (
-                    <><ShieldAlert size={11} /> Chưa xác thực</>
-                  )}
-                </div>
 
                 {/* Hover overlay with agent actions */}
                 <div className="property-card-actions-overlay">
@@ -405,6 +588,71 @@ const OverviewDashboard = ({
           }}
           onCancel={() => setDeletingProperty(null)}
         />
+      )}
+
+      {/* Ward List Checklist Modal (Sub-Modal) */}
+      {showWardListModal && (
+        <div className="modal-backdrop sub-modal-backdrop" onClick={handleCancelWardList}>
+          <div className="ward-list-modal-content" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close-btn" onClick={handleCancelWardList}>
+              <X size={24} />
+            </button>
+            <h3>Chọn Phường từ danh sách</h3>
+            
+            <div className="region-tabs">
+              {Object.keys(WARDS_BY_REGION).map((region) => (
+                <button 
+                  key={region}
+                  type="button"
+                  className={`region-tab-btn ${activeRegionTab === region ? 'active' : ''}`}
+                  onClick={() => {
+                    setActiveRegionTab(region);
+                    setListModalSearchQuery('');
+                  }}
+                >
+                  {region}
+                </button>
+              ))}
+            </div>
+
+            <div className="list-search-container">
+              <input 
+                type="text" 
+                placeholder="Tìm phường..." 
+                value={listModalSearchQuery}
+                onChange={(e) => setListModalSearchQuery(e.target.value)}
+              />
+            </div>
+
+            <div className="ward-checklist-container">
+              {filteredListWards.length === 0 ? (
+                <div className="empty-checklist">Không tìm thấy phường phù hợp.</div>
+              ) : (
+                <div className="ward-checklist-grid">
+                  {filteredListWards.map((ward) => {
+                    const isChecked = subTempSelectedWards.includes(ward);
+                    return (
+                      <label key={ward} className="ward-checkbox-label">
+                        <input 
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => handleToggleSubTempWard(ward)}
+                        />
+                        <span className="custom-checkbox"></span>
+                        <span className="ward-name-text">{ward}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="filter-actions">
+              <button type="button" className="btn-secondary" onClick={handleCancelWardList}>Hủy</button>
+              <button type="button" className="btn-primary" onClick={handleSaveWardList}>Lưu</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

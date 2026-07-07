@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Home, Search, LayoutDashboard, Settings, LogOut, BarChart2, HelpCircle, MessageSquare, Shield
+  Home, Search, LayoutDashboard, Settings, LogOut, BarChart2, HelpCircle, MessageSquare, Shield,
+  User, Star
 } from 'lucide-react';
 import OverviewDashboard from '../features/agent/overview/OverviewDashboard';
 import CreateListingWizard from '../features/agent/create-listing/CreateListingWizard';
@@ -143,7 +144,13 @@ const AgentOverview = () => {
     <div className="agent-dashboard">
       <aside className="sidebar">
         {/* Logo */}
-        <div className="sidebar-logo">SWIPE NEST</div>
+        <div 
+          className="sidebar-logo" 
+          onClick={() => navigate('/')} 
+          style={{ cursor: 'pointer' }}
+        >
+          SWIPE NEST
+        </div>
 
         {/* Nav section */}
         <div className="sidebar-section-label">Điều hướng</div>
@@ -173,10 +180,16 @@ const AgentOverview = () => {
             <BarChart2 size={18} /> Phân tích
           </button>
           <button
-            className={`nav-btn ${activeTab === 'settings' ? 'active' : ''}`}
-            onClick={() => handleTabChange('overview')}
+            className={`nav-btn ${activeTab === 'feedback' ? 'active' : ''}`}
+            onClick={() => handleTabChange('feedback')}
           >
-            <Settings size={18} /> Cài đặt
+            <Star size={18} /> Đánh giá
+          </button>
+          <button
+            className={`nav-btn ${activeTab === 'profile' ? 'active' : ''}`}
+            onClick={() => handleTabChange('profile')}
+          >
+            <User size={18} /> Hồ sơ cá nhân
           </button>
         </nav>
 
@@ -188,8 +201,8 @@ const AgentOverview = () => {
       </aside>
 
       <main className="main-content">
-        {/* Topbar shown on overview and profile page */}
-        {(activeTab === 'overview' || activeTab === 'profile') && (
+        {/* Topbar shown on overview, profile, and feedback page */}
+        {(activeTab === 'overview' || activeTab === 'profile' || activeTab === 'feedback') && (
           <header className="topbar">
             <div className="search-bar">
               <Search size={16} color="#94a3b8" />
@@ -336,6 +349,20 @@ const AgentOverview = () => {
               onEditProperty={handleEditProperty}
               onDeleteProperty={handleDeleteProperty}
               setActiveTab={handleTabChange}
+              initialTab="kyc"
+            />
+          )}
+
+          {/* TAB 8: FEEDBACK PANEL */}
+          {activeTab === 'feedback' && (
+            <AgentProfile
+              currentUser={currentUser}
+              data={data}
+              onEditProperty={handleEditProperty}
+              onDeleteProperty={handleDeleteProperty}
+              setActiveTab={handleTabChange}
+              initialTab="reviews"
+              hideHeader={true}
             />
           )}
         </div>
