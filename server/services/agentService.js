@@ -15,7 +15,7 @@ const getOverview = async (userId) => {
     .from('properties')
     .select(`
       id, title, price, thumbnail, views, status, bedrooms, bathrooms, area, city, district, ward, address, property_type, owner_id,
-      owner:users!owner_id(name, role, avatar, trust_score, created_at)
+      owner:users!owner_id(name, role, avatar, trust_score, created_at, verification_status)
     `)
     .eq('owner_id', userId)
     .eq('status', 'AVAILABLE');

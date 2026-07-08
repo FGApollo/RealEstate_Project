@@ -687,7 +687,7 @@ const Home = () => {
           <button className="menu-btn" aria-label="Menu" onClick={() => setShowSidebar(true)}>
             <Menu size={20} />
           </button>
-          <span className="logo-text">Swipe Nest</span>
+          <span className="logo-text" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>Swipe Nest</span>
         </div>
 
         <nav className="nav-middle">
@@ -738,7 +738,7 @@ const Home = () => {
         <div className="mobile-sidebar-backdrop" onClick={() => setShowSidebar(false)}>
           <div className="mobile-sidebar-drawer" onClick={(e) => e.stopPropagation()}>
             <div className="mobile-sidebar-header">
-              <span className="logo-text">Swipe Nest</span>
+              <span className="logo-text" onClick={() => { navigate('/'); setShowSidebar(false); }} style={{ cursor: 'pointer' }}>Swipe Nest</span>
               <button className="close-sidebar-btn" onClick={() => setShowSidebar(false)}>
                 <X size={20} />
               </button>
@@ -1037,7 +1037,7 @@ const Home = () => {
       <footer className="footer">
         <div className="footer-grid">
           <div className="footer-col">
-            <span className="footer-logo">Swipe Nest</span>
+            <span className="footer-logo" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>Swipe Nest</span>
             <p className="footer-desc">
               Nâng tầm trải nghiệm bất động sản qua lăng kính của sự tinh tế và chuyên nghiệp.
             </p>

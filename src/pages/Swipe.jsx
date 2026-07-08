@@ -772,7 +772,7 @@ const Swipe = () => {
         <div className="mobile-sidebar-backdrop" onClick={() => setShowSidebar(false)}>
           <div className="mobile-sidebar-drawer" onClick={(e) => e.stopPropagation()}>
             <div className="mobile-sidebar-header">
-              <span className="logo-text">Swipe Nest</span>
+              <span className="logo-text" onClick={() => { navigate('/'); setShowSidebar(false); }} style={{ cursor: 'pointer' }}>Swipe Nest</span>
               <button className="close-sidebar-btn" onClick={() => setShowSidebar(false)}>
                 <X size={20} />
               </button>

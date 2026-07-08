@@ -304,7 +304,13 @@ const AdminPage = () => {
       {/* LEFT NAVBAR - Exactly 2 items as requested */}
       <aside className="admin-sidebar">
         <div className="admin-logo-wrapper">
-          <div className="admin-logo">SWIPE NEST</div>
+          <div 
+            className="admin-logo" 
+            onClick={() => navigate('/')} 
+            style={{ cursor: 'pointer' }}
+          >
+            SWIPE NEST
+          </div>
         </div>
 
         <div className="admin-nav-label">Điều hướng Admin</div>
