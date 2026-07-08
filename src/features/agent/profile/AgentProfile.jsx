@@ -374,9 +374,17 @@ const AgentProfile = ({
       setKycStatus(prev => ({ ...prev, verificationStatus: 'VERIFIED' }));
       
       if (typeof window !== 'undefined') {
-        const localUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-        localUser.verification_status = 'VERIFIED';
-        localStorage.setItem('currentUser', JSON.stringify(localUser));
+        try {
+          const mainUser = JSON.parse(localStorage.getItem('user') || '{}');
+          mainUser.verification_status = 'VERIFIED';
+          localStorage.setItem('user', JSON.stringify(mainUser));
+
+          const localUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+          localUser.verification_status = 'VERIFIED';
+          localStorage.setItem('currentUser', JSON.stringify(localUser));
+        } catch (e) {
+          console.error('Error saving verification status:', e);
+        }
       }
     } catch (err) {
       console.error(err);

@@ -507,6 +507,13 @@ const getBackSideEvidence = (backText) => {
   };
 };
 
+const isForcedDemoResult = () => {
+  const mode = (process.env.KYC_OCR_DEMO_RESULT || process.env.KYC_DEMO_MODE || '').toLowerCase();
+  if (mode === 'pass' || mode === 'true') return true;
+  if (mode === 'fail' || mode === 'false') return false;
+  return null;
+};
+
 const analyzeCitizenId = async (frontImageBuffer, backImageBuffer) => {
   if (!frontImageBuffer || !backImageBuffer) {
     return {
@@ -519,6 +526,42 @@ const analyzeCitizenId = async (frontImageBuffer, backImageBuffer) => {
         missingFields: getRequiredFields(),
         warnings: []
       }
+    };
+  }
+
+  const forcedResult = isForcedDemoResult();
+  if (forcedResult === true) {
+    const data = {
+      idNumber: '012345678910',
+      fullName: 'CAO THANH VÂN',
+      dob: '15/05/1985',
+      sex: 'Nữ',
+      nationality: 'Viet Nam',
+      expiry: '20/10/2035',
+      placeOfOrigin: 'P. Sài Gòn, TP. Hồ Chí Minh',
+      placeOfResidence: '49 Bùi Thị Xuân, P. Sài Gòn, TP. Hồ Chí Minh'
+    };
+    return {
+      isValid: true,
+      errorMessage: null,
+      data,
+      warnings: ['Chế độ Demo/Test OCR: Tự động xác thực thành công'],
+      debug: {
+        validFieldCount: 8,
+        missingFields: [],
+        warnings: ['Demo mode active'],
+        ocrRotation: { front: 0, back: 0 },
+        backSideEvidence: { count: 5, keywordMatches: ['DEMO'], hasMrzLikeLine: true }
+      }
+    };
+  }
+  if (forcedResult === false) {
+    return {
+      isValid: false,
+      errorMessage: 'Khong doc du thong tin CCCD (Demo fail)',
+      data: {},
+      warnings: [],
+      debug: { validFieldCount: 0, missingFields: getRequiredFields(), warnings: [] }
     };
   }
 
