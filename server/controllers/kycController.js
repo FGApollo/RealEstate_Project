@@ -1,11 +1,7 @@
 const kycService = require('../services/kycService');
 
 const getKycStatus = async (req, res) => {
-  const { userId } = req.query;
-
-  if (!userId) {
-    return res.status(400).json({ error: 'Missing userId parameter' });
-  }
+  const userId = req.user.id;
 
   try {
     const status = await kycService.getKycStatus(userId);
@@ -17,13 +13,10 @@ const getKycStatus = async (req, res) => {
 };
 
 const uploadCard = async (req, res) => {
-  const { userId, fullName, phone } = req.body;
+  const { fullName, phone } = req.body;
+  const userId = req.user.id;
   const frontImage = req.files?.frontImage?.[0];
   const backImage = req.files?.backImage?.[0];
-
-  if (!userId) {
-    return res.status(400).json({ error: 'Missing userId' });
-  }
 
   if (!frontImage || !backImage) {
     return res.status(400).json({ error: 'Both frontImage and backImage are required' });
@@ -50,12 +43,8 @@ const uploadCard = async (req, res) => {
 };
 
 const uploadSelfie = async (req, res) => {
-  const { userId } = req.body;
+  const userId = req.user.id;
   const selfieImage = req.file;
-
-  if (!userId) {
-    return res.status(400).json({ error: 'Missing userId' });
-  }
 
   if (!selfieImage) {
     return res.status(400).json({ error: 'selfieImage is required' });

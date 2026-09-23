@@ -2,12 +2,8 @@ const userProfileService = require('../services/userProfileService');
 
 const uploadAvatar = async (req, res) => {
   try {
-    const { userId } = req.body;
+    const userId = req.user.id;
     const avatar = req.file || req.files?.find((file) => file.fieldname.trim() === 'avatar');
-
-    if (!userId) {
-      return res.status(400).json({ error: 'Missing userId' });
-    }
 
     if (!avatar) {
       return res.status(400).json({ error: 'Missing avatar file. Use form-data file field named avatar' });

@@ -13,60 +13,46 @@ const getSubscription = async (userId) => {
   return data;
 };
 
-const createOrUpdateSubscription = async (userId, planName, priceVnd, status, months = 1) => {
-  const now = new Date();
-  const startDate = now.toISOString();
-  
-  // Calculate end date based on duration
-  const endDateObj = new Date();
-  endDateObj.setMonth(endDateObj.getMonth() + months);
-  const endDate = endDateObj.toISOString();
-
-  // Check if subscription exists
-  const existing = await getSubscription(userId);
-
-  let result;
-  if (existing) {
-    const { data, error } = await supabase
-      .from('seller_subscriptions')
-      .update({
-        plan_name: planName,
-        price_vnd: priceVnd,
-        start_date: startDate,
-        end_date: endDate,
-        status: status,
-        updated_at: startDate
-      })
-      .eq('user_id', userId)
-      .select()
-      .single();
-
-    if (error) throw new Error(error.message);
-    result = data;
-  } else {
-    const { data, error } = await supabase
-      .from('seller_subscriptions')
-      .insert([{
-        user_id: userId,
-        plan_name: planName,
-        price_vnd: priceVnd,
-        start_date: startDate,
-        end_date: endDate,
-        status: status,
-        created_at: startDate,
-        updated_at: startDate
-      }])
-      .select()
-      .single();
-
-    if (error) throw new Error(error.message);
-    result = data;
+const startFreeTrial = async (userId, planName) => {
+  if (planName !== 'FREE_TRIAL') {
+    const error = new Error('Paid subscriptions require a verified payment flow');
+    error.statusCode = 409;
+    throw error;
   }
 
-  return result;
+  const existing = await getSubscription(userId);
+  if (existing) {
+    const error = new Error('A subscription has already been started for this account');
+    error.statusCode = 409;
+    throw error;
+  }
+
+  const now = new Date();
+  const startDate = now.toISOString();
+  const endDateObj = new Date();
+  endDateObj.setMonth(endDateObj.getMonth() + 1);
+  const endDate = endDateObj.toISOString();
+
+  const { data, error } = await supabase
+    .from('seller_subscriptions')
+    .insert([{
+      user_id: userId,
+      plan_name: 'FREE_TRIAL',
+      price_vnd: 0,
+      start_date: startDate,
+      end_date: endDate,
+      status: 'ACTIVE',
+      created_at: startDate,
+      updated_at: startDate
+    }])
+    .select()
+    .single();
+
+  if (error) throw new Error(error.message);
+  return data;
 };
 
 module.exports = {
   getSubscription,
-  createOrUpdateSubscription
+  startFreeTrial
 };

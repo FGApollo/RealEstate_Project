@@ -5,15 +5,17 @@ import {
   MapPin, Phone, MessageCircle, Home, Compass, Heart, Map
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
+import { apiFetch } from '../auth/apiClient';
+import { useAuth } from '../auth/useAuth';
 import './Chat.css';
 
 const Chat = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { user: currentUser } = useAuth();
   const targetAgentId = searchParams.get('agentId');
   const targetPropertyId = searchParams.get('propertyId');
 
-  const [currentUser, setCurrentUser] = useState(null);
   const [conversations, setConversations] = useState([]);
   const [activeConversation, setActiveConversation] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -32,16 +34,6 @@ const Chat = () => {
     scrollToBottom();
   }, [messages]);
 
-  // Auth check
-  useEffect(() => {
-    const savedUser = localStorage.getItem('user');
-    if (savedUser) {
-      setCurrentUser(JSON.parse(savedUser));
-    } else {
-      navigate('/login');
-    }
-  }, [navigate]);
-
   // Fetch initial data
   useEffect(() => {
     if (!currentUser) return;
@@ -50,7 +42,7 @@ const Chat = () => {
       try {
         setLoading(true);
         // 1. Fetch conversations
-        const convRes = await fetch(`${API_BASE_URL}/api/chat/conversations?userId=${currentUser.id}`);
+        const convRes = await apiFetch(`${API_BASE_URL}/api/chat/conversations`);
         if (convRes.ok) {
           const convData = await convRes.json();
           setConversations(convData.conversations || []);
@@ -65,7 +57,7 @@ const Chat = () => {
               setActiveConversation(existing);
             } else {
               // Create a temporary conversation object for the UI
-              const agentDetailsRes = await fetch(`${API_BASE_URL}/api/auth/user/${agentIdNum}`);
+              const agentDetailsRes = await apiFetch(`${API_BASE_URL}/api/user/${agentIdNum}`);
               let partnerObj = { id: agentIdNum, name: 'Đang tải...', role: 'AGENT' };
               if (agentDetailsRes.ok) {
                 const partnerData = await agentDetailsRes.json();
@@ -83,7 +75,7 @@ const Chat = () => {
 
             // Fetch property info if any
             if (targetPropertyId) {
-              const propRes = await fetch(`${API_BASE_URL}/api/properties/${targetPropertyId}`);
+              const propRes = await apiFetch(`${API_BASE_URL}/api/properties/${targetPropertyId}`);
               if (propRes.ok) {
                 const propData = await propRes.json();
                 setActiveProperty(propData.property);
@@ -110,7 +102,7 @@ const Chat = () => {
 
     const fetchMessages = async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/chat/messages?userId=${currentUser.id}&otherId=${activeConversation.partner.id}`);
+        const res = await apiFetch(`${API_BASE_URL}/api/chat/messages?otherId=${activeConversation.partner.id}`);
         if (res.ok) {
           const data = await res.json();
           setMessages(data.messages || []);
@@ -136,11 +128,10 @@ const Chat = () => {
     setNewMessage('');
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/chat/messages`, {
+      const res = await apiFetch(`${API_BASE_URL}/api/chat/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          senderId: currentUser.id,
           receiverId: activeConversation.partner.id,
           propertyId: activeProperty?.id || null,
           message: msgText
@@ -152,7 +143,7 @@ const Chat = () => {
         setMessages(prev => [...prev, data.message]);
         
         // Refresh conversations list to update last message preview
-        const convRes = await fetch(`${API_BASE_URL}/api/chat/conversations?userId=${currentUser.id}`);
+        const convRes = await apiFetch(`${API_BASE_URL}/api/chat/conversations`);
         if (convRes.ok) {
           const convData = await convRes.json();
           setConversations(convData.conversations || []);
