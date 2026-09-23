@@ -1,4 +1,6 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route } from 'react-router-dom'
+import AdminRoute from './components/AdminRoute'
+import ProtectedRoute from './components/ProtectedRoute'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import LoginAgent from './pages/LoginAgent'
@@ -13,15 +15,21 @@ import './App.css'
 function App() {
   return (
     <Routes>
-      <Route path="/" element={<Home />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/login/agent" element={<LoginAgent />} />
       <Route path="/register/agent" element={<RegisterAgent />} />
-      <Route path="/swipe/:categoryName" element={<Swipe />} />
-      <Route path="/sale/overview" element={<AgentOverview />} />
-      <Route path="/chat" element={<Chat />} />
-      <Route path="/admin" element={<AdminPage />} />
+      <Route element={<ProtectedRoute />}>
+        <Route path="/" element={<Home />} />
+        <Route path="/swipe/:categoryName" element={<Swipe />} />
+        <Route path="/chat" element={<Chat />} />
+      </Route>
+      <Route element={<ProtectedRoute allowedRoles={['AGENT']} />}>
+        <Route path="/sale/overview" element={<AgentOverview />} />
+      </Route>
+      <Route element={<AdminRoute />}>
+        <Route path="/admin" element={<AdminPage />} />
+      </Route>
     </Routes>
   )
 }

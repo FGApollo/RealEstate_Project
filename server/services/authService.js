@@ -1,16 +1,50 @@
 const bcrypt = require('bcrypt');
-const { OAuth2Client } = require('google-auth-library');
 const { supabase } = require('../config/supabase');
+const googleIdentityService = require('./googleIdentityService');
+const { resolvePublicRegistration } = require('./registrationPolicy');
 
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const PUBLIC_USER_FIELDS = ['id', 'name', 'email', 'avatar', 'role', 'phone', 'verification_status', 'trust_score'];
+const toPublicUser = (user) => Object.fromEntries(
+  PUBLIC_USER_FIELDS.filter((field) => user[field] !== undefined).map((field) => [field, user[field]])
+);
 
-const registerUser = async ({ name, email, password, role = 'USER', phone = null }) => {
+const serviceError = (message, statusCode, code) => {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  if (code) error.code = code;
+  return error;
+};
+
+const normalizeEmail = (email) => String(email || '').trim().toLowerCase();
+
+const findUserByEmail = async (email) => {
+  const { data, error } = await supabase.from('users').select('*').eq('email', email).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data;
+};
+
+const findUserById = async (id) => {
+  const { data, error } = await supabase.from('users').select('*').eq('id', id).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data;
+};
+
+const findGoogleIdentity = async (field, value) => {
+  const { data, error } = await supabase
+    .from('google_identities').select('subject, user_id').eq(field, value).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data;
+};
+
+const registerUser = async ({ name, email, password, intent = 'USER_SIGNUP', phone = null, role }) => {
+  if (role !== undefined) {
+    throw serviceError('Invalid registration role', 400);
+  }
+  const registration = resolvePublicRegistration(intent, phone);
+  const normalizedEmail = normalizeEmail(email);
+
   // Check if user exists
-  const { data: existingUser } = await supabase
-    .from('users')
-    .select('*')
-    .eq('email', email)
-    .single();
+  const existingUser = await findUserByEmail(normalizedEmail);
 
   if (existingUser) {
     throw new Error('User with this email already exists');
@@ -23,21 +57,20 @@ const registerUser = async ({ name, email, password, role = 'USER', phone = null
   // Insert
   const { data, error } = await supabase
     .from('users')
-    .insert([{ name, email, password: hashedPassword, role, phone }])
+    .insert([{ name, email: normalizedEmail, password: hashedPassword, ...registration }])
     .select()
     .single();
 
   if (error) throw new Error(error.message);
 
-  delete data.password;
-  return data;
+  return toPublicUser(data);
 };
 
 const loginUser = async ({ email, password }) => {
   const { data: user, error } = await supabase
     .from('users')
     .select('*')
-    .eq('email', email)
+    .eq('email', normalizeEmail(email))
     .single();
 
   if (error || !user || !user.password) {
@@ -49,78 +82,84 @@ const loginUser = async ({ email, password }) => {
     throw new Error('Invalid email or password');
   }
 
-  delete user.password;
-  return user;
+  return toPublicUser(user);
 };
 
-const googleLogin = async (credential) => {
-  let email, name;
+const googleLogin = async (credential, intent = 'LOGIN', phone = null, linkPassword = null) => {
+  if (!['LOGIN', 'USER_SIGNUP', 'AGENT_SIGNUP'].includes(intent)) {
+    throw serviceError('Invalid Google registration intent', 400);
+  }
 
-  // Check if credential is a JWT (ID Token) or an Access Token
-  if (credential.startsWith('eyJ') && credential.split('.').length === 3) {
-    // Verify as ID Token
-    const ticket = await googleClient.verifyIdToken({
-      idToken: credential,
-      audience: process.env.GOOGLE_CLIENT_ID,
-    });
-    
-    const payload = ticket.getPayload();
-    email = payload.email;
-    name = payload.name;
-  } else {
-    // Verify as Access Token by calling Google Userinfo API
-    const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-      headers: {
-        Authorization: `Bearer ${credential}`
+  const identity = await googleIdentityService.verifyGoogleIdentity(credential);
+  const linkedIdentity = await findGoogleIdentity('subject', identity.subject);
+  if (linkedIdentity) {
+    const linkedUser = await findUserById(linkedIdentity.user_id);
+    if (!linkedUser) throw serviceError('Linked account not found', 409);
+    return toPublicUser(linkedUser);
+  }
+
+  const existingUser = await findUserByEmail(identity.email);
+  if (existingUser) {
+    const otherIdentity = await findGoogleIdentity('user_id', existingUser.id);
+    if (otherIdentity && otherIdentity.subject !== identity.subject) {
+      throw serviceError('Account is linked to a different Google identity', 409);
+    }
+    if (!identity.authoritativeEmail) {
+      if (!existingUser.password) {
+        throw serviceError('This account needs a separate recovery process before Google linking', 409);
       }
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to verify Google access token');
+      if (typeof linkPassword !== 'string' || !linkPassword) {
+        throw serviceError('Confirm your existing account password to link Google', 409, 'PASSWORD_LINK_REQUIRED');
+      }
+      const passwordMatches = await bcrypt.compare(linkPassword, existingUser.password);
+      if (!passwordMatches) throw serviceError('Incorrect account password', 401);
     }
 
-    const payload = await response.json();
-    email = payload.email;
-    name = payload.name;
+    if (!otherIdentity) {
+      const { error } = await supabase.from('google_identities')
+        .insert({ subject: identity.subject, user_id: existingUser.id });
+      if (error) {
+        const concurrentLink = await findGoogleIdentity('subject', identity.subject);
+        if (!concurrentLink || concurrentLink.user_id !== existingUser.id) {
+          throw serviceError('Google identity linking conflict', 409);
+        }
+      }
+    }
+    return toPublicUser(existingUser);
   }
 
-  if (!email) {
-    throw new Error('Invalid Google token');
+  if (intent === 'LOGIN') {
+    throw serviceError('No account found. Choose a registration page first', 404);
+  }
+  if (!identity.authoritativeEmail) {
+    throw serviceError('Google cannot confirm current ownership of this third-party email', 409);
   }
 
-  // Check if user exists in our DB
-  const { data: user, error } = await supabase
-    .from('users')
-    .select('*')
-    .eq('email', email)
-    .single();
-
-  if (user) {
-    // User exists, log them in
-    delete user.password;
-    return user;
-  } else {
-    // User doesn't exist, create them. 
-    // We don't have a password for Google users. Depending on your schema, 
-    // the password column should ideally be nullable or we can store a random string.
-    // Assuming password is not required strictly or can be null.
-    const { data: newUser, error: createError } = await supabase
-      .from('users')
-      .insert([{ name, email, password: null }])
-      .select()
-      .single();
-
-    if (createError) throw new Error(createError.message);
-    
-    delete newUser.password;
-    return newUser;
+  const registration = resolvePublicRegistration(intent, phone);
+  const { data: userId, error: provisionError } = await supabase.rpc('provision_google_user', {
+    p_subject: identity.subject,
+    p_email: identity.email,
+    p_name: identity.name,
+    p_avatar: identity.avatar,
+    p_phone: registration.phone,
+    p_role: registration.role
+  });
+  if (provisionError) {
+    if (provisionError.code === '23505') {
+      throw serviceError('An account for this Google identity or email already exists', 409);
+    }
+    throw new Error(provisionError.message);
   }
+
+  const newUser = await findUserById(userId);
+  if (!newUser) throw new Error('Provisioned user not found');
+  return toPublicUser(newUser);
 };
 
 const getUserById = async (id) => {
   const { data, error } = await supabase
     .from('users')
-    .select('id, name, email, avatar, role, phone')
+    .select('id, name, avatar, role')
     .eq('id', id)
     .single();
 
@@ -132,5 +171,6 @@ module.exports = {
   registerUser,
   loginUser,
   googleLogin,
-  getUserById
+  getUserById,
+  toPublicUser
 };

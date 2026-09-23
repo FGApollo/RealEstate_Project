@@ -2,10 +2,10 @@ const reportService = require('../services/reportService');
 
 const createReport = async (req, res) => {
   try {
-    const { propertyId, reporterId, reason, description } = req.body;
+    const { propertyId, reason, description } = req.body;
     const result = await reportService.createReport({
       propertyId,
-      reporterId,
+      reporterId: req.user.id,
       reason,
       description
     });
@@ -29,8 +29,7 @@ const getAdminReports = async (req, res) => {
 const resolveReport = async (req, res) => {
   try {
     const { reportId } = req.params;
-    const { adminId } = req.body;
-    const result = await reportService.resolveReport(reportId, adminId);
+    const result = await reportService.resolveReport(reportId, req.user.id);
     res.status(200).json(result);
   } catch (error) {
     res.status(error.statusCode || 500).json({ error: error.message || 'Failed to resolve report' });
@@ -40,8 +39,7 @@ const resolveReport = async (req, res) => {
 const rejectReport = async (req, res) => {
   try {
     const { reportId } = req.params;
-    const { adminId } = req.body;
-    const result = await reportService.rejectReport(reportId, adminId);
+    const result = await reportService.rejectReport(reportId, req.user.id);
     res.status(200).json(result);
   } catch (error) {
     res.status(error.statusCode || 500).json({ error: error.message || 'Failed to reject report' });

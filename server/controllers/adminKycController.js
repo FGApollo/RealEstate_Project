@@ -16,7 +16,7 @@ const getStatusCode = (error) => ERROR_STATUS_CODES[error.message] || 500;
 
 const getRejectedVerifications = async (req, res) => {
   try {
-    const verifications = await adminKycService.getRejectedVerifications(req.query.adminId);
+    const verifications = await adminKycService.getRejectedVerifications(req.user.id);
 
     res.status(200).json({
       success: true,
@@ -30,7 +30,7 @@ const getRejectedVerifications = async (req, res) => {
 const getVerificationDetail = async (req, res) => {
   try {
     const verification = await adminKycService.getVerificationDetail(
-      req.query.adminId,
+      req.user.id,
       req.params.verificationId
     );
 
@@ -46,7 +46,7 @@ const getVerificationDetail = async (req, res) => {
 const approveVerification = async (req, res) => {
   try {
     const result = await adminKycService.approveVerification(
-      req.body.adminId,
+      req.user.id,
       req.params.verificationId
     );
 
@@ -62,7 +62,7 @@ const approveVerification = async (req, res) => {
 const rejectVerification = async (req, res) => {
   try {
     const result = await adminKycService.rejectVerification(
-      req.body.adminId,
+      req.user.id,
       req.params.verificationId,
       req.body.rejectReason
     );

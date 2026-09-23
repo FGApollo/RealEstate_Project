@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useOutletContext } from 'react-router-dom';
 import {
   Home, Search, LayoutDashboard, Settings, LogOut, BarChart2, HelpCircle, MessageSquare, Shield,
   User, Star, CreditCard
@@ -12,36 +12,23 @@ import AgentProfile from '../features/agent/profile/AgentProfile';
 import AgentPricing from '../features/agent/pricing/AgentPricing';
 import './AgentOverview.css';
 import { API_BASE_URL } from '../config';
+import { apiFetch } from '../auth/apiClient';
+import { useAuth } from '../auth/useAuth';
 
 const AgentOverview = () => {
   const navigate = useNavigate();
-  const [currentUser, setCurrentUser] = useState(() => {
-    try {
-      const saved = localStorage.getItem('user');
-      return saved ? JSON.parse(saved) : { id: 12, name: 'Zăn Cao', role: 'AGENT', verification_status: 'UNVERIFIED' };
-    } catch {
-      return { id: 12, name: 'Zăn Cao', role: 'AGENT', verification_status: 'UNVERIFIED' };
-    }
-  });
+  const { currentUser: authenticatedUser } = useOutletContext();
+  const { logout } = useAuth();
+  const [currentUser, setCurrentUser] = useState(authenticatedUser);
 
-  useEffect(() => {
-    const sessionUser = localStorage.getItem('user');
-    if (!sessionUser) {
-      navigate('/login/agent');
-    } else {
-      const parsedUser = JSON.parse(sessionUser);
-      if (parsedUser.role !== 'AGENT') {
-        navigate('/');
-      } else {
-        setCurrentUser(parsedUser);
-      }
-    }
-  }, [navigate]);
-
-  const handleLogout = (e) => {
+  const handleLogout = async (e) => {
     e.preventDefault();
-    localStorage.removeItem('user');
-    navigate('/login/agent');
+    try {
+      await logout();
+      navigate('/login/agent');
+    } catch (error) {
+      alert(error.message);
+    }
   };
 
   const [data, setData] = useState({
@@ -69,7 +56,7 @@ const AgentOverview = () => {
 
   const fetchFunnelStats = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/chat/funnel/stats?agentId=${currentUser.id}`);
+      const res = await apiFetch(`${API_BASE_URL}/api/chat/funnel/stats`);
       if (res.ok) {
         const result = await res.json();
         setFunnelStats(result.stats || { AWARENESS: 0, CONSIDERATION: 0, INTENT: 0, ACTION: 0 });
@@ -94,7 +81,7 @@ const AgentOverview = () => {
 
   const handleDeleteProperty = async (id) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/properties/${id}?userId=${currentUser.id}`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/properties/${id}`, {
         method: 'DELETE'
       });
       if (response.ok) {
@@ -115,17 +102,13 @@ const AgentOverview = () => {
   useEffect(() => {
     const fetchOverview = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/agent/overview?userId=${currentUser.id}`);
+        const response = await apiFetch(`${API_BASE_URL}/api/agent/overview`);
         if (response.ok) {
           const result = await response.json();
           setData(result);
           if (result.agent) {
             setCurrentUser(prev => ({
               ...prev,
-              ...result.agent
-            }));
-            localStorage.setItem('user', JSON.stringify({
-              ...currentUser,
               ...result.agent
             }));
           }

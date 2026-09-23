@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { CheckCircle2, Mail, CreditCard, Sparkles, AlertCircle, Clock } from 'lucide-react';
 import { API_BASE_URL } from '../../../config';
+import { apiFetch } from '../../../auth/apiClient';
 import './AgentPricing.css';
 
 const AgentPricing = ({ currentUser }) => {
@@ -12,7 +13,7 @@ const AgentPricing = ({ currentUser }) => {
   const fetchSubscription = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/subscriptions?userId=${currentUser.id}`);
+      const res = await apiFetch(`${API_BASE_URL}/api/subscriptions`);
       if (res.ok) {
         const data = await res.json();
         setSubscription(data);
@@ -28,33 +29,25 @@ const AgentPricing = ({ currentUser }) => {
     fetchSubscription();
   }, [currentUser.id]);
 
-  const handleSubscribe = async (planName, priceVnd) => {
+  const handleSubscribe = async (planName) => {
     setActionLoading(true);
     setMessage('');
     try {
-      const res = await fetch(`${API_BASE_URL}/api/subscriptions`, {
+      const res = await apiFetch(`${API_BASE_URL}/api/subscriptions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          userId: currentUser.id,
-          planName: planName,
-          priceVnd: priceVnd,
-          status: 'ACTIVE',
-          months: 1
-        })
+        body: JSON.stringify({ planName })
       });
 
       if (res.ok) {
         const data = await res.json();
         setSubscription(data);
-        setMessage(planName === 'FREE_TRIAL' 
-          ? 'Kích hoạt dùng thử 1 tháng thành công!' 
-          : 'Đăng ký gói trả phí 1.000.000đ/tháng thành công!'
-        );
+        setMessage('Kích hoạt dùng thử 1 tháng thành công!');
       } else {
-        setMessage('Có lỗi xảy ra, vui lòng thử lại.');
+        const error = await res.json();
+        setMessage(error.error || 'Có lỗi xảy ra, vui lòng thử lại.');
       }
     } catch (err) {
       console.error('Error subscribing:', err);
@@ -132,7 +125,7 @@ const AgentPricing = ({ currentUser }) => {
               <span className="amount">0đ</span>
               <span className="period">/ 1 tháng đầu</span>
             </div>
-            <p className="plan-desc">Sau 1 tháng dùng thử, tự động gia hạn gói cơ bản với mức phí chỉ 1.000.000đ / tháng.</p>
+            <p className="plan-desc">Dùng thử 1 tháng. Không tự động gia hạn hoặc thu phí; gói trả phí sẽ được mở sau khi có quy trình thanh toán xác thực.</p>
           </div>
 
           <ul className="plan-features">
@@ -166,7 +159,7 @@ const AgentPricing = ({ currentUser }) => {
             ) : (
               <button 
                 className="btn-plan-action" 
-                onClick={() => handleSubscribe('FREE_TRIAL', 0)}
+                onClick={() => handleSubscribe('FREE_TRIAL')}
                 disabled={actionLoading}
               >
                 Kích hoạt dùng thử ngay
@@ -175,7 +168,7 @@ const AgentPricing = ({ currentUser }) => {
           </div>
         </div>
 
-        {/* Plan 1.5: Paid Premium (Simulated Option) */}
+        {/* Paid activation is intentionally unavailable until a verified payment flow exists. */}
         <div className={`pricing-card popular-plan ${subscription?.plan_name === 'PAID' ? 'active-plan' : ''}`}>
           <div className="popular-badge">KHUYÊN DÙNG</div>
           <div className="plan-header">
@@ -212,12 +205,8 @@ const AgentPricing = ({ currentUser }) => {
                 Gói Premium đang hoạt động
               </button>
             ) : (
-              <button 
-                className="btn-plan-action" 
-                onClick={() => handleSubscribe('PAID', 1000000)}
-                disabled={actionLoading}
-              >
-                Đăng ký gói Premium
+              <button className="btn-plan-disabled" disabled>
+                Tạm chưa hỗ trợ thanh toán
               </button>
             )}
           </div>

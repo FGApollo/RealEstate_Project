@@ -9,6 +9,8 @@ import { motion, useMotionValue, useTransform, useAnimation } from 'framer-motio
 import PropertyDetailModal from '../components/PropertyDetailModal';
 import './Swipe.css';
 import { API_BASE_URL } from '../config';
+import { apiFetch } from '../auth/apiClient';
+import { useAuth } from '../auth/useAuth';
 
 const WARDS_BY_REGION = {
   'TP.HCM': [
@@ -129,6 +131,7 @@ const categorySuggestionDetails = {
 };
 
 const Swipe = () => {
+  const { user } = useAuth();
   const { categoryName } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -196,27 +199,14 @@ const Swipe = () => {
   const [selectedSavedProperty, setSelectedSavedProperty] = useState(null);
   const [showSidebar, setShowSidebar] = useState(false);
 
-  const [user, setUser] = useState(null);
   const [dbFavorites, setDbFavorites] = useState([]);
   const [isLoadingSaved, setIsLoadingSaved] = useState(false);
 
-  // Check login session on mount
-  useEffect(() => {
-    const sessionUser = localStorage.getItem('user');
-    if (sessionUser) {
-      setUser(JSON.parse(sessionUser));
-    } else {
-      navigate('/login');
-    }
-  }, [navigate]);
-
   const fetchFavorites = async () => {
-    const sessionUser = localStorage.getItem('user');
-    if (!sessionUser) return;
-    const parsedUser = JSON.parse(sessionUser);
+    if (!user) return;
     setIsLoadingSaved(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/favorites?userId=${parsedUser.id}`);
+      const response = await apiFetch(`${API_BASE_URL}/api/favorites`);
       if (response.ok) {
         const data = await response.json();
         setDbFavorites(data.favorites || []);
@@ -377,7 +367,7 @@ const Swipe = () => {
   useEffect(() => {
     const fetchProperties = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/properties`);
+        const response = await apiFetch(`${API_BASE_URL}/api/properties`);
         if (response.ok) {
           const data = await response.json();
           if (data.properties && data.properties.length > 0) {
@@ -551,20 +541,20 @@ const Swipe = () => {
           if (prev.some(f => f.id === currentProperty.id)) return prev;
           return [...prev, currentProperty];
         });
-        fetch(`${API_BASE_URL}/api/favorites`, {
+        apiFetch(`${API_BASE_URL}/api/favorites`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId: user.id, propertyId: currentProperty.id })
+          body: JSON.stringify({ propertyId: currentProperty.id })
         }).catch(err => console.error('Error adding favorite to DB:', err));
       }
 
       // Remove from database favorites if swiped left (dislike)
       if (direction === 'left' && user?.id) {
         setDbFavorites(prev => prev.filter(f => f.id !== currentProperty.id));
-        fetch(`${API_BASE_URL}/api/favorites/delete`, {
+        apiFetch(`${API_BASE_URL}/api/favorites/delete`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId: user.id, propertyId: currentProperty.id })
+          body: JSON.stringify({ propertyId: currentProperty.id })
         }).catch(err => console.error('Error removing favorite from DB:', err));
       }
     }
@@ -592,10 +582,10 @@ const Swipe = () => {
     if (isFav) {
       setDbFavorites(prev => prev.filter(fav => fav.id !== currentProperty.id));
       try {
-        await fetch(`${API_BASE_URL}/api/favorites/delete`, {
+        await apiFetch(`${API_BASE_URL}/api/favorites/delete`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId: user.id, propertyId: currentProperty.id })
+          body: JSON.stringify({ propertyId: currentProperty.id })
         });
       } catch (err) {
         console.error('Error removing favorite:', err);
@@ -603,10 +593,10 @@ const Swipe = () => {
     } else {
       setDbFavorites(prev => [...prev, currentProperty]);
       try {
-        await fetch(`${API_BASE_URL}/api/favorites`, {
+        await apiFetch(`${API_BASE_URL}/api/favorites`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId: user.id, propertyId: currentProperty.id })
+          body: JSON.stringify({ propertyId: currentProperty.id })
         });
       } catch (err) {
         console.error('Error adding favorite:', err);
@@ -647,10 +637,10 @@ const Swipe = () => {
     setDbFavorites(prev => prev.filter(item => item.id !== propertyId));
     if (user?.id) {
       try {
-        await fetch(`${API_BASE_URL}/api/favorites/delete`, {
+        await apiFetch(`${API_BASE_URL}/api/favorites/delete`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId: user.id, propertyId })
+          body: JSON.stringify({ propertyId })
         });
       } catch (err) {
         console.error('Error removing favorite from DB:', err);
@@ -1190,17 +1180,17 @@ const Swipe = () => {
             const isFav = dbFavorites.some(fav => fav.id === activePropertyForModal.id);
             if (isFav) {
               setDbFavorites(prev => prev.filter(fav => fav.id !== activePropertyForModal.id));
-              fetch(`${API_BASE_URL}/api/favorites/delete`, {
+              apiFetch(`${API_BASE_URL}/api/favorites/delete`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: user.id, propertyId: activePropertyForModal.id })
+                body: JSON.stringify({ propertyId: activePropertyForModal.id })
               }).catch(err => console.error(err));
             } else {
               setDbFavorites(prev => [...prev, activePropertyForModal]);
-              fetch(`${API_BASE_URL}/api/favorites`, {
+              apiFetch(`${API_BASE_URL}/api/favorites`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: user.id, propertyId: activePropertyForModal.id })
+                body: JSON.stringify({ propertyId: activePropertyForModal.id })
               }).catch(err => console.error(err));
             }
           }}

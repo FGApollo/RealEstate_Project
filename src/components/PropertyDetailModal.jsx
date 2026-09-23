@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   X, ChevronLeft, ChevronRight, Sparkles, MapPin, 
@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import './PropertyDetailModal.css';
 import { API_BASE_URL } from '../config';
+import { apiFetch } from '../auth/apiClient';
+import { useAuth } from '../auth/useAuth';
 
 const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = false, isFavorite = false, onToggleFavorite, onSelectProperty }) => {
   const [fetchedProperty, setFetchedProperty] = useState(null);
@@ -25,13 +27,7 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
   const [sortOrder, setSortOrder] = useState('newest'); // 'newest', 'oldest', 'highest', 'lowest'
   const [ratingFilter, setRatingFilter] = useState('all'); // 'all', '5', '4', '3', '2', '1'
 
-  const user = useMemo(() => {
-    try {
-      return JSON.parse(localStorage.getItem('user') || 'null');
-    } catch {
-      return null;
-    }
-  }, []);
+  const { user } = useAuth();
 
   const [localRating, setLocalRating] = useState(property?.average_rating || 0);
   const [localReviewCount, setLocalReviewCount] = useState(property?.review_count || 0);
@@ -51,7 +47,7 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
     if (prop?.id) {
       // If property does not have owner information or full description/specs, fetch details by ID
       if (!prop.owner || !prop.description) {
-        fetch(`${API_BASE_URL}/api/properties/${prop.id}`)
+        apiFetch(`${API_BASE_URL}/api/properties/${prop.id}`)
           .then(res => res.json())
           .then(data => {
             if (data.property) {
@@ -64,7 +60,7 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
       }
 
       setIsLoadingReviews(true);
-      fetch(`${API_BASE_URL}/api/properties/${prop.id}/reviews`)
+      apiFetch(`${API_BASE_URL}/api/properties/${prop.id}/reviews`)
         .then(res => res.json())
         .then(data => {
           setReviews(data.reviews || []);
@@ -76,7 +72,7 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
         });
 
       setIsLoadingSimilar(true);
-      fetch(`${API_BASE_URL}/api/properties/${prop.id}/similar`)
+      apiFetch(`${API_BASE_URL}/api/properties/${prop.id}/similar`)
         .then(res => res.json())
         .then(data => {
           setSimilarProperties(data.properties || []);
@@ -164,14 +160,12 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/properties/${property.id}/reviews`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/properties/${property.id}/reviews`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: user.id,
           rating: ratingVal,
           comment: reviewText,
-          isVerifiedReview: true,
           images: selectedImages
         })
       });

@@ -9,6 +9,8 @@ import {
 } from 'lucide-react';
 import './Home.css';
 import { API_BASE_URL } from '../config';
+import { apiFetch } from '../auth/apiClient';
+import { useAuth } from '../auth/useAuth';
 
 const categoryImages = {
   'Apartment': 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=400&q=80',
@@ -99,7 +101,7 @@ const CUSTOM_LOCATION_SUGGESTIONS = [
 
 const Home = () => {
   const navigate = useNavigate();
-  const [user, setUser] = useState(null);
+  const { user, logout } = useAuth();
   const [showDropdown, setShowDropdown] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
   const [properties, setProperties] = useState([]);
@@ -152,7 +154,7 @@ const Home = () => {
   useEffect(() => {
     if (selectedProperty?.id) {
       setIsLoadingReviews(true);
-      fetch(`${API_BASE_URL}/api/properties/${selectedProperty.id}/reviews`)
+      apiFetch(`${API_BASE_URL}/api/properties/${selectedProperty.id}/reviews`)
         .then(res => res.json())
         .then(data => {
           setReviews(data.reviews || []);
@@ -164,7 +166,7 @@ const Home = () => {
         });
 
       setIsLoadingSimilar(true);
-      fetch(`${API_BASE_URL}/api/properties/${selectedProperty.id}/similar`)
+      apiFetch(`${API_BASE_URL}/api/properties/${selectedProperty.id}/similar`)
         .then(res => res.json())
         .then(data => {
           setSimilarProperties(data.properties || []);
@@ -252,14 +254,12 @@ const Home = () => {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/properties/${selectedProperty.id}/reviews`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/properties/${selectedProperty.id}/reviews`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: user.id,
           rating: ratingVal,
           comment: reviewText,
-          isVerifiedReview: true,
           images: selectedImages
         })
       });
@@ -317,27 +317,14 @@ const Home = () => {
     }));
   }, [properties]);
 
-  // Check login session on mount
   useEffect(() => {
-    const sessionUser = localStorage.getItem('user');
-    if (!sessionUser) {
-      navigate('/login');
-    } else {
-      const parsedUser = JSON.parse(sessionUser);
-      if (parsedUser.role === 'AGENT') {
-        navigate('/sale/overview');
-      } else {
-        setUser(parsedUser);
-      }
-    }
-  }, [navigate]);
+    if (user?.role === 'AGENT') navigate('/sale/overview', { replace: true });
+  }, [navigate, user]);
 
   const fetchFavorites = async () => {
-    const sessionUser = localStorage.getItem('user');
-    if (!sessionUser) return;
-    const parsedUser = JSON.parse(sessionUser);
+    if (!user) return;
     try {
-      const response = await fetch(`${API_BASE_URL}/api/favorites?userId=${parsedUser.id}`);
+      const response = await apiFetch(`${API_BASE_URL}/api/favorites`);
       if (response.ok) {
         const data = await response.json();
         setDbFavorites(data.favorites || []);
@@ -361,7 +348,7 @@ const Home = () => {
   useEffect(() => {
     const fetchProperties = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/properties`);
+        const response = await apiFetch(`${API_BASE_URL}/api/properties`);
         if (!response.ok) throw new Error('Failed to fetch properties');
         const data = await response.json();
         
@@ -659,9 +646,13 @@ const Home = () => {
     ).slice(0, 8);
   }, [wardSearchQuery, selectedWards, selectedProvince]);
 
-  const handleLogout = () => {
-    localStorage.removeItem('user');
-    navigate('/login');
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/login');
+    } catch (error) {
+      alert(error.message);
+    }
   };
 
   const formatPrice = (price) => {
@@ -1172,17 +1163,17 @@ const Home = () => {
                           if (!user?.id) return;
                           if (isFav) {
                             setDbFavorites(prev => prev.filter(fav => fav.id !== selectedProperty.id));
-                            fetch(`${API_BASE_URL}/api/favorites/delete`, {
+                            apiFetch(`${API_BASE_URL}/api/favorites/delete`, {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ userId: user.id, propertyId: selectedProperty.id })
+                              body: JSON.stringify({ propertyId: selectedProperty.id })
                             }).catch(err => console.error(err));
                           } else {
                             setDbFavorites(prev => [...prev, selectedProperty]);
-                            fetch(`${API_BASE_URL}/api/favorites`, {
+                            apiFetch(`${API_BASE_URL}/api/favorites`, {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ userId: user.id, propertyId: selectedProperty.id })
+                              body: JSON.stringify({ propertyId: selectedProperty.id })
                             }).catch(err => console.error(err));
                           }
                         }}

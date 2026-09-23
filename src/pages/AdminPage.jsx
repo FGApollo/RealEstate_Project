@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, Link, useOutletContext } from 'react-router-dom';
 import {
   ShieldCheck, AlertTriangle, Search, LogOut, HelpCircle, UserX, CheckCircle,
   XCircle, FileText, Image, User, Check, X, ShieldAlert, Flag, Home, Mail, Clock, Award
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
+import { apiFetch } from '../auth/apiClient';
+import { useAuth } from '../auth/useAuth';
 import './AdminPage.css';
 
 const REASON_LABELS = {
@@ -19,22 +21,8 @@ const REASON_LABELS = {
 
 const AdminPage = () => {
   const navigate = useNavigate();
-  
-  // Get current admin user from localStorage or use mock fallback for rapid testing
-  const [currentUser, setCurrentUser] = useState(() => {
-    try {
-      const saved = localStorage.getItem('user');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.role === 'ADMIN' || parsed.role === 'admin') {
-          return parsed;
-        }
-      }
-      return { id: 1, name: 'Admin Swipe Nest', role: 'ADMIN', email: 'admin@swipenest.com' };
-    } catch {
-      return { id: 1, name: 'Admin Swipe Nest', role: 'ADMIN', email: 'admin@swipenest.com' };
-    }
-  });
+  const { currentUser } = useOutletContext();
+  const { logout } = useAuth();
 
   // Exactly 2 navbar items: 'account-verification' (Kiểm duyệt tài khoản) & 'report-moderation' (Kiểm duyệt báo cáo)
   const [activeTab, setActiveTab] = useState('account-verification');
@@ -59,17 +47,21 @@ const AdminPage = () => {
   const [reportStatusFilter, setReportStatusFilter] = useState('PENDING'); // PENDING | RESOLVED | REJECTED | ALL
 
   // Logout handler
-  const handleLogout = (e) => {
+  const handleLogout = async (e) => {
     e.preventDefault();
-    localStorage.removeItem('user');
-    navigate('/login');
+    try {
+      await logout();
+      navigate('/login');
+    } catch (error) {
+      alert(error.message);
+    }
   };
 
   // 1. Fetch Rejected KYC List
   const fetchRejectedKyc = async () => {
     setLoadingKyc(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/admin/kyc/rejected?adminId=${currentUser.id}`);
+      const res = await apiFetch(`${API_BASE_URL}/api/admin/kyc/rejected`);
       if (res.ok) {
         const data = await res.json();
         const list = Array.isArray(data) ? data : (data.verifications || data.data || []);
@@ -90,7 +82,7 @@ const AdminPage = () => {
     if (!id) return;
     setLoadingDetail(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/admin/kyc/${id}?adminId=${currentUser.id}`);
+      const res = await apiFetch(`${API_BASE_URL}/api/admin/kyc/${id}`);
       if (res.ok) {
         const data = await res.json();
         const detail = data.verification || data.data || data;
@@ -112,7 +104,7 @@ const AdminPage = () => {
       const url = status === 'ALL'
         ? `${API_BASE_URL}/api/reports/admin`
         : `${API_BASE_URL}/api/reports/admin?status=${status}`;
-      const res = await fetch(url);
+      const res = await apiFetch(url);
       if (res.ok) {
         const data = await res.json();
         const list = Array.isArray(data) ? data : (data.reports || data.data || []);
@@ -153,10 +145,10 @@ const AdminPage = () => {
 
     setActionLoading(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/admin/kyc/${selectedKycId}/approve`, {
+      const res = await apiFetch(`${API_BASE_URL}/api/admin/kyc/${selectedKycId}/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ adminId: currentUser.id })
+        body: JSON.stringify({})
       });
       const result = await res.json();
       if (res.ok) {
@@ -186,11 +178,10 @@ const AdminPage = () => {
 
     setActionLoading(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/admin/kyc/${selectedKycId}/reject`, {
+      const res = await apiFetch(`${API_BASE_URL}/api/admin/kyc/${selectedKycId}/reject`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          adminId: currentUser.id,
           rejectReason: rejectReasonInput.trim()
         })
       });
@@ -224,10 +215,10 @@ const AdminPage = () => {
 
     setActionLoading(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/reports/admin/${reportId}/resolve`, {
+      const res = await apiFetch(`${API_BASE_URL}/api/reports/admin/${reportId}/resolve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ adminId: currentUser.id })
+        body: JSON.stringify({})
       });
       const result = await res.json();
       if (res.ok) {
@@ -252,10 +243,10 @@ const AdminPage = () => {
 
     setActionLoading(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/reports/admin/${reportId}/reject`, {
+      const res = await apiFetch(`${API_BASE_URL}/api/reports/admin/${reportId}/reject`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ adminId: currentUser.id })
+        body: JSON.stringify({})
       });
       const result = await res.json();
       if (res.ok) {

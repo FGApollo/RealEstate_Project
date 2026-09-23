@@ -14,7 +14,7 @@ const getProperties = async (req, res) => {
 
 const createProperty = async (req, res) => {
   try {
-    const property = await propertyService.createProperty(req.body);
+    const property = await propertyService.createProperty({ ...req.body, owner_id: req.user.id });
     res.status(201).json({ success: true, property });
   } catch (error) {
     console.error('Error creating property:', error);
@@ -39,26 +39,22 @@ const getPropertyById = async (req, res) => {
 const updateProperty = async (req, res) => {
   try {
     const { id } = req.params;
-    const property = await propertyService.updateProperty(id, req.body);
+    const property = await propertyService.updateProperty(id, req.user.id, req.body);
     res.status(200).json({ success: true, property });
   } catch (error) {
-    console.error('Error updating property:', error);
-    res.status(500).json({ error: error.message || 'Internal server error' });
+    if (!error.statusCode || error.statusCode >= 500) console.error('Error updating property:', error);
+    res.status(error.statusCode || 500).json({ error: error.message || 'Internal server error' });
   }
 };
 
 const deleteProperty = async (req, res) => {
   try {
     const { id } = req.params;
-    const { userId } = req.query;
-    if (!userId) {
-      return res.status(400).json({ error: 'Missing userId parameter' });
-    }
-    await propertyService.deleteProperty(id, userId);
+    await propertyService.deleteProperty(id, req.user.id);
     res.status(200).json({ success: true });
   } catch (error) {
-    console.error('Error deleting property:', error);
-    res.status(500).json({ error: error.message || 'Internal server error' });
+    if (!error.statusCode || error.statusCode >= 500) console.error('Error deleting property:', error);
+    res.status(error.statusCode || 500).json({ error: error.message || 'Internal server error' });
   }
 };
 
@@ -76,13 +72,13 @@ const getPropertyReviews = async (req, res) => {
 const createPropertyReview = async (req, res) => {
   try {
     const { id } = req.params;
-    const { userId, rating, comment, isVerifiedReview, images } = req.body;
+    const { rating, comment, images } = req.body;
     
-    if (!userId || !rating) {
-      return res.status(400).json({ error: 'Missing userId or rating' });
+    if (!rating) {
+      return res.status(400).json({ error: 'Missing rating' });
     }
 
-    const review = await reviewService.createPropertyReview(id, userId, rating, comment, isVerifiedReview, images);
+    const review = await reviewService.createPropertyReview(id, req.user.id, rating, comment, false, images);
     res.status(201).json({ success: true, review });
   } catch (error) {
     console.error('Error creating property review:', error);
@@ -93,7 +89,7 @@ const createPropertyReview = async (req, res) => {
 const checkBeforeSave = async (req, res) => {
   try {
     const { excludeId } = req.query;
-    const propertyData = req.body;
+    const propertyData = { ...req.body, owner_id: req.user.id };
 
     // 1. Check similarity in DB
     const similarityResult = await propertyService.checkSimilarity(propertyData, excludeId);

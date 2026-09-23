@@ -1,13 +1,17 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { User, Lock, EyeOff, Eye } from 'lucide-react';
 import AuthLayout from '../components/AuthLayout';
+import GoogleAuthButton from '../components/GoogleAuthButton';
 import Input from '../components/ui/Input';
 import Button from '../components/ui/Button';
 import { API_BASE_URL } from '../config';
+import { useAuth } from '../auth/useAuth';
+import { roleDestination } from '../auth/roleDestination';
 
 const LoginAgent = () => {
   const navigate = useNavigate();
+  const { completeLogin } = useAuth();
   const location = useLocation();
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({ email: '', password: '' });
@@ -32,6 +36,7 @@ const LoginAgent = () => {
       const response = await fetch(`${API_BASE_URL}/api/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(formData)
       });
 
@@ -41,13 +46,8 @@ const LoginAgent = () => {
         throw new Error(data.error || 'Failed to login');
       }
 
-      // Check if user is an agent
-      if (data.user.role !== 'AGENT') {
-        throw new Error('Tài khoản của bạn không có quyền truy cập dành cho Môi giới. Vui lòng đăng nhập qua trang dành cho Khách hàng.');
-      }
-
-      localStorage.setItem('user', JSON.stringify(data.user));
-      navigate('/sale/overview');
+      completeLogin(data);
+      navigate(roleDestination(data.user.role));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -102,6 +102,9 @@ const LoginAgent = () => {
           </Button>
         </div>
       </form>
+
+      <div className="divider">HOẶC TIẾP TỤC VỚI</div>
+      <GoogleAuthButton intent="LOGIN" onError={setError} />
 
       <div className="auth-footer">
         <div>Chưa có tài khoản Agent? <Link to="/register/agent">Đăng ký tại đây</Link></div>

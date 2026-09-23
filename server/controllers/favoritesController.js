@@ -1,10 +1,7 @@
 const favoritesService = require('../services/favoritesService');
 
 const getFavorites = async (req, res) => {
-  const { userId } = req.query;
-  if (!userId) {
-    return res.status(400).json({ error: 'Missing userId parameter' });
-  }
+  const userId = req.user.id;
 
   try {
     const favorites = await favoritesService.getFavorites(userId);
@@ -16,9 +13,10 @@ const getFavorites = async (req, res) => {
 };
 
 const addFavorite = async (req, res) => {
-  const { userId, propertyId } = req.body;
-  if (!userId || !propertyId) {
-    return res.status(400).json({ error: 'Missing userId or propertyId' });
+  const { propertyId } = req.body;
+  const userId = req.user.id;
+  if (!propertyId) {
+    return res.status(400).json({ error: 'Missing propertyId' });
   }
 
   try {
@@ -31,9 +29,10 @@ const addFavorite = async (req, res) => {
 };
 
 const removeFavorite = async (req, res) => {
-  const { userId, propertyId } = req.body;
-  if (!userId || !propertyId) {
-    return res.status(400).json({ error: 'Missing userId or propertyId' });
+  const { propertyId } = req.body;
+  const userId = req.user.id;
+  if (!propertyId) {
+    return res.status(400).json({ error: 'Missing propertyId' });
   }
 
   try {
