@@ -81,74 +81,39 @@ const getUserById = async (userId) => {
   return user;
 };
 
-const memorySessions = new Map();
-
 const getAuthenticatedUser = async (token) => {
   const payload = verifyAccessToken(token);
-  let session = memorySessions.get(payload.sid);
+  const { data: session, error } = await supabase
+    .from('auth_sessions')
+    .select('id, user_id, expires_at, revoked_at')
+    .eq('id', payload.sid)
+    .maybeSingle();
 
-  if (!session) {
-    try {
-      const { data, error } = await supabase
-        .from('auth_sessions')
-        .select('id, user_id, expires_at, revoked_at')
-        .eq('id', payload.sid)
-        .maybeSingle();
-
-      if (!error && data) {
-        session = data;
-      }
-    } catch (e) {
-      // Ignored: fallback to valid JWT payload
-    }
+  if (error) throw new Error(error.message);
+  if (!session || session.revoked_at || new Date(session.expires_at).getTime() <= Date.now()
+    || String(session.user_id) !== payload.sub) {
+    return null;
   }
 
-  if (session) {
-    if (session.revoked_at || new Date(session.expires_at).getTime() <= Date.now()
-      || String(session.user_id) !== payload.sub) {
-      return null;
-    }
-  }
-
-  return getUserById(payload.sub);
+  return getUserById(session.user_id);
 };
 
 const createSession = async (user) => {
   const refreshToken = generateRefreshToken();
-  let sessionId = crypto.randomUUID();
-
-  try {
-    const { data: session, error } = await supabase
-      .from('auth_sessions')
-      .insert({
-        user_id: user.id,
-        refresh_token_hash: hashToken(refreshToken),
-        expires_at: new Date(Date.now() + REFRESH_TOKEN_TTL_MS).toISOString()
-      })
-      .select('id')
-      .single();
-
-    if (!error && session) {
-      sessionId = session.id;
-    } else {
-      memorySessions.set(sessionId, {
-        id: sessionId,
-        user_id: user.id,
-        refresh_token_hash: hashToken(refreshToken),
-        expires_at: new Date(Date.now() + REFRESH_TOKEN_TTL_MS).toISOString()
-      });
-    }
-  } catch (err) {
-    memorySessions.set(sessionId, {
-      id: sessionId,
+  const { data: session, error } = await supabase
+    .from('auth_sessions')
+    .insert({
       user_id: user.id,
       refresh_token_hash: hashToken(refreshToken),
       expires_at: new Date(Date.now() + REFRESH_TOKEN_TTL_MS).toISOString()
-    });
-  }
+    })
+    .select('id')
+    .single();
+
+  if (error) throw new Error(error.message);
 
   return {
-    accessToken: signAccessToken(user.id, sessionId),
+    accessToken: signAccessToken(user.id, session.id),
     refreshToken
   };
 };
