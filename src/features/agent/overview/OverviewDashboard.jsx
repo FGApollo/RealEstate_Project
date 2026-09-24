@@ -252,7 +252,18 @@ const OverviewDashboard = ({
                   <div className="notification-tooltip dashboard-tooltip">
                     <div className="tooltip-content">
                       <span className="tooltip-text">Tài khoản của bạn chưa được xác minh.</span>
-                      <a href="#" className="tooltip-action" onClick={(e) => e.preventDefault()}>Xác minh ngay!</a>
+                      <a 
+                        href="#kyc" 
+                        className="tooltip-action" 
+                        onClick={(e) => {
+                          e.preventDefault();
+                          if (typeof setActiveTab === 'function') {
+                            setActiveTab('profile');
+                          }
+                        }}
+                      >
+                        Xác minh ngay!
+                      </a>
                     </div>
                   </div>
                 </>
