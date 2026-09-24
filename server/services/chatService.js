@@ -98,6 +98,25 @@ const getConversations = async (userId) => {
 };
 
 const updateFunnelStage = async (agentId, userId, stage) => {
+  if (!['AWARENESS', 'CONSIDERATION', 'INTENT', 'ACTION'].includes(stage)) {
+    const error = new Error('Invalid funnel stage');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const { data: messages, error: relationshipError } = await supabase
+    .from('messages')
+    .select('id')
+    .or(`and(sender_id.eq.${agentId},receiver_id.eq.${userId}),and(sender_id.eq.${userId},receiver_id.eq.${agentId})`)
+    .limit(1);
+
+  if (relationshipError) throw new Error(relationshipError.message);
+  if (!messages?.length) {
+    const error = new Error('Customer is not in this agent conversation');
+    error.statusCode = 403;
+    throw error;
+  }
+
   const { data, error } = await supabase
     .from('agent_user_funnel')
     .upsert({

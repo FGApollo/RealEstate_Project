@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { API_BASE_URL } from '../../../config';
+import { apiFetch } from '../../../auth/apiClient';
 
 const DEFAULT_LISTING = (currentUser) => ({
   title: '',
@@ -66,7 +67,7 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
   useEffect(() => {
     const fetchProvinces = async () => {
       try {
-        const res = await fetch('https://provinces.open-api.vn/api/p/');
+        const res = await apiFetch('https://provinces.open-api.vn/api/p/');
         if (res.ok) setProvinces(await res.json());
       } catch (err) {
         console.error('Failed to fetch provinces:', err);
@@ -81,7 +82,7 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
 
     const fetchProperty = async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/properties/${editingPropertyId}`);
+        const res = await apiFetch(`${API_BASE_URL}/api/properties/${editingPropertyId}`);
         if (!res.ok) return;
         const { property: prop } = await res.json();
 
@@ -126,7 +127,7 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
           const pMatch = provinces.find(p => p.name.includes(prop.city) || prop.city.includes(p.name));
           if (pMatch) {
             setSelectedProvinceCode(pMatch.code);
-            const distRes = await fetch(`https://provinces.open-api.vn/api/p/${pMatch.code}?depth=2`);
+            const distRes = await apiFetch(`https://provinces.open-api.vn/api/p/${pMatch.code}?depth=2`);
             if (distRes.ok) {
               const distData = await distRes.json();
               setDistricts(distData.districts || []);
@@ -134,7 +135,7 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
                 const dMatch = distData.districts?.find(d => d.name.includes(prop.district) || prop.district.includes(d.name));
                 if (dMatch) {
                   setSelectedDistrictCode(dMatch.code);
-                  const wardRes = await fetch(`https://provinces.open-api.vn/api/d/${dMatch.code}?depth=2`);
+                  const wardRes = await apiFetch(`https://provinces.open-api.vn/api/d/${dMatch.code}?depth=2`);
                   if (wardRes.ok) {
                     const wardData = await wardRes.json();
                     setWards(wardData.wards || []);
@@ -156,7 +157,7 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
   const loadDistricts = async (provinceCode) => {
     if (!provinceCode) { setDistricts([]); setWards([]); return; }
     try {
-      const res = await fetch(`https://provinces.open-api.vn/api/p/${provinceCode}?depth=2`);
+      const res = await apiFetch(`https://provinces.open-api.vn/api/p/${provinceCode}?depth=2`);
       if (res.ok) { setDistricts((await res.json()).districts || []); setWards([]); }
     } catch (err) { console.error('Failed to load districts:', err); }
   };
@@ -164,7 +165,7 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
   const loadWards = async (districtCode) => {
     if (!districtCode) { setWards([]); return; }
     try {
-      const res = await fetch(`https://provinces.open-api.vn/api/d/${districtCode}?depth=2`);
+      const res = await apiFetch(`https://provinces.open-api.vn/api/d/${districtCode}?depth=2`);
       if (res.ok) setWards((await res.json()).wards || []);
     } catch (err) { console.error('Failed to load wards:', err); }
   };
@@ -174,14 +175,14 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
     const pMatch = provinces.find(p => p.name.toLowerCase().includes(cityName.toLowerCase()) || cityName.toLowerCase().includes(p.name.toLowerCase()));
     if (!pMatch) return;
     setSelectedProvinceCode(pMatch.code);
-    const distRes = await fetch(`https://provinces.open-api.vn/api/p/${pMatch.code}?depth=2`);
+    const distRes = await apiFetch(`https://provinces.open-api.vn/api/p/${pMatch.code}?depth=2`);
     if (!distRes.ok) return;
     const distData = await distRes.json();
     setDistricts(distData.districts || []);
     const dMatch = distData.districts?.find(d => d.name.toLowerCase().includes(districtName.toLowerCase()) || districtName.toLowerCase().includes(d.name.toLowerCase()));
     if (!dMatch) return;
     setSelectedDistrictCode(dMatch.code);
-    const wardRes = await fetch(`https://provinces.open-api.vn/api/d/${dMatch.code}?depth=2`);
+    const wardRes = await apiFetch(`https://provinces.open-api.vn/api/d/${dMatch.code}?depth=2`);
     if (!wardRes.ok) return;
     const wardData = await wardRes.json();
     setWards(wardData.wards || []);
@@ -213,7 +214,7 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
     const updateCoordinates = async (newLat, newLng) => {
       setListing(prev => ({ ...prev, latitude: newLat, longitude: newLng }));
       try {
-        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${newLat}&lon=${newLng}&format=json&accept-language=vi`);
+        const res = await apiFetch(`https://nominatim.openstreetmap.org/reverse?lat=${newLat}&lon=${newLng}&format=json&accept-language=vi`);
         if (res.ok) {
           const data = await res.json();
           const addr = data.address || {};
@@ -244,7 +245,7 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
         setListing(prev => ({ ...prev, latitude: lat, longitude: lon }));
         if (mapRef.current && markerRef.current) { mapRef.current.setView([lat, lon], 15); markerRef.current.setLatLng([lat, lon]); }
         try {
-          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=vi`);
+          const res = await apiFetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=vi`);
           if (res.ok) {
             const data = await res.json();
             const addr = data.address || {};
@@ -267,7 +268,7 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
     if (!listing.address_detail || !listing.ward) { alert('Vui lòng chọn Tỉnh, Quận, Phường và nhập số nhà/tên đường trước khi tìm.'); return; }
     const searchVal = `${listing.address_detail}, ${listing.ward}, ${listing.district}, ${listing.city}`;
     try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchVal)}&format=json&limit=1`);
+      const res = await apiFetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchVal)}&format=json&limit=1`);
       if (res.ok) {
         const data = await res.json();
         if (data.length > 0) {
@@ -337,7 +338,6 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
     setShowWarningsModal(false);
     try {
       const payload = {
-        owner_id: currentUser.id,
         title: listing.title,
         description: listing.description,
         price: parseFloat(listing.price) || 0,
@@ -367,7 +367,7 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
         : `${API_BASE_URL}/api/properties`;
       const method = mode === 'edit' ? 'PUT' : 'POST';
 
-      const response = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const response = await apiFetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
 
       if (response.ok) {
         const { property: savedProperty } = await response.json();
@@ -405,7 +405,6 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
     setWarnings([]);
     try {
       const payload = {
-        owner_id: currentUser.id,
         title: listing.title,
         description: listing.description,
         price: parseFloat(listing.price) || 0,
@@ -434,7 +433,7 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
         ? `${API_BASE_URL}/api/properties/check-before-save?excludeId=${editingPropertyId}`
         : `${API_BASE_URL}/api/properties/check-before-save`;
 
-      const checkRes = await fetch(checkUrl, {
+      const checkRes = await apiFetch(checkUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

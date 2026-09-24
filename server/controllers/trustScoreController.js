@@ -2,11 +2,7 @@ const trustScoreService = require('../services/trustScoreService');
 
 const checkProfileCompleted = async (req, res) => {
   try {
-    const { userId } = req.body;
-
-    if (!userId) {
-      return res.status(400).json({ error: 'Missing userId' });
-    }
+    const userId = req.user.id;
 
     const result = await trustScoreService.applyProfileCompletenessBonus(userId);
     res.status(200).json(result);
@@ -17,11 +13,7 @@ const checkProfileCompleted = async (req, res) => {
 
 const checkThirtyDaysClean = async (req, res) => {
   try {
-    const { userId } = req.body;
-
-    if (!userId) {
-      return res.status(400).json({ error: 'Missing userId' });
-    }
+    const userId = req.user.id;
 
     const result = await trustScoreService.applyThirtyDaysNoViolationBonus(userId);
     res.status(200).json(result);

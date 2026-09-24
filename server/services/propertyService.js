@@ -289,8 +289,23 @@ const getPropertyById = async (id) => {
   return data;
 };
 
-const updateProperty = async (id, propertyData) => {
-  const { features, images, lifestyle_tags, ...fields } = propertyData;
+const updateProperty = async (id, actorId, propertyData) => {
+  const { features, images, lifestyle_tags } = propertyData;
+  const editableFields = [
+    'title', 'description', 'price', 'area', 'bedrooms', 'bathrooms', 'property_type',
+    'status', 'city', 'district', 'ward', 'floor_range', 'address', 'address_detail',
+    'thumbnail', 'virtual_tour_url', 'contact_phone', 'latitude', 'longitude'
+  ];
+  const fields = Object.fromEntries(
+    editableFields.filter((field) => Object.hasOwn(propertyData, field))
+      .map((field) => [field, propertyData[field]])
+  );
+  if (Object.hasOwn(fields, 'price')) fields.price = parseFloat(fields.price) || 0;
+  if (Object.hasOwn(fields, 'area')) fields.area = parseFloat(fields.area) || 0;
+  if (Object.hasOwn(fields, 'bedrooms')) fields.bedrooms = parseInt(fields.bedrooms, 10) || 0;
+  if (Object.hasOwn(fields, 'bathrooms')) fields.bathrooms = parseInt(fields.bathrooms, 10) || 0;
+  if (Object.hasOwn(fields, 'latitude')) fields.latitude = parseFloat(fields.latitude) || null;
+  if (Object.hasOwn(fields, 'longitude')) fields.longitude = parseFloat(fields.longitude) || null;
 
   // 1. Get the current property to check existing ownership
   const { data: existingProp, error: getPropError } = await supabase
@@ -300,38 +315,37 @@ const updateProperty = async (id, propertyData) => {
     .single();
 
   if (getPropError || !existingProp) {
-    throw new Error('Không tìm thấy tin đăng.');
+    const error = new Error('Không tìm thấy tin đăng.');
+    error.statusCode = 404;
+    throw error;
   }
 
-  if (existingProp.owner_id !== Number(fields.owner_id)) {
-    throw new Error('Bạn không có quyền chỉnh sửa tin đăng của người khác.');
+  if (existingProp.owner_id !== Number(actorId)) {
+    const error = new Error('Bạn không có quyền chỉnh sửa tin đăng của người khác.');
+    error.statusCode = 403;
+    throw error;
   }
 
   // 2. Verify role of the updater is AGENT
   const { data: ownerUser, error: ownerError } = await supabase
     .from('users')
     .select('role')
-    .eq('id', fields.owner_id)
+    .eq('id', actorId)
     .single();
 
   if (ownerError || !ownerUser || ownerUser.role !== 'AGENT') {
     throw new Error('Chỉ tài khoản có vai trò Môi giới (AGENT) mới có quyền chỉnh sửa tin đăng.');
   }
 
+  if (Object.hasOwn(fields, 'thumbnail')) {
+    fields.thumbnail = await saveBase64Image(fields.thumbnail);
+  }
+
   const { data: property, error: propertyError } = await supabase
     .from('properties')
-    .update({
-      ...fields,
-      price: parseFloat(fields.price) || 0,
-      area: parseFloat(fields.area) || 0,
-      bedrooms: parseInt(fields.bedrooms) || 0,
-      bathrooms: parseInt(fields.bathrooms) || 0,
-      status: fields.status || 'AVAILABLE',
-      thumbnail: await saveBase64Image(fields.thumbnail),
-      latitude: parseFloat(fields.latitude) || null,
-      longitude: parseFloat(fields.longitude) || null
-    })
+    .update(fields)
     .eq('id', id)
+    .eq('owner_id', actorId)
     .select()
     .single();
 
@@ -340,17 +354,23 @@ const updateProperty = async (id, propertyData) => {
     throw new Error(propertyError.message);
   }
 
-  await syncRelatedRows('property_features', 'property_id', id,
-    features?.map(name => ({ property_id: id, feature_name: name })));
+  if (features !== undefined) {
+    await syncRelatedRows('property_features', 'property_id', id,
+      features.map(name => ({ property_id: id, feature_name: name })));
+  }
 
-  const savedImages = images ? await Promise.all(images.map(async (url) => ({
-    property_id: id,
-    image_url: await saveBase64Image(url)
-  }))) : [];
-  await syncRelatedRows('property_images', 'property_id', id, savedImages);
+  if (images !== undefined) {
+    const savedImages = await Promise.all(images.map(async (url) => ({
+      property_id: id,
+      image_url: await saveBase64Image(url)
+    })));
+    await syncRelatedRows('property_images', 'property_id', id, savedImages);
+  }
 
-  await syncRelatedRows('lifestyle_tags', 'property_id', id,
-    lifestyle_tags?.map(tag => ({ property_id: id, tag_name: tag })));
+  if (lifestyle_tags !== undefined) {
+    await syncRelatedRows('lifestyle_tags', 'property_id', id,
+      lifestyle_tags.map(tag => ({ property_id: id, tag_name: tag })));
+  }
 
   // Recalculate similarity and link on update
   try {
@@ -369,7 +389,7 @@ const updateProperty = async (id, propertyData) => {
   return property;
 };
 
-const deleteProperty = async (id, userId) => {
+const deleteProperty = async (id, actorId) => {
   // 1. Verify ownership and get old images
   const { data: existingProp, error: getPropError } = await supabase
     .from('properties')
@@ -378,11 +398,15 @@ const deleteProperty = async (id, userId) => {
     .single();
 
   if (getPropError || !existingProp) {
-    throw new Error('Không tìm thấy tin đăng.');
+    const error = new Error('Không tìm thấy tin đăng.');
+    error.statusCode = 404;
+    throw error;
   }
 
-  if (existingProp.owner_id !== Number(userId)) {
-    throw new Error('Bạn không có quyền xoá tin đăng của người khác.');
+  if (existingProp.owner_id !== Number(actorId)) {
+    const error = new Error('Bạn không có quyền xoá tin đăng của người khác.');
+    error.statusCode = 403;
+    throw error;
   }
 
   // Collect all unique image URLs to delete

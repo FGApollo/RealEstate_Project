@@ -2,7 +2,8 @@ const phoneOtpService = require('../services/phoneOtpService');
 
 const sendOtp = async (req, res) => {
   try {
-    const { userId, phone } = req.body;
+    const { phone } = req.body;
+    const userId = req.user.id;
 
     if (!userId || !phone) {
       return res.status(400).json({ error: 'Missing userId or phone' });
@@ -17,7 +18,8 @@ const sendOtp = async (req, res) => {
 
 const verifyOtp = async (req, res) => {
   try {
-    const { userId, phone, otp } = req.body;
+    const { phone, otp } = req.body;
+    const userId = req.user.id;
 
     if (!userId || !phone || !otp) {
       return res.status(400).json({ error: 'Missing userId, phone or otp' });

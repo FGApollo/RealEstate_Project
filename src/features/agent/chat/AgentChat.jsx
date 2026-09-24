@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MessageSquare, Send, Phone, Shield, User, Sparkles, MessageCircle } from 'lucide-react';
 import { API_BASE_URL } from '../../../config';
+import { apiFetch } from '../../../auth/apiClient';
 import './AgentChat.css';
 
 const FUNNEL_STAGES = [
@@ -35,7 +36,7 @@ const AgentChat = ({ currentUser }) => {
     setShowPropertySelector(true);
     setIsLoadingProperties(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/properties`);
+      const res = await apiFetch(`${API_BASE_URL}/api/properties`);
       if (res.ok) {
         const data = await res.json();
         const filtered = (data.properties || []).filter(
@@ -52,11 +53,10 @@ const AgentChat = ({ currentUser }) => {
 
   const sendPropertyCard = async (property) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/chat/messages`, {
+      const res = await apiFetch(`${API_BASE_URL}/api/chat/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          senderId: currentUser.id,
           receiverId: activeConversation.partner.id,
           propertyId: property.id,
           message: `[Bất động sản] ${property.title}`
@@ -78,7 +78,7 @@ const AgentChat = ({ currentUser }) => {
   const fetchConversations = async () => {
     if (!currentUser) return;
     try {
-      const res = await fetch(`${API_BASE_URL}/api/chat/conversations?userId=${currentUser.id}`);
+      const res = await apiFetch(`${API_BASE_URL}/api/chat/conversations`);
       if (res.ok) {
         const data = await res.json();
         setConversations(data.conversations || []);
@@ -108,7 +108,7 @@ const AgentChat = ({ currentUser }) => {
 
     const fetchMessages = async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/chat/messages?userId=${currentUser.id}&otherId=${activeConversation.partner.id}`);
+        const res = await apiFetch(`${API_BASE_URL}/api/chat/messages?otherId=${activeConversation.partner.id}`);
         if (res.ok) {
           const data = await res.json();
           setMessages(data.messages || []);
@@ -134,11 +134,10 @@ const AgentChat = ({ currentUser }) => {
     setNewMessage('');
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/chat/messages`, {
+      const res = await apiFetch(`${API_BASE_URL}/api/chat/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          senderId: currentUser.id,
           receiverId: activeConversation.partner.id,
           message: msgText
         })
@@ -158,11 +157,10 @@ const AgentChat = ({ currentUser }) => {
   const handleStageChange = async (stageKey) => {
     if (!currentUser || !activeConversation) return;
     try {
-      const res = await fetch(`${API_BASE_URL}/api/chat/funnel`, {
+      const res = await apiFetch(`${API_BASE_URL}/api/chat/funnel`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          agentId: currentUser.id,
           userId: activeConversation.partner.id,
           stage: stageKey
         })

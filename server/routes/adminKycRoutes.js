@@ -1,6 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const adminKycController = require('../controllers/adminKycController');
+const { authenticate, requireRole } = require('../middleware/authenticate');
+
+router.use(authenticate, requireRole('ADMIN'));
 
 router.get('/rejected', adminKycController.getRejectedVerifications);
 router.get('/:verificationId', adminKycController.getVerificationDetail);

@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { User, Lock, EyeOff, Eye, Mail, Phone } from 'lucide-react';
 import AuthLayout from '../components/AuthLayout';
+import GoogleAuthButton from '../components/GoogleAuthButton';
 import Input from '../components/ui/Input';
 import Button from '../components/ui/Button';
 import { API_BASE_URL } from '../config';
@@ -32,7 +33,7 @@ const RegisterAgent = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...formData,
-          role: 'AGENT'
+          intent: 'AGENT_SIGNUP'
         })
       });
 
@@ -111,6 +112,12 @@ const RegisterAgent = () => {
           </Button>
         </div>
       </form>
+
+      <div className="divider">HOẶC ĐĂNG KÝ VỚI</div>
+      <p style={{ textAlign: 'center', fontSize: '0.85rem' }}>
+        Đăng ký bằng Google chỉ cần nhập số điện thoại; tên và email lấy từ tài khoản Google đã xác minh.
+      </p>
+      <GoogleAuthButton intent="AGENT_SIGNUP" phone={formData.phone} onError={setError} />
 
       <div className="auth-footer">
         <div>Đã có tài khoản Môi giới? <Link to="/login/agent">Đăng nhập</Link></div>

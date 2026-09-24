@@ -2,11 +2,7 @@ const agentService = require('../services/agentService');
 const { supabase } = require('../config/supabase');
 
 const getOverview = async (req, res) => {
-  const { userId } = req.query;
-
-  if (!userId) {
-    return res.status(400).json({ error: 'Missing userId parameter' });
-  }
+  const userId = req.user.id;
 
   try {
     const overview = await agentService.getOverview(userId);
@@ -18,11 +14,7 @@ const getOverview = async (req, res) => {
  };
 
 const getAgentReviews = async (req, res) => {
-  const { userId } = req.query;
-
-  if (!userId) {
-    return res.status(400).json({ error: 'Missing userId parameter' });
-  }
+  const userId = req.user.id;
 
   try {
     const reviews = await agentService.getAgentReviews(userId);

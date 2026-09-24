@@ -7,6 +7,8 @@ import {
   Check, ArrowRight, Grid, Info, Sun, Smile, Camera, ArrowLeft, CheckCircle2
 } from 'lucide-react';
 import { API_BASE_URL } from '../../../config';
+import { apiFetch } from '../../../auth/apiClient';
+import { useAuth } from '../../../auth/useAuth';
 import PropertyDetailModal from '../../../components/PropertyDetailModal';
 import DeleteConfirmModal from '../overview/DeleteConfirmModal';
 import './AgentProfile.css';
@@ -65,6 +67,7 @@ const AgentProfile = ({
   initialTab = 'kyc',
   hideHeader = false
 }) => {
+  const { updateUser } = useAuth();
   const [selectedProfileTab, setSelectedProfileTab] = useState(initialTab);
 
   useEffect(() => {
@@ -147,7 +150,7 @@ const AgentProfile = ({
   useEffect(() => {
     const fetchFunnelStats = async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/chat/funnel/stats?agentId=${currentUser.id}`);
+        const res = await apiFetch(`${API_BASE_URL}/api/chat/funnel/stats`);
         if (res.ok) {
           const result = await res.json();
           setFunnelStats(result.stats || { AWARENESS: 0, CONSIDERATION: 0, INTENT: 0, ACTION: 0 });
@@ -164,7 +167,7 @@ const AgentProfile = ({
       const fetchReviews = async () => {
         setLoadingReviews(true);
         try {
-          const res = await fetch(`${API_BASE_URL}/api/agent/reviews?userId=${currentUser.id}`);
+          const res = await apiFetch(`${API_BASE_URL}/api/agent/reviews`);
           if (res.ok) {
             const data = await res.json();
             setReviews(data || []);
@@ -190,7 +193,7 @@ const AgentProfile = ({
     const fetchKycStatus = async () => {
       setLoadingKyc(true);
       try {
-        const res = await fetch(`${API_BASE_URL}/api/kyc/status?userId=${currentUser.id}`);
+        const res = await apiFetch(`${API_BASE_URL}/api/kyc/status`);
         if (res.ok) {
           const data = await res.json();
           setKycStatus(data);
@@ -329,11 +332,10 @@ const AgentProfile = ({
     setOtpSuccessMsg('');
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/phone/send-otp`, {
+      const res = await apiFetch(`${API_BASE_URL}/api/phone/send-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: currentUser.id,
           phone: cleanPhone
         })
       });
@@ -379,11 +381,10 @@ const AgentProfile = ({
     setKycError('');
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/phone/verify-otp`, {
+      const res = await apiFetch(`${API_BASE_URL}/api/phone/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: currentUser.id,
           phone: cleanPhone,
           otp: kycOtp.trim()
         })
@@ -395,14 +396,7 @@ const AgentProfile = ({
       }
 
       setPhoneVerified(true);
-      try {
-        const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
-        storedUser.phone = cleanPhone;
-        storedUser.phone_verified = true;
-        localStorage.setItem('user', JSON.stringify(storedUser));
-      } catch (err) {
-        // ignore
-      }
+      updateUser({ phone: cleanPhone, phone_verified: true });
 
       setKycWizardStep(2);
     } catch (err) {
@@ -424,13 +418,12 @@ const AgentProfile = ({
 
     try {
       const formData = new FormData();
-      formData.append('userId', currentUser.id);
       formData.append('fullName', kycFullName);
       formData.append('phone', kycPhone);
       formData.append('frontImage', kycFrontFile);
       formData.append('backImage', kycBackFile);
 
-      const res = await fetch(`${API_BASE_URL}/api/kyc/upload-card`, {
+      const res = await apiFetch(`${API_BASE_URL}/api/kyc/upload-card`, {
         method: 'POST',
         body: formData
       });
@@ -463,10 +456,9 @@ const AgentProfile = ({
 
     try {
       const formData = new FormData();
-      formData.append('userId', currentUser.id);
       formData.append('selfieImage', kycSelfieFile);
 
-      const res = await fetch(`${API_BASE_URL}/api/kyc/upload-selfie`, {
+      const res = await apiFetch(`${API_BASE_URL}/api/kyc/upload-selfie`, {
         method: 'POST',
         body: formData
       });
@@ -478,20 +470,7 @@ const AgentProfile = ({
 
       setKycWizardStep(4);
       setKycStatus(prev => ({ ...prev, verificationStatus: 'VERIFIED' }));
-      
-      if (typeof window !== 'undefined') {
-        try {
-          const mainUser = JSON.parse(localStorage.getItem('user') || '{}');
-          mainUser.verification_status = 'VERIFIED';
-          localStorage.setItem('user', JSON.stringify(mainUser));
-
-          const localUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-          localUser.verification_status = 'VERIFIED';
-          localStorage.setItem('currentUser', JSON.stringify(localUser));
-        } catch (e) {
-          console.error('Error saving verification status:', e);
-        }
-      }
+      updateUser({ verification_status: 'VERIFIED' });
     } catch (err) {
       console.error(err);
       setKycError(err.message);
