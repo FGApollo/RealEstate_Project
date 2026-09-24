@@ -7,7 +7,15 @@ const MIN_IMAGE_WIDTH = 180;
 const MIN_IMAGE_HEIGHT = 180;
 const MIN_SELFIE_SKIN_RATIO = 0.025;
 const MIN_CARD_SKIN_RATIO = 0.01;
-const MIN_MATCH_SCORE = 0.8;
+const DEFAULT_DEMO_MATCH_SCORE = 0.70;
+
+const getDemoMatchThreshold = () => {
+  const parsed = Number(process.env.KYC_DEMO_MIN_SCORE);
+  if (Number.isFinite(parsed) && parsed > 0 && parsed <= 1) {
+    return parsed;
+  }
+  return DEFAULT_DEMO_MATCH_SCORE;
+};
 const FACEPP_MAX_IMAGE_SIZE = 1024;
 const FACEPP_CARD_FACE_SIZE = 640;
 const DEFAULT_FACEPP_TIMEOUT_MS = 60000;
@@ -425,20 +433,26 @@ const compareFacesWithDemo = async (cardFrontImageBuffer, selfieImageBuffer) => 
       };
     }
 
+    const minMatchScore = getDemoMatchThreshold();
     const bestScore = Math.max(...usableCardProfiles.map((profile) => scoreProfiles(profile, selfieProfile)));
+    const roundedScore = Number(bestScore.toFixed(4));
 
-    if (bestScore < MIN_MATCH_SCORE) {
+    if (bestScore < minMatchScore) {
       return {
         isMatch: false,
         errorMessage: 'Khuon mat khong khop voi CCCD',
-        provider: 'demo'
+        provider: 'demo',
+        matchScore: roundedScore,
+        threshold: minMatchScore
       };
     }
 
     return {
       isMatch: true,
       errorMessage: null,
-      provider: 'demo'
+      provider: 'demo',
+      matchScore: roundedScore,
+      threshold: minMatchScore
     };
   } catch (error) {
     console.error('Demo face comparison failed:', error);

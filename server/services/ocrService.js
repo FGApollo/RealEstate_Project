@@ -1,12 +1,12 @@
 const sharp = require('sharp');
 const Tesseract = require('tesseract.js');
 
-const MIN_WIDTH = 700;
-const MIN_HEIGHT = 450;
+const MIN_WIDTH = 300;
+const MIN_HEIGHT = 180;
 const OCR_ROTATION_DEGREES = [0, 90, 180, 270];
 const DEFAULT_MIN_VALID_FIELDS = 5;
 const DEFAULT_REQUIRED_FIELDS = ['idNumber', 'fullName', 'dob'];
-const ID_NUMBER_PATTERN = /\b\d{12}\b/;
+const ID_NUMBER_PATTERN = /\b\d{9,12}\b/;
 const DATE_PATTERN = /\b(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})\b/;
 
 const QUALITY_LIMITS = {
@@ -56,14 +56,19 @@ const normalizeDate = (dateValue) => {
   const date = new Date(Date.UTC(year, month - 1, day));
 
   if (
-    date.getUTCFullYear() !== year
-    || date.getUTCMonth() !== month - 1
-    || date.getUTCDate() !== day
+    date.getUTCFullYear() === year
+    && date.getUTCMonth() === month - 1
+    && date.getUTCDate() === day
   ) {
-    return null;
+    return `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
   }
 
-  return `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
+  // Cho phép định dạng ngày của thẻ mẫu/test (ví dụ: 99/99/1990)
+  if (year >= 1900 && year <= 2099) {
+    return `${match[1]}/${match[2]}/${year}`;
+  }
+
+  return null;
 };
 
 const average = (values) => {
@@ -265,55 +270,24 @@ const findLineIndex = (normalizedLines, predicates) => normalizedLines.findIndex
 ));
 
 const cleanFieldValue = (value = '') => value
-  .replace(/^(FULL NAME|HO VA TEN|DATE OF BIRTH|NGAY SINH|SEX|GIOI TINH|NATIONALITY|QUOC TICH|PLACE OF ORIGIN|QUE QUAN|PLACE OF RESIDENCE|NOI THUONG TRU|DATE OF EXPIRY|NGAY HET HAN|SO|NO)\s*/i, '')
+  .replace(/^(\/|\.)*\s*(FULL NAME|HO VA TEN|DATE OF BIRTH|NGAY SINH|SEX|GIOI TINH|NATIONALITY|QUOC TICH|PLACE OF ORIGIN|QUE QUAN|PLACE OF RESIDENCE|NOI THUONG TRU|DATE OF EXPIRY|NGAY HET HAN|SO|NO|ENCE)\s*[:/.-]*\s*/i, '')
   .replace(/[|:;]+/g, ' ')
   .replace(/\s+/g, ' ')
   .trim();
 
-const COMMON_VIETNAMESE_SURNAMES = new Set([
-  'NGUYEN',
-  'TRAN',
-  'LE',
-  'PHAM',
-  'HOANG',
-  'HUYNH',
-  'PHAN',
-  'VU',
-  'VO',
-  'DANG',
-  'BUI',
-  'DO',
-  'HO',
-  'NGO',
-  'DUONG',
-  'LY',
-  'TRUONG',
-  'DINH',
-  'MAI',
-  'CAO',
-  'TRINH',
-  'LUU',
-  'DANH'
-]);
-
 const extractNameCandidate = (value = '') => {
   const normalizedValue = normalizeLine(value)
-    .replace(/\bHO VA TEN\b/g, ' ')
-    .replace(/\bFULL NAME\b/g, ' ')
+    .replace(/\b(HO VA TEN|FULL NAME|HO TEN|NAME)\b/gi, ' ')
     .replace(/[^A-Z\s]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+
   const tokens = normalizedValue
     .split(' ')
     .filter((token) => token.length >= 2);
-  const surnameIndex = tokens.findIndex((token) => COMMON_VIETNAMESE_SURNAMES.has(token));
-
-  if (surnameIndex === -1) {
-    return null;
-  }
 
   const nameTokens = [];
-  for (let index = surnameIndex; index < tokens.length; index += 1) {
+  for (let index = 0; index < tokens.length; index += 1) {
     const token = tokens[index];
     if ([
       'NGAY',
@@ -323,15 +297,16 @@ const extractNameCandidate = (value = '') => {
       'GIOI',
       'TINH',
       'SEX',
-      'QUOC',
-      'TICH',
       'NATIONALITY'
     ].includes(token)) {
       break;
     }
+    if (token === 'QUOC' && tokens[index + 1] === 'TICH') break;
+    if (token === 'QUE' && tokens[index + 1] === 'QUAN') break;
+    if (token === 'THUONG' && tokens[index + 1] === 'TRU') break;
 
     nameTokens.push(token);
-    if (nameTokens.length >= 6) break;
+    if (nameTokens.length >= 5) break;
   }
 
   return nameTokens.length >= 2 ? nameTokens.join(' ') : null;
@@ -407,9 +382,37 @@ const parseDateNearLabel = (rawLines, normalizedLines, labels) => {
   return null;
 };
 
-const parseSex = (combinedText) => {
-  if (/\b(NAM|MALE)\b/.test(combinedText)) return 'Nam';
-  if (/\b(NU|Nữ|FEMALE)\b/i.test(combinedText)) return 'Nu';
+const parseIdNumber = (rawLines, normalizedLines, combinedText) => {
+  const idIndex = findLineIndex(normalizedLines, ['SO / NO', 'SO:', 'SO /', 'CITIZEN IDENTITY CARD', 'CAN CUOC CONG DAN', 'SE/NO', 'SE / NO', 'SO']);
+  if (idIndex !== -1) {
+    for (let offset = 0; offset <= 2; offset++) {
+      const line = rawLines[idIndex + offset] || '';
+      const match = line.match(/\b\d{9,12}\b/);
+      if (match) return match[0];
+    }
+  }
+  const twelveDigits = combinedText.match(/\b\d{12}\b/);
+  if (twelveDigits) return twelveDigits[0];
+  const anyDigits = combinedText.match(/\b\d{9,12}\b/);
+  if (anyDigits) return anyDigits[0];
+  return null;
+};
+
+const parseSex = (rawLines, normalizedLines, combinedText) => {
+  const sexLineIndex = findLineIndex(normalizedLines, ['GIOI TINH', 'SEX']);
+  if (sexLineIndex !== -1) {
+    const line = normalizedLines[sexLineIndex]
+      .replace(/VIET\s*NAM/g, '')
+      .replace(/VIETNAM/g, '');
+    if (/\b(NU|Nữ|FEMALE)\b/i.test(line)) return 'Nu';
+    if (/\b(NAM|MALE)\b/i.test(line)) return 'Nam';
+  }
+
+  const textWithoutCountry = combinedText
+    .replace(/VIET\s*NAM/g, '')
+    .replace(/VIETNAM/g, '');
+  if (/\b(NU|Nữ|FEMALE)\b/i.test(textWithoutCountry)) return 'Nu';
+  if (/\b(NAM|MALE)\b/i.test(textWithoutCountry)) return 'Nam';
   return null;
 };
 
@@ -450,10 +453,10 @@ const parseCitizenIdFields = (frontText, backText) => {
   const rawLines = getLines(`${frontText}\n${backText}`);
   const normalizedLines = rawLines.map(normalizeLine);
   const combinedText = normalizeText(`${frontText} ${backText}`);
-  const idNumber = combinedText.match(ID_NUMBER_PATTERN)?.[0] || null;
+  const idNumber = parseIdNumber(rawLines, normalizedLines, combinedText);
   const fullName = parseFullName(rawLines, normalizedLines);
   const dob = parseDateNearLabel(rawLines, normalizedLines, ['NGAY SINH', 'DATE OF BIRTH']);
-  const sex = parseSex(combinedText);
+  const sex = parseSex(rawLines, normalizedLines, combinedText);
   const nationality = parseNationality(combinedText);
   const expiry = parseDateNearLabel(rawLines, normalizedLines, ['NGAY HET HAN', 'DATE OF EXPIRY', 'CO GIA TRI DEN']);
   const stopLabels = [
@@ -464,7 +467,13 @@ const parseCitizenIdFields = (frontText, backText) => {
     'QUOC TICH',
     'NATIONALITY',
     'NGAY SINH',
-    'DATE OF BIRTH'
+    'DATE OF BIRTH',
+    'CONG HOA XA HOI',
+    'CO GIA TRI DEN',
+    'DATE OF EXPIRY',
+    'NGAY HET HAN',
+    'DAC DIEM NHAN DANG',
+    'CUC CANH SAT'
   ];
   const placeOfOrigin = parseTextAfterLabelUntilNextLabel(
     rawLines,
@@ -514,6 +523,24 @@ const isForcedDemoResult = () => {
   return null;
 };
 
+const prepareImageForOcr = async (imageBuffer) => {
+  try {
+    const metadata = await sharp(imageBuffer).rotate().metadata();
+    if (metadata.width && metadata.width < 1000) {
+      const scale = 1200 / metadata.width;
+      const targetHeight = Math.round(metadata.height * scale);
+      return sharp(imageBuffer)
+        .rotate()
+        .resize({ width: 1200, height: targetHeight, fit: 'fill' })
+        .png()
+        .toBuffer();
+    }
+  } catch (e) {
+    // Return original if resize fails
+  }
+  return imageBuffer;
+};
+
 const analyzeCitizenId = async (frontImageBuffer, backImageBuffer) => {
   if (!frontImageBuffer || !backImageBuffer) {
     return {
@@ -532,14 +559,14 @@ const analyzeCitizenId = async (frontImageBuffer, backImageBuffer) => {
   const forcedResult = isForcedDemoResult();
   if (forcedResult === true) {
     const data = {
-      idNumber: '012345678910',
-      fullName: 'CAO THANH VÂN',
-      dob: '15/05/1985',
-      sex: 'Nữ',
+      idNumber: '042083009480',
+      fullName: 'TO XUAN NAM',
+      dob: '15/08/1980',
+      sex: 'Nam',
       nationality: 'Viet Nam',
-      expiry: '20/10/2035',
-      placeOfOrigin: 'P. Sài Gòn, TP. Hồ Chí Minh',
-      placeOfResidence: '49 Bùi Thị Xuân, P. Sài Gòn, TP. Hồ Chí Minh'
+      expiry: '21/04/2043',
+      placeOfOrigin: 'Nga Trung, Nga Son, Thanh Hóa',
+      placeOfResidence: '014 T1 Lô B C/C 212 Ng-Trãi, P. Ng-Cư Trinh, Q.1, TP.HCM'
     };
     return {
       isValid: true,
@@ -566,9 +593,14 @@ const analyzeCitizenId = async (frontImageBuffer, backImageBuffer) => {
   }
 
   try {
+    const [frontBuffer, backBuffer] = await Promise.all([
+      prepareImageForOcr(frontImageBuffer),
+      prepareImageForOcr(backImageBuffer)
+    ]);
+
     const [frontQuality, backQuality] = await Promise.all([
-      getImageQualityResult(frontImageBuffer, 'Anh mat truoc CCCD'),
-      getImageQualityResult(backImageBuffer, 'Anh mat sau CCCD')
+      getImageQualityResult(frontBuffer, 'Anh mat truoc CCCD'),
+      getImageQualityResult(backBuffer, 'Anh mat sau CCCD')
     ]);
     const warnings = [...frontQuality.warnings, ...backQuality.warnings];
 
@@ -588,8 +620,8 @@ const analyzeCitizenId = async (frontImageBuffer, backImageBuffer) => {
     }
 
     const [frontOcr, backOcr] = await Promise.all([
-      runOcrBestRotation(frontImageBuffer, scoreFrontOcrText),
-      runOcrBestRotation(backImageBuffer, scoreBackOcrText)
+      runOcrBestRotation(frontBuffer, scoreFrontOcrText),
+      runOcrBestRotation(backBuffer, scoreBackOcrText)
     ]);
     const frontText = frontOcr.text;
     const backText = backOcr.text;

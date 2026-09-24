@@ -469,8 +469,8 @@ const AdminPage = () => {
                         <span className="admin-info-value">{kycDetail.user?.name || kycDetail.full_name || 'Chưa cập nhật'}</span>
                       </div>
                       <div className="admin-info-item">
-                        <span className="admin-info-label">ID Number / Hồ sơ ID</span>
-                        <span className="admin-info-value">#{kycDetail.id}</span>
+                        <span className="admin-info-label">Số CCCD / ID Hồ sơ</span>
+                        <span className="admin-info-value">{kycDetail.id_number || kycDetail.ocr_data?.idNumber || `#${kycDetail.id}`}</span>
                       </div>
                       <div className="admin-info-item">
                         <span className="admin-info-label">Email</span>
@@ -490,7 +490,7 @@ const AdminPage = () => {
                       </div>
                     </div>
 
-                    {kycDetail.reject_reason && (
+                    {kycDetail.reject_reason && !kycDetail.reject_reason.startsWith('{') && (
                       <div className="admin-reject-alert">
                         <div className="admin-reject-icon">
                           <AlertTriangle size={24} />

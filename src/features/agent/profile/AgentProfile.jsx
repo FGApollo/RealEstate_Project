@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
-import { 
-  MapPin, Bed, Bath, Maximize, Shield, ShieldCheck, ShieldAlert, 
-  Mail, Phone, Plus, SlidersHorizontal, X, Edit3, Trash2, 
+import {
+  MapPin, Bed, Bath, Maximize, Shield, ShieldCheck, ShieldAlert,
+  Mail, Phone, Plus, SlidersHorizontal, X, Edit3, Trash2,
   ExternalLink, MessageSquare, Star, Award, Compass, Heart,
   FileText, Lock, TrendingUp, RefreshCw, ThumbsUp, CheckCircle, Upload, AlertCircle,
   Check, ArrowRight, Grid, Info, Sun, Smile, Camera, ArrowLeft, CheckCircle2
@@ -15,34 +15,34 @@ import './AgentProfile.css';
 
 const WARDS_BY_REGION = {
   'TP.HCM': [
-    'Phường mới', 'Phường Sài Gòn', 'Phường Tân Định', 'Phường Bến Thành', 'Phường Cầu Ông Lãnh', 
-    'Phường Bàn Cờ', 'Phường Xuân Hòa', 'Phường Nhiêu Lộc', 'Phường Xóm Chiếu', 'Phường Khánh Hội', 
-    'Phường Vĩnh Hội', 'Phường Chợ Quán', 'Phường An Đông', 'Phường Chợ Lớn', 'Phường Bình Tây', 
-    'Phường Bình Tiên', 'Phường Bình Phú', 'Phường Phú Lâm', 'Phường Tân Thuận', 'Phường Phú Thuận', 
-    'Phường Tân Mỹ', 'Phường Tân Hưng', 'Phường Chánh Hưng', 'Phường Phú Định', 'Phường Bình Đông', 
-    'Phường Diên Hồng', 'Phường Vườn Lài', 'Phường Hòa Hưng', 'Phường Minh Phụng', 'Phường Bình Thới', 
-    'Phường Hòa Bình', 'Phường Phú Thọ', 'Phường Đông Hưng Thuận', 'Phường Trung Mỹ Tây', 
-    'Phường Tân Thới Hiệp', 'Phường Thới An', 'Phường An Phú Đông', 'Phường An Lạc', 'Phường Bình Tân', 
-    'Phường Tân Tạo', 'Phường Bình Trị Đông', 'Phường Bình Hưng Hòa', 'Phường Gia Định', 
-    'Phường Bình Thạnh', 'Phường Bình Lợi Trung', 'Phường Thạnh Mỹ Tây', 'Phường Bình Quới', 
-    'Phường Hạnh Thông', 'Phường An Nhơn', 'Phường Gò Vấp', 'Phường An Hội Đông', 'Phường Thông Tây Hội', 
-    'Phường An Hội Tây', 'Phường Đức Nhuận', 'Phường Cầu Kiệu', 'Phường Phú Nhuận', 'Phường Tân Sơn Hòa', 
-    'Phường Tân Sơn Nhất', 'Phường Tân Hòa', 'Phường Bảy Hiền', 'Phường Tân Bình', 'Phường Tân Sơn', 
-    'Phường Tây Thạnh', 'Phường Tân Sơn Nhì', 'Phường Phú Thọ Hòa', 'Phường Tân Phú', 'Phường Phú Thạnh', 
-    'Phường Hiệp Bình', 'Phường Thủ Đức', 'Phường Tam Bình', 'Phường Linh Xuân', 'Phường Tăng Nhơn Phú', 
-    'Phường Long Bình', 'Phường Long Phước', 'Phường Long Trường', 'Phường Cát Lái', 'Phường Bình Trưng', 
+    'Phường mới', 'Phường Sài Gòn', 'Phường Tân Định', 'Phường Bến Thành', 'Phường Cầu Ông Lãnh',
+    'Phường Bàn Cờ', 'Phường Xuân Hòa', 'Phường Nhiêu Lộc', 'Phường Xóm Chiếu', 'Phường Khánh Hội',
+    'Phường Vĩnh Hội', 'Phường Chợ Quán', 'Phường An Đông', 'Phường Chợ Lớn', 'Phường Bình Tây',
+    'Phường Bình Tiên', 'Phường Bình Phú', 'Phường Phú Lâm', 'Phường Tân Thuận', 'Phường Phú Thuận',
+    'Phường Tân Mỹ', 'Phường Tân Hưng', 'Phường Chánh Hưng', 'Phường Phú Định', 'Phường Bình Đông',
+    'Phường Diên Hồng', 'Phường Vườn Lài', 'Phường Hòa Hưng', 'Phường Minh Phụng', 'Phường Bình Thới',
+    'Phường Hòa Bình', 'Phường Phú Thọ', 'Phường Đông Hưng Thuận', 'Phường Trung Mỹ Tây',
+    'Phường Tân Thới Hiệp', 'Phường Thới An', 'Phường An Phú Đông', 'Phường An Lạc', 'Phường Bình Tân',
+    'Phường Tân Tạo', 'Phường Bình Trị Đông', 'Phường Bình Hưng Hòa', 'Phường Gia Định',
+    'Phường Bình Thạnh', 'Phường Bình Lợi Trung', 'Phường Thạnh Mỹ Tây', 'Phường Bình Quới',
+    'Phường Hạnh Thông', 'Phường An Nhơn', 'Phường Gò Vấp', 'Phường An Hội Đông', 'Phường Thông Tây Hội',
+    'Phường An Hội Tây', 'Phường Đức Nhuận', 'Phường Cầu Kiệu', 'Phường Phú Nhuận', 'Phường Tân Sơn Hòa',
+    'Phường Tân Sơn Nhất', 'Phường Tân Hòa', 'Phường Bảy Hiền', 'Phường Tân Bình', 'Phường Tân Sơn',
+    'Phường Tây Thạnh', 'Phường Tân Sơn Nhì', 'Phường Phú Thọ Hòa', 'Phường Tân Phú', 'Phường Phú Thạnh',
+    'Phường Hiệp Bình', 'Phường Thủ Đức', 'Phường Tam Bình', 'Phường Linh Xuân', 'Phường Tăng Nhơn Phú',
+    'Phường Long Bình', 'Phường Long Phước', 'Phường Long Trường', 'Phường Cát Lái', 'Phường Bình Trưng',
     'Phường Phước Long', 'Phường An Khánh'
   ],
   'Bình Dương': [
-    'Phường Đông Hòa', 'Phường Dĩ An', 'Phường Tân Đông Hiệp', 'Phường An Phú', 'Phường Bình Hòa', 
-    'Phường Lái Thiêu', 'Phường Thuận An', 'Phường Thuận Giao', 'Phường Thủ Dầu Một', 'Phường Phú Lợi', 
-    'Phường Chánh Hiệp', 'Phường Bình Dương', 'Phường Hòa Lợi', 'Phường Phú An', 'Phường Tây Nam', 
-    'Phường Long Nguyên', 'Phường Bến Cát', 'Phường Chánh Phú Hòa', 'Phường Vĩnh Tân', 'Phường Bình Cơ', 
+    'Phường Đông Hòa', 'Phường Dĩ An', 'Phường Tân Đông Hiệp', 'Phường An Phú', 'Phường Bình Hòa',
+    'Phường Lái Thiêu', 'Phường Thuận An', 'Phường Thuận Giao', 'Phường Thủ Dầu Một', 'Phường Phú Lợi',
+    'Phường Chánh Hiệp', 'Phường Bình Dương', 'Phường Hòa Lợi', 'Phường Phú An', 'Phường Tây Nam',
+    'Phường Long Nguyên', 'Phường Bến Cát', 'Phường Chánh Phú Hòa', 'Phường Vĩnh Tân', 'Phường Bình Cơ',
     'Phường Tân Uyên', 'Phường Tân Hiệp', 'Phường Tân Khánh'
   ],
   'Bà Rịa - Vũng Tàu': [
-    'Phường Vũng Tàu', 'Phường Tam Thắng', 'Phường Rạch Dừa', 'Phường Phước Thắng', 'Phường Long Hương', 
-    'Phường Bà Rịa', 'Phường Tam Long', 'Phường Tân Hải', 'Phường Tân Phước', 'Phường Phú Mỹ', 
+    'Phường Vũng Tàu', 'Phường Tam Thắng', 'Phường Rạch Dừa', 'Phường Phước Thắng', 'Phường Long Hương',
+    'Phường Bà Rịa', 'Phường Tam Long', 'Phường Tân Hải', 'Phường Tân Phước', 'Phường Phú Mỹ',
     'Phường Tân Thành'
   ]
 };
@@ -58,11 +58,11 @@ const normalizeWard = (ward) => {
     .trim();
 };
 
-const AgentProfile = ({ 
-  currentUser, 
-  data, 
-  onEditProperty, 
-  onDeleteProperty, 
+const AgentProfile = ({
+  currentUser,
+  data,
+  onEditProperty,
+  onDeleteProperty,
   setActiveTab,
   initialTab = 'kyc',
   hideHeader = false
@@ -73,7 +73,7 @@ const AgentProfile = ({
   useEffect(() => {
     setSelectedProfileTab(initialTab);
   }, [initialTab]);
-  
+
   // Ward Filtering states (same as buyer page)
   const [selectedWards, setSelectedWards] = useState([]);
   const [tempSelectedWards, setTempSelectedWards] = useState([]);
@@ -171,7 +171,7 @@ const AgentProfile = ({
           if (res.ok) {
             const data = await res.json();
             setReviews(data || []);
-            
+
             // Initialize helpful counts
             const counts = {};
             data.forEach((r, idx) => {
@@ -214,7 +214,7 @@ const AgentProfile = ({
     const date = new Date(dateStr);
     const diffMs = now - date;
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    
+
     if (diffDays === 0) {
       const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
       if (diffHours === 0) {
@@ -496,13 +496,13 @@ const AgentProfile = ({
   // Filter reviews
   const filteredReviews = useMemo(() => {
     let result = [...reviews];
-    
+
     // Filter by Rating
     if (appliedReviewRatingFilter !== 'ALL') {
       const ratingVal = parseInt(appliedReviewRatingFilter);
       result = result.filter(r => r.rating === ratingVal);
     }
-    
+
     // Filter by Media
     if (appliedReviewMediaFilter !== 'ALL') {
       if (appliedReviewMediaFilter === 'MEDIA') {
@@ -511,7 +511,7 @@ const AgentProfile = ({
         result = result.filter(r => !r.images || r.images.length === 0);
       }
     }
-    
+
     return result;
   }, [reviews, appliedReviewRatingFilter, appliedReviewMediaFilter]);
 
@@ -526,8 +526,8 @@ const AgentProfile = ({
   const suggestedWards = useMemo(() => {
     if (!wardSearchQuery.trim()) return [];
     const query = wardSearchQuery.toLowerCase();
-    return ALL_WARDS.filter(ward => 
-      ward.toLowerCase().includes(query) && 
+    return ALL_WARDS.filter(ward =>
+      ward.toLowerCase().includes(query) &&
       !tempSelectedWards.some(selected => normalizeWard(selected) === normalizeWard(ward))
     ).slice(0, 5);
   }, [wardSearchQuery, tempSelectedWards]);
@@ -626,7 +626,7 @@ const AgentProfile = ({
     if (!price || price === 0) return 'Liên hệ';
     const billion = 1000000000;
     const million = 1000000;
-    
+
     if (price >= billion) {
       return `${(price / billion).toFixed(1).replace('.0', '')} tỷ`;
     }
@@ -649,9 +649,9 @@ const AgentProfile = ({
         <div className="agent-profile-header-card">
           <div className="avatar-section">
             <div className="profile-avatar-container">
-              <img 
-                src={currentUser.avatar || "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&h=400&fit=crop&q=80"} 
-                alt={currentUser.name} 
+              <img
+                src={currentUser.avatar || "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&h=400&fit=crop&q=80"}
+                alt={currentUser.name}
                 className="profile-avatar-img"
               />
               {currentUser.verification_status === 'VERIFIED' && (
@@ -660,13 +660,13 @@ const AgentProfile = ({
                 </div>
               )}
             </div>
-            
+
             <div className="agent-text-details">
               <div className="name-role-row">
                 <h2 className="agent-profile-name">{currentUser.name || 'Zân Cao'}</h2>
                 <span className="role-chip">Saler</span>
               </div>
-              
+
               <div className="location-row">
                 <MapPin size={16} color="#64748b" />
                 <span>Hồ Chí Minh City, VN</span>
@@ -722,13 +722,13 @@ const AgentProfile = ({
       {/* Hiding tabs since profile page now only shows identity verification (kyc) */}
       {false && !hideHeader && (
         <div className="profile-tabs-nav">
-          <button 
+          <button
             className={`profile-tab-btn ${selectedProfileTab === 'posts' ? 'active' : ''}`}
             onClick={() => setSelectedProfileTab('posts')}
           >
             Bài đã đăng
           </button>
-          <button 
+          <button
             className={`profile-tab-btn ${selectedProfileTab === 'kyc' ? 'active' : ''}`}
             onClick={() => setSelectedProfileTab('kyc')}
           >
@@ -739,7 +739,7 @@ const AgentProfile = ({
 
       {/* 3. TABS CONTENT */}
       <div className="profile-tab-content">
-        
+
         {/* TAB 1: BÀI ĐÃ ĐĂNG */}
         {selectedProfileTab === 'posts' && (
           <div className="posts-tab-container">
@@ -750,11 +750,11 @@ const AgentProfile = ({
                 <span className="filter-label">Khu vực</span>
                 <div className="ward-search-input-group">
                   <div className="ward-search-input-wrapper">
-                    <input 
-                      type="text" 
-                      placeholder="Tìm phường..." 
-                      value={wardSearchQuery} 
-                      onChange={(e) => setWardSearchQuery(e.target.value)} 
+                    <input
+                      type="text"
+                      placeholder="Tìm phường..."
+                      value={wardSearchQuery}
+                      onChange={(e) => setWardSearchQuery(e.target.value)}
                     />
                     {wardSearchQuery && (
                       <button className="clear-search-btn" onClick={() => setWardSearchQuery('')}>
@@ -830,7 +830,7 @@ const AgentProfile = ({
             {/* Properties Grid */}
             <div className="profile-listings-grid">
               {/* Create new listing card */}
-              <div 
+              <div
                 className="property-item-card dashed-create-card"
                 onClick={() => setActiveTab('create-listing')}
               >
@@ -846,9 +846,9 @@ const AgentProfile = ({
               {/* Property cards */}
               {filteredListings.map((listing) => (
                 <div key={listing.id} className="property-item-card real-property-card">
-                  <img 
-                    src={listing.thumbnail || 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800&q=80'} 
-                    alt={listing.title} 
+                  <img
+                    src={listing.thumbnail || 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800&q=80'}
+                    alt={listing.title}
                     className="property-card-img"
                   />
 
@@ -859,22 +859,22 @@ const AgentProfile = ({
 
                   {/* Property Actions Overlays */}
                   <div className="card-actions-overlay">
-                    <button 
-                      className="card-action-btn" 
+                    <button
+                      className="card-action-btn"
                       title="Xem chi tiết"
                       onClick={() => setPreviewProperty(listing)}
                     >
                       <ExternalLink size={14} />
                     </button>
-                    <button 
-                      className="card-action-btn" 
+                    <button
+                      className="card-action-btn"
                       title="Chỉnh sửa"
                       onClick={() => onEditProperty && onEditProperty(listing.id)}
                     >
                       <Edit3 size={14} />
                     </button>
-                    <button 
-                      className="card-action-btn danger" 
+                    <button
+                      className="card-action-btn danger"
                       title="Xoá tin đăng"
                       onClick={() => setDeletingProperty(listing)}
                     >
@@ -885,7 +885,7 @@ const AgentProfile = ({
                   {/* Bottom Info Gradient */}
                   <div className="property-card-overlay">
                     <h3 className="property-card-title">{listing.title}</h3>
-                    
+
                     <div className="property-card-address-row">
                       <MapPin size={12} />
                       <span>{listing.ward ? `${listing.ward}, ${listing.district || ''}` : (listing.address || 'Hồ Chí Minh City')}</span>
@@ -896,7 +896,7 @@ const AgentProfile = ({
                         <span className="price-amount">{formatPrice(listing.price)}</span>
                         <span className="price-unit">/tháng</span>
                       </div>
-                      
+
                       <div className="property-card-specs">
                         <span className="spec-item"><Bed size={12} /> {listing.bedrooms || 0}</span>
                         <span className="spec-item"><Bath size={12} /> {listing.bathrooms || 0}</span>
@@ -920,7 +920,7 @@ const AgentProfile = ({
         {selectedProfileTab === 'crm' && (() => {
           const total = funnelStats.AWARENESS + funnelStats.CONSIDERATION + funnelStats.INTENT + funnelStats.ACTION;
           const maxVal = Math.max(1, funnelStats.AWARENESS, funnelStats.CONSIDERATION, funnelStats.INTENT, funnelStats.ACTION);
-          
+
           const stages = [
             { key: 'AWARENESS', label: 'Nhận biết & Quan tâm', desc: 'Khách hàng mới nhắn tin, tìm hiểu thông tin', color: '#6366f1' },
             { key: 'CONSIDERATION', label: 'Cân nhắc', desc: 'Khách hàng so sánh, cân nhắc kỹ lưỡng', color: '#f59e0b' },
@@ -939,7 +939,7 @@ const AgentProfile = ({
                 {stages.map((stage) => {
                   const count = funnelStats[stage.key] || 0;
                   const pctWidth = maxVal > 0 ? Math.max(25, (count / maxVal) * 100) : 25;
-                  
+
                   return (
                     <div key={stage.key} className="crm-funnel-row">
                       <div className="crm-stage-label">
@@ -947,9 +947,9 @@ const AgentProfile = ({
                         <span className="stage-desc">{stage.desc}</span>
                       </div>
                       <div className="crm-bar-outer">
-                        <div 
+                        <div
                           className="crm-bar-inner"
-                          style={{ 
+                          style={{
                             width: `${pctWidth}%`,
                             backgroundColor: stage.color
                           }}
@@ -985,7 +985,7 @@ const AgentProfile = ({
           <div className="reviews-tab-container">
             <h3>Đánh giá từ khách hàng</h3>
             <p className="subtitle">Xem phản hồi từ khách thuê về chất lượng phòng và dịch vụ của bạn.</p>
-            
+
             {loadingReviews ? (
               <p className="loading-text">Đang tải đánh giá...</p>
             ) : reviews.length === 0 ? (
@@ -1002,11 +1002,11 @@ const AgentProfile = ({
                     <span className="rating-huge-val">{averageRating}</span>
                     <div className="rating-huge-stars">
                       {Array.from({ length: 5 }).map((_, i) => (
-                        <Star 
-                          key={i} 
-                          size={18} 
-                          fill={i < Math.round(parseFloat(averageRating)) ? "#f59e0b" : "none"} 
-                          color={i < Math.round(parseFloat(averageRating)) ? "#f59e0b" : "#cbd5e1"} 
+                        <Star
+                          key={i}
+                          size={18}
+                          fill={i < Math.round(parseFloat(averageRating)) ? "#f59e0b" : "none"}
+                          color={i < Math.round(parseFloat(averageRating)) ? "#f59e0b" : "#cbd5e1"}
                         />
                       ))}
                     </div>
@@ -1040,8 +1040,8 @@ const AgentProfile = ({
                   <div className="reviews-filter-bar">
                     <div className="filter-group-item">
                       <label>Đánh giá</label>
-                      <select 
-                        value={reviewRatingFilter} 
+                      <select
+                        value={reviewRatingFilter}
                         onChange={(e) => setReviewRatingFilter(e.target.value)}
                       >
                         <option value="ALL">Tất cả đánh giá</option>
@@ -1055,8 +1055,8 @@ const AgentProfile = ({
 
                     <div className="filter-group-item">
                       <label>Hình Ảnh/ Video</label>
-                      <select 
-                        value={reviewMediaFilter} 
+                      <select
+                        value={reviewMediaFilter}
                         onChange={(e) => setReviewMediaFilter(e.target.value)}
                       >
                         <option value="ALL">Tất cả đánh giá</option>
@@ -1082,7 +1082,7 @@ const AgentProfile = ({
                       {filteredReviews.map((rev) => {
                         const hasImage = rev.images && rev.images.length > 0;
                         const initialLetter = rev.user?.name ? rev.user.name.charAt(0).toUpperCase() : 'U';
-                        
+
                         return (
                           <div key={rev.id} className="profile-review-card">
                             <div className="review-card-header">
@@ -1099,16 +1099,16 @@ const AgentProfile = ({
                               </div>
                               <div className="review-rating">
                                 {Array.from({ length: 5 }).map((_, i) => (
-                                  <Star 
-                                    key={i} 
-                                    size={14} 
-                                    fill={i < rev.rating ? "#f59e0b" : "none"} 
-                                    color={i < rev.rating ? "#f59e0b" : "#cbd5e1"} 
+                                  <Star
+                                    key={i}
+                                    size={14}
+                                    fill={i < rev.rating ? "#f59e0b" : "none"}
+                                    color={i < rev.rating ? "#f59e0b" : "#cbd5e1"}
                                   />
                                 ))}
                               </div>
                             </div>
-                            
+
                             <div className="reviewed-property-title">
                               Tin đăng: <strong>{rev.propertyTitle}</strong>
                             </div>
@@ -1118,25 +1118,25 @@ const AgentProfile = ({
                             {hasImage && (
                               <div className="review-images-row">
                                 {rev.images.map((img, idx) => (
-                                  <img 
-                                    key={idx} 
-                                    src={img.image_url.startsWith('http') ? img.image_url : `${API_BASE_URL}${img.image_url}`} 
-                                    alt="Review thumbnail" 
-                                    className="review-thumb-img" 
+                                  <img
+                                    key={idx}
+                                    src={img.image_url.startsWith('http') ? img.image_url : `${API_BASE_URL}${img.image_url}`}
+                                    alt="Review thumbnail"
+                                    className="review-thumb-img"
                                   />
                                 ))}
                               </div>
                             )}
 
                             <div className="review-card-footer">
-                              <button 
-                                className="action-btn helpful-btn" 
+                              <button
+                                className="action-btn helpful-btn"
                                 onClick={() => handleHelpfulClick(rev.id)}
                               >
                                 <ThumbsUp size={14} />
                                 <span>Hữu ích ({helpfulCounts[rev.id] || 0})</span>
                               </button>
-                              <button 
+                              <button
                                 className="action-btn reply-btn"
                                 onClick={() => handleToggleReplyInput(rev.id)}
                               >
@@ -1170,14 +1170,14 @@ const AgentProfile = ({
                                   onChange={(e) => setReplyText(prev => ({ ...prev, [rev.id]: e.target.value }))}
                                 />
                                 <div className="reply-actions">
-                                  <button 
-                                    className="btn-cancel-reply" 
+                                  <button
+                                    className="btn-cancel-reply"
                                     onClick={() => handleToggleReplyInput(rev.id)}
                                   >
                                     Hủy
                                   </button>
-                                  <button 
-                                    className="btn-submit-reply" 
+                                  <button
+                                    className="btn-submit-reply"
                                     onClick={() => handleSendReply(rev.id)}
                                   >
                                     Gửi
@@ -1225,35 +1225,35 @@ const AgentProfile = ({
                       <div className="kyc-details-grid">
                         <div className="kyc-field">
                           <span className="kyc-field-label">HỌ VÀ TÊN</span>
-                          <span className="kyc-field-value">{kycStatus?.kycDetails?.fullName || kycVerificationData?.full_name || kycFullName || 'CAO THANH VÂN'}</span>
+                          <span className="kyc-field-value">{kycStatus?.kycDetails?.fullName || kycVerificationData?.full_name || kycFullName || currentUser?.name || '---'}</span>
                         </div>
                         <div className="kyc-field">
                           <span className="kyc-field-label">SỐ CCCD</span>
-                          <span className="kyc-field-value">{kycStatus?.kycDetails?.idNumber || kycVerificationData?.id_number || '012345678910'}</span>
+                          <span className="kyc-field-value">{kycStatus?.kycDetails?.idNumber || kycVerificationData?.id_number || '---'}</span>
                         </div>
                         <div className="kyc-field">
                           <span className="kyc-field-label">NGÀY SINH</span>
-                          <span className="kyc-field-value">{kycStatus?.kycDetails?.dob || '15/05/1985'}</span>
+                          <span className="kyc-field-value">{kycStatus?.kycDetails?.dob || '---'}</span>
                         </div>
                         <div className="kyc-field">
                           <span className="kyc-field-label">GIỚI TÍNH</span>
-                          <span className="kyc-field-value">{kycStatus?.kycDetails?.sex || 'Nữ'}</span>
+                          <span className="kyc-field-value">{kycStatus?.kycDetails?.sex || '---'}</span>
                         </div>
                         <div className="kyc-field full-width">
                           <span className="kyc-field-label">QUÊ QUÁN</span>
-                          <span className="kyc-field-value">{kycStatus?.kycDetails?.placeOfOrigin || 'P. Sài Gòn, TP. Hồ Chí Minh'}</span>
+                          <span className="kyc-field-value">{kycStatus?.kycDetails?.placeOfOrigin || '---'}</span>
                         </div>
                         <div className="kyc-field full-width">
                           <span className="kyc-field-label">NƠI THƯỜNG TRÚ</span>
-                          <span className="kyc-field-value">{kycStatus?.kycDetails?.placeOfResidence || '49 Bùi Thị Xuân, P. Sài Gòn, TP. Hồ Chí Minh'}</span>
+                          <span className="kyc-field-value">{kycStatus?.kycDetails?.placeOfResidence || '---'}</span>
                         </div>
                         <div className="kyc-field">
                           <span className="kyc-field-label">NGÀY CẤP</span>
-                          <span className="kyc-field-value">{kycStatus?.kycDetails?.issueDate || '20/10/2021'}</span>
+                          <span className="kyc-field-value">{kycStatus?.kycDetails?.issueDate || '---'}</span>
                         </div>
                         <div className="kyc-field">
                           <span className="kyc-field-label">NƠI CẤP</span>
-                          <span className="kyc-field-value">{kycStatus?.kycDetails?.issuePlace || 'Cục Cảnh sát QLHC về TTXH'}</span>
+                          <span className="kyc-field-value">{kycStatus?.kycDetails?.issuePlace || '---'}</span>
                         </div>
                       </div>
 
@@ -1336,7 +1336,7 @@ const AgentProfile = ({
                   <div className="kyc-main-panel">
                     {kycError && <div className="kyc-error-banner"><AlertCircle size={16} /> {kycError}</div>}
                     {otpSuccessMsg && (
-                      <div 
+                      <div
                         className="kyc-success-banner"
                         style={{
                           background: '#ecfdf5',
@@ -1361,26 +1361,26 @@ const AgentProfile = ({
                           <h4 className="step-card-heading">Thông tin cơ bản</h4>
                           <div className="step-input-group">
                             <label>HỌ VÀ TÊN</label>
-                            <input 
-                              type="text" 
-                              placeholder="VD: Nguyễn Văn A" 
-                              value={kycFullName} 
-                              onChange={(e) => setKycFullName(e.target.value)} 
+                            <input
+                              type="text"
+                              placeholder="VD: Nguyễn Văn A"
+                              value={kycFullName}
+                              onChange={(e) => setKycFullName(e.target.value)}
                             />
                           </div>
                           <div className="step-input-group mt-4">
                             <label>SỐ ĐIỆN THOẠI</label>
                             <div style={{ display: 'flex', gap: '8px' }}>
-                              <input 
-                                type="text" 
-                                placeholder="VD: 0982123456" 
-                                value={kycPhone} 
+                              <input
+                                type="text"
+                                placeholder="VD: 0982123456"
+                                value={kycPhone}
                                 onChange={(e) => {
                                   setKycPhone(e.target.value);
                                   if (phoneVerified && e.target.value !== currentUser?.phone) {
                                     setPhoneVerified(false);
                                   }
-                                }} 
+                                }}
                                 style={{ flex: 1 }}
                               />
                               <button
@@ -1423,20 +1423,20 @@ const AgentProfile = ({
                             </p>
                             <div className="step-input-group mt-3">
                               <label>MÃ OTP (6 CHỮ SỐ)</label>
-                              <input 
-                                type="text" 
+                              <input
+                                type="text"
                                 maxLength={6}
-                                placeholder="Nhập 6 chữ số OTP..." 
-                                value={kycOtp} 
-                                onChange={(e) => setKycOtp(e.target.value.replace(/\D/g, ''))} 
+                                placeholder="Nhập 6 chữ số OTP..."
+                                value={kycOtp}
+                                onChange={(e) => setKycOtp(e.target.value.replace(/\D/g, ''))}
                               />
                             </div>
                           </div>
                         )}
 
                         <div className="wizard-actions-right">
-                          <button 
-                            type="submit" 
+                          <button
+                            type="submit"
                             className="btn-wizard-next"
                             disabled={isOtpVerifying}
                           >
@@ -1554,15 +1554,15 @@ const AgentProfile = ({
                       </div>
                       <h4>Tình trạng xác thực</h4>
                       <p>Hãy hoàn tất các bước này để nhận huy hiệu xác thực và tạo dựng lòng tin với khách hàng.</p>
-                      
+
                       <div className="status-progress-container">
                         <div className="status-progress-labels">
                           <span>QUÁ TRÌNH XÁC THỰC</span>
                           <span>{kycWizardStep === 1 ? '0%' : kycWizardStep === 2 ? '33%' : '66%'}</span>
                         </div>
                         <div className="status-progress-track">
-                          <div 
-                            className="status-progress-bar" 
+                          <div
+                            className="status-progress-bar"
                             style={{ width: kycWizardStep === 1 ? '0%' : kycWizardStep === 2 ? '33%' : '66%' }}
                           />
                         </div>
@@ -1631,7 +1631,7 @@ const AgentProfile = ({
                   <div className="kyc-privileges-panel">
                     <div className="kyc-privileges-card">
                       <h4>Đặc quyền cho tài khoản đã xác minh</h4>
-                      
+
                       <div className="privilege-list">
                         <div className="privilege-item">
                           <div className="priv-icon-box green">
@@ -1678,16 +1678,16 @@ const AgentProfile = ({
 
       {/* 4. MODALS (PORTAL-LIKE) */}
       {previewProperty && (
-        <PropertyDetailModal 
-          property={previewProperty} 
-          onClose={() => setPreviewProperty(null)} 
+        <PropertyDetailModal
+          property={previewProperty}
+          onClose={() => setPreviewProperty(null)}
           showFavoriteActions={false}
         />
       )}
 
       {deletingProperty && (
-        <DeleteConfirmModal 
-          property={deletingProperty} 
+        <DeleteConfirmModal
+          property={deletingProperty}
           onConfirm={(id) => {
             onDeleteProperty && onDeleteProperty(id);
             setDeletingProperty(null);
@@ -1704,10 +1704,10 @@ const AgentProfile = ({
               <X size={24} />
             </button>
             <h3>Chọn Phường từ danh sách</h3>
-            
+
             <div className="region-tabs">
               {Object.keys(WARDS_BY_REGION).map((region) => (
-                <button 
+                <button
                   key={region}
                   type="button"
                   className={`region-tab-btn ${activeRegionTab === region ? 'active' : ''}`}
@@ -1722,9 +1722,9 @@ const AgentProfile = ({
             </div>
 
             <div className="list-search-container">
-              <input 
-                type="text" 
-                placeholder="Tìm phường..." 
+              <input
+                type="text"
+                placeholder="Tìm phường..."
                 value={listModalSearchQuery}
                 onChange={(e) => setListModalSearchQuery(e.target.value)}
               />
@@ -1739,7 +1739,7 @@ const AgentProfile = ({
                     const isChecked = subTempSelectedWards.includes(ward);
                     return (
                       <label key={ward} className="ward-checkbox-label">
-                        <input 
+                        <input
                           type="checkbox"
                           checked={isChecked}
                           onChange={() => handleToggleSubTempWard(ward)}
