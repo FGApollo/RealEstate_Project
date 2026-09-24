@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const { supabase } = require('../config/supabase');
 const trustScoreService = require('./trustScoreService');
+const esmsService = require('./esmsService');
 
 const OTP_TTL_MS = 5 * 60 * 1000;
 const OTP_COOLDOWN_MS = 60 * 1000;
@@ -138,6 +139,12 @@ const sendOtp = async ({ userId, phone }) => {
   const expiresAt = new Date(Date.now() + OTP_TTL_MS).toISOString();
   const otpCode = generateOtpCode();
 
+  // Gửi tin nhắn SMS OTP qua eSMS Gateway
+  const smsResult = await esmsService.sendOtpSms({
+    phone: normalizedPhone,
+    otp: otpCode
+  });
+
   const { error } = await supabase
     .from('phone_otps')
     .insert({
@@ -155,7 +162,14 @@ const sendOtp = async ({ userId, phone }) => {
 
   return {
     success: true,
-    message: 'OTP has been created'
+    message: smsResult.isMock
+      ? 'Mã OTP đã được tạo (Chế độ giả lập eSMS)'
+      : (smsResult.sandbox
+          ? 'Mã OTP đã gửi qua Sandbox eSMS (Thử nghiệm kết nối thành công, không trừ tiền)'
+          : 'Mã OTP đã được gửi đến số điện thoại của bạn qua SMS'),
+    isMock: smsResult.isMock,
+    sandbox: Boolean(smsResult.sandbox),
+    smsId: smsResult.smsId
   };
 };
 

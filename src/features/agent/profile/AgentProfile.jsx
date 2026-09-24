@@ -127,9 +127,25 @@ const AgentProfile = ({
   const [kycError, setKycError] = useState('');
   const [kycVerificationData, setKycVerificationData] = useState(null);
   const [kycFullName, setKycFullName] = useState(currentUser?.name || 'Nguyễn Văn A');
-  const [kycPhone, setKycPhone] = useState(currentUser?.phone || '0982****123');
+  const [kycPhone, setKycPhone] = useState(currentUser?.phone || '');
   const [kycOtp, setKycOtp] = useState('');
   const [kycSubmitting, setKycSubmitting] = useState(false);
+  const [isOtpSending, setIsOtpSending] = useState(false);
+  const [isOtpVerifying, setIsOtpVerifying] = useState(false);
+  const [otpCountdown, setOtpCountdown] = useState(0);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpSuccessMsg, setOtpSuccessMsg] = useState('');
+  const [phoneVerified, setPhoneVerified] = useState(Boolean(currentUser?.phone_verified));
+
+  useEffect(() => {
+    let timer;
+    if (otpCountdown > 0) {
+      timer = setInterval(() => {
+        setOtpCountdown((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [otpCountdown]);
 
   useEffect(() => {
     const fetchFunnelStats = async () => {
@@ -299,14 +315,95 @@ const AgentProfile = ({
     setKycError('');
   };
 
-  const handleStep1Submit = (e) => {
+  const handleSendOtp = async () => {
+    if (!kycPhone) {
+      setKycError('Vui lòng nhập số điện thoại');
+      return;
+    }
+    const vnPhoneRegex = /^(03|05|07|08|09)\d{8}$/;
+    const cleanPhone = kycPhone.trim();
+    if (!vnPhoneRegex.test(cleanPhone)) {
+      setKycError('Số điện thoại không hợp lệ (cần là số ĐT Việt Nam 10 chữ số bắt đầu bằng 03, 05, 07, 08, 09)');
+      return;
+    }
+
+    setIsOtpSending(true);
+    setKycError('');
+    setOtpSuccessMsg('');
+
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/api/phone/send-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: cleanPhone
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Gửi OTP thất bại');
+      }
+
+      setOtpSent(true);
+      setOtpCountdown(60);
+      setOtpSuccessMsg(data.message || 'Mã OTP đã được gửi đến số điện thoại của bạn');
+    } catch (err) {
+      setKycError(err.message);
+    } finally {
+      setIsOtpSending(false);
+    }
+  };
+
+  const handleStep1Submit = async (e) => {
     if (e) e.preventDefault();
     if (!kycFullName || !kycPhone) {
       setKycError('Vui lòng điền họ tên và số điện thoại');
       return;
     }
+
+    const cleanPhone = kycPhone.trim();
+
+    // Nếu số điện thoại này đã được xác thực trước đó
+    if (phoneVerified && currentUser?.phone === cleanPhone) {
+      setKycError('');
+      setKycWizardStep(2);
+      return;
+    }
+
+    // Nếu chưa xác thực thì bắt buộc phải nhập mã OTP 6 số
+    if (!kycOtp || kycOtp.trim().length !== 6) {
+      setKycError('Vui lòng nhập đầy đủ mã OTP 6 chữ số được gửi qua SMS');
+      return;
+    }
+
+    setIsOtpVerifying(true);
     setKycError('');
-    setKycWizardStep(2);
+
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/api/phone/verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: cleanPhone,
+          otp: kycOtp.trim()
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Xác thực OTP thất bại');
+      }
+
+      setPhoneVerified(true);
+      updateUser({ phone: cleanPhone, phone_verified: true });
+
+      setKycWizardStep(2);
+    } catch (err) {
+      setKycError(err.message);
+    } finally {
+      setIsOtpVerifying(false);
+    }
   };
 
   const handleCardSubmit = async (e) => {
@@ -1238,6 +1335,25 @@ const AgentProfile = ({
                 <div className="kyc-tab-grid">
                   <div className="kyc-main-panel">
                     {kycError && <div className="kyc-error-banner"><AlertCircle size={16} /> {kycError}</div>}
+                    {otpSuccessMsg && (
+                      <div 
+                        className="kyc-success-banner"
+                        style={{
+                          background: '#ecfdf5',
+                          border: '1px solid #a7f3d0',
+                          color: '#065f46',
+                          padding: '10px 14px',
+                          borderRadius: '8px',
+                          marginBottom: '16px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          fontSize: '13px'
+                        }}
+                      >
+                        <Check size={16} /> {otpSuccessMsg}
+                      </div>
+                    )}
 
                     {kycWizardStep === 1 && (
                       <form onSubmit={handleStep1Submit} className="kyc-wizard-form-box">
@@ -1254,34 +1370,77 @@ const AgentProfile = ({
                           </div>
                           <div className="step-input-group mt-4">
                             <label>SỐ ĐIỆN THOẠI</label>
-                            <input 
-                              type="text" 
-                              placeholder="VD: 0982****123" 
-                              value={kycPhone} 
-                              onChange={(e) => setKycPhone(e.target.value)} 
-                            />
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              <input 
+                                type="text" 
+                                placeholder="VD: 0982123456" 
+                                value={kycPhone} 
+                                onChange={(e) => {
+                                  setKycPhone(e.target.value);
+                                  if (phoneVerified && e.target.value !== currentUser?.phone) {
+                                    setPhoneVerified(false);
+                                  }
+                                }} 
+                                style={{ flex: 1 }}
+                              />
+                              <button
+                                type="button"
+                                onClick={handleSendOtp}
+                                disabled={isOtpSending || otpCountdown > 0 || (phoneVerified && currentUser?.phone === kycPhone)}
+                                style={{
+                                  padding: '0 16px',
+                                  borderRadius: '8px',
+                                  border: 'none',
+                                  background: (phoneVerified && currentUser?.phone === kycPhone) ? '#10b981' : (otpCountdown > 0 ? '#94a3b8' : '#2563eb'),
+                                  color: '#fff',
+                                  fontWeight: 600,
+                                  cursor: (otpCountdown > 0 || (phoneVerified && currentUser?.phone === kycPhone)) ? 'not-allowed' : 'pointer',
+                                  whiteSpace: 'nowrap',
+                                  fontSize: '13px'
+                                }}
+                              >
+                                {phoneVerified && currentUser?.phone === kycPhone ? (
+                                  '✓ Đã xác thực'
+                                ) : isOtpSending ? (
+                                  'Đang gửi...'
+                                ) : otpCountdown > 0 ? (
+                                  `Gửi lại (${otpCountdown}s)`
+                                ) : otpSent ? (
+                                  'Gửi lại mã'
+                                ) : (
+                                  'Gửi mã OTP'
+                                )}
+                              </button>
+                            </div>
                           </div>
                         </div>
 
-                        <div className="kyc-step-card mt-5">
-                          <h4 className="step-card-heading">Xác minh số điện thoại</h4>
-                          <p className="step-phone-hint">
-                            Vui lòng nhập mã OTP được gửi qua số điện thoại <strong className="text-blue-600">{kycPhone || '0982****123'}</strong> để được xác minh, nếu chưa nhận được mã: <button type="button" className="btn-link-resend">Gửi lại</button>
-                          </p>
-                          <div className="step-input-group mt-3">
-                            <label>MÃ OTP</label>
-                            <input 
-                              type="text" 
-                              placeholder="Nhập mã OTP..." 
-                              value={kycOtp} 
-                              onChange={(e) => setKycOtp(e.target.value)} 
-                            />
+                        {(!phoneVerified || currentUser?.phone !== kycPhone) && (
+                          <div className="kyc-step-card mt-5">
+                            <h4 className="step-card-heading">Xác minh số điện thoại qua SMS</h4>
+                            <p className="step-phone-hint">
+                              Vui lòng nhập mã OTP được gửi qua SMS đến số điện thoại <strong className="text-blue-600">{kycPhone || '...'}</strong> để xác minh tài khoản.
+                            </p>
+                            <div className="step-input-group mt-3">
+                              <label>MÃ OTP (6 CHỮ SỐ)</label>
+                              <input 
+                                type="text" 
+                                maxLength={6}
+                                placeholder="Nhập 6 chữ số OTP..." 
+                                value={kycOtp} 
+                                onChange={(e) => setKycOtp(e.target.value.replace(/\D/g, ''))} 
+                              />
+                            </div>
                           </div>
-                        </div>
+                        )}
 
                         <div className="wizard-actions-right">
-                          <button type="submit" className="btn-wizard-next">
-                            Tiếp theo <ArrowRight size={16} />
+                          <button 
+                            type="submit" 
+                            className="btn-wizard-next"
+                            disabled={isOtpVerifying}
+                          >
+                            {isOtpVerifying ? 'Đang xác thực...' : 'Tiếp theo'} <ArrowRight size={16} />
                           </button>
                         </div>
                       </form>
