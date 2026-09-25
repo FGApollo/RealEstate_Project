@@ -33,7 +33,7 @@ export const validateRegistration = ({ name, email, password, confirmPassword, i
   }
   if (!emailIsValid) errors.email = 'Enter a valid email address.';
   if (!passwordValue.trim()) errors.password = 'Password cannot contain only spaces.';
-  else if (passwordLength < 15) errors.password = 'Use at least 15 characters.';
+  else if (passwordLength < 10) errors.password = 'Use at least 10 characters.';
   else if (passwordBytes > 72) errors.password = 'Password must be no more than 72 UTF-8 bytes.';
   else if (COMMON_PASSWORDS.has(passwordValue.toLowerCase())) {
     errors.password = 'Choose a less common password.';

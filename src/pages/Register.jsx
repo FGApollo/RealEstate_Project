@@ -100,6 +100,7 @@ const Register = () => {
           onRightIconClick={togglePasswordVisibility}
           placeholder="Tạo mật khẩu"
           type={showPassword ? "text" : "password"}
+          minLength={10}
           value={formData.password}
           onChange={handleChange}
           autoComplete="new-password"
@@ -107,7 +108,7 @@ const Register = () => {
         />
 
         <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '0.35rem 0 1rem' }}>
-          Tối thiểu 15 ký tự; có thể dùng cụm từ và khoảng trắng. Không cần quy tắc ký tự hoa/số/ký hiệu.
+          Tối thiểu 10 ký tự; có thể dùng cụm từ và khoảng trắng. Không cần quy tắc ký tự hoa/số/ký hiệu.
         </p>
 
         <Input
@@ -116,6 +117,7 @@ const Register = () => {
           name="confirmPassword"
           placeholder="Nhập lại mật khẩu"
           type="password"
+          minLength={10}
           value={formData.confirmPassword}
           onChange={handleChange}
           autoComplete="new-password"

@@ -29,8 +29,9 @@ test('registration normalizes email/name but preserves the exact password', () =
   assert.equal(registration.role, 'USER');
 });
 
-test('weak, common, whitespace-only and bcrypt-overlong passwords are rejected', () => {
-  assert.match(validatePassword('short'), /15 characters/);
+test('passwords need at least 10 characters; common, whitespace-only and bcrypt-overlong passwords are rejected', () => {
+  assert.match(validatePassword('123456789'), /10 characters/);
+  assert.equal(validatePassword('abcdefghij'), null);
   assert.match(validatePassword('               '), /only spaces/);
   assert.match(validatePassword('password1234567'), /common/);
   assert.match(validatePassword('é'.repeat(37)), /72 UTF-8 bytes/);

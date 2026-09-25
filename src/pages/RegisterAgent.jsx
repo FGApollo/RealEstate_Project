@@ -114,6 +114,7 @@ const RegisterAgent = () => {
           onRightIconClick={togglePasswordVisibility}
           placeholder="Tạo mật khẩu đăng nhập"
           type={showPassword ? "text" : "password"}
+          minLength={10}
           value={formData.password}
           onChange={handleChange}
           autoComplete="new-password"
@@ -121,7 +122,7 @@ const RegisterAgent = () => {
         />
 
         <p style={{ fontSize: '0.78rem', color: '#94a3b8', margin: '0.35rem 0 1rem' }}>
-          Mật khẩu tối thiểu 15 ký tự; không cần quy tắc ký tự hoa/số/ký hiệu.
+          Mật khẩu tối thiểu 10 ký tự; không cần quy tắc ký tự hoa/số/ký hiệu.
         </p>
 
         <Input
@@ -130,6 +131,7 @@ const RegisterAgent = () => {
           name="confirmPassword"
           placeholder="Nhập lại mật khẩu"
           type="password"
+          minLength={10}
           value={formData.confirmPassword}
           onChange={handleChange}
           autoComplete="new-password"

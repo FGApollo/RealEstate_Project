@@ -78,7 +78,11 @@ const registerUser = async ({
     .single();
 
   if (error?.code === '23505') return { accepted: true };
-  if (error) throw serviceError('Registration is temporarily unavailable', 503, 'REGISTRATION_UNAVAILABLE');
+  if (error) {
+    // Log only the database error code; never log submitted identity or password data.
+    console.error('Registration user insert failed:', error.code || error.name || 'database_error');
+    throw serviceError('Registration is temporarily unavailable', 503, 'REGISTRATION_UNAVAILABLE');
+  }
 
   await emailVerificationService.issueAndSend(data);
 
