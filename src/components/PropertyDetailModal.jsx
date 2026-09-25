@@ -900,7 +900,7 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
                                 gap: '8px'
                               }}>
                                 {rev.replies.map((reply) => {
-                                  const isOwner = reply.user_id === property.owner_id;
+                                  const isOwner = Number(reply.user_id) === Number(property?.owner_id);
                                   const isAdmin = reply.user?.role === 'ADMIN';
                                   const isAgent = reply.user?.role === 'AGENT';
                                   return (

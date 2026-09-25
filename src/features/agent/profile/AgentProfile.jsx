@@ -161,7 +161,7 @@ const AgentProfile = ({
       }
     };
     fetchFunnelStats();
-  }, [currentUser.id]);
+  }, [currentUser?.id]);
 
   useEffect(() => {
     if (selectedProfileTab === 'reviews') {
@@ -179,9 +179,9 @@ const AgentProfile = ({
               if (r.replies && r.replies.length > 0) {
                 loadedReplies[r.id] = r.replies.map((rep) => ({
                   id: rep.id,
-                  author: rep.user?.name || (rep.user_id === currentUser.id ? currentUser.name : 'Người dùng'),
+                  author: rep.user?.name || (Number(rep.user_id) === Number(currentUser?.id) ? currentUser?.name : 'Người dùng'),
                   role: rep.user?.role || 'USER',
-                  isAuthor: rep.user_id === currentUser.id,
+                  isAuthor: Number(rep.user_id) === Number(currentUser?.id),
                   text: rep.reply_text,
                   created_at: rep.created_at
                 }));
@@ -204,7 +204,7 @@ const AgentProfile = ({
       };
       fetchReviews();
     }
-  }, [selectedProfileTab, currentUser.id]);
+  }, [selectedProfileTab, currentUser?.id]);
 
   useEffect(() => {
     const fetchKycStatus = async () => {
