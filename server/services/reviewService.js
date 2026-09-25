@@ -56,6 +56,7 @@ const getPropertyReviews = async (propertyId) => {
       replies:property_review_replies(
         id,
         review_id,
+        user_id,
         reply_text,
         created_at,
         user:users!user_id(id, name, avatar, role)
@@ -254,7 +255,7 @@ const createReviewReply = async (reviewId, userId, replyText) => {
     throw error;
   }
 
-  // 1. Fetch review and associated property to verify owner
+  // 1. Fetch review and associated property to verify existence
   const { data: review, error: revError } = await supabase
     .from('property_reviews')
     .select(`
@@ -271,22 +272,7 @@ const createReviewReply = async (reviewId, userId, replyText) => {
     throw error;
   }
 
-  const ownerId = review.property ? review.property.owner_id : null;
-  if (ownerId !== uId) {
-    const { data: userProfile } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', uId)
-      .single();
-
-    if (!userProfile || userProfile.role !== 'ADMIN') {
-      const error = new Error('Chỉ chủ sở hữu bất động sản mới có quyền phản hồi đánh giá này');
-      error.statusCode = 403;
-      throw error;
-    }
-  }
-
-  // 2. Insert into property_review_replies
+  // 2. Insert into property_review_replies (open to all authenticated users)
   const { data: insertedReply, error: insError } = await supabase
     .from('property_review_replies')
     .insert([{
@@ -297,6 +283,7 @@ const createReviewReply = async (reviewId, userId, replyText) => {
     .select(`
       id,
       review_id,
+      user_id,
       reply_text,
       created_at,
       user:users!user_id(id, name, avatar, role)
@@ -308,7 +295,12 @@ const createReviewReply = async (reviewId, userId, replyText) => {
     throw new Error(insError.message);
   }
 
-  return insertedReply;
+  const isOwner = Boolean(review.property && review.property.owner_id === uId);
+
+  return {
+    ...insertedReply,
+    is_owner: isOwner
+  };
 };
 
 module.exports = {

@@ -32,6 +32,11 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
   const [localRating, setLocalRating] = useState(property?.average_rating || 0);
   const [localReviewCount, setLocalReviewCount] = useState(property?.review_count || 0);
 
+  // States for review replies in modal
+  const [showReplyBox, setShowReplyBox] = useState({});
+  const [replyTextMap, setReplyTextMap] = useState({});
+  const [submittingReplyMap, setSubmittingReplyMap] = useState({});
+
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -214,6 +219,55 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
     } catch (err) {
       console.error(err);
       alert('Lỗi khi gửi đánh giá: ' + err.message);
+    }
+  };
+
+  const handleToggleReplyBox = (reviewId) => {
+    setShowReplyBox(prev => ({
+      ...prev,
+      [reviewId]: !prev[reviewId]
+    }));
+  };
+
+  const handleSendReviewReply = async (reviewId) => {
+    if (!user) {
+      alert('Vui lòng đăng nhập để phản hồi đánh giá này!');
+      return;
+    }
+
+    const text = (replyTextMap[reviewId] || '').trim();
+    if (!text) return;
+
+    setSubmittingReplyMap(prev => ({ ...prev, [reviewId]: true }));
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/api/properties/reviews/${reviewId}/reply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reply_text: text })
+      });
+
+      if (res.ok) {
+        const newReply = await res.json();
+        setReviews(prev => prev.map(rev => {
+          if (rev.id === reviewId) {
+            return {
+              ...rev,
+              replies: [...(rev.replies || []), newReply]
+            };
+          }
+          return rev;
+        }));
+        setReplyTextMap(prev => ({ ...prev, [reviewId]: '' }));
+        setShowReplyBox(prev => ({ ...prev, [reviewId]: false }));
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || 'Có lỗi xảy ra khi gửi phản hồi.');
+      }
+    } catch (err) {
+      console.error('Error sending reply:', err);
+      alert('Lỗi kết nối khi gửi phản hồi.');
+    } finally {
+      setSubmittingReplyMap(prev => ({ ...prev, [reviewId]: false }));
     }
   };
 
@@ -762,7 +816,78 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
                               <button className="helpful-btn">
                                 <span>👍 Hữu ích ({rev.helpful_count || 0})</span>
                               </button>
+                              <button 
+                                className="reply-btn"
+                                onClick={() => handleToggleReplyBox(rev.id)}
+                              >
+                                <span>💬 Phản hồi</span>
+                              </button>
                             </div>
+
+                            {/* Reply Input Box in Modal */}
+                            {showReplyBox[rev.id] && (
+                              <div style={{
+                                marginTop: '10px',
+                                padding: '12px',
+                                backgroundColor: '#f8fafc',
+                                borderRadius: '8px',
+                                border: '1px solid #e2e8f0'
+                              }}>
+                                <textarea
+                                  placeholder={user ? "Nhập phản hồi hoặc ý kiến của bạn..." : "Vui lòng đăng nhập để phản hồi..."}
+                                  value={replyTextMap[rev.id] || ''}
+                                  onChange={(e) => setReplyTextMap(prev => ({ ...prev, [rev.id]: e.target.value }))}
+                                  disabled={Boolean(submittingReplyMap[rev.id]) || !user}
+                                  rows={3}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 10px',
+                                    borderRadius: '6px',
+                                    border: '1px solid #cbd5e1',
+                                    fontSize: '13px',
+                                    resize: 'vertical',
+                                    outline: 'none',
+                                    boxSizing: 'border-box'
+                                  }}
+                                />
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '8px' }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleReplyBox(rev.id)}
+                                    disabled={Boolean(submittingReplyMap[rev.id])}
+                                    style={{
+                                      background: '#e2e8f0',
+                                      border: 'none',
+                                      padding: '6px 12px',
+                                      borderRadius: '6px',
+                                      fontSize: '12px',
+                                      fontWeight: 600,
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    Hủy
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSendReviewReply(rev.id)}
+                                    disabled={Boolean(submittingReplyMap[rev.id]) || !(replyTextMap[rev.id] || '').trim() || !user}
+                                    style={{
+                                      background: '#2563eb',
+                                      color: '#fff',
+                                      border: 'none',
+                                      padding: '6px 14px',
+                                      borderRadius: '6px',
+                                      fontSize: '12px',
+                                      fontWeight: 600,
+                                      cursor: 'pointer',
+                                      opacity: !(replyTextMap[rev.id] || '').trim() ? 0.6 : 1
+                                    }}
+                                  >
+                                    {submittingReplyMap[rev.id] ? 'Đang gửi...' : 'Gửi phản hồi'}
+                                  </button>
+                                </div>
+                              </div>
+                            )}
 
                             {/* Replies List */}
                             {rev.replies && rev.replies.length > 0 && (
@@ -774,42 +899,73 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
                                 flexDirection: 'column',
                                 gap: '8px'
                               }}>
-                                {rev.replies.map((reply) => (
-                                  <div key={reply.id} style={{
-                                    backgroundColor: '#f8fafc',
-                                    borderRadius: '8px',
-                                    padding: '8px 12px',
-                                    textAlign: 'left'
-                                  }}>
-                                    <div style={{
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '6px',
-                                      fontSize: '12px',
-                                      marginBottom: '4px'
+                                {rev.replies.map((reply) => {
+                                  const isOwner = reply.user_id === property.owner_id;
+                                  const isAdmin = reply.user?.role === 'ADMIN';
+                                  const isAgent = reply.user?.role === 'AGENT';
+                                  return (
+                                    <div key={reply.id} style={{
+                                      backgroundColor: '#f8fafc',
+                                      borderRadius: '8px',
+                                      padding: '8px 12px',
+                                      textAlign: 'left'
                                     }}>
-                                      <span style={{ fontWeight: 700, color: '#0f172a' }}>
-                                        {reply.user?.name || 'Môi giới'}
-                                      </span>
-                                      <span style={{
-                                        backgroundColor: '#dbeafe',
-                                        color: '#1e40af',
-                                        fontSize: '10px',
-                                        fontWeight: 800,
-                                        padding: '1px 5px',
-                                        borderRadius: '4px'
+                                      <div style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        fontSize: '12px',
+                                        marginBottom: '4px'
                                       }}>
-                                        Tác giả
-                                      </span>
-                                      <span style={{ color: '#64748b' }}>
-                                        · {new Date(reply.created_at).toLocaleDateString('vi-VN')}
-                                      </span>
+                                        <span style={{ fontWeight: 700, color: '#0f172a' }}>
+                                          {reply.user?.name || 'Người dùng'}
+                                        </span>
+                                        {isOwner && (
+                                          <span style={{
+                                            backgroundColor: '#dbeafe',
+                                            color: '#1e40af',
+                                            fontSize: '10px',
+                                            fontWeight: 800,
+                                            padding: '1px 5px',
+                                            borderRadius: '4px'
+                                          }}>
+                                            Tác giả
+                                          </span>
+                                        )}
+                                        {!isOwner && isAdmin && (
+                                          <span style={{
+                                            backgroundColor: '#fce7f3',
+                                            color: '#be185d',
+                                            fontSize: '10px',
+                                            fontWeight: 800,
+                                            padding: '1px 5px',
+                                            borderRadius: '4px'
+                                          }}>
+                                            Quản trị viên
+                                          </span>
+                                        )}
+                                        {!isOwner && !isAdmin && isAgent && (
+                                          <span style={{
+                                            backgroundColor: '#e0f2fe',
+                                            color: '#0369a1',
+                                            fontSize: '10px',
+                                            fontWeight: 700,
+                                            padding: '1px 5px',
+                                            borderRadius: '4px'
+                                          }}>
+                                            Môi giới
+                                          </span>
+                                        )}
+                                        <span style={{ color: '#64748b' }}>
+                                          · {new Date(reply.created_at).toLocaleDateString('vi-VN')}
+                                        </span>
+                                      </div>
+                                      <p style={{ margin: 0, fontSize: '13px', color: '#334155', lineHeight: 1.4 }}>
+                                        {reply.reply_text}
+                                      </p>
                                     </div>
-                                    <p style={{ margin: 0, fontSize: '13px', color: '#334155', lineHeight: 1.4 }}>
-                                      {reply.reply_text}
-                                    </p>
-                                  </div>
-                                ))}
+                                  );
+                                })}
                               </div>
                             )}
                           </div>

@@ -179,8 +179,9 @@ const AgentProfile = ({
               if (r.replies && r.replies.length > 0) {
                 loadedReplies[r.id] = r.replies.map((rep) => ({
                   id: rep.id,
-                  author: rep.user?.name || currentUser.name || 'Môi giới',
-                  role: rep.user?.role || 'Broker',
+                  author: rep.user?.name || (rep.user_id === currentUser.id ? currentUser.name : 'Người dùng'),
+                  role: rep.user?.role || 'USER',
+                  isAuthor: rep.user_id === currentUser.id,
                   text: rep.reply_text,
                   created_at: rep.created_at
                 }));
@@ -301,7 +302,8 @@ const AgentProfile = ({
           [reviewId]: [...(prev[reviewId] || []), {
             id: savedReply.id,
             author: savedReply.user?.name || currentUser.name || 'Môi giới',
-            role: savedReply.user?.role || 'Broker',
+            role: savedReply.user?.role || currentUser.role || 'AGENT',
+            isAuthor: true,
             text: savedReply.reply_text,
             created_at: savedReply.created_at
           }]
@@ -1231,7 +1233,13 @@ const AgentProfile = ({
                                   <div key={reply.id} className="review-reply-item">
                                     <div className="reply-header">
                                       <span className="reply-author">{reply.author}</span>
-                                      <span className="reply-badge">Tác giả</span>
+                                      {reply.isAuthor ? (
+                                        <span className="reply-badge">Tác giả</span>
+                                      ) : reply.role === 'ADMIN' ? (
+                                        <span className="reply-badge" style={{ backgroundColor: '#fce7f3', color: '#be185d' }}>Quản trị viên</span>
+                                      ) : reply.role === 'AGENT' ? (
+                                        <span className="reply-badge" style={{ backgroundColor: '#e0f2fe', color: '#0369a1' }}>Môi giới</span>
+                                      ) : null}
                                       <span className="reply-time">· {formatTimeAgo(reply.created_at)}</span>
                                     </div>
                                     <p className="reply-text">{reply.text}</p>

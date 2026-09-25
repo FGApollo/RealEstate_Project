@@ -157,6 +157,24 @@ const getSimilarProperties = async (req, res) => {
   }
 };
 
+const createReviewReply = async (req, res) => {
+  const userId = req.user.id;
+  const { reviewId } = req.params;
+  const { reply_text } = req.body;
+
+  if (!reply_text || !reply_text.trim()) {
+    return res.status(400).json({ error: 'Nội dung phản hồi không được để trống' });
+  }
+
+  try {
+    const reply = await reviewService.createReviewReply(reviewId, userId, reply_text);
+    res.status(201).json(reply);
+  } catch (error) {
+    console.error('Error replying to review:', error);
+    res.status(error.statusCode || 500).json({ error: error.message || 'Internal server error' });
+  }
+};
+
 module.exports = {
   MAX_PROPERTY_IMAGE_COUNT,
   MAX_PROPERTY_IMAGE_BYTES,
@@ -167,6 +185,8 @@ module.exports = {
   deleteProperty,
   getPropertyReviews,
   createPropertyReview,
+  createReviewReply,
   checkBeforeSave,
   getSimilarProperties
 };
+
