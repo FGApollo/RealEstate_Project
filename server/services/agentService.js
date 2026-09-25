@@ -90,7 +90,15 @@ const getAgentReviews = async (agentId) => {
       user_id,
       property_id,
       user:users!user_id(name, avatar, role),
-      images:property_review_images(image_url)
+      images:property_review_images(image_url),
+      replies:property_review_replies(
+        id,
+        review_id,
+        user_id,
+        reply_text,
+        created_at,
+        user:users!user_id(id, name, avatar, role)
+      )
     `)
     .in('property_id', propertyIds)
     .eq('status', 'APPROVED')

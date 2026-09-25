@@ -14,5 +14,6 @@ router.put('/:id', authenticate, requireRole('AGENT'), rateLimiters.write, prope
 router.delete('/:id', authenticate, requireRole('AGENT'), rateLimiters.write, propertyController.deleteProperty);
 router.get('/:id/reviews', rateLimiters.read, propertyController.getPropertyReviews);
 router.post('/:id/reviews', authenticate, rateLimiters.write, propertyController.createPropertyReview);
+router.post('/reviews/:reviewId/reply', authenticate, rateLimiters.write, propertyController.createReviewReply);
 
 module.exports = router;

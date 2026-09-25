@@ -1131,6 +1131,12 @@
   font-weight: 700;
   color: #475569;
   cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.btn-cancel-reply:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .btn-submit-reply {
@@ -1142,6 +1148,18 @@
   font-weight: 700;
   color: #ffffff;
   cursor: pointer;
+  transition: background 0.2s, opacity 0.2s;
+}
+
+.btn-submit-reply:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #94a3b8;
+}
+
+.review-reply-input-box textarea:disabled {
+  background-color: #f1f5f9;
+  cursor: not-allowed;
 }
 
 .review-replies-list {
