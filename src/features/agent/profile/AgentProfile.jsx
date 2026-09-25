@@ -353,6 +353,12 @@ const AgentProfile = ({
 
       const data = await res.json();
       if (!res.ok) {
+        if (res.status === 429) {
+          const retryAfter = Number(res.headers.get('Retry-After') || data.retryAfterSeconds);
+          if (Number.isFinite(retryAfter) && retryAfter > 0) {
+            setOtpCountdown(Math.ceil(retryAfter));
+          }
+        }
         throw new Error(data.error || 'Gửi OTP thất bại');
       }
 

@@ -12,6 +12,9 @@ const sendOtp = async (req, res) => {
     const result = await phoneOtpService.sendOtp({ userId, phone });
     res.status(200).json(result);
   } catch (error) {
+    if (error.retryAfterSeconds) {
+      res.set('Retry-After', String(error.retryAfterSeconds));
+    }
     res.status(error.statusCode || 500).json({ error: error.message || 'Internal server error' });
   }
 };
@@ -28,6 +31,9 @@ const verifyOtp = async (req, res) => {
     const result = await phoneOtpService.verifyOtp({ userId, phone, otp });
     res.status(200).json(result);
   } catch (error) {
+    if (error.retryAfterSeconds) {
+      res.set('Retry-After', String(error.retryAfterSeconds));
+    }
     res.status(error.statusCode || 500).json({ error: error.message || 'Internal server error' });
   }
 };

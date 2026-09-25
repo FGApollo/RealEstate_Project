@@ -2,6 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { API_BASE_URL } from '../../../config';
 import { apiFetch } from '../../../auth/apiClient';
 
+const MAX_LISTING_IMAGES = 6;
+const MAX_LISTING_IMAGE_BYTES = 5 * 1024 * 1024;
+
 const DEFAULT_LISTING = (currentUser) => ({
   title: '',
   description: '',
@@ -285,7 +288,17 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
 
   // Image handlers
   const handleImageFileChange = (e) => {
-    Array.from(e.target.files).forEach(file => {
+    const selectedFiles = Array.from(e.target.files);
+    const availableSlots = Math.max(0, MAX_LISTING_IMAGES - listing.images.length);
+    if (selectedFiles.length > availableSlots) {
+      alert(`Mỗi tin đăng tối đa ${MAX_LISTING_IMAGES} ảnh.`);
+    }
+    selectedFiles.slice(0, availableSlots).forEach(file => {
+      if (!file.type.startsWith('image/')) return;
+      if (file.size > MAX_LISTING_IMAGE_BYTES) {
+        alert('Mỗi ảnh đăng tin phải từ 5 MB trở xuống.');
+        return;
+      }
       const reader = new FileReader();
       reader.onloadend = () => {
         setListing(prev => {
@@ -301,8 +314,17 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
 
   const handleDrop = (e) => {
     e.preventDefault();
-    Array.from(e.dataTransfer.files).forEach(file => {
+    const selectedFiles = Array.from(e.dataTransfer.files).filter(file => file.type.startsWith('image/'));
+    const availableSlots = Math.max(0, MAX_LISTING_IMAGES - listing.images.length);
+    if (selectedFiles.length > availableSlots) {
+      alert(`Mỗi tin đăng tối đa ${MAX_LISTING_IMAGES} ảnh.`);
+    }
+    selectedFiles.slice(0, availableSlots).forEach(file => {
       if (!file.type.startsWith('image/')) return;
+      if (file.size > MAX_LISTING_IMAGE_BYTES) {
+        alert('Mỗi ảnh đăng tin phải từ 5 MB trở xuống.');
+        return;
+      }
       const reader = new FileReader();
       reader.onloadend = () => {
         setListing(prev => {

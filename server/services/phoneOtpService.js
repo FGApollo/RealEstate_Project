@@ -2,15 +2,18 @@ const crypto = require('crypto');
 const { supabase } = require('../config/supabase');
 const trustScoreService = require('./trustScoreService');
 const esmsService = require('./esmsService');
+const { getOtpSendLimits, createOtpQuotaHash } = require('./otpSendPolicy');
 
 const OTP_TTL_MS = 5 * 60 * 1000;
 const OTP_COOLDOWN_MS = 60 * 1000;
 const MAX_VERIFY_ATTEMPTS = 5;
 const VIETNAM_PHONE_PATTERN = /^(03|05|07|08|09)\d{8}$/;
 
-const createServiceError = (message, statusCode = 400) => {
+const createServiceError = (message, statusCode = 400, code, retryAfterSeconds) => {
   const error = new Error(message);
   error.statusCode = statusCode;
+  if (code) error.code = code;
+  if (retryAfterSeconds) error.retryAfterSeconds = retryAfterSeconds;
   return error;
 };
 
@@ -34,6 +37,52 @@ const validatePhone = (phone) => {
   }
 
   return normalizedPhone;
+};
+
+const getLiveSmsQuota = () => {
+  const limits = getOtpSendLimits();
+  if (!limits) {
+    throw createServiceError(
+      'Live OTP sending is not configured with per-phone and global daily limits',
+      503
+    );
+  }
+  return limits;
+};
+
+const reserveLiveSmsQuota = async (phone) => {
+  if (!esmsService.isLiveSmsEnabled()) return;
+
+  const { maxPerHour, maxPerDay, maxGlobalPerDay } = getLiveSmsQuota();
+  const phoneHash = createOtpQuotaHash(phone, process.env.JWT_SECRET);
+  const globalHash = createOtpQuotaHash('global-live-otp-sends', process.env.JWT_SECRET);
+  const { data, error } = await supabase.rpc('reserve_phone_otp_send', {
+    p_phone_hash: phoneHash,
+    p_global_hash: globalHash,
+    p_max_per_hour: maxPerHour,
+    p_max_per_day: maxPerDay,
+    p_max_global_per_day: maxGlobalPerDay,
+    p_cooldown_seconds: Math.floor(OTP_COOLDOWN_MS / 1000)
+  });
+
+  if (error) {
+    console.error('Live OTP quota reservation failed:', error.message);
+    throw createServiceError('OTP sending is temporarily unavailable', 503);
+  }
+
+  const reservation = Array.isArray(data) ? data[0] : data;
+  if (!reservation?.allowed) {
+    const retryAfterSeconds = Math.max(1, Number(reservation?.retry_after_seconds) || 60);
+    let message = 'Please wait before requesting another OTP.';
+    if (reservation?.reason === 'HOURLY_LIMIT') {
+      message = 'OTP send limit reached for this phone. Please try again later.';
+    } else if (reservation?.reason === 'DAILY_LIMIT') {
+      message = 'OTP daily send limit reached for this phone. Please try again tomorrow.';
+    } else if (reservation?.reason === 'GLOBAL_DAILY_LIMIT') {
+      message = 'OTP sending is temporarily limited. Please try again later.';
+    }
+    throw createServiceError(message, 429, undefined, retryAfterSeconds);
+  }
 };
 
 const ensureUserExists = async (userId) => {
@@ -110,7 +159,13 @@ const ensureOtpCooldownPassed = async (userId, phone) => {
 
   const createdAt = parseDatabaseTimestamp(latestOtp.created_at);
   if (Number.isFinite(createdAt) && Date.now() - createdAt < OTP_COOLDOWN_MS) {
-    throw createServiceError('Please wait 60 seconds before requesting a new OTP');
+    const retryAfterSeconds = Math.max(1, Math.ceil((createdAt + OTP_COOLDOWN_MS - Date.now()) / 1000));
+    throw createServiceError(
+      'Please wait before requesting a new OTP',
+      429,
+      'OTP_COOLDOWN',
+      retryAfterSeconds
+    );
   }
 };
 
@@ -134,6 +189,9 @@ const sendOtp = async ({ userId, phone }) => {
 
   await ensureUserExists(userId);
   await ensureOtpCooldownPassed(userId, normalizedPhone);
+  // For billable SMS, reserve a shared, atomic per-phone quota before calling eSMS.
+  // Failed provider requests still consume the reservation to avoid retry storms.
+  await reserveLiveSmsQuota(normalizedPhone);
   await markOldOtpsUsed(userId, normalizedPhone);
 
   const expiresAt = new Date(Date.now() + OTP_TTL_MS).toISOString();
@@ -205,7 +263,10 @@ const verifyOtp = async ({ userId, phone, otp }) => {
   }
 
   if ((otpRecord.attempt_count || 0) >= MAX_VERIFY_ATTEMPTS) {
-    throw createServiceError('OTP attempt limit exceeded');
+    const retryAfterSeconds = Math.max(1, Math.ceil(
+      (parseDatabaseTimestamp(otpRecord.expires_at) - Date.now()) / 1000
+    ));
+    throw createServiceError('OTP attempt limit exceeded', 429, 'OTP_ATTEMPT_LIMIT', retryAfterSeconds);
   }
 
   if (otpRecord.otp_code !== normalizedOtp) {
@@ -254,5 +315,7 @@ const verifyOtp = async ({ userId, phone, otp }) => {
 
 module.exports = {
   sendOtp,
-  verifyOtp
+  verifyOtp,
+  validatePhone,
+  getLiveSmsQuota
 };

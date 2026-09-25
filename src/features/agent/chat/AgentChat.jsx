@@ -16,6 +16,7 @@ const AgentChat = ({ currentUser }) => {
   const [activeConversation, setActiveConversation] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
+  const [sendError, setSendError] = useState('');
   const [loading, setLoading] = useState(true);
 
   const messagesEndRef = useRef(null);
@@ -130,8 +131,8 @@ const AgentChat = ({ currentUser }) => {
     e.preventDefault();
     if (!newMessage.trim() || !currentUser || !activeConversation) return;
 
-    const msgText = newMessage;
-    setNewMessage('');
+    const msgText = newMessage.trim();
+    setSendError('');
 
     try {
       const res = await apiFetch(`${API_BASE_URL}/api/chat/messages`, {
@@ -143,13 +144,20 @@ const AgentChat = ({ currentUser }) => {
         })
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        setMessages(prev => [...prev, data.message]);
-        fetchConversations();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setSendError(data.error || (res.status === 429
+          ? 'Bạn đang gửi tin nhắn quá nhanh. Vui lòng thử lại sau.'
+          : 'Không thể gửi tin nhắn. Vui lòng thử lại.'));
+        return;
       }
+
+      setNewMessage('');
+      setMessages(prev => [...prev, data.message]);
+      fetchConversations();
     } catch (err) {
       console.error('Error sending message:', err);
+      setSendError('Lỗi kết nối. Tin nhắn vẫn được giữ lại để bạn thử gửi lại.');
     }
   };
 
@@ -379,12 +387,14 @@ const AgentChat = ({ currentUser }) => {
                 type="text"
                 placeholder="Nhập phản hồi..."
                 value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
+                maxLength={2000}
+                onChange={(e) => { setNewMessage(e.target.value); setSendError(''); }}
               />
               <button type="submit" className="send-btn">
                 <Send size={18} />
               </button>
             </form>
+            {sendError && <p role="alert" style={{ color: '#b91c1c', margin: '4px 12px' }}>{sendError}</p>}
           </>
         ) : (
           <div className="chat-placeholder">
