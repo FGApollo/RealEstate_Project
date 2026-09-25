@@ -32,7 +32,7 @@ const validatePassword = (password) => {
   if (password.length > 72) return 'Password must be no more than 72 UTF-8 bytes';
   if (!password.trim()) return 'Password cannot contain only spaces';
   const characterCount = [...password].length;
-  if (characterCount < 15) return 'Use at least 15 characters';
+  if (characterCount < 10) return 'Use at least 10 characters';
   if (Buffer.byteLength(password, 'utf8') > 72) {
     return 'Password must be no more than 72 UTF-8 bytes';
   }
