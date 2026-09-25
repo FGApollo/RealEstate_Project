@@ -197,6 +197,17 @@ const AgentProfile = ({
         if (res.ok) {
           const data = await res.json();
           setKycStatus(data);
+
+          // Nếu đang có hồ sơ PENDING và đã tải CCCD (khi F5 hoặc tải lại trang):
+          // Tự động khôi phục người dùng vào Bước 3 (Chụp ảnh khuôn mặt) mà không phải làm lại từ đầu
+          if (data.latestVerificationStatus === 'PENDING' && data.hasCardUploaded) {
+            setKycWizardStep((currentStep) => {
+              if (currentStep === 0 || currentStep === 1 || currentStep === 2) {
+                return 3;
+              }
+              return currentStep;
+            });
+          }
         }
       } catch (err) {
         console.error('Error fetching KYC status:', err);
@@ -205,7 +216,7 @@ const AgentProfile = ({
       }
     };
     fetchKycStatus();
-  }, [currentUser.id, currentUser.verification_status, kycWizardStep]);
+  }, [currentUser.id, currentUser.verification_status]);
 
   // Helpers
   const formatTimeAgo = (dateStr) => {
@@ -434,6 +445,14 @@ const AgentProfile = ({
       }
 
       setKycVerificationData(result.verification || result.data);
+      setKycStatus(prev => ({
+        ...prev,
+        verificationStatus: 'PENDING',
+        latestVerificationStatus: 'PENDING',
+        hasPendingVerification: true,
+        hasCardUploaded: true
+      }));
+      updateUser({ verification_status: 'PENDING' });
       setKycWizardStep(3);
     } catch (err) {
       console.error(err);
@@ -465,11 +484,27 @@ const AgentProfile = ({
 
       const result = await res.json();
       if (!res.ok || !result.success) {
-        throw new Error(result.error || 'Khuôn mặt không khớp với ảnh CCCD, vui lòng chụp lại.');
+        if (result.canRetrySelfie === false) {
+          setKycStatus(prev => ({
+            ...prev,
+            verificationStatus: 'REJECTED',
+            latestVerificationStatus: 'REJECTED',
+            hasPendingVerification: false,
+            hasCardUploaded: false
+          }));
+          updateUser({ verification_status: 'REJECTED' });
+        }
+        throw new Error(result.error || result.message || 'Khuôn mặt không khớp với ảnh CCCD, vui lòng chụp lại.');
       }
 
       setKycWizardStep(4);
-      setKycStatus(prev => ({ ...prev, verificationStatus: 'VERIFIED' }));
+      setKycStatus(prev => ({
+        ...prev,
+        verificationStatus: 'VERIFIED',
+        latestVerificationStatus: 'APPROVED',
+        hasPendingVerification: false,
+        hasCardUploaded: false
+      }));
       updateUser({ verification_status: 'VERIFIED' });
     } catch (err) {
       console.error(err);
@@ -1514,6 +1549,24 @@ const AgentProfile = ({
                           <h4 className="step-card-heading">Xác thực khuôn mặt</h4>
                           <p className="step-card-sub">Vui lòng đưa khuôn mặt của bạn vào khung hình và giữ yên để hệ thống tự động nhận diện.</p>
 
+                          {kycStatus?.latestVerificationStatus === 'PENDING' && !kycFrontFile && (
+                            <div style={{
+                              background: '#ecfdf5',
+                              border: '1px solid #a7f3d0',
+                              color: '#065f46',
+                              padding: '10px 14px',
+                              borderRadius: '8px',
+                              marginBottom: '16px',
+                              fontSize: '13px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px'
+                            }}>
+                              <Check size={16} />
+                              <span>Ảnh CCCD 2 mặt đã được lưu an toàn. Vui lòng tiếp tục bước chụp ảnh chân dung (Selfie) để hoàn tất.</span>
+                            </div>
+                          )}
+
                           <div className="s3-camera-wrapper">
                             <div className="s3-oval-frame">
                               <input type="file" id="selfie-upload-input" accept="image/*" onChange={(e) => handleFileChange(e, 'selfie')} style={{ display: 'none' }} />
@@ -1615,16 +1668,31 @@ const AgentProfile = ({
                   <div className="kyc-main-panel">
                     <div className="kyc-unverified-card">
                       <div className="warning-icon-wrapper">
-                        <ShieldAlert size={36} color="#f97316" />
+                        <ShieldAlert size={36} color={kycStatus?.latestVerificationStatus === 'PENDING' ? '#2563eb' : '#f97316'} />
                       </div>
                       <p className="unverified-text">
-                        Để bảo vệ cộng đồng Swipe Nest và trải nghiệm đầy đủ các tính năng độc quyền, vui lòng hoàn tất xác thực danh tính.
+                        {kycStatus?.latestVerificationStatus === 'PENDING' && kycStatus?.hasCardUploaded
+                          ? 'Bạn đã tải lên ảnh CCCD 2 mặt thành công. Vui lòng tiếp tục bước chụp ảnh chân dung để hoàn tất xác thực.'
+                          : 'Để bảo vệ cộng đồng Swipe Nest và trải nghiệm đầy đủ các tính năng độc quyền, vui lòng hoàn tất xác thực danh tính.'}
                       </p>
-                      <button className="btn-trigger-kyc" onClick={handleStartKyc}>
-                        Xác thực ngay
+                      <button 
+                        className="btn-trigger-kyc" 
+                        onClick={() => {
+                          if (kycStatus?.latestVerificationStatus === 'PENDING' && kycStatus?.hasCardUploaded) {
+                            setKycWizardStep(3);
+                          } else {
+                            handleStartKyc();
+                          }
+                        }}
+                      >
+                        {kycStatus?.latestVerificationStatus === 'PENDING' && kycStatus?.hasCardUploaded
+                          ? 'Tiếp tục chụp ảnh khuôn mặt'
+                          : 'Xác thực ngay'}
                       </button>
                       <span className="kyc-secure-note">🛡️ Xác thực an toàn theo chuẩn AES-256</span>
-                      <h4 className="unverified-status-title">Tài khoản chưa được xác minh</h4>
+                      <h4 className="unverified-status-title">
+                        {kycStatus?.latestVerificationStatus === 'PENDING' ? 'Hồ sơ đang chờ xác thực khuôn mặt' : 'Tài khoản chưa được xác minh'}
+                      </h4>
                     </div>
                   </div>
 
