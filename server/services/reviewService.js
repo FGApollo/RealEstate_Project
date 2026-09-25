@@ -52,7 +52,14 @@ const getPropertyReviews = async (propertyId) => {
     .select(`
       *,
       user:users!user_id(name, avatar, role),
-      images:property_review_images(image_url)
+      images:property_review_images(image_url),
+      replies:property_review_replies(
+        id,
+        review_id,
+        reply_text,
+        created_at,
+        user:users!user_id(id, name, avatar, role)
+      )
     `)
     .eq('property_id', propertyId)
     .eq('status', 'APPROVED')
@@ -231,8 +238,83 @@ const createPropertyReview = async (propertyId, userId, rating, comment, images 
   return finalReview;
 };
 
+const createReviewReply = async (reviewId, userId, replyText) => {
+  const rId = parseInt(reviewId);
+  const uId = parseInt(userId);
+
+  if (isNaN(rId)) {
+    const error = new Error('Mã đánh giá không hợp lệ');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (!replyText || !replyText.trim()) {
+    const error = new Error('Nội dung phản hồi không được để trống');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  // 1. Fetch review and associated property to verify owner
+  const { data: review, error: revError } = await supabase
+    .from('property_reviews')
+    .select(`
+      id,
+      property_id,
+      property:properties!property_id(id, owner_id)
+    `)
+    .eq('id', rId)
+    .single();
+
+  if (revError || !review) {
+    const error = new Error('Đánh giá không tồn tại');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const ownerId = review.property ? review.property.owner_id : null;
+  if (ownerId !== uId) {
+    const { data: userProfile } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', uId)
+      .single();
+
+    if (!userProfile || userProfile.role !== 'ADMIN') {
+      const error = new Error('Chỉ chủ sở hữu bất động sản mới có quyền phản hồi đánh giá này');
+      error.statusCode = 403;
+      throw error;
+    }
+  }
+
+  // 2. Insert into property_review_replies
+  const { data: insertedReply, error: insError } = await supabase
+    .from('property_review_replies')
+    .insert([{
+      review_id: rId,
+      user_id: uId,
+      reply_text: replyText.trim()
+    }])
+    .select(`
+      id,
+      review_id,
+      reply_text,
+      created_at,
+      user:users!user_id(id, name, avatar, role)
+    `)
+    .single();
+
+  if (insError) {
+    console.error('Error inserting review reply:', insError);
+    throw new Error(insError.message);
+  }
+
+  return insertedReply;
+};
+
 module.exports = {
   getPropertyReviews,
   createPropertyReview,
-  checkUserVerifiedTransaction
+  checkUserVerifiedTransaction,
+  createReviewReply
 };
+

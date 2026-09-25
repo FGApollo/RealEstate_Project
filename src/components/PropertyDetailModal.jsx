@@ -762,10 +762,56 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
                               <button className="helpful-btn">
                                 <span>👍 Hữu ích ({rev.helpful_count || 0})</span>
                               </button>
-                              <button className="reply-btn">
-                                <span>💬 Trả lời</span>
-                              </button>
                             </div>
+
+                            {/* Replies List */}
+                            {rev.replies && rev.replies.length > 0 && (
+                              <div className="property-review-replies-list" style={{
+                                marginTop: '10px',
+                                paddingLeft: '14px',
+                                borderLeft: '3px solid #e2e8f0',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '8px'
+                              }}>
+                                {rev.replies.map((reply) => (
+                                  <div key={reply.id} style={{
+                                    backgroundColor: '#f8fafc',
+                                    borderRadius: '8px',
+                                    padding: '8px 12px',
+                                    textAlign: 'left'
+                                  }}>
+                                    <div style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '6px',
+                                      fontSize: '12px',
+                                      marginBottom: '4px'
+                                    }}>
+                                      <span style={{ fontWeight: 700, color: '#0f172a' }}>
+                                        {reply.user?.name || 'Môi giới'}
+                                      </span>
+                                      <span style={{
+                                        backgroundColor: '#dbeafe',
+                                        color: '#1e40af',
+                                        fontSize: '10px',
+                                        fontWeight: 800,
+                                        padding: '1px 5px',
+                                        borderRadius: '4px'
+                                      }}>
+                                        Tác giả
+                                      </span>
+                                      <span style={{ color: '#64748b' }}>
+                                        · {new Date(reply.created_at).toLocaleDateString('vi-VN')}
+                                      </span>
+                                    </div>
+                                    <p style={{ margin: 0, fontSize: '13px', color: '#334155', lineHeight: 1.4 }}>
+                                      {reply.reply_text}
+                                    </p>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         );
                       })

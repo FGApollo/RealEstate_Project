@@ -112,6 +112,7 @@ const AgentProfile = ({
   const [reviewReplies, setReviewReplies] = useState({});
   const [showReplyInput, setShowReplyInput] = useState({});
   const [replyText, setReplyText] = useState({});
+  const [submittingReply, setSubmittingReply] = useState({});
 
   // KYC States
   const [kycStatus, setKycStatus] = useState(null);
@@ -172,9 +173,24 @@ const AgentProfile = ({
             const data = await res.json();
             setReviews(data || []);
 
+            // Initialize replies from server database
+            const loadedReplies = {};
+            (data || []).forEach((r) => {
+              if (r.replies && r.replies.length > 0) {
+                loadedReplies[r.id] = r.replies.map((rep) => ({
+                  id: rep.id,
+                  author: rep.user?.name || currentUser.name || 'Môi giới',
+                  role: rep.user?.role || 'Broker',
+                  text: rep.reply_text,
+                  created_at: rep.created_at
+                }));
+              }
+            });
+            setReviewReplies(loadedReplies);
+
             // Initialize helpful counts
             const counts = {};
-            data.forEach((r, idx) => {
+            (data || []).forEach((r, idx) => {
               counts[r.id] = idx === 0 ? 12 : idx === 1 ? 5 : 8;
             });
             setHelpfulCounts(counts);
@@ -264,30 +280,52 @@ const AgentProfile = ({
     }));
   };
 
-  const handleSendReply = (reviewId) => {
+  const handleSendReply = async (reviewId) => {
     const text = replyText[reviewId];
     if (!text || !text.trim()) return;
 
-    setReviewReplies(prev => ({
-      ...prev,
-      [reviewId]: [...(prev[reviewId] || []), {
-        id: `reply-${Date.now()}`,
-        author: currentUser.name || 'Zân Cao',
-        role: 'Broker',
-        text: text,
-        created_at: new Date().toISOString()
-      }]
-    }));
+    setSubmittingReply(prev => ({ ...prev, [reviewId]: true }));
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/api/agent/reviews/${reviewId}/reply`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ reply_text: text.trim() })
+      });
 
-    setReplyText(prev => ({
-      ...prev,
-      [reviewId]: ''
-    }));
+      if (res.ok) {
+        const savedReply = await res.json();
+        setReviewReplies(prev => ({
+          ...prev,
+          [reviewId]: [...(prev[reviewId] || []), {
+            id: savedReply.id,
+            author: savedReply.user?.name || currentUser.name || 'Môi giới',
+            role: savedReply.user?.role || 'Broker',
+            text: savedReply.reply_text,
+            created_at: savedReply.created_at
+          }]
+        }));
 
-    setShowReplyInput(prev => ({
-      ...prev,
-      [reviewId]: false
-    }));
+        setReplyText(prev => ({
+          ...prev,
+          [reviewId]: ''
+        }));
+
+        setShowReplyInput(prev => ({
+          ...prev,
+          [reviewId]: false
+        }));
+      } else {
+        const errorData = await res.json().catch(() => ({}));
+        alert(errorData.error || 'Có lỗi xảy ra khi gửi phản hồi.');
+      }
+    } catch (err) {
+      console.error('Error sending reply:', err);
+      alert('Không thể gửi phản hồi. Vui lòng kiểm tra lại kết nối.');
+    } finally {
+      setSubmittingReply(prev => ({ ...prev, [reviewId]: false }));
+    }
   };
 
   const handleFileChange = (e, side) => {
@@ -1209,19 +1247,22 @@ const AgentProfile = ({
                                   placeholder="Nhập phản hồi của bạn..."
                                   value={replyText[rev.id] || ''}
                                   onChange={(e) => setReplyText(prev => ({ ...prev, [rev.id]: e.target.value }))}
+                                  disabled={Boolean(submittingReply[rev.id])}
                                 />
                                 <div className="reply-actions">
                                   <button
                                     className="btn-cancel-reply"
                                     onClick={() => handleToggleReplyInput(rev.id)}
+                                    disabled={Boolean(submittingReply[rev.id])}
                                   >
                                     Hủy
                                   </button>
                                   <button
                                     className="btn-submit-reply"
                                     onClick={() => handleSendReply(rev.id)}
+                                    disabled={Boolean(submittingReply[rev.id]) || !(replyText[rev.id] || '').trim()}
                                   >
-                                    Gửi
+                                    {submittingReply[rev.id] ? 'Đang gửi...' : 'Gửi'}
                                   </button>
                                 </div>
                               </div>
