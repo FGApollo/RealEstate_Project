@@ -16,14 +16,14 @@ const trustScoreRoutes = require('./routes/trustScoreRoutes');
 const userProfileRoutes = require('./routes/userProfileRoutes');
 const subscriptionRoutes = require('./routes/subscriptionRoutes');
 const { getJwtConfig, getCookieOptions } = require('./services/authSessionService');
-const { allowedOrigins } = require('./middleware/trustedOrigin');
+const { corsOptions } = require('./middleware/trustedOrigin');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 getJwtConfig();
 getCookieOptions();
-app.use(cors({ origin: allowedOrigins, credentials: true }));
+app.use(cors(corsOptions));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
