@@ -6,7 +6,7 @@ const ACCESS_TOKEN_TTL = '15m';
 const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const COOKIE_NAME = 'swipenest_refresh';
 const COOKIE_PATH = '/api/auth';
-const USER_COLUMNS = 'id, name, email, avatar, role, phone, verification_status, trust_score';
+const USER_COLUMNS = 'id, name, email, avatar, role, phone, email_verified_at, verification_status, trust_score';
 
 const getJwtConfig = () => {
   const secret = process.env.JWT_SECRET;
@@ -99,6 +99,13 @@ const getAuthenticatedUser = async (token) => {
 };
 
 const createSession = async (user) => {
+  if (!user?.email_verified_at) {
+    const error = new Error('Verify your email before signing in');
+    error.statusCode = 403;
+    error.code = 'EMAIL_VERIFICATION_REQUIRED';
+    throw error;
+  }
+
   const refreshToken = generateRefreshToken();
   const { data: session, error } = await supabase
     .from('auth_sessions')
@@ -146,7 +153,7 @@ const refreshSession = async (refreshToken) => {
   }
 
   const user = await getUserById(session.user_id);
-  if (!user) return null;
+  if (!user || !user.email_verified_at) return null;
 
   const newRefreshToken = generateRefreshToken();
   const { data: rotated, error: rotationError } = await supabase

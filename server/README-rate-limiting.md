@@ -50,3 +50,10 @@ include passwords, OTPs, access/refresh tokens, email, phone, or limiter keys.
 The current frontend displays the server's OTP error and uses `Retry-After` to
 keep its resend countdown aligned with the backend. That countdown is UX only;
 the server-side limit is authoritative.
+
+Email verification resend uses IP and normalized IP+email limits in the existing
+rate-limit middleware, including one request per normalized IP+email each
+minute, plus a database-enforced 60-second cooldown and five
+token issues per account per rolling hour. The verification token endpoint is
+also IP-limited. The in-process IP counters have the same multi-instance caveat
+described above; per-account token issuance is serialized in Supabase.

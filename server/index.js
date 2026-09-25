@@ -36,6 +36,18 @@ getCookieOptions();
 app.use(cors(corsOptions));
 // Count API requests before parsing large JSON or multipart payloads.
 app.use('/api', rateLimiters.api);
+// Authentication DTOs contain no large payloads; cap them separately from listing JSON.
+const authJsonParser = express.json({ limit: '24kb' });
+const authUrlencodedParser = express.urlencoded({ limit: '24kb', extended: true });
+[
+  '/api/register',
+  '/api/login',
+  '/api/google-login',
+  '/api/auth'
+].forEach((routePath) => {
+  app.use(routePath, authJsonParser);
+  app.use(routePath, authUrlencodedParser);
+});
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 

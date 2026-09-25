@@ -1,6 +1,6 @@
--- Create a mock agent
+-- Create a mock listing owner that cannot authenticate (no password is stored).
 INSERT INTO public.users (name, email, password, role)
-VALUES ('Zăn Cao', 'zancao.agent@estate.test', 'mockpass', 'AGENT')
+VALUES ('Zăn Cao', 'zancao.agent@estate.test', NULL, 'AGENT')
 RETURNING id;
 
 -- Wait, since we are returning ID, let's just make sure it exists, or insert and then update some properties.
@@ -13,7 +13,7 @@ BEGIN
   -- Insert the agent if not exists
   IF NOT EXISTS (SELECT 1 FROM public.users WHERE email = 'zancao.agent@estate.test') THEN
     INSERT INTO public.users (name, email, password, role)
-    VALUES ('Zăn Cao', 'zancao.agent@estate.test', 'mockpass', 'AGENT')
+    VALUES ('Zăn Cao', 'zancao.agent@estate.test', NULL, 'AGENT')
     RETURNING id INTO v_agent_id;
   ELSE
     SELECT id INTO v_agent_id FROM public.users WHERE email = 'zancao.agent@estate.test';
