@@ -13,6 +13,13 @@ const authenticate = async (req, res, next) => {
       return res.status(401).json({ error: 'Invalid or expired session' });
     }
 
+    if (!user.email_verified_at) {
+      return res.status(403).json({
+        error: 'Hãy xác minh email trước khi sử dụng tài khoản này',
+        code: 'EMAIL_VERIFICATION_REQUIRED'
+      });
+    }
+
     req.user = user;
     return next();
   } catch (error) {

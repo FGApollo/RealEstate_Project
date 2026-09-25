@@ -7,6 +7,12 @@ const { rateLimiters } = require('../middleware/rateLimiters');
 
 router.post('/register', requireTrustedOrigin, rateLimiters.authIp, rateLimiters.registerIp,
   rateLimiters.registerIpEmail, authController.register);
+router.post('/auth/resend-verification', requireTrustedOrigin, rateLimiters.authIp,
+  rateLimiters.verificationSendIp, rateLimiters.verificationSendCooldown,
+  rateLimiters.verificationSendIpEmail,
+  authController.resendVerification);
+router.post('/auth/verify-email', requireTrustedOrigin, rateLimiters.authIp,
+  rateLimiters.verificationVerifyIp, authController.verifyEmail);
 router.post('/login', requireTrustedOrigin, rateLimiters.authIp, rateLimiters.loginIpEmail,
   authController.login);
 router.post('/google-login', requireTrustedOrigin, rateLimiters.authIp, rateLimiters.googleIp,

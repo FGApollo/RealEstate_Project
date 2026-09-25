@@ -5,13 +5,13 @@ const seed = async () => {
   console.log('Seeding reviews and reviewer users...');
   
   // 1. Hash password for reviewer users
-  const hashedPassword = await bcrypt.hash('mockpassword123', 10);
+  const hashedPassword = await bcrypt.hash('MockReviewAccount-2026-Only!', 12);
   
   // 2. Define reviewer users
   const reviewers = [
-    { name: 'Courtney Henry', email: 'courtney.henry@estate.test', password: hashedPassword, role: 'USER', verification_status: 'VERIFIED' },
-    { name: 'Jerome Bell', email: 'jerome.bell@estate.test', password: hashedPassword, role: 'USER', verification_status: 'VERIFIED' },
-    { name: 'Albert Flores', email: 'albert.flores@estate.test', password: hashedPassword, role: 'USER', verification_status: 'VERIFIED' }
+    { name: 'Courtney Henry', email: 'courtney.henry@estate.test', password: hashedPassword, role: 'USER', verification_status: 'VERIFIED', email_verified_at: new Date().toISOString() },
+    { name: 'Jerome Bell', email: 'jerome.bell@estate.test', password: hashedPassword, role: 'USER', verification_status: 'VERIFIED', email_verified_at: new Date().toISOString() },
+    { name: 'Albert Flores', email: 'albert.flores@estate.test', password: hashedPassword, role: 'USER', verification_status: 'VERIFIED', email_verified_at: new Date().toISOString() }
   ];
   
   const userIds = {};

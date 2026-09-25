@@ -5,6 +5,8 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import LoginAgent from './pages/LoginAgent'
 import RegisterAgent from './pages/RegisterAgent'
+import VerifyEmail from './pages/VerifyEmail'
+import ResendVerification from './pages/ResendVerification'
 import Home from './pages/Home'
 import Swipe from './pages/Swipe'
 import AgentOverview from './pages/AgentOverview'
@@ -19,6 +21,8 @@ function App() {
       <Route path="/register" element={<Register />} />
       <Route path="/login/agent" element={<LoginAgent />} />
       <Route path="/register/agent" element={<RegisterAgent />} />
+      <Route path="/verify-email" element={<VerifyEmail />} />
+      <Route path="/resend-verification" element={<ResendVerification />} />
       <Route element={<ProtectedRoute />}>
         <Route path="/" element={<Home />} />
         <Route path="/swipe/:categoryName" element={<Swipe />} />

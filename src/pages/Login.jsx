@@ -16,6 +16,7 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
+  const [needsVerification, setNeedsVerification] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const successMessage = location.state?.message;
 
@@ -31,6 +32,7 @@ const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setNeedsVerification(false);
     setIsLoading(true);
 
     try {
@@ -44,6 +46,7 @@ const Login = () => {
       const data = await response.json();
 
       if (!response.ok) {
+        setNeedsVerification(data.code === 'EMAIL_VERIFICATION_REQUIRED');
         throw new Error(data.error || 'Failed to login');
       }
 
@@ -70,7 +73,17 @@ const Login = () => {
     >
       <form onSubmit={handleSubmit}>
         {successMessage && <div style={{ color: 'green', marginBottom: '1rem', fontSize: '0.875rem', textAlign: 'center' }}>{successMessage}</div>}
+        {successMessage && location.state?.email && (
+          <p style={{ textAlign: 'center', fontSize: '0.85rem' }}>
+            <Link to="/resend-verification" state={{ email: location.state.email }}>Chưa nhận được email? Gửi lại</Link>
+          </p>
+        )}
         {error && <div style={{ color: 'red', marginBottom: '1rem', fontSize: '0.875rem', textAlign: 'center' }}>{error}</div>}
+        {needsVerification && (
+          <p style={{ textAlign: 'center', fontSize: '0.85rem' }}>
+            <Link to="/resend-verification" state={{ email: formData.email }}>Gửi lại email xác minh</Link>
+          </p>
+        )}
 
         <Input 
           label="EMAIL"

@@ -97,3 +97,24 @@ test('login limiter normalizes email and keeps different accounts separate', asy
   assert.equal((await login('test@EXAMPLE.com')).status, 429);
   assert.equal((await login('another@example.com')).status, 200);
 });
+
+test('verification resend cooldown normalizes email and does not depend on account lookup', async (t) => {
+  const limiters = createRateLimiters({
+    verificationSendCooldownMs: 60_000,
+    verificationSendCooldownLimit: 1
+  });
+  const app = express();
+  app.use(express.json());
+  app.post('/resend', limiters.verificationSendCooldown, (_req, res) => res.status(202).end());
+  const { server, baseUrl } = await startServer(app);
+  t.after(() => server.close());
+
+  const resend = (email) => fetch(`${baseUrl}/resend`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ email })
+  });
+  assert.equal((await resend(' TEST@example.com ')).status, 202);
+  assert.equal((await resend('test@EXAMPLE.com')).status, 429);
+  assert.equal((await resend('another@example.com')).status, 202);
+});

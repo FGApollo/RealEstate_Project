@@ -61,6 +61,12 @@ const createRateLimiters = (overrides = {}) => {
     loginLimit: readPositiveInteger('LOGIN_IP_EMAIL_RATE_LIMIT_MAX', 8),
     registerIpLimit: readPositiveInteger('REGISTER_IP_RATE_LIMIT_MAX', 10),
     registerEmailLimit: readPositiveInteger('REGISTER_IP_EMAIL_RATE_LIMIT_MAX', 3),
+    verificationSendWindowMs: readPositiveInteger('EMAIL_VERIFICATION_SEND_WINDOW_MS', HOUR),
+    verificationSendCooldownMs: readPositiveInteger('EMAIL_VERIFICATION_SEND_COOLDOWN_MS', MINUTE),
+    verificationSendCooldownLimit: readPositiveInteger('EMAIL_VERIFICATION_SEND_COOLDOWN_MAX', 1),
+    verificationSendIpLimit: readPositiveInteger('EMAIL_VERIFICATION_SEND_IP_MAX', 10),
+    verificationSendEmailLimit: readPositiveInteger('EMAIL_VERIFICATION_SEND_IP_EMAIL_MAX', 5),
+    verificationVerifyLimit: readPositiveInteger('EMAIL_VERIFICATION_VERIFY_IP_MAX', 30),
     googleLimit: readPositiveInteger('GOOGLE_LOGIN_IP_RATE_LIMIT_MAX', 20),
     sessionLimit: readPositiveInteger('AUTH_SESSION_IP_RATE_LIMIT_MAX', 40),
     writeWindowMs: readPositiveInteger('WRITE_RATE_LIMIT_WINDOW_MS', 15 * MINUTE),
@@ -125,6 +131,26 @@ const createRateLimiters = (overrides = {}) => {
     loginIpEmail: byIpAndEmail('login-ip-email', config.authWindowMs, config.loginLimit),
     registerIp: byIp('register-ip', HOUR, config.registerIpLimit),
     registerIpEmail: byIpAndEmail('register-ip-email', 24 * HOUR, config.registerEmailLimit),
+    verificationSendIp: byIp(
+      'email-verification-send-ip',
+      config.verificationSendWindowMs,
+      config.verificationSendIpLimit
+    ),
+    verificationSendCooldown: byIpAndEmail(
+      'email-verification-send-cooldown',
+      config.verificationSendCooldownMs,
+      config.verificationSendCooldownLimit
+    ),
+    verificationSendIpEmail: byIpAndEmail(
+      'email-verification-send-ip-email',
+      config.verificationSendWindowMs,
+      config.verificationSendEmailLimit
+    ),
+    verificationVerifyIp: byIp(
+      'email-verification-verify-ip',
+      config.authWindowMs,
+      config.verificationVerifyLimit
+    ),
     googleIp: byIp('google-login-ip', config.authWindowMs, config.googleLimit),
     sessionIp: byIp('auth-session-ip', config.authWindowMs, config.sessionLimit),
     write: byUser('authenticated-write', config.writeWindowMs, config.writeLimit),
