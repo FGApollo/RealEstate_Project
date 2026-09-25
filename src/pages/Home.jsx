@@ -222,10 +222,14 @@ const Home = () => {
       list = list.filter(r => r.user_id === user.id);
     }
     
-    // Star filter
+    // Star / verified filter
     if (ratingFilter !== 'all') {
-      const stars = parseInt(ratingFilter);
-      list = list.filter(r => r.rating === stars);
+      if (ratingFilter === 'verified') {
+        list = list.filter(r => Boolean(r.is_verified_review));
+      } else {
+        const stars = parseInt(ratingFilter);
+        list = list.filter(r => r.rating === stars);
+      }
     }
     
     // Sorting
@@ -250,6 +254,10 @@ const Home = () => {
     if (!selectedProperty) return;
     if (!user) {
       alert('Vui lòng đăng nhập để gửi đánh giá!');
+      return;
+    }
+    if (user.id === selectedProperty.owner_id) {
+      alert('Chủ sở hữu không thể tự đánh giá bất động sản của mình!');
       return;
     }
 
@@ -1541,6 +1549,7 @@ const Home = () => {
                     <div className="select-wrapper">
                       <select value={ratingFilter} onChange={(e) => setRatingFilter(e.target.value)}>
                         <option value="all">Tất cả sao</option>
+                        <option value="verified">✓ Đã xác thực giao dịch</option>
                         <option value="5">5 sao</option>
                         <option value="4">4 sao</option>
                         <option value="3">3 sao</option>
@@ -1560,7 +1569,7 @@ const Home = () => {
                       filteredReviewsList.map((rev) => {
                         const avatarInitial = rev.user?.name ? rev.user.name.charAt(0).toUpperCase() : 'U';
                         const reviewDate = new Date(rev.created_at).toLocaleDateString('vi-VN');
-                        const isVerified = rev.is_verified_review || rev.user_id === selectedProperty.owner_id;
+                        const isVerified = Boolean(rev.is_verified_review);
                         
                         return (
                           <div key={rev.id} className="review-item-card">
@@ -1576,6 +1585,11 @@ const Home = () => {
                                 <div className="reviewer-name-date">
                                   <div className="reviewer-name-row">
                                     <span className="reviewer-name">{rev.user?.name || 'Người dùng'}</span>
+                                    {isVerified && (
+                                      <span className="purchased-badge" title="Đánh giá đã được xác thực qua giao dịch thực tế">
+                                        ✓ Đã giao dịch
+                                      </span>
+                                    )}
                                   </div>
                                   <span className="review-date">{reviewDate}</span>
                                 </div>

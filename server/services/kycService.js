@@ -183,17 +183,25 @@ const getKycStatus = async (userId) => {
     };
   }
 
+  const hasCardUploaded = Boolean(
+    latestVerificationStatus === PENDING_STATUS &&
+    latestVerification?.id_card_front_url &&
+    latestVerification?.id_card_back_url
+  );
+
   return {
     verificationStatus: user.verification_status || 'UNVERIFIED',
     latestVerificationStatus,
     rejectReason: latestVerificationStatus === REJECTED_STATUS ? latestVerification?.reject_reason : null,
     hasPendingVerification: latestVerificationStatus === PENDING_STATUS,
+    hasCardUploaded,
+    pendingStep: (latestVerificationStatus === PENDING_STATUS && hasCardUploaded) ? 3 : 1,
     canStartKyc: user.verification_status !== VERIFIED_STATUS,
     selfieAttemptsUsed: attemptsUsed,
     selfieAttemptsLeft: latestVerificationStatus === PENDING_STATUS
       ? Math.max(0, MAX_SELFIE_ATTEMPTS - attemptsUsed)
       : null,
-    kycDetails
+    kycDetails: user.verification_status === VERIFIED_STATUS ? kycDetails : null
   };
 };
 

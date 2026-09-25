@@ -78,11 +78,11 @@ const createPropertyReview = async (req, res) => {
       return res.status(400).json({ error: 'Missing rating' });
     }
 
-    const review = await reviewService.createPropertyReview(id, req.user.id, rating, comment, false, images);
+    const review = await reviewService.createPropertyReview(id, req.user.id, rating, comment, images);
     res.status(201).json({ success: true, review });
   } catch (error) {
     console.error('Error creating property review:', error);
-    res.status(500).json({ error: error.message || 'Internal server error' });
+    res.status(error.statusCode || 500).json({ error: error.message || 'Internal server error' });
   }
 };
 
