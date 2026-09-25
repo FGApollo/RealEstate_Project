@@ -2,6 +2,30 @@ const propertyService = require('../services/propertyService');
 const reviewService = require('../services/reviewService');
 const geminiService = require('../services/geminiService');
 
+const MAX_PROPERTY_IMAGE_COUNT = 6;
+const MAX_PROPERTY_IMAGE_BYTES = 5 * 1024 * 1024;
+
+const validatePropertyImages = (body = {}) => {
+  const images = body.images || [];
+  if (!Array.isArray(images)) return 'images must be an array';
+  if (images.length > MAX_PROPERTY_IMAGE_COUNT) {
+    return `A listing can contain at most ${MAX_PROPERTY_IMAGE_COUNT} images`;
+  }
+
+  for (const image of [body.thumbnail, ...images]) {
+    if (typeof image !== 'string' || !image.startsWith('data:image/')) continue;
+    const comma = image.indexOf(',');
+    const encoded = comma >= 0 ? image.slice(comma + 1) : '';
+    const padding = encoded.endsWith('==') ? 2 : encoded.endsWith('=') ? 1 : 0;
+    const sizeBytes = Math.floor((encoded.length * 3) / 4) - padding;
+    if (sizeBytes > MAX_PROPERTY_IMAGE_BYTES) {
+      return 'Each listing image must be 5 MB or smaller';
+    }
+  }
+
+  return null;
+};
+
 const getProperties = async (req, res) => {
   try {
     const properties = await propertyService.getProperties();
@@ -14,6 +38,8 @@ const getProperties = async (req, res) => {
 
 const createProperty = async (req, res) => {
   try {
+    const imageError = validatePropertyImages(req.body);
+    if (imageError) return res.status(413).json({ error: imageError });
     const property = await propertyService.createProperty({ ...req.body, owner_id: req.user.id });
     res.status(201).json({ success: true, property });
   } catch (error) {
@@ -38,6 +64,8 @@ const getPropertyById = async (req, res) => {
 
 const updateProperty = async (req, res) => {
   try {
+    const imageError = validatePropertyImages(req.body);
+    if (imageError) return res.status(413).json({ error: imageError });
     const { id } = req.params;
     const property = await propertyService.updateProperty(id, req.user.id, req.body);
     res.status(200).json({ success: true, property });
@@ -88,6 +116,8 @@ const createPropertyReview = async (req, res) => {
 
 const checkBeforeSave = async (req, res) => {
   try {
+    const imageError = validatePropertyImages(req.body);
+    if (imageError) return res.status(413).json({ error: imageError });
     const { excludeId } = req.query;
     const propertyData = { ...req.body, owner_id: req.user.id };
 
@@ -128,6 +158,8 @@ const getSimilarProperties = async (req, res) => {
 };
 
 module.exports = {
+  MAX_PROPERTY_IMAGE_COUNT,
+  MAX_PROPERTY_IMAGE_BYTES,
   getProperties,
   createProperty,
   getPropertyById,

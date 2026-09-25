@@ -1,4 +1,5 @@
 const chatService = require('../services/chatService');
+const MAX_MESSAGE_LENGTH = 2000;
 
 const getMessages = async (req, res) => {
   try {
@@ -17,10 +18,18 @@ const getMessages = async (req, res) => {
 const sendMessage = async (req, res) => {
   try {
     const { receiverId, propertyId, message } = req.body;
-    if (!receiverId || !message) {
+    if (!receiverId || typeof message !== 'string' || !message.trim()) {
       return res.status(400).json({ error: 'receiverId and message are required' });
     }
-    const data = await chatService.sendMessage(req.user.id, Number(receiverId), propertyId ? Number(propertyId) : null, message);
+    if (message.length > MAX_MESSAGE_LENGTH) {
+      return res.status(413).json({ error: `Message must be ${MAX_MESSAGE_LENGTH} characters or fewer` });
+    }
+    const data = await chatService.sendMessage(
+      req.user.id,
+      Number(receiverId),
+      propertyId ? Number(propertyId) : null,
+      message.trim()
+    );
     res.status(201).json({ success: true, message: data });
   } catch (error) {
     console.error('Error in sendMessage:', error);
@@ -64,6 +73,7 @@ const getFunnelStats = async (req, res) => {
 };
 
 module.exports = {
+  MAX_MESSAGE_LENGTH,
   getMessages,
   sendMessage,
   getConversations,

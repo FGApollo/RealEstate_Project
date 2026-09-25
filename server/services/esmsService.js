@@ -28,6 +28,16 @@ const isConfigured = () => {
   return Boolean(apiKey && secretKey && apiKey.trim() !== '' && secretKey.trim() !== '');
 };
 
+const isLiveSmsEnabled = () => isConfigured()
+  && process.env.ESMS_MOCK !== 'true'
+  && process.env.ESMS_SANDBOX === '0';
+
+const maskPhone = (phone) => {
+  const value = String(phone || '');
+  if (value.length <= 4) return '****';
+  return `${value.slice(0, 3)}${'*'.repeat(Math.max(2, value.length - 5))}${value.slice(-2)}`;
+};
+
 /**
  * Gửi tin nhắn SMS OTP qua eSMS.vn
  * @param {Object} options
@@ -51,13 +61,7 @@ const sendOtpSms = async ({ phone, otp, customContent }) => {
 
   // Fallback Mock Mode: Nếu chưa cấu hình Key hoặc được cấu hình force mock
   if (!isConfigured() || forceMock) {
-    console.warn('\n================== [eSMS.vn MOCK MODE] ==================');
-    console.warn(`[eSMS] Chưa cấu hình ESMS_API_KEY hoặc bật ESMS_MOCK.`);
-    console.warn(`[eSMS] Gửi thử nghiệm SMS tới: ${phone}`);
-    console.warn(`[eSMS] Nội dung tin nhắn: "${content}"`);
-    console.warn(`[eSMS] Mã OTP: ${otp}`);
-    console.warn(`[eSMS] Để gửi SMS thật/sandbox, hãy thêm ESMS_API_KEY & ESMS_SECRET_KEY vào server/.env`);
-    console.warn('=========================================================\n');
+    console.warn(`[eSMS] Mock mode; no outbound SMS sent to ${maskPhone(phone)}.`);
 
     return {
       success: true,
@@ -87,7 +91,7 @@ const sendOtpSms = async ({ phone, otp, customContent }) => {
   try {
     const modeLabel = sandbox === '1' ? 'SANDBOX (Thử nghiệm)' : 'PRODUCTION (Thực tế)';
     const senderLabel = smsType === '8' ? 'Đầu số cố định 10 số (Không hiện Brandname)' : `Brandname: "${brandname}"`;
-    console.log(`[eSMS] Đang gửi SMS tới ${phone} [Chế độ: ${modeLabel}] (${senderLabel}, Type: ${smsType})...`);
+    console.log(`[eSMS] Sending OTP in ${modeLabel} (${senderLabel}, Type: ${smsType}).`);
     
     const response = await fetch(ESMS_ENDPOINT, {
       method: 'POST',
@@ -102,7 +106,7 @@ const sendOtpSms = async ({ phone, otp, customContent }) => {
     const codeResult = String(data?.CodeResult || '');
 
     if (codeResult === '100') {
-      console.log(`[eSMS] Gửi SMS thành công tới ${phone} [${modeLabel}]. SMSID: ${data.SMSID}`);
+      console.log(`[eSMS] SMS request accepted [${modeLabel}]. SMSID: ${data.SMSID}`);
       return {
         success: true,
         smsId: data.SMSID,
@@ -116,7 +120,7 @@ const sendOtpSms = async ({ phone, otp, customContent }) => {
 
     // Xử lý các mã lỗi từ eSMS
     const errorDetail = ESMS_ERROR_MESSAGES[codeResult] || data.ErrorMessage || 'Lỗi không xác định từ eSMS';
-    console.error(`[eSMS] Gửi SMS thất bại: CodeResult=${codeResult} - ${errorDetail}`);
+    console.error(`[eSMS] SMS request failed: CodeResult=${codeResult} - ${errorDetail}`);
 
     const error = new Error(`eSMS error [${codeResult}]: ${errorDetail}`);
     error.statusCode = 400;
@@ -135,5 +139,6 @@ const sendOtpSms = async ({ phone, otp, customContent }) => {
 
 module.exports = {
   sendOtpSms,
-  isConfigured
+  isConfigured,
+  isLiveSmsEnabled
 };
