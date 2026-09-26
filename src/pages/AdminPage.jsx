@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate, Link, useOutletContext } from 'react-router-dom';
 import {
   ShieldCheck, AlertTriangle, Search, LogOut, HelpCircle, UserX, CheckCircle,
-  XCircle, FileText, Image, User, Check, X, ShieldAlert, Flag, Home, Mail, Clock, Award
+  XCircle, FileText, Image, User, Check, X, ShieldAlert, Flag, Home, Mail, Clock, Award,
+  Star, EyeOff, Eye
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import { apiFetch } from '../auth/apiClient';
@@ -45,6 +46,13 @@ const AdminPage = () => {
   const [selectedReportId, setSelectedReportId] = useState(null);
   const [loadingReports, setLoadingReports] = useState(false);
   const [reportStatusFilter, setReportStatusFilter] = useState('PENDING'); // PENDING | RESOLVED | REJECTED | ALL
+
+  // State for Review Moderation
+  const [reviewsList, setReviewsList] = useState([]);
+  const [selectedReviewId, setSelectedReviewId] = useState(null);
+  const [loadingReviews, setLoadingReviews] = useState(false);
+  const [reviewStatusFilter, setReviewStatusFilter] = useState('ALL'); // ALL | APPROVED | PENDING | HIDDEN | REJECTED
+  const [reviewActionLoading, setReviewActionLoading] = useState(false);
 
   // Logout handler
   const handleLogout = async (e) => {
@@ -122,11 +130,70 @@ const AdminPage = () => {
     }
   };
 
+  // 4. Fetch Reviews (Kiểm duyệt đánh giá)
+  const fetchAdminReviews = async () => {
+    setLoadingReviews(true);
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/api/admin/reviews`);
+      if (res.ok) {
+        const data = await res.json();
+        const list = Array.isArray(data) ? data : [];
+        setReviewsList(list);
+        if (list.length > 0) {
+          setSelectedReviewId(list[0].id);
+        } else {
+          setSelectedReviewId(null);
+        }
+      }
+    } catch (err) {
+      console.error('Lỗi khi tải danh sách đánh giá:', err);
+    } finally {
+      setLoadingReviews(false);
+    }
+  };
+
+  const handleUpdateReviewStatus = async (reviewId, newStatus) => {
+    if (!reviewId) return;
+
+    let confirmMsg = `Bạn có chắc chắn muốn chuyển trạng thái đánh giá #${reviewId} sang: ${newStatus}?`;
+    if (newStatus === 'HIDDEN') {
+      confirmMsg = `Bạn có chắc chắn muốn ẨN đánh giá #${reviewId}? Đánh giá này sẽ bị ẩn khỏi bài đăng và tự động trừ khỏi điểm sao trung bình của bất động sản.`;
+    } else if (newStatus === 'APPROVED') {
+      confirmMsg = `Bạn muốn DUYỆT CÔNG KHAI đánh giá #${reviewId}? Đánh giá sẽ được tính vào điểm sao của bất động sản.`;
+    }
+
+    if (!window.confirm(confirmMsg)) return;
+
+    setReviewActionLoading(true);
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/api/admin/reviews/${reviewId}/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        alert(data.message || `Đã cập nhật trạng thái thành ${newStatus}`);
+        setReviewsList(prev => prev.map(r => r.id === reviewId ? { ...r, status: newStatus } : r));
+      } else {
+        alert(data.error || 'Cập nhật trạng thái đánh giá thất bại');
+      }
+    } catch (err) {
+      console.error('Lỗi cập nhật trạng thái review:', err);
+      alert('Lỗi kết nối máy chủ');
+    } finally {
+      setReviewActionLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (activeTab === 'account-verification') {
       fetchRejectedKyc();
     } else if (activeTab === 'report-moderation') {
       fetchReports(reportStatusFilter);
+    } else if (activeTab === 'review-moderation') {
+      fetchAdminReviews();
     }
   }, [activeTab, reportStatusFilter]);
 
@@ -283,6 +350,38 @@ const AdminPage = () => {
     return propTitle.toLowerCase().includes(q) || propAddr.toLowerCase().includes(q) || reporterName.toLowerCase().includes(q) || reasonStr.toLowerCase().includes(q);
   });
 
+  const reviewStats = {
+    total: (Array.isArray(reviewsList) ? reviewsList : []).length,
+    approved: (Array.isArray(reviewsList) ? reviewsList : []).filter(r => r.status === 'APPROVED').length,
+    pending: (Array.isArray(reviewsList) ? reviewsList : []).filter(r => r.status === 'PENDING').length,
+    hidden: (Array.isArray(reviewsList) ? reviewsList : []).filter(r => r.status === 'HIDDEN').length,
+    rejected: (Array.isArray(reviewsList) ? reviewsList : []).filter(r => r.status === 'REJECTED').length
+  };
+
+  const filteredReviewsList = (Array.isArray(reviewsList) ? reviewsList : []).filter(item => {
+    if (reviewStatusFilter !== 'ALL' && item.status !== reviewStatusFilter) {
+      return false;
+    }
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    const propTitle = item.property?.title || '';
+    const propAddr = item.property?.address || '';
+    const userName = item.user?.name || '';
+    const userEmail = item.user?.email || '';
+    const comment = item.comment || '';
+    const idStr = `#${item.id}`;
+    return (
+      propTitle.toLowerCase().includes(q) ||
+      propAddr.toLowerCase().includes(q) ||
+      userName.toLowerCase().includes(q) ||
+      userEmail.toLowerCase().includes(q) ||
+      comment.toLowerCase().includes(q) ||
+      idStr.includes(q)
+    );
+  });
+
+  const selectedReview = (Array.isArray(reviewsList) ? reviewsList : []).find(r => r.id === selectedReviewId);
+
   const initials = currentUser.name
     ? currentUser.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
     : 'AD';
@@ -327,6 +426,17 @@ const AdminPage = () => {
             <AlertTriangle size={20} />
             <span>Kiểm duyệt báo cáo</span>
           </button>
+
+          <button
+            className={`admin-nav-btn ${activeTab === 'review-moderation' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTab('review-moderation');
+              setSearchQuery('');
+            }}
+          >
+            <Star size={20} />
+            <span>Kiểm duyệt đánh giá</span>
+          </button>
         </nav>
 
         <div className="admin-sidebar-bottom">
@@ -350,7 +460,13 @@ const AdminPage = () => {
             <input
               type="text"
               className="admin-search-input"
-              placeholder={activeTab === 'account-verification' ? "Tìm kiếm tài khoản theo tên, email, ID..." : "Tìm kiếm báo cáo theo bất động sản, lý do, người gửi..."}
+              placeholder={
+                activeTab === 'account-verification'
+                  ? "Tìm kiếm tài khoản theo tên, email, ID..."
+                  : activeTab === 'report-moderation'
+                  ? "Tìm kiếm báo cáo theo bất động sản, lý do, người gửi..."
+                  : "Tìm kiếm đánh giá theo người gửi, bất động sản, nội dung..."
+              }
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -391,6 +507,12 @@ const AdminPage = () => {
                 onClick={() => setActiveTab('report-moderation')}
               >
                 Kiểm duyệt báo cáo
+              </button>
+              <button
+                className={`admin-pill-btn ${activeTab === 'review-moderation' ? 'active' : ''}`}
+                onClick={() => setActiveTab('review-moderation')}
+              >
+                Kiểm duyệt đánh giá
               </button>
             </div>
           </div>
@@ -794,6 +916,322 @@ const AdminPage = () => {
                         </div>
                       )}
                     </>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: KIỂM DUYỆT ĐÁNH GIÁ (REVIEW MODERATION) */}
+          {activeTab === 'review-moderation' && (
+            <div>
+              {/* Filter Pills Bar */}
+              <div className="report-filter-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button
+                    className={`report-filter-btn ${reviewStatusFilter === 'ALL' ? 'active' : ''}`}
+                    onClick={() => setReviewStatusFilter('ALL')}
+                  >
+                    Tất cả ({reviewStats.total})
+                  </button>
+                  <button
+                    className={`report-filter-btn ${reviewStatusFilter === 'APPROVED' ? 'active' : ''}`}
+                    onClick={() => setReviewStatusFilter('APPROVED')}
+                    style={{ color: reviewStatusFilter === 'APPROVED' ? '#ffffff' : '#059669' }}
+                  >
+                    Đang hiển thị ({reviewStats.approved})
+                  </button>
+                  <button
+                    className={`report-filter-btn ${reviewStatusFilter === 'PENDING' ? 'active' : ''}`}
+                    onClick={() => setReviewStatusFilter('PENDING')}
+                    style={{ color: reviewStatusFilter === 'PENDING' ? '#ffffff' : '#d97706' }}
+                  >
+                    Chờ duyệt ({reviewStats.pending})
+                  </button>
+                  <button
+                    className={`report-filter-btn ${reviewStatusFilter === 'HIDDEN' ? 'active' : ''}`}
+                    onClick={() => setReviewStatusFilter('HIDDEN')}
+                    style={{ color: reviewStatusFilter === 'HIDDEN' ? '#ffffff' : '#dc2626' }}
+                  >
+                    Đã ẩn vi phạm ({reviewStats.hidden})
+                  </button>
+                  <button
+                    className={`report-filter-btn ${reviewStatusFilter === 'REJECTED' ? 'active' : ''}`}
+                    onClick={() => setReviewStatusFilter('REJECTED')}
+                    style={{ color: reviewStatusFilter === 'REJECTED' ? '#ffffff' : '#991b1b' }}
+                  >
+                    Đã từ chối ({reviewStats.rejected})
+                  </button>
+                </div>
+              </div>
+
+              <div className="admin-grid-container" style={{ marginTop: 20 }}>
+                {/* LEFT COLUMN: REVIEW LIST */}
+                <div className="admin-list-column">
+                  {loadingReviews ? (
+                    <div className="admin-empty-state">Đang tải danh sách đánh giá...</div>
+                  ) : filteredReviewsList.length === 0 ? (
+                    <div className="admin-empty-state">
+                      <Star size={40} color="#cbd5e1" />
+                      <h4>Không có đánh giá nào ({reviewStatusFilter})</h4>
+                      <p>Hệ thống không tìm thấy đánh giá nào phù hợp với bộ lọc hiện tại.</p>
+                    </div>
+                  ) : (
+                    filteredReviewsList.map((item) => {
+                      const userName = item.user?.name || 'Người dùng';
+                      const userAvatar = item.user?.avatar;
+                      const propTitle = item.property?.title || `Bất động sản #${item.property_id}`;
+                      const dateStr = item.created_at ? new Date(item.created_at).toLocaleDateString('vi-VN') : '';
+                      const isSelected = selectedReviewId === item.id;
+                      const status = (item.status || 'APPROVED').toUpperCase();
+
+                      return (
+                        <div
+                          key={item.id}
+                          className={`admin-card-item ${isSelected ? 'active' : ''}`}
+                          onClick={() => setSelectedReviewId(item.id)}
+                        >
+                          <div className="admin-card-top">
+                            {userAvatar ? (
+                              <img src={userAvatar} alt="Avatar" className="admin-card-avatar" />
+                            ) : (
+                              <div className="admin-card-avatar" style={{ backgroundColor: '#eff6ff', color: '#2563eb' }}>
+                                {userName[0]?.toUpperCase() || 'U'}
+                              </div>
+                            )}
+                            <div className="admin-card-info">
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <span className="admin-card-name">{userName}</span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                  {[1, 2, 3, 4, 5].map((s) => (
+                                    <Star
+                                      key={s}
+                                      size={12}
+                                      fill={s <= item.rating ? '#f59e0b' : 'none'}
+                                      color={s <= item.rating ? '#f59e0b' : '#cbd5e1'}
+                                    />
+                                  ))}
+                                </div>
+                              </div>
+                              <span className="admin-card-date" style={{ color: '#0369a1', fontWeight: 600 }}>
+                                {propTitle}
+                              </span>
+                              <span className="admin-card-id">Đánh giá #{item.id} · {dateStr}</span>
+                            </div>
+                          </div>
+
+                          <p style={{
+                            fontSize: '0.85rem',
+                            color: '#475569',
+                            margin: '6px 0',
+                            lineHeight: 1.4,
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden'
+                          }}>
+                            "{item.comment}"
+                          </p>
+
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+                            <span
+                              className={`admin-card-badge ${
+                                status === 'APPROVED' ? 'admin-badge-approved' :
+                                status === 'HIDDEN' ? 'admin-badge-hidden' :
+                                status === 'REJECTED' ? 'admin-badge-rejected' : 'admin-badge-pending'
+                              }`}
+                            >
+                              {status === 'APPROVED' ? '✓ Đang hiển thị' :
+                               status === 'HIDDEN' ? '⛔ Đã ẩn vi phạm' :
+                               status === 'REJECTED' ? '✕ Đã từ chối' : '⏳ Chờ duyệt'}
+                            </span>
+
+                            {item.images && item.images.length > 0 && (
+                              <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <Image size={12} /> {item.images.length} ảnh
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* RIGHT COLUMN: REVIEW DETAIL VIEW */}
+                <div className="admin-detail-panel">
+                  {!selectedReview ? (
+                    <div className="admin-empty-state">
+                      <Star size={48} color="#cbd5e1" />
+                      <h4>Chưa chọn đánh giá nào</h4>
+                      <p>Vui lòng nhấp vào một đánh giá ở danh sách bên trái để xem chi tiết và thực hiện kiểm duyệt.</p>
+                    </div>
+                  ) : (
+                    <div className="admin-report-detail-content">
+                      {/* Review Header Banner */}
+                      <div className="admin-detail-header-card">
+                        <div className="admin-detail-header-left">
+                          <div className="admin-detail-prop-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <span>Đánh giá #{selectedReview.id}</span>
+                            <span
+                              className={`admin-card-badge ${
+                                selectedReview.status === 'APPROVED' ? 'admin-badge-approved' :
+                                selectedReview.status === 'HIDDEN' ? 'admin-badge-hidden' :
+                                selectedReview.status === 'REJECTED' ? 'admin-badge-rejected' : 'admin-badge-pending'
+                              }`}
+                            >
+                              {selectedReview.status === 'APPROVED' ? '✓ Đang hiển thị công khai' :
+                               selectedReview.status === 'HIDDEN' ? '⛔ Đã ẩn vi phạm' :
+                               selectedReview.status === 'REJECTED' ? '✕ Đã từ chối' : '⏳ Đang chờ duyệt'}
+                            </span>
+                          </div>
+                          <p className="admin-detail-time" style={{ marginTop: 4 }}>
+                            Đăng ngày: {new Date(selectedReview.created_at).toLocaleString('vi-VN')}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Two Grid Cards: User info & Property Info */}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16, marginTop: 16 }}>
+                        {/* Card: Reviewer */}
+                        <div className="admin-evidence-box">
+                          <h4 style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '0 0 10px 0', fontSize: '0.95rem' }}>
+                            <User size={18} color="#2563eb" />
+                            Người đánh giá
+                          </h4>
+                          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                            {selectedReview.user?.avatar ? (
+                              <img src={selectedReview.user.avatar} alt="Avatar" style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover' }} />
+                            ) : (
+                              <div style={{ width: 44, height: 44, borderRadius: '50%', backgroundColor: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
+                                {selectedReview.user?.name ? selectedReview.user.name[0].toUpperCase() : 'U'}
+                              </div>
+                            )}
+                            <div>
+                              <div style={{ fontWeight: 700, color: '#1e293b' }}>{selectedReview.user?.name || 'Người dùng'}</div>
+                              <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Vai trò: {selectedReview.user?.role || 'USER'}</div>
+                              <div style={{ fontSize: '0.8rem', color: '#64748b' }}>User ID: #{selectedReview.user_id}</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Card: Property */}
+                        <div className="admin-evidence-box">
+                          <h4 style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '0 0 10px 0', fontSize: '0.95rem' }}>
+                            <Home size={18} color="#059669" />
+                            Tin đăng bất động sản
+                          </h4>
+                          <div>
+                            <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: 4 }}>
+                              {selectedReview.property?.title || `Bất động sản #${selectedReview.property_id}`}
+                            </div>
+                            <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: 2 }}>
+                              📍 {selectedReview.property?.address || 'Không rõ địa chỉ'}
+                            </div>
+                            <div style={{ fontSize: '0.8rem', color: '#059669', fontWeight: 600 }}>
+                              💵 {selectedReview.property?.price ? `${Number(selectedReview.property.price).toLocaleString('vi-VN')} VND` : 'Liên hệ'}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Review Rating & Content */}
+                      <div className="admin-evidence-box" style={{ marginTop: 16 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#f59e0b' }}>{selectedReview.rating}.0</span>
+                            <div style={{ display: 'flex', gap: 3 }}>
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <Star
+                                  key={star}
+                                  size={18}
+                                  fill={star <= selectedReview.rating ? '#f59e0b' : 'none'}
+                                  color={star <= selectedReview.rating ? '#f59e0b' : '#cbd5e1'}
+                                />
+                              ))}
+                            </div>
+                          </div>
+
+                          {selectedReview.is_verified_review && (
+                            <span className="verified-review-badge">
+                              ✓ Đã xác thực giao dịch
+                            </span>
+                          )}
+                        </div>
+
+                        <div style={{
+                          backgroundColor: '#f8fafc',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: 10,
+                          padding: '14px 16px',
+                          fontSize: '0.95rem',
+                          color: '#1e293b',
+                          lineHeight: 1.6,
+                          fontStyle: 'italic'
+                        }}>
+                          "{selectedReview.comment}"
+                        </div>
+
+                        {/* Review Attached Images */}
+                        {selectedReview.images && selectedReview.images.length > 0 && (
+                          <div style={{ marginTop: 16 }}>
+                            <h5 style={{ fontSize: '0.85rem', color: '#475569', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <Image size={15} /> Hình ảnh đính kèm ({selectedReview.images.length}):
+                            </h5>
+                            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                              {selectedReview.images.map((img, i) => (
+                                <img
+                                  key={i}
+                                  src={img.image_url.startsWith('http') ? img.image_url : `${API_BASE_URL}${img.image_url}`}
+                                  alt="Review image"
+                                  style={{ width: 100, height: 100, objectFit: 'cover', borderRadius: 8, cursor: 'pointer', border: '1px solid #e2e8f0' }}
+                                  onClick={() => window.open(img.image_url.startsWith('http') ? img.image_url : `${API_BASE_URL}${img.image_url}`, '_blank')}
+                                  title="Nhấp để xem kích thước đầy đủ"
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Admin Action Buttons */}
+                      <div className="admin-actions-bar" style={{ marginTop: 24 }}>
+                        {selectedReview.status !== 'APPROVED' && (
+                          <button
+                            className="admin-btn admin-btn-approve"
+                            onClick={() => handleUpdateReviewStatus(selectedReview.id, 'APPROVED')}
+                            disabled={reviewActionLoading}
+                          >
+                            <Check size={18} />
+                            <span>Duyệt công khai (APPROVED)</span>
+                          </button>
+                        )}
+
+                        {selectedReview.status !== 'HIDDEN' && (
+                          <button
+                            className="admin-btn"
+                            style={{ backgroundColor: '#ea580c', color: '#ffffff' }}
+                            onClick={() => handleUpdateReviewStatus(selectedReview.id, 'HIDDEN')}
+                            disabled={reviewActionLoading}
+                            title="Ẩn đánh giá vi phạm, không hiển thị trên bài đăng và tự động trừ khỏi điểm sao trung bình"
+                          >
+                            <EyeOff size={18} />
+                            <span>Ẩn vi phạm (HIDDEN)</span>
+                          </button>
+                        )}
+
+                        {selectedReview.status !== 'REJECTED' && (
+                          <button
+                            className="admin-btn admin-btn-reject"
+                            onClick={() => handleUpdateReviewStatus(selectedReview.id, 'REJECTED')}
+                            disabled={reviewActionLoading}
+                          >
+                            <XCircle size={18} />
+                            <span>Từ chối (REJECTED)</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>
