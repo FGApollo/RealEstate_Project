@@ -6,6 +6,7 @@ const { rateLimiters } = require('../middleware/rateLimiters');
 
 router.use(authenticate);
 
+router.get('/tasks', rateLimiters.read, trustScoreController.getBonusTasksStatus);
 router.post('/profile-completed/check', rateLimiters.write, trustScoreController.checkProfileCompleted);
 router.post('/30-days-clean/check', rateLimiters.write, trustScoreController.checkThirtyDaysClean);
 

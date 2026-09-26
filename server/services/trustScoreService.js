@@ -145,7 +145,10 @@ const applyOneTimeBonus = async (userId, action, pointChange, reason) => {
 
 const applyProfileCompletenessBonus = async (userId) => {
   const user = await getUserForTrustScore(userId, 'id, trust_score, avatar, name, phone');
-  const hasCompletedProfile = Boolean(user.avatar) && Boolean(user.name) && Boolean(user.phone);
+  const hasAvatar = Boolean(user.avatar && String(user.avatar).trim());
+  const hasName = Boolean(user.name && String(user.name).trim());
+  const hasPhone = Boolean(user.phone && String(user.phone).trim());
+  const hasCompletedProfile = hasAvatar && hasName && hasPhone;
 
   if (!hasCompletedProfile) {
     return {
@@ -216,8 +219,12 @@ const applyThirtyDaysNoViolationBonus = async (userId) => {
         .in('related_report_id', reportIds)
         .eq('action', 'APPEAL_PENALTY_REFUND');
 
-      const refundedReportIds = new Set((refundedLogs || []).map((l) => l.related_report_id));
-      const activeViolations = resolvedReports.filter((r) => !refundedReportIds.has(r.id));
+      const refundedReportIds = new Set(
+        (refundedLogs || [])
+          .filter((l) => l.related_report_id != null)
+          .map((l) => Number(l.related_report_id))
+      );
+      const activeViolations = resolvedReports.filter((r) => !refundedReportIds.has(Number(r.id)));
 
       if (activeViolations.length > 0) {
         return {
@@ -236,6 +243,153 @@ const applyThirtyDaysNoViolationBonus = async (userId) => {
     5,
     'Account active for 30 days without confirmed violations'
   );
+};
+
+const getBonusTasksStatus = async (userId) => {
+  const user = await getUserForTrustScore(
+    userId,
+    'id, trust_score, avatar, name, phone, created_at, verification_status'
+  );
+
+  // 1. Task: Profile completeness bonus
+  const hasProfileBonus = await hasActionLog(userId, 'PROFILE_COMPLETED');
+  const hasAvatar = Boolean(user.avatar && String(user.avatar).trim());
+  const hasName = Boolean(user.name && String(user.name).trim());
+  const hasPhone = Boolean(user.phone && String(user.phone).trim());
+  const profileComplete = hasAvatar && hasName && hasPhone;
+
+  // 2. Task: 30 days clean bonus
+  const hasCleanBonus = await hasActionLog(userId, 'ACCOUNT_30_DAYS_CLEAN');
+  const createdAt = parseDatabaseTimestamp(user.created_at);
+  const now = Date.now();
+  const ageMs = Number.isFinite(createdAt) ? Math.max(0, now - createdAt) : 0;
+  const daysActive = Math.floor(ageMs / (24 * 60 * 60 * 1000));
+  const daysRemaining = Math.max(0, 30 - daysActive);
+  const isOldEnough = ageMs >= THIRTY_DAYS_MS;
+
+  // Check active violations and appeals
+  let activeViolationsCount = 0;
+  let refundedAppealsCount = 0;
+  let pendingAppealsCount = 0;
+
+  const { data: properties, error: propertiesError } = await supabase
+    .from('properties')
+    .select('id')
+    .eq('owner_id', userId);
+
+  if (!propertiesError && properties && properties.length > 0) {
+    const propertyIds = properties.map((property) => property.id);
+    const { data: resolvedReports } = await supabase
+      .from('property_reports')
+      .select('id, handled_at')
+      .in('property_id', propertyIds)
+      .eq('status', 'RESOLVED');
+
+    if (resolvedReports && resolvedReports.length > 0) {
+      const reportIds = resolvedReports.map((r) => r.id);
+      const { data: refundedLogs } = await supabase
+        .from('trust_score_logs')
+        .select('related_report_id')
+        .in('related_report_id', reportIds)
+        .eq('action', 'APPEAL_PENALTY_REFUND');
+
+      const refundedReportIds = new Set(
+        (refundedLogs || [])
+          .filter((l) => l.related_report_id != null)
+          .map((l) => Number(l.related_report_id))
+      );
+      refundedAppealsCount = refundedReportIds.size;
+      const activeViolations = resolvedReports.filter((r) => !refundedReportIds.has(Number(r.id)));
+      activeViolationsCount = activeViolations.length;
+
+      if (activeViolationsCount > 0) {
+        const activeReportIds = activeViolations.map((r) => r.id);
+        const { data: pendingAppeals } = await supabase
+          .from('property_report_appeals')
+          .select('id')
+          .in('report_id', activeReportIds)
+          .eq('status', 'PENDING');
+
+        pendingAppealsCount = pendingAppeals ? pendingAppeals.length : 0;
+      }
+    }
+  }
+
+  const cleanEligible = isOldEnough && activeViolationsCount === 0 && !hasCleanBonus;
+
+  // 3. Task: KYC verification
+  const isKycVerified = user.verification_status === 'VERIFIED';
+  const isKycPending = user.verification_status === 'PENDING';
+  let hasKycBonus = await hasActionLog(userId, 'KYC_APPROVED');
+
+  // If user is already VERIFIED in database but has not received the +20 bonus log yet
+  // (e.g. status was edited directly in DB, or verified prior to trust score system),
+  // automatically synchronize and grant the +20 bonus now!
+  if (isKycVerified && !hasKycBonus) {
+    try {
+      const bonusRes = await applyOneTimeBonus(
+        userId,
+        'KYC_APPROVED',
+        20,
+        'KYC/ID card verification approved'
+      );
+      if (bonusRes && bonusRes.applied) {
+        hasKycBonus = true;
+        user.trust_score = bonusRes.trustScore;
+      }
+    } catch (e) {
+      console.error('Failed to sync KYC bonus for verified user:', e);
+    }
+  }
+
+  return {
+    trustScore: Number(user.trust_score ?? DEFAULT_TRUST_SCORE),
+    verificationStatus: user.verification_status,
+    tasks: [
+      {
+        id: 'PROFILE_COMPLETED',
+        title: 'Hoàn thiện hồ sơ cá nhân',
+        description: 'Cập nhật đầy đủ ảnh đại diện, họ tên và số điện thoại liên hệ.',
+        points: 5,
+        claimed: hasProfileBonus,
+        eligible: profileComplete && !hasProfileBonus,
+        progress: {
+          hasAvatar,
+          hasName,
+          hasPhone,
+          completedCount: (hasAvatar ? 1 : 0) + (hasName ? 1 : 0) + (hasPhone ? 1 : 0),
+          totalCount: 3
+        }
+      },
+      {
+        id: 'ACCOUNT_30_DAYS_CLEAN',
+        title: '30 ngày hoạt động uy tín',
+        description: 'Tài khoản hoạt động tối thiểu 30 ngày và không có vi phạm được xác nhận.',
+        points: 5,
+        claimed: hasCleanBonus,
+        eligible: cleanEligible,
+        progress: {
+          daysActive,
+          daysRequired: 30,
+          daysRemaining,
+          isOldEnough,
+          activeViolationsCount,
+          refundedAppealsCount,
+          pendingAppealsCount
+        }
+      },
+      {
+        id: 'KYC_VERIFIED',
+        title: 'Xác thực định danh môi giới (KYC)',
+        description: 'Xác minh CCCD/CMND để nâng cao uy tín với khách hàng và bảo mật tài khoản.',
+        points: 20,
+        claimed: isKycVerified,
+        eligible: false,
+        isPending: isKycPending,
+        status: user.verification_status
+      }
+    ]
+  };
 };
 
 const getReportById = async (reportId) => {
@@ -495,6 +649,7 @@ module.exports = {
   applyOneTimeBonus,
   applyProfileCompletenessBonus,
   applyThirtyDaysNoViolationBonus,
+  getBonusTasksStatus,
   applyReportPenalty,
   applyPropertyHiddenPenalty,
   reverseReportPenalty

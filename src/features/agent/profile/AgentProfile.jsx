@@ -11,6 +11,7 @@ import { apiFetch } from '../../../auth/apiClient';
 import { useAuth } from '../../../auth/useAuth';
 import PropertyDetailModal from '../../../components/PropertyDetailModal';
 import DeleteConfirmModal from '../overview/DeleteConfirmModal';
+import TrustScoreBonusModal from './TrustScoreBonusModal';
 import './AgentProfile.css';
 
 const WARDS_BY_REGION = {
@@ -69,6 +70,7 @@ const AgentProfile = ({
 }) => {
   const { updateUser } = useAuth();
   const [selectedProfileTab, setSelectedProfileTab] = useState(initialTab);
+  const [isBonusModalOpen, setIsBonusModalOpen] = useState(false);
 
   useEffect(() => {
     setSelectedProfileTab(initialTab);
@@ -835,6 +837,15 @@ const AgentProfile = ({
                     Trust Score: <span style={{ color: trustColor, fontWeight: 'bold' }}>{score}/100</span> <span style={{ fontSize: '12px', color: '#64748b' }}>({trustText})</span>
                   </div>
                 </div>
+                <button
+                  type="button"
+                  className="profile-bonus-tasks-btn"
+                  onClick={() => setIsBonusModalOpen(true)}
+                  title="Nhiệm vụ nhận điểm tín nhiệm"
+                >
+                  <Award size={16} />
+                  <span>Nhiệm vụ tích điểm</span>
+                </button>
               </div>
             );
           })()}
@@ -1934,6 +1945,21 @@ const AgentProfile = ({
           </div>
         </div>
       )}
+
+      {/* Feature 50: Trust Score Bonus Tasks Modal */}
+      <TrustScoreBonusModal
+        isOpen={isBonusModalOpen}
+        onClose={() => setIsBonusModalOpen(false)}
+        currentUser={currentUser}
+        onScoreUpdated={(newScore) => {
+          if (currentUser) {
+            currentUser.trust_score = newScore;
+          }
+        }}
+        onNavigateToKyc={() => {
+          setSelectedProfileTab('kyc');
+        }}
+      />
     </div>
   );
 };
