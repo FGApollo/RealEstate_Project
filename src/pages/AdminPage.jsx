@@ -3,7 +3,7 @@ import { useNavigate, Link, useOutletContext } from 'react-router-dom';
 import {
   ShieldCheck, AlertTriangle, Search, LogOut, HelpCircle, UserX, CheckCircle,
   XCircle, FileText, Image, ImageIcon, User, Check, X, ShieldAlert, Flag, Home, Mail, Clock, Award,
-  Star, EyeOff, Eye, Scale, ExternalLink
+  Star, EyeOff, Eye, Scale, ExternalLink, Activity, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, RotateCcw, History
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import { apiFetch } from '../auth/apiClient';
@@ -18,6 +18,15 @@ const REASON_LABELS = {
   'ALREADY_RENTED': { label: 'Đã bán/thuê chưa cập nhật', penalty: -8, color: '#d97706', bg: '#fef3c7' },
   'SCAM': { label: 'Lừa đảo / Scam', penalty: -30, color: '#dc2626', bg: '#fee2e2' },
   'OTHER': { label: 'Lý do khác', penalty: 0, color: '#64748b', bg: '#f1f5f9' }
+};
+
+const ACTION_TYPE_LABELS = {
+  'KYC_APPROVED': { label: 'Duyệt KYC', color: '#16a34a', bg: '#f0fdf4' },
+  'PROFILE_COMPLETED': { label: 'Hoàn thiện hồ sơ', color: '#2563eb', bg: '#eff6ff' },
+  'ACCOUNT_30_DAYS_CLEAN': { label: '30 ngày sạch lỗi', color: '#9333ea', bg: '#faf5ff' },
+  'REPORT_PENALTY': { label: 'Phạt vi phạm báo cáo', color: '#dc2626', bg: '#fef2f2' },
+  'PROPERTY_HIDDEN': { label: 'Ẩn bài đăng vi phạm', color: '#ea580c', bg: '#fff7ed' },
+  'APPEAL_PENALTY_REFUND': { label: 'Hoàn trả điểm khiếu nại', color: '#059669', bg: '#ecfdf5' }
 };
 
 const AdminPage = () => {
@@ -60,6 +69,15 @@ const AdminPage = () => {
   const [loadingAppeals, setLoadingAppeals] = useState(false);
   const [appealStatusFilter, setAppealStatusFilter] = useState('ALL'); // ALL | PENDING | APPROVED | REJECTED
   const [appealActionLoading, setAppealActionLoading] = useState(false);
+
+  // State for Trust Score Audit Logs
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [loadingAuditLogs, setLoadingAuditLogs] = useState(false);
+  const [auditTypeFilter, setAuditTypeFilter] = useState('ALL'); // ALL | BONUS | PENALTY | REFUND
+  const [auditActionFilter, setAuditActionFilter] = useState('ALL'); // ALL | KYC_APPROVED | ...
+  const [auditPage, setAuditPage] = useState(1);
+  const [auditPagination, setAuditPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
+  const [auditStats, setAuditStats] = useState({ totalLogs: 0, totalBonus: 0, totalPenalty: 0, totalRefund: 0 });
 
   // Logout handler
   const handleLogout = async (e) => {
@@ -278,6 +296,32 @@ const AdminPage = () => {
     }
   };
 
+  // 6. Fetch Trust Score Audit Logs
+  const fetchAuditLogs = async (page = 1, type = auditTypeFilter, action = auditActionFilter, search = searchQuery) => {
+    setLoadingAuditLogs(true);
+    try {
+      const params = new URLSearchParams({
+        page,
+        limit: 20,
+        type,
+        action,
+        search: search || ''
+      });
+      const res = await apiFetch(`${API_BASE_URL}/api/admin/trust-score-logs?${params.toString()}`);
+      if (res.ok) {
+        const data = await res.json();
+        setAuditLogs(data.logs || []);
+        if (data.pagination) setAuditPagination(data.pagination);
+        if (data.stats) setAuditStats(data.stats);
+        setAuditPage(page);
+      }
+    } catch (err) {
+      console.error('Lỗi khi tải nhật ký điểm uy tín:', err);
+    } finally {
+      setLoadingAuditLogs(false);
+    }
+  };
+
   useEffect(() => {
     if (activeTab === 'account-verification') {
       fetchRejectedKyc();
@@ -287,8 +331,16 @@ const AdminPage = () => {
       fetchAdminReviews();
     } else if (activeTab === 'appeal-moderation') {
       fetchAppeals();
+    } else if (activeTab === 'audit-logs') {
+      fetchAuditLogs(1, auditTypeFilter, auditActionFilter, searchQuery);
     }
   }, [activeTab, reportStatusFilter]);
+
+  useEffect(() => {
+    if (activeTab === 'audit-logs') {
+      fetchAuditLogs(1, auditTypeFilter, auditActionFilter, searchQuery);
+    }
+  }, [auditTypeFilter, auditActionFilter]);
 
   useEffect(() => {
     if (selectedKycId && activeTab === 'account-verification') {
@@ -599,6 +651,17 @@ const AdminPage = () => {
             <Scale size={20} />
             <span>Xử lý khiếu nại</span>
           </button>
+
+          <button
+            className={`admin-nav-btn ${activeTab === 'audit-logs' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTab('audit-logs');
+              setSearchQuery('');
+            }}
+          >
+            <Activity size={20} />
+            <span>Nhật ký điểm uy tín</span>
+          </button>
         </nav>
 
         <div className="admin-sidebar-bottom">
@@ -629,7 +692,9 @@ const AdminPage = () => {
                   ? "Tìm kiếm báo cáo theo bất động sản, lý do, người gửi..."
                   : activeTab === 'review-moderation'
                   ? "Tìm kiếm đánh giá theo người gửi, bất động sản, nội dung..."
-                  : "Tìm kiếm khiếu nại theo môi giới, bài đăng, lý do..."
+                  : activeTab === 'appeal-moderation'
+                  ? "Tìm kiếm khiếu nại theo môi giới, bài đăng, lý do..."
+                  : "Tìm kiếm nhật ký theo người dùng, lý do, ID..."
               }
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -1744,6 +1809,272 @@ const AdminPage = () => {
                     </div>
                   )}
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 5: TRUST SCORE AUDIT LOGS */}
+          {activeTab === 'audit-logs' && (
+            <div className="admin-audit-section">
+              {/* Top Section Header */}
+              <div className="admin-audit-header">
+                <div>
+                  <h2 className="admin-section-title">Nhật ký Biến động Điểm Uy Tín (Audit Logs)</h2>
+                  <p className="admin-section-desc">
+                    Tra cứu và kiểm toán toàn bộ lịch sử thưởng/phạt/hoàn điểm của các tài khoản trên hệ thống
+                  </p>
+                </div>
+                <button
+                  className="admin-btn-refresh"
+                  onClick={() => fetchAuditLogs(1, auditTypeFilter, auditActionFilter, searchQuery)}
+                  disabled={loadingAuditLogs}
+                  title="Tải lại dữ liệu"
+                >
+                  <RotateCcw size={16} className={loadingAuditLogs ? 'spin-icon' : ''} />
+                  <span>Làm mới</span>
+                </button>
+              </div>
+
+              {/* Stat Summary Cards */}
+              <div className="admin-audit-stats-grid">
+                <div className="admin-audit-stat-card">
+                  <div className="audit-stat-icon-wrap" style={{ backgroundColor: '#eff6ff', color: '#2563eb' }}>
+                    <Activity size={22} />
+                  </div>
+                  <div className="audit-stat-info">
+                    <span className="audit-stat-label">Tổng lượt biến động</span>
+                    <span className="audit-stat-value">{auditStats.totalLogs}</span>
+                    <span className="audit-stat-hint">Lượt ghi nhận trong sổ cái</span>
+                  </div>
+                </div>
+
+                <div className="admin-audit-stat-card">
+                  <div className="audit-stat-icon-wrap" style={{ backgroundColor: '#f0fdf4', color: '#16a34a' }}>
+                    <TrendingUp size={22} />
+                  </div>
+                  <div className="audit-stat-info">
+                    <span className="audit-stat-label">Tổng điểm đã thưởng</span>
+                    <span className="audit-stat-value" style={{ color: '#16a34a' }}>+{auditStats.totalBonus}</span>
+                    <span className="audit-stat-hint">KYC, hồ sơ, 30 ngày sạch</span>
+                  </div>
+                </div>
+
+                <div className="admin-audit-stat-card">
+                  <div className="audit-stat-icon-wrap" style={{ backgroundColor: '#fef2f2', color: '#dc2626' }}>
+                    <TrendingDown size={22} />
+                  </div>
+                  <div className="audit-stat-info">
+                    <span className="audit-stat-label">Tổng điểm đã xử phạt</span>
+                    <span className="audit-stat-value" style={{ color: '#dc2626' }}>-{auditStats.totalPenalty}</span>
+                    <span className="audit-stat-hint">Báo cáo vi phạm, ẩn tin</span>
+                  </div>
+                </div>
+
+                <div className="admin-audit-stat-card">
+                  <div className="audit-stat-icon-wrap" style={{ backgroundColor: '#ecfdf5', color: '#059669' }}>
+                    <Scale size={22} />
+                  </div>
+                  <div className="audit-stat-info">
+                    <span className="audit-stat-label">Tổng điểm hoàn lại</span>
+                    <span className="audit-stat-value" style={{ color: '#059669' }}>+{auditStats.totalRefund}</span>
+                    <span className="audit-stat-hint">Kháng cáo thành công</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Filters Bar */}
+              <div className="admin-audit-filters-bar">
+                <div className="admin-audit-type-pills">
+                  <button
+                    className={`audit-pill-btn ${auditTypeFilter === 'ALL' ? 'active' : ''}`}
+                    onClick={() => setAuditTypeFilter('ALL')}
+                  >
+                    Tất cả ({auditStats.totalLogs})
+                  </button>
+                  <button
+                    className={`audit-pill-btn bonus ${auditTypeFilter === 'BONUS' ? 'active' : ''}`}
+                    onClick={() => setAuditTypeFilter('BONUS')}
+                  >
+                    🟢 Thưởng điểm
+                  </button>
+                  <button
+                    className={`audit-pill-btn penalty ${auditTypeFilter === 'PENALTY' ? 'active' : ''}`}
+                    onClick={() => setAuditTypeFilter('PENALTY')}
+                  >
+                    🔴 Xử phạt
+                  </button>
+                  <button
+                    className={`audit-pill-btn refund ${auditTypeFilter === 'REFUND' ? 'active' : ''}`}
+                    onClick={() => setAuditTypeFilter('REFUND')}
+                  >
+                    🟡 Hoàn lại sau khiếu nại
+                  </button>
+                </div>
+
+                <div className="admin-audit-action-select-wrapper">
+                  <select
+                    className="admin-audit-select"
+                    value={auditActionFilter}
+                    onChange={(e) => setAuditActionFilter(e.target.value)}
+                  >
+                    <option value="ALL">-- Tất cả loại hành động --</option>
+                    <option value="KYC_APPROVED">Duyệt KYC (+20đ)</option>
+                    <option value="PROFILE_COMPLETED">Hoàn thiện hồ sơ (+5đ)</option>
+                    <option value="ACCOUNT_30_DAYS_CLEAN">30 ngày không vi phạm (+5đ)</option>
+                    <option value="REPORT_PENALTY">Xử phạt báo cáo vi phạm</option>
+                    <option value="PROPERTY_HIDDEN">Ẩn bài đăng vi phạm</option>
+                    <option value="APPEAL_PENALTY_REFUND">Hoàn điểm sau kháng cáo</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Data Table */}
+              <div className="admin-audit-table-card">
+                {loadingAuditLogs ? (
+                  <div className="admin-audit-loading">
+                    <RotateCcw size={28} className="spin-icon" color="#2563eb" />
+                    <span>Đang tải nhật ký kiểm toán...</span>
+                  </div>
+                ) : auditLogs.length === 0 ? (
+                  <div className="admin-audit-empty">
+                    <History size={48} color="#94a3b8" />
+                    <h4>Không tìm thấy nhật ký kiểm toán nào</h4>
+                    <p>Hãy thử thay đổi điều kiện lọc hoặc từ khóa tìm kiếm.</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="admin-audit-table-responsive">
+                      <table className="admin-audit-table">
+                        <thead>
+                          <tr>
+                            <th>Thời gian</th>
+                            <th>Người dùng</th>
+                            <th>Hành động</th>
+                            <th>Biến động</th>
+                            <th>Điểm số</th>
+                            <th>Lý do & Đối tượng liên quan</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {auditLogs.map((log) => {
+                            const isPositive = Number(log.point_change) > 0;
+                            const actionInfo = ACTION_TYPE_LABELS[log.action] || {
+                              label: log.action || 'Biến động',
+                              color: isPositive ? '#16a34a' : '#dc2626',
+                              bg: isPositive ? '#f0fdf4' : '#fef2f2'
+                            };
+
+                            return (
+                              <tr key={log.id}>
+                                <td className="audit-cell-time">
+                                  <div className="audit-time-main">
+                                    <Clock size={13} />
+                                    <span>{log.created_at ? new Date(log.created_at).toLocaleDateString('vi-VN') : 'N/A'}</span>
+                                  </div>
+                                  <span className="audit-time-sub">
+                                    {log.created_at ? new Date(log.created_at).toLocaleTimeString('vi-VN') : ''}
+                                  </span>
+                                </td>
+
+                                <td className="audit-cell-user">
+                                  <div className="audit-user-row">
+                                    {log.user?.avatar ? (
+                                      <img src={log.user.avatar} alt="" className="audit-user-avatar" />
+                                    ) : (
+                                      <div className="audit-user-avatar-placeholder">
+                                        {(log.user?.name || 'U').charAt(0).toUpperCase()}
+                                      </div>
+                                    )}
+                                    <div className="audit-user-details">
+                                      <span className="audit-user-name">{log.user?.name || `User #${log.user_id}`}</span>
+                                      <span className="audit-user-email">{log.user?.email || 'N/A'}</span>
+                                    </div>
+                                    <span className={`audit-role-tag ${log.user?.role?.toLowerCase()}`}>
+                                      {log.user?.role || 'USER'}
+                                    </span>
+                                  </div>
+                                </td>
+
+                                <td className="audit-cell-action">
+                                  <span
+                                    className="audit-action-tag"
+                                    style={{
+                                      backgroundColor: actionInfo.bg,
+                                      color: actionInfo.color,
+                                      borderColor: `${actionInfo.color}33`
+                                    }}
+                                  >
+                                    {actionInfo.label}
+                                  </span>
+                                </td>
+
+                                <td className="audit-cell-change">
+                                  <span className={`audit-change-badge ${isPositive ? 'positive' : 'negative'}`}>
+                                    {isPositive ? `+${log.point_change}` : log.point_change}
+                                  </span>
+                                </td>
+
+                                <td className="audit-cell-score">
+                                  {log.old_score !== null && log.new_score !== null ? (
+                                    <div className="audit-score-flow">
+                                      <span className="score-old">{log.old_score}</span>
+                                      <span className="score-arrow">➔</span>
+                                      <span className="score-new" style={{ color: log.new_score < 50 ? '#dc2626' : '#16a34a' }}>
+                                        {log.new_score}
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <span style={{ color: '#94a3b8' }}>-</span>
+                                  )}
+                                </td>
+
+                                <td className="audit-cell-reason">
+                                  <p className="audit-reason-text">{log.reason || 'Không có ghi chú'}</p>
+                                  <div className="audit-meta-tags">
+                                    {log.property && (
+                                      <span className="audit-meta-pill" title={log.property.title}>
+                                        <Home size={12} /> Bài đăng #{log.related_property_id}: {log.property.title.slice(0, 28)}...
+                                      </span>
+                                    )}
+                                    {log.related_report_id && (
+                                      <span className="audit-meta-pill report">
+                                        <Flag size={12} /> Báo cáo #{log.related_report_id}
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Pagination */}
+                    <div className="admin-audit-pagination">
+                      <span className="audit-pagination-info">
+                        Hiển thị {auditLogs.length} trên tổng số {auditPagination.total} bản ghi (Trang {auditPagination.page}/{auditPagination.totalPages || 1})
+                      </span>
+                      <div className="audit-pagination-actions">
+                        <button
+                          className="audit-page-btn"
+                          disabled={auditPagination.page <= 1 || loadingAuditLogs}
+                          onClick={() => fetchAuditLogs(auditPagination.page - 1, auditTypeFilter, auditActionFilter, searchQuery)}
+                        >
+                          Trang trước
+                        </button>
+                        <span className="audit-page-current">{auditPagination.page}</span>
+                        <button
+                          className="audit-page-btn"
+                          disabled={auditPagination.page >= auditPagination.totalPages || loadingAuditLogs}
+                          onClick={() => fetchAuditLogs(auditPagination.page + 1, auditTypeFilter, auditActionFilter, searchQuery)}
+                        >
+                          Trang sau
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           )}

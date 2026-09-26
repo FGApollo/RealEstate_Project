@@ -1,12 +1,22 @@
 import { useState, useEffect } from 'react';
 import {
   ShieldCheck, Award, CheckCircle2, AlertCircle, Clock,
-  ArrowRight, X, Sparkles, UserCheck, Shield, ChevronRight, RefreshCw
+  ArrowRight, X, Sparkles, UserCheck, Shield, ChevronRight, RefreshCw,
+  History, ArrowUpRight, ArrowDownRight, RotateCcw, AlertTriangle, FileText
 } from 'lucide-react';
 import { API_BASE_URL } from '../../../config';
 import { apiFetch } from '../../../auth/apiClient';
 import { useAuth } from '../../../auth/useAuth';
 import './TrustScoreBonusModal.css';
+
+const ACTION_CONFIG = {
+  'KYC_APPROVED': { label: 'Xác thực định danh KYC thành công', color: '#16a34a', bg: '#f0fdf4' },
+  'PROFILE_COMPLETED': { label: 'Hoàn thiện thông tin hồ sơ cá nhân', color: '#2563eb', bg: '#eff6ff' },
+  'ACCOUNT_30_DAYS_CLEAN': { label: 'Thưởng 30 ngày hoạt động không vi phạm', color: '#9333ea', bg: '#faf5ff' },
+  'REPORT_PENALTY': { label: 'Trừ điểm do phản ánh vi phạm được xác thực', color: '#dc2626', bg: '#fef2f2' },
+  'PROPERTY_HIDDEN': { label: 'Trừ điểm do tin đăng bị ẩn vi phạm', color: '#ea580c', bg: '#fff7ed' },
+  'APPEAL_PENALTY_REFUND': { label: 'Hoàn trả điểm phạt sau khiếu nại thành công', color: '#059669', bg: '#ecfdf5' }
+};
 
 const TrustScoreBonusModal = ({
   isOpen,
@@ -16,10 +26,13 @@ const TrustScoreBonusModal = ({
   onNavigateToKyc
 }) => {
   const { updateUser } = useAuth();
+  const [activeModalTab, setActiveModalTab] = useState('tasks'); // 'tasks' | 'history'
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState(null);
   const [actionLoading, setActionLoading] = useState(null);
   const [notification, setNotification] = useState(null);
+  const [logs, setLogs] = useState([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
 
   const fetchBonusStatus = async () => {
     try {
@@ -40,12 +53,30 @@ const TrustScoreBonusModal = ({
     }
   };
 
+  const fetchMyLogs = async () => {
+    try {
+      setLoadingLogs(true);
+      const res = await apiFetch(`${API_BASE_URL}/api/trust-score/my-logs?limit=50`);
+      if (res.ok) {
+        const result = await res.json();
+        setLogs(result.logs || []);
+      }
+    } catch (err) {
+      console.error('Failed to load trust score logs:', err);
+    } finally {
+      setLoadingLogs(false);
+    }
+  };
+
   useEffect(() => {
     if (isOpen) {
       fetchBonusStatus();
       setNotification(null);
+      if (activeModalTab === 'history') {
+        fetchMyLogs();
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, activeModalTab]);
 
   if (!isOpen) return null;
 
@@ -199,15 +230,37 @@ const TrustScoreBonusModal = ({
           </div>
         )}
 
+        {/* Tab Switcher */}
+        <div className="trust-modal-nav-tabs">
+          <button
+            type="button"
+            className={`trust-nav-tab-btn ${activeModalTab === 'tasks' ? 'active' : ''}`}
+            onClick={() => setActiveModalTab('tasks')}
+          >
+            <Award size={16} />
+            <span>Nhiệm vụ tăng điểm</span>
+          </button>
+          <button
+            type="button"
+            className={`trust-nav-tab-btn ${activeModalTab === 'history' ? 'active' : ''}`}
+            onClick={() => setActiveModalTab('history')}
+          >
+            <History size={16} />
+            <span>Lịch sử biến động</span>
+            {logs.length > 0 && <span className="trust-tab-count-pill">{logs.length}</span>}
+          </button>
+        </div>
+
         {/* Content Body */}
         <div className="trust-modal-body">
-          {loading ? (
-            <div className="trust-modal-loading">
-              <RefreshCw size={24} className="spin-icon" />
-              <span>Đang tải thông tin nhiệm vụ...</span>
-            </div>
-          ) : (
-            <div className="trust-tasks-list">
+          {activeModalTab === 'tasks' ? (
+            loading ? (
+              <div className="trust-modal-loading">
+                <RefreshCw size={24} className="spin-icon" />
+                <span>Đang tải thông tin nhiệm vụ...</span>
+              </div>
+            ) : (
+              <div className="trust-tasks-list">
               {/* TASK 1: PROFILE COMPLETED */}
               <div className={`trust-task-card ${profileTask?.claimed ? 'claimed' : profileTask?.eligible ? 'eligible' : ''}`}>
                 <div className="trust-task-header">
@@ -404,13 +457,93 @@ const TrustScoreBonusModal = ({
                 </div>
               </div>
             </div>
+            )
+          ) : (
+            /* TAB 2: AUDIT LOGS / HISTORY */
+            <div className="trust-history-container">
+              {loadingLogs ? (
+                <div className="trust-modal-loading">
+                  <RefreshCw size={24} className="spin-icon" />
+                  <span>Đang tải lịch sử biến động điểm...</span>
+                </div>
+              ) : logs.length === 0 ? (
+                <div className="trust-logs-empty">
+                  <div className="trust-empty-icon-wrap">
+                    <History size={40} color="#94a3b8" />
+                  </div>
+                  <h4 className="trust-empty-title">Chưa có lịch sử biến động điểm</h4>
+                  <p className="trust-empty-subtitle">
+                    Mọi thay đổi điểm từ duyệt KYC, hoàn thiện hồ sơ, hoạt động sạch hoặc xử lý báo cáo vi phạm sẽ được ghi nhận minh bạch tại đây.
+                  </p>
+                </div>
+              ) : (
+                <div className="trust-logs-list">
+                  {logs.map((log) => {
+                    const isPositive = Number(log.point_change) > 0;
+                    const config = ACTION_CONFIG[log.action] || {
+                      label: log.action || 'Biến động điểm uy tín',
+                      color: isPositive ? '#16a34a' : '#dc2626',
+                      bg: isPositive ? '#f0fdf4' : '#fef2f2'
+                    };
+
+                    return (
+                      <div key={log.id} className="trust-log-item">
+                        <div
+                          className="trust-log-icon"
+                          style={{ backgroundColor: config.bg, color: config.color }}
+                        >
+                          {isPositive ? <ArrowUpRight size={20} /> : <ArrowDownRight size={20} />}
+                        </div>
+                        <div className="trust-log-main">
+                          <div className="trust-log-header">
+                            <span
+                              className="trust-log-action-badge"
+                              style={{
+                                backgroundColor: config.bg,
+                                color: config.color,
+                                border: `1px solid ${config.color}33`
+                              }}
+                            >
+                              {config.label}
+                            </span>
+                            <span className="trust-log-date">
+                              <Clock size={12} style={{ display: 'inline', marginRight: 4 }} />
+                              {log.created_at ? new Date(log.created_at).toLocaleString('vi-VN') : 'N/A'}
+                            </span>
+                          </div>
+                          <p className="trust-log-reason">{log.reason || 'Không có mô tả chi tiết'}</p>
+                          {log.property && (
+                            <div className="trust-log-rel">
+                              <FileText size={12} />
+                              <span>Bài đăng: <strong>{log.property.title}</strong></span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="trust-log-score-col">
+                          <span className={`trust-log-points ${isPositive ? 'positive' : 'negative'}`}>
+                            {isPositive ? `+${log.point_change}` : log.point_change}
+                          </span>
+                          {log.old_score !== null && log.new_score !== null && (
+                            <span className="trust-log-progression">
+                              {log.old_score} ➔ {log.new_score}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           )}
         </div>
 
         {/* Modal Footer */}
         <div className="trust-modal-footer">
           <div className="trust-footer-tip">
-            💡 <em>Lưu ý:</em> Mỗi nhiệm vụ chỉ nhận thưởng 1 lần duy nhất trong suốt vòng đời tài khoản.
+            {activeModalTab === 'tasks'
+              ? '💡 Lưu ý: Mỗi nhiệm vụ chỉ nhận thưởng 1 lần duy nhất trong suốt vòng đời tài khoản.'
+              : '🛡️ Mọi biến động điểm được hệ thống tự động ghi nhận minh bạch.'}
           </div>
           <button type="button" className="trust-modal-close-action-btn" onClick={onClose}>
             Đóng

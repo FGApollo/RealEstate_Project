@@ -642,6 +642,182 @@ const reverseReportPenalty = async (reportId, adminId, adminNote = '') => {
   };
 };
 
+const getUserTrustScoreLogs = async (userId, { limit = 50, offset = 0 } = {}) => {
+  const safeLimit = Math.max(1, Math.min(100, Number(limit) || 50));
+  const safeOffset = Math.max(0, Number(offset) || 0);
+
+  const { data: logs, count, error } = await supabase
+    .from('trust_score_logs')
+    .select('*', { count: 'exact' })
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .range(safeOffset, safeOffset + safeLimit - 1);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  // Enrich with related properties if any
+  const propertyIds = [...new Set((logs || []).map((l) => l.related_property_id).filter(Boolean))];
+  const propertyMap = new Map();
+  if (propertyIds.length > 0) {
+    const { data: properties } = await supabase
+      .from('properties')
+      .select('id, title, price, is_hidden')
+      .in('id', propertyIds);
+    if (properties) {
+      properties.forEach((p) => propertyMap.set(p.id, p));
+    }
+  }
+
+  const enrichedLogs = (logs || []).map((log) => ({
+    ...log,
+    property: log.related_property_id ? propertyMap.get(log.related_property_id) || null : null
+  }));
+
+  return {
+    logs: enrichedLogs,
+    total: count ?? enrichedLogs.length,
+    limit: safeLimit,
+    offset: safeOffset
+  };
+};
+
+const getTrustScoreStats = async () => {
+  const { data: allLogs, error } = await supabase
+    .from('trust_score_logs')
+    .select('action, point_change');
+
+  if (error || !allLogs) {
+    return { totalLogs: 0, totalBonus: 0, totalPenalty: 0, totalRefund: 0 };
+  }
+
+  let totalBonus = 0;
+  let totalPenalty = 0;
+  let totalRefund = 0;
+
+  for (const log of allLogs) {
+    const pts = Number(log.point_change) || 0;
+    if (pts > 0) {
+      if (log.action === 'APPEAL_PENALTY_REFUND') {
+        totalRefund += pts;
+      } else {
+        totalBonus += pts;
+      }
+    } else if (pts < 0) {
+      totalPenalty += Math.abs(pts);
+    }
+  }
+
+  return {
+    totalLogs: allLogs.length,
+    totalBonus,
+    totalPenalty,
+    totalRefund
+  };
+};
+
+const getAdminTrustScoreLogs = async ({
+  page = 1,
+  limit = 20,
+  search = '',
+  action = 'ALL',
+  type = 'ALL'
+} = {}) => {
+  const safePage = Math.max(1, Number(page) || 1);
+  const safeLimit = Math.max(1, Math.min(100, Number(limit) || 20));
+  const offset = (safePage - 1) * safeLimit;
+
+  let query = supabase
+    .from('trust_score_logs')
+    .select('*', { count: 'exact' });
+
+  // Type filter
+  if (type === 'BONUS') {
+    query = query.gt('point_change', 0);
+  } else if (type === 'PENALTY') {
+    query = query.lt('point_change', 0);
+  } else if (type === 'REFUND') {
+    query = query.eq('action', 'APPEAL_PENALTY_REFUND');
+  }
+
+  // Action filter
+  if (action && action !== 'ALL') {
+    query = query.eq('action', action);
+  }
+
+  // Search filter
+  const trimmedSearch = (search || '').trim();
+  if (trimmedSearch) {
+    // Check if search matches user name/email first
+    const { data: matchedUsers } = await supabase
+      .from('users')
+      .select('id')
+      .or(`name.ilike.%${trimmedSearch}%,email.ilike.%${trimmedSearch}%`)
+      .limit(50);
+
+    const matchedUserIds = (matchedUsers || []).map((u) => u.id);
+    if (matchedUserIds.length > 0) {
+      query = query.or(`user_id.in.(${matchedUserIds.join(',')}),reason.ilike.%${trimmedSearch}%`);
+    } else {
+      query = query.ilike('reason', `%${trimmedSearch}%`);
+    }
+  }
+
+  query = query.order('created_at', { ascending: false })
+    .range(offset, offset + safeLimit - 1);
+
+  const { data: logs, count, error } = await query;
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  // Batch load users
+  const userIds = [...new Set((logs || []).map((l) => l.user_id).filter(Boolean))];
+  const userMap = new Map();
+  if (userIds.length > 0) {
+    const { data: users } = await supabase
+      .from('users')
+      .select('id, name, email, avatar, role, phone, trust_score')
+      .in('id', userIds);
+    if (users) {
+      users.forEach((u) => userMap.set(u.id, u));
+    }
+  }
+
+  // Batch load properties
+  const propertyIds = [...new Set((logs || []).map((l) => l.related_property_id).filter(Boolean))];
+  const propertyMap = new Map();
+  if (propertyIds.length > 0) {
+    const { data: properties } = await supabase
+      .from('properties')
+      .select('id, title, price, is_hidden')
+      .in('id', propertyIds);
+    if (properties) {
+      properties.forEach((p) => propertyMap.set(p.id, p));
+    }
+  }
+
+  const enrichedLogs = (logs || []).map((log) => ({
+    ...log,
+    user: log.user_id ? userMap.get(log.user_id) || null : null,
+    property: log.related_property_id ? propertyMap.get(log.related_property_id) || null : null
+  }));
+
+  const stats = await getTrustScoreStats();
+
+  return {
+    logs: enrichedLogs,
+    pagination: {
+      page: safePage,
+      limit: safeLimit,
+      total: count ?? enrichedLogs.length,
+      totalPages: Math.ceil((count ?? enrichedLogs.length) / safeLimit) || 1
+    },
+    stats
+  };
+};
+
 module.exports = {
   updateTrustScore,
   hasActionLog,
@@ -652,5 +828,8 @@ module.exports = {
   getBonusTasksStatus,
   applyReportPenalty,
   applyPropertyHiddenPenalty,
-  reverseReportPenalty
+  reverseReportPenalty,
+  getUserTrustScoreLogs,
+  getAdminTrustScoreLogs,
+  getTrustScoreStats
 };

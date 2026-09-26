@@ -1,8 +1,9 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const router = require('../routes/trustScoreRoutes');
+const adminRouter = require('../routes/adminRoutes');
 
-test('trustScoreRoutes registers all expected bonus task endpoints', () => {
+test('trustScoreRoutes registers all expected bonus task and logs endpoints', () => {
   const routes = router.stack
     .filter((layer) => layer.route)
     .map((layer) => ({
@@ -12,17 +13,35 @@ test('trustScoreRoutes registers all expected bonus task endpoints', () => {
 
   const paths = routes.map((r) => r.path);
   assert.ok(paths.includes('/tasks'), 'Route /tasks should exist');
+  assert.ok(paths.includes('/my-logs'), 'Route /my-logs should exist');
   assert.ok(paths.includes('/profile-completed/check'), 'Route /profile-completed/check should exist');
   assert.ok(paths.includes('/30-days-clean/check'), 'Route /30-days-clean/check should exist');
 
   const tasksRoute = routes.find((r) => r.path === '/tasks');
   assert.ok(tasksRoute.methods.includes('get'), 'GET /tasks should be allowed');
 
+  const myLogsRoute = routes.find((r) => r.path === '/my-logs');
+  assert.ok(myLogsRoute.methods.includes('get'), 'GET /my-logs should be allowed');
+
   const profileRoute = routes.find((r) => r.path === '/profile-completed/check');
   assert.ok(profileRoute.methods.includes('post'), 'POST /profile-completed/check should be allowed');
 
   const cleanRoute = routes.find((r) => r.path === '/30-days-clean/check');
   assert.ok(cleanRoute.methods.includes('post'), 'POST /30-days-clean/check should be allowed');
+});
+
+test('adminRoutes registers audit log endpoint /trust-score-logs', () => {
+  const adminRoutes = adminRouter.stack
+    .filter((layer) => layer.route)
+    .map((layer) => ({
+      path: layer.route.path,
+      methods: Object.keys(layer.route.methods)
+    }));
+
+  const paths = adminRoutes.map((r) => r.path);
+  assert.ok(paths.includes('/trust-score-logs'), 'Route /trust-score-logs should exist in adminRoutes');
+  const auditRoute = adminRoutes.find((r) => r.path === '/trust-score-logs');
+  assert.ok(auditRoute.methods.includes('get'), 'GET /trust-score-logs should be allowed');
 });
 
 test('profile completeness validation requires non-empty avatar, name, and phone', () => {
