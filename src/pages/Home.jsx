@@ -1,28 +1,37 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Mascot } from 'page-mascot';
 import { 
   Menu, Search, MapPin, Home as HomeIcon, 
-  Bed, Bath, Maximize, LogOut, User, 
+  Bed, Bath, Maximize, LogOut,
   ChevronDown, ArrowRight, Heart, X, SlidersHorizontal,
   ChevronLeft, ChevronRight, MessageSquare, Calendar, Eye, ShieldCheck, Phone, Shield, Share2, Sparkles,
-  Ruler, Star
+  Ruler, Star, Bell, Zap
 } from 'lucide-react';
 import './Home.css';
 import { API_BASE_URL } from '../config';
 import { apiFetch } from '../auth/apiClient';
 import { useAuth } from '../auth/useAuth';
 
-const categoryImages = {
-  'Apartment': 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=400&q=80',
-  'Căn Hộ': 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=400&q=80',
-  'Studio': 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=400&q=80',
-  'Villa': 'https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=400&q=80',
-  'Biệt Thự': 'https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=400&q=80',
-  'Townhouse': 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=400&q=80',
-  'Nhà Phố': 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=400&q=80',
-  'Condo': 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=400&q=80',
-  'Đất Nền': 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=400&q=80',
-  'Land': 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=400&q=80'
+const SwipeNestMark = () => (
+  <svg className="brand-mark-art" viewBox="0 0 150 150" aria-hidden="true" focusable="false">
+    <path d="M75 7 139 53v61a25 25 0 0 1-25 25H36a25 25 0 0 1-25-25V53L75 7Z" fill="#25499b" />
+    <path d="M75 7 24 55v57a27 27 0 0 0 27 27h24V7Z" fill="#fff" opacity=".055" />
+    <path d="M29 72c27-14 65-15 92-1" fill="none" stroke="#f3c52f" strokeWidth="8" strokeLinecap="round" />
+    <path d="M57 49v54m0-54 39 54V49" fill="none" stroke="#fff" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const getCategoryIllustration = (name = '') => {
+  const normalized = String(name).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+  if (/van phong|office/.test(normalized)) return '/icons/categories/office.webp';
+  if (/mat bang|kinh doanh|shop|retail|store/.test(normalized)) return '/icons/categories/shop.webp';
+  if (/dat nen|land/.test(normalized)) return '/icons/categories/land.webp';
+  if (/phong tro|studio|room/.test(normalized)) return '/icons/categories/room.webp';
+  if (/chung cu|can ho|apartment|condo/.test(normalized)) return '/icons/categories/apartment.webp';
+
+  return '/icons/categories/house.webp';
 };
 
 const WARDS_BY_REGION = {
@@ -312,8 +321,7 @@ const Home = () => {
 
     return Object.keys(counts).map(type => ({
       name: type,
-      count: counts[type],
-      image: categoryImages[type] || 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=400&q=80'
+      count: counts[type]
     }));
   }, [properties]);
 
@@ -666,9 +674,29 @@ const Home = () => {
     return `${(price / 1000000).toFixed(0)} Triệu`;
   };
 
-  // Get specific properties dynamically from filtered properties
-  const mainVilla = filteredProperties[0];
-  const otherProperties = filteredProperties.slice(1, 3);
+  const toggleFavorite = async (property) => {
+    if (!user?.id) return;
+    const isFavorite = dbFavorites.some(fav => fav.id === property.id);
+
+    if (isFavorite) {
+      setDbFavorites(prev => prev.filter(fav => fav.id !== property.id));
+      apiFetch(`${API_BASE_URL}/api/favorites/delete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ propertyId: property.id })
+      }).catch(err => console.error(err));
+    } else {
+      setDbFavorites(prev => [...prev, property]);
+      apiFetch(`${API_BASE_URL}/api/favorites`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ propertyId: property.id })
+      }).catch(err => console.error(err));
+    }
+  };
+
+  const featuredProperties = filteredProperties.slice(0, 4);
+  const popularAreas = ['Quận 1', 'Quận 7', 'Thủ Đức', 'Căn hộ', 'Nhà phố', 'Dưới 3 tỷ'];
 
   return (
     <div className="home-container">
@@ -678,7 +706,10 @@ const Home = () => {
           <button className="menu-btn" aria-label="Menu" onClick={() => setShowSidebar(true)}>
             <Menu size={20} />
           </button>
-          <span className="logo-text" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>Swipe Nest</span>
+          <button className="brand-lockup" onClick={() => navigate('/')} aria-label="Về trang chủ">
+            <span className="brand-mark"><SwipeNestMark /></span>
+            <span className="logo-text">Swipe Nest</span>
+          </button>
         </div>
 
         <nav className="nav-middle">
@@ -690,7 +721,11 @@ const Home = () => {
 
         <div className="nav-right">
           <button className="search-icon-btn" aria-label="Search button">
-            <Search size={20} />
+            <Search size={18} />
+          </button>
+          <button className="notification-btn" aria-label="Thông báo">
+            <Bell size={18} />
+            <span className="notification-dot"></span>
           </button>
           
           {user && (
@@ -729,7 +764,10 @@ const Home = () => {
         <div className="mobile-sidebar-backdrop" onClick={() => setShowSidebar(false)}>
           <div className="mobile-sidebar-drawer" onClick={(e) => e.stopPropagation()}>
             <div className="mobile-sidebar-header">
-              <span className="logo-text" onClick={() => { navigate('/'); setShowSidebar(false); }} style={{ cursor: 'pointer' }}>Swipe Nest</span>
+              <button className="brand-lockup mobile-sidebar-brand" onClick={() => { navigate('/'); setShowSidebar(false); }} aria-label="Về trang chủ">
+                <span className="brand-mark"><SwipeNestMark /></span>
+                <span className="logo-text">Swipe Nest</span>
+              </button>
               <button className="close-sidebar-btn" onClick={() => setShowSidebar(false)}>
                 <X size={20} />
               </button>
@@ -746,42 +784,78 @@ const Home = () => {
 
       {/* Hero Section */}
       <section className="hero-section">
-        <img 
-          src="https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1920&q=80" 
-          alt="Hero Background" 
-          className="hero-bg" 
-        />
-        <div className="hero-overlay"></div>
         <div className="hero-content">
-          <div className="hero-title-container">
-            <h1>Tìm Kiếm Ngôi Nhà</h1>
-            <h1><span style={{ color: '#0f2963', background: 'white', padding: '0 0.5rem', borderRadius: '8px' }}>Mơ Ước</span> Của Bạn</h1>
+          <div className="hero-top-row">
+            <div className="hero-copy">
+              <div className="hero-eyebrow"><Sparkles size={12} /> NƠI NHỮNG ƯỚC MƠ CÓ TỔ ẤM BẮT ĐẦU</div>
+              <div className="hero-title-container">
+                <h1>Tìm Kiếm Ngôi Nhà</h1>
+                <h1><span className="highlight-blue">Mơ Ước Của Bạn</span></h1>
+              </div>
+              <p className="hero-description">
+                Khám phá hàng ngàn bất động sản phù hợp với phong cách sống của bạn. Dễ dàng. Nhanh chóng. Cùng <strong>Swipe Nest.</strong>
+              </p>
+            </div>
+
+            <div className="hero-mascot-container">
+              <div className="mascot-speech-bubble">
+                Cùng tìm<br/>ngôi nhà lý tưởng<br/>nào!
+                <div className="speech-bubble-tail"></div>
+              </div>
+              <Mascot
+                directions="/mascots/otter-builder-directions.webp"
+                reactions="/mascots/otter-builder-reactions.webp"
+                size={176}
+                label="rái cá Swipe Nest"
+                className="hero-mascot-img"
+              />
+            </div>
+
+            <div className="hero-visual">
+              <div className="hero-photo-frame">
+                <img
+                  src="https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=85"
+                  alt="House"
+                />
+                <div className="hero-photo-badge">
+                  <div className="badge-icon-box"><HomeIcon size={14} color="#1a42b8" /></div>
+                  <div className="badge-text-box">
+                    <span className="badge-title">Good Homes</span>
+                    <span className="badge-subtitle">Brighter Tomorrows</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Search Form */}
           <form className="search-bar-container" onSubmit={executeSearch}>
             {/* 1. Ô địa điểm */}
             <div className="search-field location-field-wrapper">
-              <MapPin size={20} className="search-icon-gray" />
-              <div className="selected-wards-inline">
-                {selectedWards.map(ward => (
-                  <span key={ward} className="ward-pill-badge">
-                    {ward}
-                    <button type="button" className="remove-ward-pill-btn" onClick={() => handleRemoveWard(ward)}>
-                      <X size={10} />
-                    </button>
-                  </span>
-                ))}
-                <input 
-                  type="text" 
-                  placeholder={selectedWards.length === 0 ? "Nhập phường, quận, thành phố..." : ""} 
-                  value={searchLoc}
-                  onChange={(e) => {
-                    setSearchLoc(e.target.value);
-                    setShowSuggestions(true);
-                  }}
-                  onFocus={() => setShowSuggestions(true)}
-                />
+              <div className="search-field-icon-wrapper light-blue-bg"><MapPin size={18} color="#1a42b8" /></div>
+              <div className="search-field-content">
+                <label>Nhập địa điểm</label>
+                <div className="selected-wards-inline">
+                  {selectedWards.map(ward => (
+                    <span key={ward} className="ward-pill-badge">
+                      {ward}
+                      <button type="button" className="remove-ward-pill-btn" onClick={() => handleRemoveWard(ward)}>
+                        <X size={10} />
+                      </button>
+                    </span>
+                  ))}
+                  <input
+                    type="text"
+                    aria-label="Địa điểm"
+                    placeholder={selectedWards.length === 0 ? "Phường, quận, thành phố..." : ""}
+                    value={searchLoc}
+                    onChange={(e) => {
+                      setSearchLoc(e.target.value);
+                      setShowSuggestions(true);
+                    }}
+                    onFocus={() => setShowSuggestions(true)}
+                  />
+                </div>
               </div>
               {searchLoc && (
                 <button type="button" className="clear-search-btn" onClick={() => setSearchLoc('')}>
@@ -806,83 +880,100 @@ const Home = () => {
 
             {/* 2. Loại hình */}
             <div className="search-field select-field">
-              <HomeIcon size={20} className="search-icon-gray" />
-              <select 
-                value={searchType}
-                onChange={handleSearchTypeChange}
-              >
-                <option value="ALL">Tất cả loại hình</option>
-                <option value="Căn Hộ">Căn hộ</option>
-                <option value="Chung Cư">Chung cư</option>
-                <option value="Nhà Ở">Nhà ở</option>
-                <option value="Biệt Thự">Biệt thự</option>
-                <option value="Đất Nền">Đất nền</option>
-                {searchType === 'CUSTOM' && <option value="CUSTOM">Nhiều loại hình</option>}
-              </select>
+              <div className="search-field-icon-wrapper light-blue-bg"><HomeIcon size={18} color="#1a42b8" /></div>
+              <div className="search-field-content">
+                <label>Loại bất động sản</label>
+                <select value={searchType} onChange={handleSearchTypeChange} aria-label="Loại bất động sản">
+                  <option value="ALL">Tất cả loại</option>
+                  <option value="Căn Hộ">Căn hộ</option>
+                  <option value="Chung Cư">Chung cư</option>
+                  <option value="Nhà Ở">Nhà ở</option>
+                  <option value="Biệt Thự">Biệt thự</option>
+                  <option value="Đất Nền">Đất nền</option>
+                  {searchType === 'CUSTOM' && <option value="CUSTOM">Nhiều loại hình</option>}
+                </select>
+              </div>
+              <ChevronDown size={14} className="select-arrow-icon" />
             </div>
 
             <div className="search-field-divider"></div>
 
             {/* 3. Khoảng giá select */}
             <div className="search-field select-field">
-              <span className="price-icon-text">₫</span>
-              <select 
-                value={priceRange}
-                onChange={handlePriceRangeChange}
-              >
-                <option value="ALL">Khoảng giá</option>
-                <option value="under-5m">Dưới 5 triệu</option>
-                <option value="5m-10m">5 - 10 triệu</option>
-                <option value="10m-20m">10 - 20 triệu</option>
-                <option value="over-20m">Trên 20 triệu</option>
-                {priceRange === 'CUSTOM' && <option value="CUSTOM">Tùy chọn giá</option>}
-              </select>
+              <div className="search-field-icon-wrapper solid-blue-bg"><span style={{color: 'white', fontWeight: 'bold', fontSize: '14px'}}>$</span></div>
+              <div className="search-field-content">
+                <label>Khoảng giá</label>
+                <select value={priceRange} onChange={handlePriceRangeChange} aria-label="Khoảng giá">
+                  <option value="ALL">Tất cả mức giá</option>
+                  <option value="under-5m">Dưới 5 triệu</option>
+                  <option value="5m-10m">5 - 10 triệu</option>
+                  <option value="10m-20m">10 - 20 triệu</option>
+                  <option value="over-20m">Trên 20 triệu</option>
+                  {priceRange === 'CUSTOM' && <option value="CUSTOM">Tùy chọn giá</option>}
+                </select>
+              </div>
+              <ChevronDown size={14} className="select-arrow-icon" />
             </div>
 
             <div className="search-field-divider"></div>
 
-            {/* 4. Bộ lọc button */}
-            <div className="search-field button-field">
-              <button 
-                type="button" 
-                className={`home-adv-filter-btn ${activeFilterCount > 0 ? 'active' : ''}`}
-                onClick={() => setShowAdvModal(true)}
-              >
-                <SlidersHorizontal size={18} />
-                <span>Bộ lọc</span>
-                {activeFilterCount > 0 && (
-                  <span className="home-filter-badge">{activeFilterCount}</span>
-                )}
-              </button>
+            {/* 4. Diện tích */}
+            <div className="search-field select-field" onClick={() => setShowAdvModal(true)} style={{ cursor: 'pointer' }}>
+              <div className="search-field-icon-wrapper light-blue-bg">
+                <SlidersHorizontal size={18} color="#1a42b8" />
+              </div>
+              <div className="search-field-content">
+                <label>Diện tích</label>
+                <div className="pseudo-select-text" style={{ fontSize: '0.95rem', color: 'var(--text-primary)' }}>Tất cả diện tích</div>
+              </div>
+              <ChevronDown size={14} className="select-arrow-icon" />
+              {activeFilterCount > 0 && (
+                <span className="home-filter-badge-new">{activeFilterCount}</span>
+              )}
             </div>
 
             {/* 5. Tìm kiếm button */}
-            <button type="submit" className="search-btn">
-              Tìm kiếm <ArrowRight size={16} />
-            </button>
+            <div className="search-btn-wrapper" style={{ padding: '0 0.5rem 0 1rem' }}>
+              <button type="submit" className="search-btn">
+                <Search size={18} /> Tìm kiếm <ArrowRight size={16} />
+              </button>
+            </div>
           </form>
+
+          <div className="popular-searches">
+            <span>Tìm kiếm phổ biến:</span>
+            {popularAreas.map(area => <button key={area} type="button" onClick={() => setSearchLoc(area)}>{area}</button>)}
+          </div>
         </div>
       </section>
 
       {/* Danh Mục Phổ Biến (Popular Categories) */}
       <section className="categories-section">
-        <h2>Danh Mục Phổ Biến</h2>
+        <div className="section-heading-row">
+          <div>
+            <h2>Danh Mục Phổ Biến <Zap size={16} fill="currentColor" /></h2>
+            <p>Khám phá các loại bất động sản phù hợp với nhu cầu của bạn</p>
+          </div>
+          <button className="view-all-link" onClick={() => navigate('/swipe/Tất cả')}>Xem tất cả <ArrowRight size={14} /></button>
+        </div>
         <div className="categories-grid">
-          {categories.map((category) => (
+          {categories.slice(0, 6).map((category) => (
             <div 
               className="category-card" 
               key={category.name}
               onClick={() => navigate(`/swipe/${encodeURIComponent(category.name)}`)}
             >
-              <img 
-                src={category.image} 
-                alt={category.name} 
+              <img
+                src={getCategoryIllustration(category.name)}
+                alt=""
+                aria-hidden="true"
                 className="category-img" 
               />
-              <div className="category-overlay">
+              <div className="category-info">
                 <h3>{category.name}</h3>
                 <p>{category.count}+ tin đăng</p>
               </div>
+              <ChevronRight size={15} className="category-arrow" />
             </div>
           ))}
         </div>
@@ -890,137 +981,61 @@ const Home = () => {
 
       {/* Dành Cho Bạn (Recommended Properties) */}
       <section className="recommended-section">
-        <div className="section-header">
-          <div className="section-title-wrapper">
-            <span>TUYỂN CHỌN</span>
-            <h2>Dành Cho Bạn</h2>
+        <div className="section-heading-row listings-heading">
+          <div>
+            <h2>Bất Động Sản Nổi Bật <Sparkles size={16} /></h2>
+            <p>Những lựa chọn được yêu thích nhất từ cộng đồng Swipe Nest</p>
           </div>
-          <a href="#" className="view-all-link" onClick={() => { setSearchType('ALL'); setSearchLoc(''); }}>
+          <button className="view-all-link" onClick={() => navigate('/swipe/Tất cả')}>
             Xem tất cả <ArrowRight size={14} />
-          </a>
+          </button>
         </div>
 
-        <div className="properties-layout">
-          {/* Left Column - Large Property Card */}
-          {mainVilla && (
-            <div 
-              className="large-property-card"
-              onClick={() => {
-                setSelectedProperty(mainVilla);
-                setShowDetailModal(true);
-              }}
-              style={{ cursor: 'pointer' }}
-            >
-              <div className="property-card-bg-wrapper">
-                <img src={mainVilla.thumbnail} alt={mainVilla.title} className="property-card-bg-img" />
-                <div className="property-card-gradient-overlay"></div>
-              </div>
-
-              {mainVilla.is_highlighted && (
-                <div className="property-card-badge-container">
-                  <span className="property-card-badge-verified highlight">
-                    NỔI BẬT
-                  </span>
-                </div>
-              )}
-
-              <div className="property-card-info-container">
-                <div className="property-card-text-block">
-                  <h3 className="property-card-title">{mainVilla.title}</h3>
-                  <div className="property-card-address">
-                    <MapPin size={16} />
-                    <span>{mainVilla.address}</span>
-                  </div>
-                </div>
-
-                <div className="property-card-meta-block">
-                  <div className="property-card-price">
-                    <span className="price-val">{formatPrice(mainVilla.price).toLowerCase()}</span>
-                    <span className="price-unit">/tháng</span>
-                  </div>
-
-                  <div className="property-card-specs-box">
-                    <div className="spec-col">
-                      <Bed size={18} />
-                      <span className="spec-val">{mainVilla.bedrooms}</span>
-                    </div>
-                    <div className="spec-col-divider"></div>
-                    <div className="spec-col">
-                      <Bath size={18} />
-                      <span className="spec-val">{mainVilla.bathrooms}</span>
-                    </div>
-                    <div className="spec-col-divider"></div>
-                    <div className="spec-col">
-                      <Ruler size={18} />
-                      <span className="spec-val">{mainVilla.area}m²</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Right Column - Small Stacked Cards */}
-          <div className="properties-stack">
-            {otherProperties.map((property) => (
-              <div 
-                className="small-property-card" 
+        <div className="featured-properties-grid">
+          {featuredProperties.map((property) => {
+            const isFavorite = dbFavorites.some(fav => fav.id === property.id);
+            return (
+              <article
+                className="listing-card"
                 key={property.id}
                 onClick={() => {
                   setSelectedProperty(property);
                   setShowDetailModal(true);
                 }}
-                style={{ cursor: 'pointer' }}
               >
-                <div className="property-card-bg-wrapper">
-                  <img src={property.thumbnail} alt={property.title} className="property-card-bg-img" />
-                  <div className="property-card-gradient-overlay"></div>
+                <div className="listing-image-wrap">
+                  <img src={property.thumbnail} alt={property.title} />
+                  {property.is_highlighted && <span className="listing-highlight-badge"><Sparkles size={11} /> Nổi bật</span>}
+                  <button
+                    className={`listing-favorite ${isFavorite ? 'active' : ''}`}
+                    aria-label={isFavorite ? 'Bỏ lưu' : 'Lưu bất động sản'}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      toggleFavorite(property);
+                    }}
+                  >
+                    <Heart size={16} fill={isFavorite ? 'currentColor' : 'none'} />
+                  </button>
                 </div>
-
-                {property.is_highlighted && (
-                  <div className="property-card-badge-container">
-                    <span className="property-card-badge-verified highlight">
-                      NỔI BẬT
-                    </span>
-                  </div>
-                )}
-
-                <div className="property-card-info-container small-card-info-container">
-                  <div className="property-card-text-block">
-                    <h4 className="property-card-title small-title">{property.title}</h4>
-                    <div className="property-card-address small-address">
-                      <MapPin size={14} />
-                      <span>{property.address}</span>
-                    </div>
-                  </div>
-
-                  <div className="property-card-meta-block small-meta-block">
-                    <div className="property-card-price small-price">
-                      <span className="price-val">{formatPrice(property.price).toLowerCase()}</span>
-                      <span className="price-unit">/tháng</span>
-                    </div>
-
-                    <div className="property-card-specs-box small-specs-box">
-                      <div className="spec-col">
-                        <Bed size={14} />
-                        <span className="spec-val">{property.bedrooms}</span>
-                      </div>
-                      <div className="spec-col-divider small-divider"></div>
-                      <div className="spec-col">
-                        <Bath size={14} />
-                        <span className="spec-val">{property.bathrooms}</span>
-                      </div>
-                      <div className="spec-col-divider small-divider"></div>
-                      <div className="spec-col">
-                        <Ruler size={14} />
-                        <span className="spec-val">{property.area}m²</span>
-                      </div>
+                <div className="listing-card-body">
+                  <h3>{property.title}</h3>
+                  <p className="listing-address"><MapPin size={12} /> {property.address}</p>
+                  <div className="listing-card-bottom">
+                    <p className="listing-price"><strong>{formatPrice(property.price).toLowerCase()}</strong><span>/tháng</span></p>
+                    <div className="listing-specs">
+                      <span><Bed size={12} /> {property.bedrooms}</span>
+                      <span><Bath size={12} /> {property.bathrooms}</span>
+                      <span><Ruler size={12} /> {property.area}m²</span>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              </article>
+            );
+          })}
+
+          {featuredProperties.length === 0 && (
+            <div className="listings-empty-state">Chưa có bất động sản phù hợp. Hãy thử thay đổi bộ lọc tìm kiếm.</div>
+          )}
         </div>
       </section>
 
@@ -1028,7 +1043,10 @@ const Home = () => {
       <footer className="footer">
         <div className="footer-grid">
           <div className="footer-col">
-            <span className="footer-logo" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>Swipe Nest</span>
+            <button className="footer-brand" onClick={() => navigate('/')}>
+              <span className="brand-mark"><SwipeNestMark /></span>
+              <span className="footer-logo">Swipe Nest</span>
+            </button>
             <p className="footer-desc">
               Nâng tầm trải nghiệm bất động sản qua lăng kính của sự tinh tế và chuyên nghiệp.
             </p>
@@ -1057,6 +1075,13 @@ const Home = () => {
             <div className="footer-links">
               <a href="#" className="footer-link">Chính Sách Bảo Mật</a>
               <a href="#" className="footer-link">Điều Khoản Sử Dụng</a>
+            </div>
+          </div>
+
+          <div className="footer-col footer-social-col">
+            <h4>KẾT NỐI VỚI CHÚNG TÔI</h4>
+            <div className="footer-socials">
+              <span>f</span><span>♪</span><span>▶</span><span>◎</span><span>in</span>
             </div>
           </div>
         </div>
