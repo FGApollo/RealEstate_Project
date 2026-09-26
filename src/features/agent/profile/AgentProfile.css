@@ -164,6 +164,30 @@
   font-size: 14px;
 }
 
+.profile-bonus-tasks-btn {
+  margin-left: auto;
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fde68a;
+  padding: 8px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.profile-bonus-tasks-btn:hover {
+  background: #fde68a;
+  color: #92400e;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(245, 158, 11, 0.15);
+}
+
 /* ════════════════════════════════════════
    2. SUB NAVIGATION TABS
    ════════════════════════════════════════ */

@@ -22,6 +22,12 @@ const AgentOverview = () => {
   const { logout } = useAuth();
   const [currentUser, setCurrentUser] = useState(authenticatedUser);
 
+  useEffect(() => {
+    if (authenticatedUser) {
+      setCurrentUser(authenticatedUser);
+    }
+  }, [authenticatedUser]);
+
   const handleLogout = async (e) => {
     e.preventDefault();
     try {
