@@ -12,4 +12,8 @@ router.use(authenticate, requireRole('ADMIN'));
 router.get('/reviews', rateLimiters.read, adminController.getAllReviews);
 router.post('/reviews/:reviewId/status', rateLimiters.write, adminController.updateReviewStatus);
 
+// API Ẩn / Mở khóa tin vi phạm (Listing Ban / Unban)
+router.post('/properties/:propertyId/hide', rateLimiters.write, adminController.hideProperty);
+router.post('/properties/:propertyId/unhide', rateLimiters.write, adminController.unhideProperty);
+
 module.exports = router;

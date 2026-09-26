@@ -99,7 +99,7 @@ const attachPropertiesToReports = async (reports) => {
 
   const { data: properties, error } = await supabase
     .from('properties')
-    .select('id, title, owner_id')
+    .select('id, title, price, is_hidden, owner_id, owner:users!owner_id(id, name, email, trust_score)')
     .in('id', propertyIds);
 
   if (error) {
@@ -116,7 +116,7 @@ const attachPropertiesToReports = async (reports) => {
 const getAdminReports = async (status) => {
   let query = supabase
     .from('property_reports')
-    .select('*')
+    .select('*, reporter:users!reporter_id(id, name, email)')
     .order('created_at', { ascending: false });
 
   if (status) {
@@ -139,11 +139,39 @@ const resolveReport = async (reportId, adminId) => {
     throw createServiceError('Thiếu adminId trong body', 400);
   }
 
+  // Get report data first to ensure we have property_id regardless of penalty status
+  const { data: reportData } = await supabase
+    .from('property_reports')
+    .select('property_id')
+    .eq('id', reportId)
+    .single();
+
+  // 1. Apply report reason penalty to owner's trust score and mark report as RESOLVED
   const result = await trustScoreService.applyReportPenalty(reportId, adminId);
+
+  // 2. Hide violating property automatically (without duplicate -15pt penalty; already penalized by report reason above)
+  const targetPropertyId = result?.propertyId || reportData?.property_id;
+  let hiddenResult = null;
+  if (targetPropertyId) {
+    try {
+      hiddenResult = await trustScoreService.applyPropertyHiddenPenalty(targetPropertyId, adminId, false);
+    } catch (hiddenErr) {
+      console.error('Error applying property hidden penalty in resolveReport:', hiddenErr);
+      // Fallback: Ensure property is marked as is_hidden = true
+      await supabase
+        .from('properties')
+        .update({ is_hidden: true })
+        .eq('id', targetPropertyId);
+    }
+  }
+
   return {
     success: true,
-    message: result.message || `Xác nhận báo cáo vi phạm thành công.`,
+    message: result.message
+      ? `${result.message}. Đã ẩn bài đăng vi phạm khỏi hệ thống.`
+      : 'Xác nhận báo cáo vi phạm và ẩn bài đăng thành công.',
     result,
+    hiddenResult,
     report: result
   };
 };

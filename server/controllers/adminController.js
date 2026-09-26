@@ -70,4 +70,45 @@ const updateReviewStatus = async (req, res) => {
   }
 };
 
-module.exports = { getAllReviews, updateReviewStatus };
+const trustScoreService = require('../services/trustScoreService');
+
+const hideProperty = async (req, res) => {
+  const { propertyId } = req.params;
+  const adminId = req.user.id;
+
+  try {
+    const result = await trustScoreService.applyPropertyHiddenPenalty(propertyId, adminId);
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error('Error in hideProperty:', error);
+    return res.status(500).json({ error: error.message || 'Internal server error' });
+  }
+};
+
+const unhideProperty = async (req, res) => {
+  const { propertyId } = req.params;
+
+  try {
+    const { data, error } = await supabase
+      .from('properties')
+      .update({ is_hidden: false })
+      .eq('id', propertyId)
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Đã mở khóa hiển thị bài đăng thành công.',
+      property: data
+    });
+  } catch (error) {
+    console.error('Error in unhideProperty:', error);
+    return res.status(500).json({ error: error.message || 'Internal server error' });
+  }
+};
+
+module.exports = { getAllReviews, updateReviewStatus, hideProperty, unhideProperty };

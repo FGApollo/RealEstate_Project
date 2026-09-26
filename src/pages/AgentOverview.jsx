@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import {
   Home, Search, LayoutDashboard, Settings, LogOut, BarChart2, HelpCircle, MessageSquare, Shield,
-  User, Star, CreditCard
+  User, Star, CreditCard, Scale
 } from 'lucide-react';
 import OverviewDashboard from '../features/agent/overview/OverviewDashboard';
 import CreateListingWizard from '../features/agent/create-listing/CreateListingWizard';
@@ -10,6 +10,7 @@ import EditListingWizard from '../features/agent/edit-listing/EditListingWizard'
 import AgentChat from '../features/agent/chat/AgentChat';
 import AgentProfile from '../features/agent/profile/AgentProfile';
 import AgentPricing from '../features/agent/pricing/AgentPricing';
+import AgentViolations from '../features/agent/violations/AgentViolations';
 import './AgentOverview.css';
 import { API_BASE_URL } from '../config';
 import { apiFetch } from '../auth/apiClient';
@@ -168,6 +169,12 @@ const AgentOverview = () => {
             onClick={() => handleTabChange('feedback')}
           >
             <Star size={18} /> Đánh giá
+          </button>
+          <button
+            className={`nav-btn ${activeTab === 'violations' ? 'active' : ''}`}
+            onClick={() => handleTabChange('violations')}
+          >
+            <Scale size={18} /> Vi phạm & Khiếu nại
           </button>
           <button
             className={`nav-btn ${activeTab === 'profile' ? 'active' : ''}`}
@@ -357,6 +364,13 @@ const AgentOverview = () => {
               setActiveTab={handleTabChange}
               initialTab="reviews"
               hideHeader={true}
+            />
+          )}
+
+          {/* TAB 8.5: VIOLATIONS & APPEALS PANEL */}
+          {activeTab === 'violations' && (
+            <AgentViolations
+              currentUser={currentUser}
             />
           )}
 

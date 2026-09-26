@@ -351,6 +351,24 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
         </button>
         
         <div className="modal-body premium-body">
+          {property.is_hidden && (
+            <div style={{
+              backgroundColor: '#fef2f2',
+              border: '1px solid #fecaca',
+              color: '#991b1b',
+              padding: '12px 16px',
+              borderRadius: '10px',
+              margin: '16px 20px 0 20px',
+              fontSize: '0.9rem',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              <span>⛔ Tin đăng này đã bị Quản trị viên tạm ẩn khỏi sàn do có báo cáo vi phạm được xác thực.</span>
+            </div>
+          )}
+
           {/* 1. Top Media Slider */}
           <div className="detail-media-slider">
             <div className="main-image-container">
