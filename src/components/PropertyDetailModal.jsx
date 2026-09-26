@@ -447,7 +447,8 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
                 )}
                 
                 <button className="action-btn share-btn" onClick={() => {
-                  navigator.clipboard.writeText(window.location.origin + `/swipe/Tất%20cả?selectPropertyId=${property.id}`);
+                  const shareUrl = `${window.location.origin}/?propertyId=${property.id}`;
+                  navigator.clipboard.writeText(shareUrl);
                   alert('Đã sao chép liên kết bài đăng!');
                 }}>
                   <Share2 size={16} />

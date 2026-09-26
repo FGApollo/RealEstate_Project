@@ -8,7 +8,10 @@
     "server": "node server/index.js",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "db:check-prod": "node .local/dump-prod-schema.cjs",
+    "db:diff": "node .local/compare-schemas.cjs",
+    "db:migration:new": "node .local/create-migration.cjs"
   },
   "dependencies": {
     "@react-oauth/google": "^0.13.5",

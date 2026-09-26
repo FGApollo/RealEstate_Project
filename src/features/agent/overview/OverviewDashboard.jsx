@@ -503,6 +503,27 @@ const OverviewDashboard = ({
                   className="property-card-img"
                 />
 
+                {/* Status Badge */}
+                <div style={{
+                  position: 'absolute',
+                  top: '12px',
+                  left: '12px',
+                  zIndex: 2,
+                  padding: '4px 8px',
+                  borderRadius: '6px',
+                  fontSize: '11px',
+                  fontWeight: '600',
+                  color: '#ffffff',
+                  backgroundColor: 
+                    listing.status === 'RENTED' ? '#3b82f6' :
+                    listing.status === 'SOLD' ? '#ef4444' :
+                    listing.status === 'PENDING' ? '#f59e0b' : '#10b981'
+                }}>
+                  {listing.status === 'RENTED' ? 'ĐÃ CHO THUÊ' :
+                   listing.status === 'SOLD' ? 'ĐÃ BÁN' :
+                   listing.status === 'PENDING' ? 'CHỜ DUYỆT' : 'ĐANG HIỂN THỊ'}
+                </div>
+
                 {/* Hover overlay with agent actions */}
                 <div className="property-card-actions-overlay">
                   <button 
