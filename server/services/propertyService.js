@@ -129,7 +129,8 @@ const getProperties = async () => {
       property_images(image_url),
       lifestyle_tags(tag_name),
       owner:users!owner_id(name, role, avatar, trust_score, created_at, verification_status)
-    `);
+    `)
+    .or('is_hidden.is.null,is_hidden.eq.false');
 
   if (error) {
     throw new Error(error.message);

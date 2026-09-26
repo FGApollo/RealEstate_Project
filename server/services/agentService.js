@@ -18,7 +18,7 @@ const getOverview = async (userId) => {
       owner:users!owner_id(name, role, avatar, trust_score, created_at, verification_status)
     `)
     .eq('owner_id', userId)
-    .eq('status', 'AVAILABLE');
+    .order('created_at', { ascending: false });
 
   if (propertiesError) throw new Error(propertiesError.message);
 

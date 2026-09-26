@@ -5,6 +5,8 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import LoginAgent from './pages/LoginAgent'
 import RegisterAgent from './pages/RegisterAgent'
+import ForgotPassword from './pages/ForgotPassword'
+import NotFound from './pages/NotFound'
 import Home from './pages/Home'
 import Swipe from './pages/Swipe'
 import AgentOverview from './pages/AgentOverview'
@@ -19,6 +21,7 @@ function App() {
       <Route path="/register" element={<Register />} />
       <Route path="/login/agent" element={<LoginAgent />} />
       <Route path="/register/agent" element={<RegisterAgent />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route element={<ProtectedRoute />}>
         <Route path="/" element={<Home />} />
         <Route path="/swipe/:categoryName" element={<Swipe />} />
@@ -30,6 +33,7 @@ function App() {
       <Route element={<AdminRoute />}>
         <Route path="/admin" element={<AdminPage />} />
       </Route>
+      <Route path="*" element={<NotFound />} />
     </Routes>
   )
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   Menu, Search, MapPin, Home as HomeIcon, 
   Bed, Bath, Maximize, LogOut, User, 
@@ -13,16 +13,12 @@ import { apiFetch } from '../auth/apiClient';
 import { useAuth } from '../auth/useAuth';
 
 const categoryImages = {
-  'Apartment': 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=400&q=80',
   'Căn Hộ': 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=400&q=80',
-  'Studio': 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=400&q=80',
-  'Villa': 'https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=400&q=80',
-  'Biệt Thự': 'https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=400&q=80',
-  'Townhouse': 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=400&q=80',
-  'Nhà Phố': 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=400&q=80',
-  'Condo': 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=400&q=80',
-  'Đất Nền': 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=400&q=80',
-  'Land': 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=400&q=80'
+  'Chung Cư': 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=400&q=80',
+  'Nhà Ở': 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=400&q=80',
+  'Phòng Trọ': 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=400&q=80',
+  'Mặt Bằng': 'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=400&q=80',
+  'Văn Phòng': 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=400&q=80'
 };
 
 const WARDS_BY_REGION = {
@@ -101,6 +97,7 @@ const CUSTOM_LOCATION_SUGGESTIONS = [
 
 const Home = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, logout } = useAuth();
   const [showDropdown, setShowDropdown] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
@@ -353,8 +350,18 @@ const Home = () => {
         const data = await response.json();
         
         if (data.properties) {
-          setProperties(data.properties);
-          setFilteredProperties(data.properties);
+          const visibleProperties = data.properties.filter(p => !p.is_hidden);
+          setProperties(visibleProperties);
+          setFilteredProperties(visibleProperties);
+
+          const propertyIdParam = searchParams.get('propertyId');
+          if (propertyIdParam) {
+            const found = visibleProperties.find(p => String(p.id) === String(propertyIdParam));
+            if (found) {
+              setSelectedProperty(found);
+              setShowDetailModal(true);
+            }
+          }
         }
       } catch (error) {
         console.error('Error fetching properties from DB:', error);
@@ -815,8 +822,9 @@ const Home = () => {
                 <option value="Căn Hộ">Căn hộ</option>
                 <option value="Chung Cư">Chung cư</option>
                 <option value="Nhà Ở">Nhà ở</option>
-                <option value="Biệt Thự">Biệt thự</option>
-                <option value="Đất Nền">Đất nền</option>
+                <option value="Phòng Trọ">Phòng trọ</option>
+                <option value="Mặt Bằng">Mặt bằng</option>
+                <option value="Văn Phòng">Văn phòng</option>
                 {searchType === 'CUSTOM' && <option value="CUSTOM">Nhiều loại hình</option>}
               </select>
             </div>
@@ -1183,7 +1191,8 @@ const Home = () => {
                       </button>
                       
                       <button className="action-btn share-btn" onClick={() => {
-                        navigator.clipboard.writeText(window.location.href);
+                        const shareUrl = `${window.location.origin}/?propertyId=${selectedProperty.id}`;
+                        navigator.clipboard.writeText(shareUrl);
                         alert('Đã sao chép liên kết bài đăng!');
                       }}>
                         <Share2 size={16} />
@@ -1355,24 +1364,27 @@ const Home = () => {
                           })()}
                           
                           <div className="poster-contact-buttons">
+                            <button
+                              type="button"
+                              className="contact-btn message-btn"
+                              onClick={() => {
+                                if (selectedProperty.owner_id) {
+                                  navigate(`/chat?agentId=${selectedProperty.owner_id}&propertyId=${selectedProperty.id}`);
+                                } else {
+                                  alert('Bất động sản này không có thông tin chủ sở hữu.');
+                                }
+                              }}
+                            >
+                              <MessageSquare size={16} /> Nhắn tin
+                            </button>
                             {selectedProperty.contact_phone ? (
-                              <>
-                                <a href={`sms:${selectedProperty.contact_phone}`} className="contact-btn message-btn">
-                                  <MessageSquare size={16} /> Nhắn tin
-                                </a>
-                                <a href={`tel:${selectedProperty.contact_phone}`} className="contact-btn call-btn">
-                                  <Phone size={16} /> Gọi ngay
-                                </a>
-                              </>
+                              <a href={`tel:${selectedProperty.contact_phone}`} className="contact-btn call-btn">
+                                <Phone size={16} /> Gọi ngay
+                              </a>
                             ) : (
-                              <>
-                                <button className="contact-btn message-btn" disabled style={{ opacity: 0.5, cursor: 'not-allowed' }}>
-                                  <MessageSquare size={16} /> Chưa có SĐT
-                                </button>
-                                <button className="contact-btn call-btn" disabled style={{ opacity: 0.5, cursor: 'not-allowed' }}>
-                                  <Phone size={16} /> Chưa có SĐT
-                                </button>
-                              </>
+                              <button className="contact-btn call-btn" disabled style={{ opacity: 0.5, cursor: 'not-allowed' }}>
+                                <Phone size={16} /> Chưa có SĐT
+                              </button>
                             )}
                           </div>
                         </div>
@@ -1701,7 +1713,7 @@ const Home = () => {
               <div className="filter-group">
                 <label className="filter-section-title">Loại bất động sản</label>
                 <div className="chips-grid">
-                  {['Căn Hộ', 'Nhà Ở', 'Chung Cư', 'Biệt Thự', 'Đất Nền'].map(cat => {
+                  {['Căn Hộ', 'Chung Cư', 'Nhà Ở', 'Phòng Trọ', 'Mặt Bằng', 'Văn Phòng'].map(cat => {
                     const isSelected = selectedCategories.includes(cat);
                     return (
                       <button
@@ -1710,7 +1722,7 @@ const Home = () => {
                         className={`filter-chip ${isSelected ? 'active' : ''}`}
                         onClick={() => handleToggleCategoryChip(cat)}
                       >
-                        {cat === 'Nhà Ở' ? 'Nhà ở' : cat === 'Căn Hộ' ? 'Căn hộ' : cat}
+                        {cat}
                       </button>
                     );
                   })}
