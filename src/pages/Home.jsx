@@ -1367,7 +1367,7 @@ const Home = () => {
                               </div>
                               <div style={{ marginTop: '8px', borderTop: '1px solid #e2e8f0', paddingTop: '6px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                 <span style={{ fontSize: '11px', color: '#475569', fontWeight: '500' }}>Sale: {sim.owner?.name || 'Môi giới'}</span>
-                                <span style={{ fontSize: '10px', color: '#d97706', backgroundColor: '#fef3c7', padding: '2px 6px', borderRadius: '4px', fontWeight: '600' }}>★ {sim.owner?.trust_score || 90}</span>
+                                <span style={{ fontSize: '10px', color: '#d97706', backgroundColor: '#fef3c7', padding: '2px 6px', borderRadius: '4px', fontWeight: '600' }}>★ {sim.owner?.trust_score ?? 50}</span>
                               </div>
                             </div>
                           </div>
@@ -1395,7 +1395,7 @@ const Home = () => {
                         </div>
                         <div className="poster-right">
                           {(() => {
-                            const score = ownerDetails.trust_score !== undefined ? Number(ownerDetails.trust_score) : 92;
+                            const score = Number(ownerDetails.trust_score ?? 50);
                             let text = 'Rất uy tín';
                             let color = '#d97706'; // gold
                             if (score <= 39) {

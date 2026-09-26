@@ -197,25 +197,36 @@ const applyThirtyDaysNoViolationBonus = async (userId) => {
 
   const propertyIds = (properties || []).map((property) => property.id);
   if (propertyIds.length > 0) {
-    const { data: resolvedReport, error: reportsError } = await supabase
+    const { data: resolvedReports, error: reportsError } = await supabase
       .from('property_reports')
-      .select('id')
+      .select('id, handled_at')
       .in('property_id', propertyIds)
-      .eq('status', 'RESOLVED')
-      .limit(1)
-      .maybeSingle();
+      .eq('status', 'RESOLVED');
 
     if (reportsError) {
       throw new Error(reportsError.message);
     }
 
-    if (resolvedReport) {
-      return {
-        success: true,
-        applied: false,
-        message: 'Account has confirmed violations',
-        trustScore: Number(user.trust_score ?? DEFAULT_TRUST_SCORE)
-      };
+    if (resolvedReports && resolvedReports.length > 0) {
+      // Find reports that were successfully appealed and had their penalties refunded
+      const reportIds = resolvedReports.map((r) => r.id);
+      const { data: refundedLogs } = await supabase
+        .from('trust_score_logs')
+        .select('related_report_id')
+        .in('related_report_id', reportIds)
+        .eq('action', 'APPEAL_PENALTY_REFUND');
+
+      const refundedReportIds = new Set((refundedLogs || []).map((l) => l.related_report_id));
+      const activeViolations = resolvedReports.filter((r) => !refundedReportIds.has(r.id));
+
+      if (activeViolations.length > 0) {
+        return {
+          success: true,
+          applied: false,
+          message: 'Account has confirmed violations',
+          trustScore: Number(user.trust_score ?? DEFAULT_TRUST_SCORE)
+        };
+      }
     }
   }
 
@@ -427,10 +438,17 @@ const reverseReportPenalty = async (reportId, adminId, adminNote = '') => {
     .lt('point_change', 0)
     .order('created_at', { ascending: false });
 
-  // Calculate total points deducted
+  // Calculate actual points deducted (preventing refund overshoot arbitrage)
   let refundPoints = 0;
   if (penaltyLogs && penaltyLogs.length > 0) {
-    refundPoints = penaltyLogs.reduce((sum, log) => sum + Math.abs(log.point_change), 0);
+    refundPoints = penaltyLogs.reduce((sum, log) => {
+      const hasScoreHistory = log.old_score !== undefined && log.old_score !== null &&
+                              log.new_score !== undefined && log.new_score !== null;
+      const actualDeducted = hasScoreHistory
+        ? Math.max(0, Number(log.old_score) - Number(log.new_score))
+        : Math.abs(Number(log.point_change));
+      return sum + actualDeducted;
+    }, 0);
   } else {
     refundPoints = Math.abs(REPORT_PENALTIES[report.reason] ?? 5);
   }

@@ -809,7 +809,7 @@ const AgentProfile = ({
           </div>
 
           {(() => {
-            const score = currentUser.trust_score !== undefined ? Number(currentUser.trust_score) : 98;
+            const score = Number(currentUser.trust_score ?? 50);
             let trustText = 'Rất uy tín';
             let trustColor = '#d97706'; // gold
             if (score <= 39) {
@@ -1136,7 +1136,7 @@ const AgentProfile = ({
                   </div>
                   <div className="summary-desc">Dựa trên {reviews.length} đánh giá</div>
                   {(() => {
-                    const score = currentUser.trust_score !== undefined ? Number(currentUser.trust_score) : 98;
+                    const score = Number(currentUser.trust_score ?? 50);
                     let text = 'Rất uy tín';
                     let color = '#d97706'; // gold
                     if (score <= 39) {

@@ -778,7 +778,7 @@ const AdminPage = () => {
                       </div>
                       <div className="admin-info-item">
                         <span className="admin-info-label">Trust Score hiện tại</span>
-                        <span className="admin-info-value">{kycDetail.user?.trust_score ?? 0} điểm</span>
+                        <span className="admin-info-value">{kycDetail.user?.trust_score ?? 50} điểm</span>
                       </div>
                     </div>
 
@@ -1033,8 +1033,8 @@ const AdminPage = () => {
                         </div>
                         <div className="admin-info-item">
                           <span className="admin-info-label">Trust Score của Owner</span>
-                          <span className="admin-info-value" style={{ color: (selectedReport.property?.owner?.trust_score ?? 100) < 50 ? '#dc2626' : '#059669', fontWeight: 800 }}>
-                            {selectedReport.property?.owner?.trust_score ?? 100} điểm
+                          <span className="admin-info-value" style={{ color: (selectedReport.property?.owner?.trust_score ?? 50) < 50 ? '#dc2626' : '#059669', fontWeight: 800 }}>
+                            {selectedReport.property?.owner?.trust_score ?? 50} điểm
                           </span>
                         </div>
                         <div className="admin-info-item" style={{ gridColumn: '1 / -1' }}>
@@ -1577,9 +1577,11 @@ const AdminPage = () => {
                       <div className="admin-info-grid" style={{ marginTop: 16 }}>
                         <div className="admin-info-item">
                           <span className="admin-info-label"><User size={14} style={{ display: 'inline', marginRight: 4 }}/> Môi giới nộp đơn (Agent)</span>
-                          <span className="admin-info-value">{selectedAppeal.agent?.name} ({selectedAppeal.agent?.email})</span>
+                          <span className="admin-info-value">
+                            {selectedAppeal.agent?.name || 'Môi giới'} {selectedAppeal.agent?.email ? `(${selectedAppeal.agent.email})` : ''}
+                          </span>
                           <span style={{ fontSize: '0.8rem', color: '#4f46e5', fontWeight: 700, marginTop: 2 }}>
-                            Trust Score: {selectedAppeal.agent?.trust_score ?? 100} điểm
+                            Trust Score: {selectedAppeal.agent?.trust_score ?? 50} điểm
                           </span>
                         </div>
                         <div className="admin-info-item">
@@ -1601,10 +1603,10 @@ const AdminPage = () => {
                             Báo cáo vi phạm gốc #{selectedAppeal.report_id}
                           </h4>
                           <p style={{ color: '#1e293b', fontWeight: 600, marginTop: 4 }}>
-                            Lý do phạt: <span style={{ color: '#ea580c' }}>{REASON_LABELS[selectedAppeal.report?.reason]?.label || selectedAppeal.report?.reason}</span> ({REASON_LABELS[selectedAppeal.report?.reason]?.penalty} điểm)
+                            Lý do phạt: <span style={{ color: '#ea580c' }}>{REASON_LABELS[selectedAppeal.report?.reason]?.label || selectedAppeal.report?.reason || 'Chưa xác định'}</span> {REASON_LABELS[selectedAppeal.report?.reason]?.penalty !== undefined ? `(${REASON_LABELS[selectedAppeal.report?.reason].penalty} điểm)` : ''}
                           </p>
                           <p style={{ color: '#475569', fontSize: '0.85rem', marginTop: 4 }}>
-                            Người báo cáo: <strong>{selectedAppeal.report?.reporter?.name || 'Khách hàng'}</strong> ({selectedAppeal.report?.reporter?.email})
+                            Người báo cáo: <strong>{selectedAppeal.report?.reporter?.name || 'Khách hàng'}</strong> {selectedAppeal.report?.reporter?.email ? `(${selectedAppeal.report.reporter.email})` : ''}
                           </p>
                           <p style={{ color: '#334155', fontSize: '0.85rem', fontStyle: 'italic', marginTop: 4, background: '#ffffff', padding: '8px 12px', borderRadius: 8, border: '1px solid #fed7aa' }}>
                             "{selectedAppeal.report?.description || 'Không có mô tả chi tiết từ người báo cáo'}"
@@ -1623,11 +1625,24 @@ const AdminPage = () => {
                         </div>
 
                         {(() => {
-                          const evImages = (selectedAppeal.evidence_urls && selectedAppeal.evidence_urls.length > 0)
-                            ? selectedAppeal.evidence_urls
-                            : (selectedAppeal.evidence_url ? (
-                                (selectedAppeal.evidence_url.startsWith('[') ? (() => { try { return JSON.parse(selectedAppeal.evidence_url); } catch(e) { return [selectedAppeal.evidence_url]; } })() : [selectedAppeal.evidence_url])
-                              ) : []);
+                          let evImages = [];
+                          if (Array.isArray(selectedAppeal.evidence_urls) && selectedAppeal.evidence_urls.length > 0) {
+                            evImages = selectedAppeal.evidence_urls.filter(Boolean);
+                          } else if (Array.isArray(selectedAppeal.evidence_url)) {
+                            evImages = selectedAppeal.evidence_url.filter(Boolean);
+                          } else if (typeof selectedAppeal.evidence_url === 'string') {
+                            const trimmed = selectedAppeal.evidence_url.trim();
+                            if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+                              try {
+                                const parsed = JSON.parse(trimmed);
+                                if (Array.isArray(parsed)) evImages = parsed.filter(Boolean);
+                              } catch (e) {
+                                evImages = [trimmed];
+                              }
+                            } else if (trimmed) {
+                              evImages = [trimmed];
+                            }
+                          }
 
                           if (evImages.length === 0) return null;
 

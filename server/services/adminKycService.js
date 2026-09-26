@@ -8,6 +8,7 @@ const PENDING_STATUS = 'PENDING';
 const REJECTED_STATUS = 'REJECTED';
 const APPROVED_STATUS = 'APPROVED';
 const TRUST_ACTION_KYC_APPROVED = 'KYC_APPROVED';
+const TRUST_ACTION_KYC_REVOKED = 'KYC_REVOKED';
 const TRUST_BONUS_KYC_APPROVED = 20;
 const TRUST_BONUS_REASON = 'KYC/ID card verification approved by admin';
 
@@ -233,8 +234,8 @@ const applyTrustScoreDirectly = async (userId) => {
     throw new Error(userError.message || 'Failed to fetch user trust score');
   }
 
-  const oldScore = Number(user.trust_score || 0);
-  const newScore = oldScore + TRUST_BONUS_KYC_APPROVED;
+  const oldScore = Number(user.trust_score ?? 50);
+  const newScore = Math.max(0, Math.min(100, oldScore + TRUST_BONUS_KYC_APPROVED));
 
   const { error: updateUserError } = await supabase
     .from('users')
@@ -275,10 +276,45 @@ const applyTrustScoreDirectly = async (userId) => {
 };
 
 const applyKycApprovedTrustScore = async (userId) => {
-  const serviceResult = await applyTrustScoreWithExistingService(userId);
+  // Check net KYC balance: approved count vs revoked count
+  const { data: approvedLogs } = await supabase
+    .from('trust_score_logs')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('action', TRUST_ACTION_KYC_APPROVED);
 
-  if (serviceResult) {
-    return serviceResult;
+  const { data: revokedLogs } = await supabase
+    .from('trust_score_logs')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('action', TRUST_ACTION_KYC_REVOKED);
+
+  const approvedCount = approvedLogs ? approvedLogs.length : 0;
+  const revokedCount = revokedLogs ? revokedLogs.length : 0;
+
+  // If bonus is currently active (approved > revoked), do not duplicate bonus
+  if (approvedCount > revokedCount) {
+    return {
+      applied: false,
+      action: TRUST_ACTION_KYC_APPROVED,
+      reason: 'KYC_APPROVED bonus already active'
+    };
+  }
+
+  // User currently has no active KYC bonus (either first time or re-approved after revocation)
+  if (typeof trustScoreService?.updateTrustScore === 'function') {
+    const newScore = await trustScoreService.updateTrustScore(
+      userId,
+      TRUST_ACTION_KYC_APPROVED,
+      TRUST_BONUS_KYC_APPROVED,
+      TRUST_BONUS_REASON
+    );
+    return {
+      applied: true,
+      action: TRUST_ACTION_KYC_APPROVED,
+      pointChange: TRUST_BONUS_KYC_APPROVED,
+      newScore
+    };
   }
 
   return applyTrustScoreDirectly(userId);
@@ -399,9 +435,48 @@ const rejectVerification = async (adminId, verificationId, rejectReason) => {
     throw new Error(userError.message || 'Failed to update user verification status');
   }
 
+  // Revoke KYC bonus points if user currently holds active bonus
+  let trustScoreRevocation = { applied: false };
+  try {
+    const { data: approvedLogs } = await supabase
+      .from('trust_score_logs')
+      .select('id')
+      .eq('user_id', verification.user_id)
+      .eq('action', TRUST_ACTION_KYC_APPROVED);
+
+    const { data: revokedLogs } = await supabase
+      .from('trust_score_logs')
+      .select('id')
+      .eq('user_id', verification.user_id)
+      .eq('action', TRUST_ACTION_KYC_REVOKED);
+
+    const approvedCount = approvedLogs ? approvedLogs.length : 0;
+    const revokedCount = revokedLogs ? revokedLogs.length : 0;
+
+    if (approvedCount > revokedCount) {
+      if (typeof trustScoreService?.updateTrustScore === 'function') {
+        const newScore = await trustScoreService.updateTrustScore(
+          verification.user_id,
+          TRUST_ACTION_KYC_REVOKED,
+          -TRUST_BONUS_KYC_APPROVED,
+          `Thu hồi điểm thưởng KYC do hồ sơ bị từ chối/hủy duyệt: ${trimmedReason}`
+        );
+        trustScoreRevocation = {
+          applied: true,
+          action: TRUST_ACTION_KYC_REVOKED,
+          pointDeducted: TRUST_BONUS_KYC_APPROVED,
+          newScore
+        };
+      }
+    }
+  } catch (tsErr) {
+    console.warn('Could not revoke KYC trust score bonus:', tsErr.message);
+  }
+
   return {
     message: 'KYC verification rejected successfully',
-    verification: updatedVerification
+    verification: updatedVerification,
+    trustScore: trustScoreRevocation
   };
 };
 

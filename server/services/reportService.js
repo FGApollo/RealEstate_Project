@@ -38,7 +38,7 @@ const validateReportReason = (reason) => {
 const getPropertyForReport = async (propertyId) => {
   const { data: property, error } = await supabase
     .from('properties')
-    .select('id, title, owner_id')
+    .select('id, title, owner_id, is_hidden')
     .eq('id', propertyId)
     .single();
 
@@ -66,6 +66,28 @@ const createReport = async ({ propertyId, reporterId, reason, description }) => 
   const property = await getPropertyForReport(propertyId);
   if (String(property.owner_id) === String(reporterId)) {
     throw createServiceError('You cannot report your own property', 400);
+  }
+
+  if (property.is_hidden) {
+    throw createServiceError('Tin đăng này hiện đã bị ẩn hoặc đang tạm khóa khỏi sàn.', 400);
+  }
+
+  // Prevent duplicate pending reports from the same user on the same property
+  const { data: existingReport, error: checkReportErr } = await supabase
+    .from('property_reports')
+    .select('id')
+    .eq('property_id', propertyId)
+    .eq('reporter_id', reporterId)
+    .eq('status', 'PENDING')
+    .limit(1)
+    .maybeSingle();
+
+  if (checkReportErr && checkReportErr.code !== 'PGRST116') {
+    throw new Error(checkReportErr.message);
+  }
+
+  if (existingReport) {
+    throw createServiceError('Bạn đã gửi báo cáo cho tin đăng này và đang chờ quản trị viên xử lý.', 400);
   }
 
   const { data: report, error } = await supabase
