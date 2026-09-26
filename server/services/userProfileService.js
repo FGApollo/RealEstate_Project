@@ -85,18 +85,12 @@ const uploadAvatar = async (userId, file) => {
 
   await updateUserAvatar(userId, publicUrl);
 
-  let profileBonus = {
-    applied: false,
-    message: 'Profile completeness bonus was not checked'
-  };
-
-  if (trustScoreService?.applyProfileCompletenessBonus) {
-    profileBonus = await trustScoreService.applyProfileCompletenessBonus(userId);
-  }
-
   return {
     avatar: publicUrl,
-    profileBonus
+    profileBonus: {
+      applied: false,
+      message: 'Claim profile bonus manually in Trust Score modal'
+    }
   };
 };
 

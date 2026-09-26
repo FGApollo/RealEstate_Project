@@ -371,7 +371,7 @@ const Swipe = () => {
         if (response.ok) {
           const data = await response.json();
           if (data.properties && data.properties.length > 0) {
-            setDbProperties(data.properties);
+            setDbProperties(data.properties.filter(p => !p.is_hidden));
           }
         }
       } catch (err) {
@@ -548,15 +548,6 @@ const Swipe = () => {
         }).catch(err => console.error('Error adding favorite to DB:', err));
       }
 
-      // Remove from database favorites if swiped left (dislike)
-      if (direction === 'left' && user?.id) {
-        setDbFavorites(prev => prev.filter(f => f.id !== currentProperty.id));
-        apiFetch(`${API_BASE_URL}/api/favorites/delete`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ propertyId: currentProperty.id })
-        }).catch(err => console.error('Error removing favorite from DB:', err));
-      }
     }
     
     // Reset values silently at center with opacity 0

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Mascot } from 'page-mascot';
 import { 
   Menu, Search, MapPin, Home as HomeIcon, 
@@ -110,6 +110,8 @@ const CUSTOM_LOCATION_SUGGESTIONS = [
 
 const Home = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const sharedPropertyId = searchParams.get('propertyId');
   const { user, logout } = useAuth();
   const [showDropdown, setShowDropdown] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
@@ -231,10 +233,14 @@ const Home = () => {
       list = list.filter(r => r.user_id === user.id);
     }
     
-    // Star filter
+    // Star / verified filter
     if (ratingFilter !== 'all') {
-      const stars = parseInt(ratingFilter);
-      list = list.filter(r => r.rating === stars);
+      if (ratingFilter === 'verified') {
+        list = list.filter(r => Boolean(r.is_verified_review));
+      } else {
+        const stars = parseInt(ratingFilter);
+        list = list.filter(r => r.rating === stars);
+      }
     }
     
     // Sorting
@@ -259,6 +265,10 @@ const Home = () => {
     if (!selectedProperty) return;
     if (!user) {
       alert('Vui lòng đăng nhập để gửi đánh giá!');
+      return;
+    }
+    if (user.id === selectedProperty.owner_id) {
+      alert('Chủ sở hữu không thể tự đánh giá bất động sản của mình!');
       return;
     }
 
@@ -312,6 +322,61 @@ const Home = () => {
     }
   };
 
+  const handleToggleHelpful = async (reviewId) => {
+    if (!user) {
+      alert('Vui lòng đăng nhập để bình chọn đánh giá này!');
+      return;
+    }
+
+    // Optimistic update
+    setReviews(prev => prev.map(r => {
+      if (r.id === reviewId) {
+        const currentlyVoted = Boolean(r.user_has_voted);
+        const currentCount = r.helpful_count || 0;
+        return {
+          ...r,
+          user_has_voted: !currentlyVoted,
+          helpful_count: currentlyVoted ? Math.max(0, currentCount - 1) : currentCount + 1
+        };
+      }
+      return r;
+    }));
+
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/api/properties/reviews/${reviewId}/helpful`, {
+        method: 'POST'
+      });
+      if (res.ok) {
+        const result = await res.json();
+        setReviews(prev => prev.map(r => {
+          if (r.id === reviewId) {
+            return {
+              ...r,
+              user_has_voted: result.has_voted,
+              helpful_count: result.helpful_count
+            };
+          }
+          return r;
+        }));
+      } else {
+        const refetch = await apiFetch(`${API_BASE_URL}/api/properties/${selectedProperty.id}/reviews`);
+        if (refetch.ok) {
+          const freshData = await refetch.json();
+          setReviews(freshData.reviews || []);
+        }
+        const errData = await res.json().catch(() => ({}));
+        alert(errData.error || 'Không thể thực hiện bình chọn lúc này.');
+      }
+    } catch (err) {
+      console.error('Error toggling review helpful in Home:', err);
+      const refetch = await apiFetch(`${API_BASE_URL}/api/properties/${selectedProperty.id}/reviews`);
+      if (refetch.ok) {
+        const freshData = await refetch.json();
+        setReviews(freshData.reviews || []);
+      }
+    }
+  };
+
   const categories = useMemo(() => {
     const counts = {};
     properties.forEach(p => {
@@ -361,8 +426,17 @@ const Home = () => {
         const data = await response.json();
         
         if (data.properties) {
-          setProperties(data.properties);
-          setFilteredProperties(data.properties);
+          const visibleProperties = data.properties.filter(p => !p.is_hidden);
+          setProperties(visibleProperties);
+          setFilteredProperties(visibleProperties);
+
+          if (sharedPropertyId) {
+            const found = visibleProperties.find(p => String(p.id) === String(sharedPropertyId));
+            if (found) {
+              setSelectedProperty(found);
+              setShowDetailModal(true);
+            }
+          }
         }
       } catch (error) {
         console.error('Error fetching properties from DB:', error);
@@ -370,7 +444,7 @@ const Home = () => {
     };
 
     fetchProperties();
-  }, []);
+  }, [sharedPropertyId]);
 
   const locationSuggestions = useMemo(() => {
     if (!searchLoc.trim()) return [];
@@ -888,6 +962,9 @@ const Home = () => {
                   <option value="Căn Hộ">Căn hộ</option>
                   <option value="Chung Cư">Chung cư</option>
                   <option value="Nhà Ở">Nhà ở</option>
+                  <option value="Phòng Trọ">Phòng trọ</option>
+                  <option value="Mặt Bằng">Mặt bằng</option>
+                  <option value="Văn Phòng">Văn phòng</option>
                   <option value="Biệt Thự">Biệt thự</option>
                   <option value="Đất Nền">Đất nền</option>
                   {searchType === 'CUSTOM' && <option value="CUSTOM">Nhiều loại hình</option>}
@@ -1208,7 +1285,8 @@ const Home = () => {
                       </button>
                       
                       <button className="action-btn share-btn" onClick={() => {
-                        navigator.clipboard.writeText(window.location.href);
+                        const shareUrl = `${window.location.origin}/?propertyId=${selectedProperty.id}`;
+                        navigator.clipboard.writeText(shareUrl);
                         alert('Đã sao chép liên kết bài đăng!');
                       }}>
                         <Share2 size={16} />
@@ -1329,7 +1407,7 @@ const Home = () => {
                               </div>
                               <div style={{ marginTop: '8px', borderTop: '1px solid #e2e8f0', paddingTop: '6px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                 <span style={{ fontSize: '11px', color: '#475569', fontWeight: '500' }}>Sale: {sim.owner?.name || 'Môi giới'}</span>
-                                <span style={{ fontSize: '10px', color: '#d97706', backgroundColor: '#fef3c7', padding: '2px 6px', borderRadius: '4px', fontWeight: '600' }}>★ {sim.owner?.trust_score || 90}</span>
+                                <span style={{ fontSize: '10px', color: '#d97706', backgroundColor: '#fef3c7', padding: '2px 6px', borderRadius: '4px', fontWeight: '600' }}>★ {sim.owner?.trust_score ?? 50}</span>
                               </div>
                             </div>
                           </div>
@@ -1357,7 +1435,7 @@ const Home = () => {
                         </div>
                         <div className="poster-right">
                           {(() => {
-                            const score = ownerDetails.trust_score !== undefined ? Number(ownerDetails.trust_score) : 92;
+                            const score = Number(ownerDetails.trust_score ?? 50);
                             let text = 'Rất uy tín';
                             let color = '#d97706'; // gold
                             if (score <= 39) {
@@ -1380,24 +1458,27 @@ const Home = () => {
                           })()}
                           
                           <div className="poster-contact-buttons">
+                            <button
+                              type="button"
+                              className="contact-btn message-btn"
+                              onClick={() => {
+                                if (selectedProperty.owner_id) {
+                                  navigate(`/chat?agentId=${selectedProperty.owner_id}&propertyId=${selectedProperty.id}`);
+                                } else {
+                                  alert('Bất động sản này không có thông tin chủ sở hữu.');
+                                }
+                              }}
+                            >
+                              <MessageSquare size={16} /> Nhắn tin
+                            </button>
                             {selectedProperty.contact_phone ? (
-                              <>
-                                <a href={`sms:${selectedProperty.contact_phone}`} className="contact-btn message-btn">
-                                  <MessageSquare size={16} /> Nhắn tin
-                                </a>
-                                <a href={`tel:${selectedProperty.contact_phone}`} className="contact-btn call-btn">
-                                  <Phone size={16} /> Gọi ngay
-                                </a>
-                              </>
+                              <a href={`tel:${selectedProperty.contact_phone}`} className="contact-btn call-btn">
+                                <Phone size={16} /> Gọi ngay
+                              </a>
                             ) : (
-                              <>
-                                <button className="contact-btn message-btn" disabled style={{ opacity: 0.5, cursor: 'not-allowed' }}>
-                                  <MessageSquare size={16} /> Chưa có SĐT
-                                </button>
-                                <button className="contact-btn call-btn" disabled style={{ opacity: 0.5, cursor: 'not-allowed' }}>
-                                  <Phone size={16} /> Chưa có SĐT
-                                </button>
-                              </>
+                              <button className="contact-btn call-btn" disabled style={{ opacity: 0.5, cursor: 'not-allowed' }}>
+                                <Phone size={16} /> Chưa có SĐT
+                              </button>
                             )}
                           </div>
                         </div>
@@ -1566,6 +1647,7 @@ const Home = () => {
                     <div className="select-wrapper">
                       <select value={ratingFilter} onChange={(e) => setRatingFilter(e.target.value)}>
                         <option value="all">Tất cả sao</option>
+                        <option value="verified">✓ Đã xác thực giao dịch</option>
                         <option value="5">5 sao</option>
                         <option value="4">4 sao</option>
                         <option value="3">3 sao</option>
@@ -1585,7 +1667,7 @@ const Home = () => {
                       filteredReviewsList.map((rev) => {
                         const avatarInitial = rev.user?.name ? rev.user.name.charAt(0).toUpperCase() : 'U';
                         const reviewDate = new Date(rev.created_at).toLocaleDateString('vi-VN');
-                        const isVerified = rev.is_verified_review || rev.user_id === selectedProperty.owner_id;
+                        const isVerified = Boolean(rev.is_verified_review);
                         
                         return (
                           <div key={rev.id} className="review-item-card">
@@ -1601,6 +1683,11 @@ const Home = () => {
                                 <div className="reviewer-name-date">
                                   <div className="reviewer-name-row">
                                     <span className="reviewer-name">{rev.user?.name || 'Người dùng'}</span>
+                                    {isVerified && (
+                                      <span className="purchased-badge" title="Đánh giá đã được xác thực qua giao dịch thực tế">
+                                        ✓ Đã giao dịch
+                                      </span>
+                                    )}
                                   </div>
                                   <span className="review-date">{reviewDate}</span>
                                 </div>
@@ -1628,7 +1715,11 @@ const Home = () => {
                             )}
                             
                             <div className="review-actions-footer">
-                              <button className="helpful-btn">
+                              <button
+                                className={`helpful-btn ${rev.user_has_voted ? 'voted' : ''}`}
+                                onClick={() => handleToggleHelpful(rev.id)}
+                                title={rev.user_has_voted ? "Bỏ bình chọn hữu ích" : "Bình chọn hữu ích"}
+                              >
                                 <span>👍 Hữu ích ({rev.helpful_count || 0})</span>
                               </button>
                               <button className="reply-btn">
@@ -1726,7 +1817,7 @@ const Home = () => {
               <div className="filter-group">
                 <label className="filter-section-title">Loại bất động sản</label>
                 <div className="chips-grid">
-                  {['Căn Hộ', 'Nhà Ở', 'Chung Cư', 'Biệt Thự', 'Đất Nền'].map(cat => {
+                  {['Căn Hộ', 'Chung Cư', 'Nhà Ở', 'Phòng Trọ', 'Mặt Bằng', 'Văn Phòng'].map(cat => {
                     const isSelected = selectedCategories.includes(cat);
                     return (
                       <button
@@ -1735,7 +1826,7 @@ const Home = () => {
                         className={`filter-chip ${isSelected ? 'active' : ''}`}
                         onClick={() => handleToggleCategoryChip(cat)}
                       >
-                        {cat === 'Nhà Ở' ? 'Nhà ở' : cat === 'Căn Hộ' ? 'Căn hộ' : cat}
+                        {cat}
                       </button>
                     );
                   })}

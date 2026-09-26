@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import {
   Home, Search, LayoutDashboard, Settings, LogOut, BarChart2, HelpCircle, MessageSquare, Shield,
-  User, Star, CreditCard
+  User, Star, CreditCard, Scale, ShieldAlert
 } from 'lucide-react';
 import OverviewDashboard from '../features/agent/overview/OverviewDashboard';
 import CreateListingWizard from '../features/agent/create-listing/CreateListingWizard';
@@ -10,6 +10,7 @@ import EditListingWizard from '../features/agent/edit-listing/EditListingWizard'
 import AgentChat from '../features/agent/chat/AgentChat';
 import AgentProfile from '../features/agent/profile/AgentProfile';
 import AgentPricing from '../features/agent/pricing/AgentPricing';
+import AgentViolations from '../features/agent/violations/AgentViolations';
 import './AgentOverview.css';
 import { API_BASE_URL } from '../config';
 import { apiFetch } from '../auth/apiClient';
@@ -20,6 +21,12 @@ const AgentOverview = () => {
   const { currentUser: authenticatedUser } = useOutletContext();
   const { logout } = useAuth();
   const [currentUser, setCurrentUser] = useState(authenticatedUser);
+
+  useEffect(() => {
+    if (authenticatedUser) {
+      setCurrentUser(authenticatedUser);
+    }
+  }, [authenticatedUser]);
 
   const handleLogout = async (e) => {
     e.preventDefault();
@@ -170,6 +177,12 @@ const AgentOverview = () => {
             <Star size={18} /> Đánh giá
           </button>
           <button
+            className={`nav-btn ${activeTab === 'violations' ? 'active' : ''}`}
+            onClick={() => handleTabChange('violations')}
+          >
+            <Scale size={18} /> Vi phạm & Khiếu nại
+          </button>
+          <button
             className={`nav-btn ${activeTab === 'profile' ? 'active' : ''}`}
             onClick={() => handleTabChange('profile')}
           >
@@ -230,6 +243,37 @@ const AgentOverview = () => {
         )}
 
         <div className="dashboard-content">
+          {/* LOW TRUST SCORE WARNING & SUSPENSION BANNER (<= 30) */}
+          {Number(currentUser?.trust_score ?? 50) <= 30 && (
+            <div className="agent-low-score-alert-banner">
+              <div className="alert-banner-icon">
+                <ShieldAlert size={28} />
+              </div>
+              <div className="alert-banner-content">
+                <div className="alert-banner-title">
+                  Tài khoản đang bị tạm đình chỉ đăng tin (Điểm uy tín: {currentUser?.trust_score ?? 0} / 100 điểm)
+                </div>
+                <div className="alert-banner-desc">
+                  Điểm tín nhiệm của bạn đang ở mức <strong>từ 30 điểm trở xuống</strong>. Hệ thống đã <strong>tự động tạm ẩn toàn bộ tin đăng</strong> của bạn trên sàn và <strong>tạm khóa quyền đăng tin mới</strong>. Bạn cần đạt từ 31 điểm trở lên để được khôi phục quyền hoạt động.
+                </div>
+                <div className="alert-banner-actions">
+                  <button
+                    className="alert-banner-btn primary"
+                    onClick={() => handleTabChange('violations')}
+                  >
+                    Xem Vi phạm & Gửi khiếu nại
+                  </button>
+                  <button
+                    className="alert-banner-btn secondary"
+                    onClick={() => handleTabChange('profile')}
+                  >
+                    Nhiệm vụ phục hồi điểm uy tín
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* TAB 1 & 2: OVERVIEW / LISTINGS */}
           {(activeTab === 'overview' || activeTab === 'listings') && (
             <OverviewDashboard
@@ -357,6 +401,13 @@ const AgentOverview = () => {
               setActiveTab={handleTabChange}
               initialTab="reviews"
               hideHeader={true}
+            />
+          )}
+
+          {/* TAB 8.5: VIOLATIONS & APPEALS PANEL */}
+          {activeTab === 'violations' && (
+            <AgentViolations
+              currentUser={currentUser}
             />
           )}
 

@@ -11,6 +11,7 @@ import { apiFetch } from '../../../auth/apiClient';
 import { useAuth } from '../../../auth/useAuth';
 import PropertyDetailModal from '../../../components/PropertyDetailModal';
 import DeleteConfirmModal from '../overview/DeleteConfirmModal';
+import TrustScoreBonusModal from './TrustScoreBonusModal';
 import './AgentProfile.css';
 
 const WARDS_BY_REGION = {
@@ -69,6 +70,7 @@ const AgentProfile = ({
 }) => {
   const { updateUser } = useAuth();
   const [selectedProfileTab, setSelectedProfileTab] = useState(initialTab);
+  const [isBonusModalOpen, setIsBonusModalOpen] = useState(false);
 
   useEffect(() => {
     setSelectedProfileTab(initialTab);
@@ -109,9 +111,12 @@ const AgentProfile = ({
 
   // Interactive Reviews states
   const [helpfulCounts, setHelpfulCounts] = useState({});
+  const [userVotedReviews, setUserVotedReviews] = useState({});
+  const [togglingHelpful, setTogglingHelpful] = useState({});
   const [reviewReplies, setReviewReplies] = useState({});
   const [showReplyInput, setShowReplyInput] = useState({});
   const [replyText, setReplyText] = useState({});
+  const [submittingReply, setSubmittingReply] = useState({});
 
   // KYC States
   const [kycStatus, setKycStatus] = useState(null);
@@ -160,7 +165,7 @@ const AgentProfile = ({
       }
     };
     fetchFunnelStats();
-  }, [currentUser.id]);
+  }, [currentUser?.id]);
 
   useEffect(() => {
     if (selectedProfileTab === 'reviews') {
@@ -172,12 +177,31 @@ const AgentProfile = ({
             const data = await res.json();
             setReviews(data || []);
 
-            // Initialize helpful counts
+            // Initialize replies from server database
+            const loadedReplies = {};
+            (data || []).forEach((r) => {
+              if (r.replies && r.replies.length > 0) {
+                loadedReplies[r.id] = r.replies.map((rep) => ({
+                  id: rep.id,
+                  author: rep.user?.name || (Number(rep.user_id) === Number(currentUser?.id) ? currentUser?.name : 'Người dùng'),
+                  role: rep.user?.role || 'USER',
+                  isAuthor: Number(rep.user_id) === Number(currentUser?.id),
+                  text: rep.reply_text,
+                  created_at: rep.created_at
+                }));
+              }
+            });
+            setReviewReplies(loadedReplies);
+
+            // Initialize helpful counts and user voted state from server database
             const counts = {};
-            data.forEach((r, idx) => {
-              counts[r.id] = idx === 0 ? 12 : idx === 1 ? 5 : 8;
+            const voted = {};
+            (data || []).forEach((r) => {
+              counts[r.id] = r.helpful_count || 0;
+              voted[r.id] = Boolean(r.user_has_voted);
             });
             setHelpfulCounts(counts);
+            setUserVotedReviews(voted);
           }
         } catch (err) {
           console.error('Error fetching reviews:', err);
@@ -187,7 +211,7 @@ const AgentProfile = ({
       };
       fetchReviews();
     }
-  }, [selectedProfileTab, currentUser.id]);
+  }, [selectedProfileTab, currentUser?.id]);
 
   useEffect(() => {
     const fetchKycStatus = async () => {
@@ -197,6 +221,17 @@ const AgentProfile = ({
         if (res.ok) {
           const data = await res.json();
           setKycStatus(data);
+
+          // Nếu đang có hồ sơ PENDING và đã tải CCCD (khi F5 hoặc tải lại trang):
+          // Tự động khôi phục người dùng vào Bước 3 (Chụp ảnh khuôn mặt) mà không phải làm lại từ đầu
+          if (data.latestVerificationStatus === 'PENDING' && data.hasCardUploaded) {
+            setKycWizardStep((currentStep) => {
+              if (currentStep === 0 || currentStep === 1 || currentStep === 2) {
+                return 3;
+              }
+              return currentStep;
+            });
+          }
         }
       } catch (err) {
         console.error('Error fetching KYC status:', err);
@@ -205,7 +240,7 @@ const AgentProfile = ({
       }
     };
     fetchKycStatus();
-  }, [currentUser.id, currentUser.verification_status, kycWizardStep]);
+  }, [currentUser.id, currentUser.verification_status]);
 
   // Helpers
   const formatTimeAgo = (dateStr) => {
@@ -232,18 +267,55 @@ const AgentProfile = ({
     return date.toLocaleDateString('vi-VN');
   };
 
-  const getReviewerRole = (name) => {
-    if (name === 'Courtney Henry') return 'Marketing Coordinator';
-    if (name === 'Jerome Bell') return 'Nhà đầu tư cá nhân';
-    if (name === 'Albert Flores') return 'Khách thuê căn hộ';
-    return 'Người dùng xem tin';
+  const getReviewerRole = (review) => {
+    if (review?.is_verified_review) {
+      return 'Khách đã giao dịch';
+    }
+    const role = review?.user?.role?.toUpperCase();
+    if (role === 'AGENT') return 'Môi giới';
+    if (role === 'ADMIN') return 'Quản trị viên';
+    return 'Khách hàng xem tin';
   };
 
-  const handleHelpfulClick = (reviewId) => {
-    setHelpfulCounts(prev => ({
-      ...prev,
-      [reviewId]: (prev[reviewId] || 0) + 1
-    }));
+  const handleHelpfulClick = async (reviewId) => {
+    if (!currentUser?.id) {
+      alert('Vui lòng đăng nhập để bình chọn đánh giá này!');
+      return;
+    }
+
+    if (togglingHelpful[reviewId]) return;
+
+    const currentlyVoted = Boolean(userVotedReviews[reviewId]);
+    const currentCount = helpfulCounts[reviewId] || 0;
+    const newCount = currentlyVoted ? Math.max(0, currentCount - 1) : currentCount + 1;
+
+    // Optimistic UI update
+    setUserVotedReviews(prev => ({ ...prev, [reviewId]: !currentlyVoted }));
+    setHelpfulCounts(prev => ({ ...prev, [reviewId]: newCount }));
+    setTogglingHelpful(prev => ({ ...prev, [reviewId]: true }));
+
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/api/properties/reviews/${reviewId}/helpful`, {
+        method: 'POST'
+      });
+      if (res.ok) {
+        const result = await res.json();
+        setUserVotedReviews(prev => ({ ...prev, [reviewId]: result.has_voted }));
+        setHelpfulCounts(prev => ({ ...prev, [reviewId]: result.helpful_count }));
+      } else {
+        // Revert on failure
+        setUserVotedReviews(prev => ({ ...prev, [reviewId]: currentlyVoted }));
+        setHelpfulCounts(prev => ({ ...prev, [reviewId]: currentCount }));
+        const errData = await res.json().catch(() => ({}));
+        alert(errData.error || 'Không thể thực hiện bình chọn lúc này.');
+      }
+    } catch (err) {
+      console.error('Error toggling helpful vote:', err);
+      setUserVotedReviews(prev => ({ ...prev, [reviewId]: currentlyVoted }));
+      setHelpfulCounts(prev => ({ ...prev, [reviewId]: currentCount }));
+    } finally {
+      setTogglingHelpful(prev => ({ ...prev, [reviewId]: false }));
+    }
   };
 
   const handleToggleReplyInput = (reviewId) => {
@@ -253,30 +325,53 @@ const AgentProfile = ({
     }));
   };
 
-  const handleSendReply = (reviewId) => {
+  const handleSendReply = async (reviewId) => {
     const text = replyText[reviewId];
     if (!text || !text.trim()) return;
 
-    setReviewReplies(prev => ({
-      ...prev,
-      [reviewId]: [...(prev[reviewId] || []), {
-        id: `reply-${Date.now()}`,
-        author: currentUser.name || 'Zân Cao',
-        role: 'Broker',
-        text: text,
-        created_at: new Date().toISOString()
-      }]
-    }));
+    setSubmittingReply(prev => ({ ...prev, [reviewId]: true }));
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/api/agent/reviews/${reviewId}/reply`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ reply_text: text.trim() })
+      });
 
-    setReplyText(prev => ({
-      ...prev,
-      [reviewId]: ''
-    }));
+      if (res.ok) {
+        const savedReply = await res.json();
+        setReviewReplies(prev => ({
+          ...prev,
+          [reviewId]: [...(prev[reviewId] || []), {
+            id: savedReply.id,
+            author: savedReply.user?.name || currentUser.name || 'Môi giới',
+            role: savedReply.user?.role || currentUser.role || 'AGENT',
+            isAuthor: true,
+            text: savedReply.reply_text,
+            created_at: savedReply.created_at
+          }]
+        }));
 
-    setShowReplyInput(prev => ({
-      ...prev,
-      [reviewId]: false
-    }));
+        setReplyText(prev => ({
+          ...prev,
+          [reviewId]: ''
+        }));
+
+        setShowReplyInput(prev => ({
+          ...prev,
+          [reviewId]: false
+        }));
+      } else {
+        const errorData = await res.json().catch(() => ({}));
+        alert(errorData.error || 'Có lỗi xảy ra khi gửi phản hồi.');
+      }
+    } catch (err) {
+      console.error('Error sending reply:', err);
+      alert('Không thể gửi phản hồi. Vui lòng kiểm tra lại kết nối.');
+    } finally {
+      setSubmittingReply(prev => ({ ...prev, [reviewId]: false }));
+    }
   };
 
   const handleFileChange = (e, side) => {
@@ -440,6 +535,14 @@ const AgentProfile = ({
       }
 
       setKycVerificationData(result.verification || result.data);
+      setKycStatus(prev => ({
+        ...prev,
+        verificationStatus: 'PENDING',
+        latestVerificationStatus: 'PENDING',
+        hasPendingVerification: true,
+        hasCardUploaded: true
+      }));
+      updateUser({ verification_status: 'PENDING' });
       setKycWizardStep(3);
     } catch (err) {
       console.error(err);
@@ -471,11 +574,27 @@ const AgentProfile = ({
 
       const result = await res.json();
       if (!res.ok || !result.success) {
-        throw new Error(result.error || 'Khuôn mặt không khớp với ảnh CCCD, vui lòng chụp lại.');
+        if (result.canRetrySelfie === false) {
+          setKycStatus(prev => ({
+            ...prev,
+            verificationStatus: 'REJECTED',
+            latestVerificationStatus: 'REJECTED',
+            hasPendingVerification: false,
+            hasCardUploaded: false
+          }));
+          updateUser({ verification_status: 'REJECTED' });
+        }
+        throw new Error(result.error || result.message || 'Khuôn mặt không khớp với ảnh CCCD, vui lòng chụp lại.');
       }
 
       setKycWizardStep(4);
-      setKycStatus(prev => ({ ...prev, verificationStatus: 'VERIFIED' }));
+      setKycStatus(prev => ({
+        ...prev,
+        verificationStatus: 'VERIFIED',
+        latestVerificationStatus: 'APPROVED',
+        hasPendingVerification: false,
+        hasCardUploaded: false
+      }));
       updateUser({ verification_status: 'VERIFIED' });
     } catch (err) {
       console.error(err);
@@ -692,7 +811,7 @@ const AgentProfile = ({
           </div>
 
           {(() => {
-            const score = currentUser.trust_score !== undefined ? Number(currentUser.trust_score) : 98;
+            const score = Number(currentUser.trust_score ?? 50);
             let trustText = 'Rất uy tín';
             let trustColor = '#d97706'; // gold
             if (score <= 39) {
@@ -718,6 +837,15 @@ const AgentProfile = ({
                     Trust Score: <span style={{ color: trustColor, fontWeight: 'bold' }}>{score}/100</span> <span style={{ fontSize: '12px', color: '#64748b' }}>({trustText})</span>
                   </div>
                 </div>
+                <button
+                  type="button"
+                  className="profile-bonus-tasks-btn"
+                  onClick={() => setIsBonusModalOpen(true)}
+                  title="Nhiệm vụ nhận điểm tín nhiệm"
+                >
+                  <Award size={16} />
+                  <span>Nhiệm vụ tích điểm</span>
+                </button>
               </div>
             );
           })()}
@@ -1019,7 +1147,7 @@ const AgentProfile = ({
                   </div>
                   <div className="summary-desc">Dựa trên {reviews.length} đánh giá</div>
                   {(() => {
-                    const score = currentUser.trust_score !== undefined ? Number(currentUser.trust_score) : 98;
+                    const score = Number(currentUser.trust_score ?? 50);
                     let text = 'Rất uy tín';
                     let color = '#d97706'; // gold
                     if (score <= 39) {
@@ -1097,9 +1225,16 @@ const AgentProfile = ({
                                   {initialLetter}
                                 </div>
                                 <div className="reviewer-meta-text">
-                                  <h4>{rev.user?.name || 'Khách hàng'}</h4>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <h4>{rev.user?.name || 'Khách hàng'}</h4>
+                                    {rev.is_verified_review && (
+                                      <span className="verified-review-badge" title="Đánh giá đã được xác thực qua giao dịch thực tế">
+                                        ✓ Đã xác thực
+                                      </span>
+                                    )}
+                                  </div>
                                   <span className="reviewer-role-time">
-                                    {getReviewerRole(rev.user?.name)} · {formatTimeAgo(rev.created_at)}
+                                    {getReviewerRole(rev)} · {formatTimeAgo(rev.created_at)}
                                   </span>
                                 </div>
                               </div>
@@ -1136,10 +1271,12 @@ const AgentProfile = ({
 
                             <div className="review-card-footer">
                               <button
-                                className="action-btn helpful-btn"
+                                className={`action-btn helpful-btn ${userVotedReviews[rev.id] ? 'voted' : ''}`}
                                 onClick={() => handleHelpfulClick(rev.id)}
+                                title={userVotedReviews[rev.id] ? "Bỏ bình chọn hữu ích" : "Bình chọn hữu ích"}
+                                disabled={Boolean(togglingHelpful[rev.id])}
                               >
-                                <ThumbsUp size={14} />
+                                <ThumbsUp size={14} fill={userVotedReviews[rev.id] ? "#0284c7" : "none"} color={userVotedReviews[rev.id] ? "#0284c7" : "currentColor"} />
                                 <span>Hữu ích ({helpfulCounts[rev.id] || 0})</span>
                               </button>
                               <button
@@ -1158,7 +1295,13 @@ const AgentProfile = ({
                                   <div key={reply.id} className="review-reply-item">
                                     <div className="reply-header">
                                       <span className="reply-author">{reply.author}</span>
-                                      <span className="reply-badge">Tác giả</span>
+                                      {reply.isAuthor ? (
+                                        <span className="reply-badge">Tác giả</span>
+                                      ) : reply.role === 'ADMIN' ? (
+                                        <span className="reply-badge" style={{ backgroundColor: '#fce7f3', color: '#be185d' }}>Quản trị viên</span>
+                                      ) : reply.role === 'AGENT' ? (
+                                        <span className="reply-badge" style={{ backgroundColor: '#e0f2fe', color: '#0369a1' }}>Môi giới</span>
+                                      ) : null}
                                       <span className="reply-time">· {formatTimeAgo(reply.created_at)}</span>
                                     </div>
                                     <p className="reply-text">{reply.text}</p>
@@ -1174,19 +1317,22 @@ const AgentProfile = ({
                                   placeholder="Nhập phản hồi của bạn..."
                                   value={replyText[rev.id] || ''}
                                   onChange={(e) => setReplyText(prev => ({ ...prev, [rev.id]: e.target.value }))}
+                                  disabled={Boolean(submittingReply[rev.id])}
                                 />
                                 <div className="reply-actions">
                                   <button
                                     className="btn-cancel-reply"
                                     onClick={() => handleToggleReplyInput(rev.id)}
+                                    disabled={Boolean(submittingReply[rev.id])}
                                   >
                                     Hủy
                                   </button>
                                   <button
                                     className="btn-submit-reply"
                                     onClick={() => handleSendReply(rev.id)}
+                                    disabled={Boolean(submittingReply[rev.id]) || !(replyText[rev.id] || '').trim()}
                                   >
-                                    Gửi
+                                    {submittingReply[rev.id] ? 'Đang gửi...' : 'Gửi'}
                                   </button>
                                 </div>
                               </div>
@@ -1520,6 +1666,24 @@ const AgentProfile = ({
                           <h4 className="step-card-heading">Xác thực khuôn mặt</h4>
                           <p className="step-card-sub">Vui lòng đưa khuôn mặt của bạn vào khung hình và giữ yên để hệ thống tự động nhận diện.</p>
 
+                          {kycStatus?.latestVerificationStatus === 'PENDING' && !kycFrontFile && (
+                            <div style={{
+                              background: '#ecfdf5',
+                              border: '1px solid #a7f3d0',
+                              color: '#065f46',
+                              padding: '10px 14px',
+                              borderRadius: '8px',
+                              marginBottom: '16px',
+                              fontSize: '13px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px'
+                            }}>
+                              <Check size={16} />
+                              <span>Ảnh CCCD 2 mặt đã được lưu an toàn. Vui lòng tiếp tục bước chụp ảnh chân dung (Selfie) để hoàn tất.</span>
+                            </div>
+                          )}
+
                           <div className="s3-camera-wrapper">
                             <div className="s3-oval-frame">
                               <input type="file" id="selfie-upload-input" accept="image/*" onChange={(e) => handleFileChange(e, 'selfie')} style={{ display: 'none' }} />
@@ -1621,16 +1785,31 @@ const AgentProfile = ({
                   <div className="kyc-main-panel">
                     <div className="kyc-unverified-card">
                       <div className="warning-icon-wrapper">
-                        <ShieldAlert size={36} color="#f97316" />
+                        <ShieldAlert size={36} color={kycStatus?.latestVerificationStatus === 'PENDING' ? '#2563eb' : '#f97316'} />
                       </div>
                       <p className="unverified-text">
-                        Để bảo vệ cộng đồng Swipe Nest và trải nghiệm đầy đủ các tính năng độc quyền, vui lòng hoàn tất xác thực danh tính.
+                        {kycStatus?.latestVerificationStatus === 'PENDING' && kycStatus?.hasCardUploaded
+                          ? 'Bạn đã tải lên ảnh CCCD 2 mặt thành công. Vui lòng tiếp tục bước chụp ảnh chân dung để hoàn tất xác thực.'
+                          : 'Để bảo vệ cộng đồng Swipe Nest và trải nghiệm đầy đủ các tính năng độc quyền, vui lòng hoàn tất xác thực danh tính.'}
                       </p>
-                      <button className="btn-trigger-kyc" onClick={handleStartKyc}>
-                        Xác thực ngay
+                      <button 
+                        className="btn-trigger-kyc" 
+                        onClick={() => {
+                          if (kycStatus?.latestVerificationStatus === 'PENDING' && kycStatus?.hasCardUploaded) {
+                            setKycWizardStep(3);
+                          } else {
+                            handleStartKyc();
+                          }
+                        }}
+                      >
+                        {kycStatus?.latestVerificationStatus === 'PENDING' && kycStatus?.hasCardUploaded
+                          ? 'Tiếp tục chụp ảnh khuôn mặt'
+                          : 'Xác thực ngay'}
                       </button>
                       <span className="kyc-secure-note">🛡️ Xác thực an toàn theo chuẩn AES-256</span>
-                      <h4 className="unverified-status-title">Tài khoản chưa được xác minh</h4>
+                      <h4 className="unverified-status-title">
+                        {kycStatus?.latestVerificationStatus === 'PENDING' ? 'Hồ sơ đang chờ xác thực khuôn mặt' : 'Tài khoản chưa được xác minh'}
+                      </h4>
                     </div>
                   </div>
 
@@ -1766,6 +1945,21 @@ const AgentProfile = ({
           </div>
         </div>
       )}
+
+      {/* Feature 50: Trust Score Bonus Tasks Modal */}
+      <TrustScoreBonusModal
+        isOpen={isBonusModalOpen}
+        onClose={() => setIsBonusModalOpen(false)}
+        currentUser={currentUser}
+        onScoreUpdated={(newScore) => {
+          if (currentUser) {
+            currentUser.trust_score = newScore;
+          }
+        }}
+        onNavigateToKyc={() => {
+          setSelectedProfileTab('kyc');
+        }}
+      />
     </div>
   );
 };

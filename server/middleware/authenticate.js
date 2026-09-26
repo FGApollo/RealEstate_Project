@@ -40,4 +40,23 @@ const requireRole = (...allowedRoles) => (req, res, next) => {
   return next();
 };
 
-module.exports = { authenticate, requireRole };
+const optionalAuthenticate = async (req, res, next) => {
+  const authorization = req.get('authorization') || '';
+  const match = /^Bearer\s+([^\s]+)$/i.exec(authorization);
+  if (!match) {
+    return next();
+  }
+
+  try {
+    const user = await authSessionService.getAuthenticatedUser(match[1]);
+    if (user) {
+      req.user = user;
+    }
+  } catch (error) {
+    // Silently continue for optional auth
+  }
+
+  return next();
+};
+
+module.exports = { authenticate, requireRole, optionalAuthenticate };

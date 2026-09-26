@@ -43,8 +43,8 @@ const createProperty = async (req, res) => {
     const property = await propertyService.createProperty({ ...req.body, owner_id: req.user.id });
     res.status(201).json({ success: true, property });
   } catch (error) {
-    console.error('Error creating property:', error);
-    res.status(500).json({ error: error.message || 'Internal server error' });
+    if (!error.statusCode || error.statusCode >= 500) console.error('Error creating property:', error);
+    res.status(error.statusCode || 500).json({ error: error.message || 'Internal server error' });
   }
 };
 
@@ -89,7 +89,8 @@ const deleteProperty = async (req, res) => {
 const getPropertyReviews = async (req, res) => {
   try {
     const { id } = req.params;
-    const reviews = await reviewService.getPropertyReviews(id);
+    const currentUserId = req.user ? req.user.id : null;
+    const reviews = await reviewService.getPropertyReviews(id, currentUserId);
     res.status(200).json({ reviews });
   } catch (error) {
     console.error('Error fetching property reviews:', error);
@@ -106,11 +107,11 @@ const createPropertyReview = async (req, res) => {
       return res.status(400).json({ error: 'Missing rating' });
     }
 
-    const review = await reviewService.createPropertyReview(id, req.user.id, rating, comment, false, images);
+    const review = await reviewService.createPropertyReview(id, req.user.id, rating, comment, images);
     res.status(201).json({ success: true, review });
   } catch (error) {
     console.error('Error creating property review:', error);
-    res.status(500).json({ error: error.message || 'Internal server error' });
+    res.status(error.statusCode || 500).json({ error: error.message || 'Internal server error' });
   }
 };
 
@@ -157,6 +158,36 @@ const getSimilarProperties = async (req, res) => {
   }
 };
 
+const createReviewReply = async (req, res) => {
+  const userId = req.user.id;
+  const { reviewId } = req.params;
+  const { reply_text } = req.body;
+
+  if (!reply_text || !reply_text.trim()) {
+    return res.status(400).json({ error: 'Nội dung phản hồi không được để trống' });
+  }
+
+  try {
+    const reply = await reviewService.createReviewReply(reviewId, userId, reply_text);
+    res.status(201).json(reply);
+  } catch (error) {
+    console.error('Error replying to review:', error);
+    res.status(error.statusCode || 500).json({ error: error.message || 'Internal server error' });
+  }
+};
+
+const toggleReviewHelpful = async (req, res) => {
+  try {
+    const { reviewId } = req.params;
+    const userId = req.user.id;
+    const result = await reviewService.toggleReviewHelpful(reviewId, userId);
+    res.status(200).json(result);
+  } catch (error) {
+    console.error('Error toggling review helpful vote:', error);
+    res.status(error.statusCode || 500).json({ error: error.message || 'Internal server error' });
+  }
+};
+
 module.exports = {
   MAX_PROPERTY_IMAGE_COUNT,
   MAX_PROPERTY_IMAGE_BYTES,
@@ -167,6 +198,9 @@ module.exports = {
   deleteProperty,
   getPropertyReviews,
   createPropertyReview,
+  createReviewReply,
+  toggleReviewHelpful,
   checkBeforeSave,
   getSimilarProperties
 };
+

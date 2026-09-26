@@ -1338,12 +1338,17 @@
 }
 
 .purchased-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
   font-size: 0.65rem;
   font-weight: 700;
-  color: #10b981;
+  color: #059669;
   background: #ecfdf5;
+  border: 1px solid #a7f3d0;
   border-radius: 4px;
-  padding: 0.05rem 0.3rem;
+  padding: 0.08rem 0.35rem;
+  line-height: 1.2;
 }
 
 .review-date {
@@ -1411,6 +1416,14 @@
 
 .review-actions-footer button:hover {
   color: #1a42b8;
+}
+
+.review-actions-footer button.helpful-btn.voted {
+  color: #0284c7;
+  background-color: #f0f9ff;
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-weight: 800;
 }
 
 @keyframes ratingFadeIn {

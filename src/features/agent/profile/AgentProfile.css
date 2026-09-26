@@ -164,6 +164,30 @@
   font-size: 14px;
 }
 
+.profile-bonus-tasks-btn {
+  margin-left: auto;
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fde68a;
+  padding: 8px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.profile-bonus-tasks-btn:hover {
+  background: #fde68a;
+  color: #92400e;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(245, 158, 11, 0.15);
+}
+
 /* ════════════════════════════════════════
    2. SUB NAVIGATION TABS
    ════════════════════════════════════════ */
@@ -1088,6 +1112,25 @@
   background-color: #f8fafc;
 }
 
+.action-btn.helpful-btn.voted {
+  color: #0284c7;
+  background-color: #f0f9ff;
+  border: 1px solid #bae6fd;
+}
+
+.verified-review-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: #059669;
+  background-color: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  padding: 2px 7px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+}
+
 .review-reply-input-box {
   background: #f8fafc;
   border: 1px solid #e2e8f0;
@@ -1131,6 +1174,12 @@
   font-weight: 700;
   color: #475569;
   cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.btn-cancel-reply:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .btn-submit-reply {
@@ -1142,6 +1191,18 @@
   font-weight: 700;
   color: #ffffff;
   cursor: pointer;
+  transition: background 0.2s, opacity 0.2s;
+}
+
+.btn-submit-reply:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #94a3b8;
+}
+
+.review-reply-input-box textarea:disabled {
+  background-color: #f1f5f9;
+  cursor: not-allowed;
 }
 
 .review-replies-list {

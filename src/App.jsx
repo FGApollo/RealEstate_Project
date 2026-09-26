@@ -7,6 +7,8 @@ import LoginAgent from './pages/LoginAgent'
 import RegisterAgent from './pages/RegisterAgent'
 import VerifyEmail from './pages/VerifyEmail'
 import ResendVerification from './pages/ResendVerification'
+import ForgotPassword from './pages/ForgotPassword'
+import NotFound from './pages/NotFound'
 import Home from './pages/Home'
 import Swipe from './pages/Swipe'
 import AgentOverview from './pages/AgentOverview'
@@ -23,6 +25,7 @@ function App() {
       <Route path="/register/agent" element={<RegisterAgent />} />
       <Route path="/verify-email" element={<VerifyEmail />} />
       <Route path="/resend-verification" element={<ResendVerification />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route element={<ProtectedRoute />}>
         <Route path="/" element={<Home />} />
         <Route path="/swipe/:categoryName" element={<Swipe />} />
@@ -34,6 +37,7 @@ function App() {
       <Route element={<AdminRoute />}>
         <Route path="/admin" element={<AdminPage />} />
       </Route>
+      <Route path="*" element={<NotFound />} />
     </Routes>
   )
 }
