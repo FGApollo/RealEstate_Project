@@ -388,6 +388,88 @@ const applyPropertyHiddenPenalty = async (propertyId, adminId, shouldPenalize = 
   };
 };
 
+const reverseReportPenalty = async (reportId, adminId, adminNote = '') => {
+  // 1. Get report details
+  const { data: report, error: reportErr } = await supabase
+    .from('property_reports')
+    .select('*, property:properties(id, owner_id, title)')
+    .eq('id', reportId)
+    .single();
+
+  if (reportErr || !report) {
+    throw new Error('Không tìm thấy báo cáo liên quan');
+  }
+
+  const ownerId = report.property?.owner_id;
+  const propertyId = report.property_id;
+
+  // 2. Check if an appeal refund has already been applied
+  const { data: existingRefund } = await supabase
+    .from('trust_score_logs')
+    .select('id')
+    .eq('action', 'APPEAL_PENALTY_REFUND')
+    .eq('related_report_id', reportId)
+    .limit(1);
+
+  if (existingRefund && existingRefund.length > 0) {
+    return {
+      success: true,
+      applied: false,
+      message: 'Điểm phạt cho báo cáo này đã được hoàn trả trước đó'
+    };
+  }
+
+  // 3. Find original penalty log
+  const { data: penaltyLogs } = await supabase
+    .from('trust_score_logs')
+    .select('*')
+    .eq('related_report_id', reportId)
+    .lt('point_change', 0)
+    .order('created_at', { ascending: false });
+
+  // Calculate total points deducted
+  let refundPoints = 0;
+  if (penaltyLogs && penaltyLogs.length > 0) {
+    refundPoints = penaltyLogs.reduce((sum, log) => sum + Math.abs(log.point_change), 0);
+  } else {
+    refundPoints = Math.abs(REPORT_PENALTIES[report.reason] ?? 5);
+  }
+
+  // 4. Refund trust score points
+  let trustScore = null;
+  if (ownerId && refundPoints > 0) {
+    trustScore = await updateTrustScore(
+      ownerId,
+      'APPEAL_PENALTY_REFUND',
+      refundPoints,
+      adminNote || `Kháng cáo thành công - Hoàn lại ${refundPoints} điểm phạt cho báo cáo #${reportId}`,
+      {
+        related_property_id: propertyId,
+        related_report_id: reportId,
+        handled_by: adminId
+      }
+    );
+  }
+
+  // 5. Unhide property
+  if (propertyId) {
+    await supabase
+      .from('properties')
+      .update({ is_hidden: false })
+      .eq('id', propertyId);
+  }
+
+  return {
+    success: true,
+    applied: true,
+    message: `Đã chấp thuận kháng cáo, hoàn lại +${refundPoints} điểm và khôi phục hiển thị bài đăng.`,
+    refundPoints,
+    trustScore,
+    propertyId,
+    ownerId
+  };
+};
+
 module.exports = {
   updateTrustScore,
   hasActionLog,
@@ -396,5 +478,6 @@ module.exports = {
   applyProfileCompletenessBonus,
   applyThirtyDaysNoViolationBonus,
   applyReportPenalty,
-  applyPropertyHiddenPenalty
+  applyPropertyHiddenPenalty,
+  reverseReportPenalty
 };

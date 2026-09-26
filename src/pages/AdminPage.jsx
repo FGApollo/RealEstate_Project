@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate, Link, useOutletContext } from 'react-router-dom';
 import {
   ShieldCheck, AlertTriangle, Search, LogOut, HelpCircle, UserX, CheckCircle,
-  XCircle, FileText, Image, User, Check, X, ShieldAlert, Flag, Home, Mail, Clock, Award,
-  Star, EyeOff, Eye
+  XCircle, FileText, Image, ImageIcon, User, Check, X, ShieldAlert, Flag, Home, Mail, Clock, Award,
+  Star, EyeOff, Eye, Scale, ExternalLink
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import { apiFetch } from '../auth/apiClient';
@@ -53,6 +53,13 @@ const AdminPage = () => {
   const [loadingReviews, setLoadingReviews] = useState(false);
   const [reviewStatusFilter, setReviewStatusFilter] = useState('ALL'); // ALL | APPROVED | PENDING | HIDDEN | REJECTED
   const [reviewActionLoading, setReviewActionLoading] = useState(false);
+
+  // State for Appeal Moderation
+  const [appealsList, setAppealsList] = useState([]);
+  const [selectedAppealId, setSelectedAppealId] = useState(null);
+  const [loadingAppeals, setLoadingAppeals] = useState(false);
+  const [appealStatusFilter, setAppealStatusFilter] = useState('ALL'); // ALL | PENDING | APPROVED | REJECTED
+  const [appealActionLoading, setAppealActionLoading] = useState(false);
 
   // Logout handler
   const handleLogout = async (e) => {
@@ -187,6 +194,90 @@ const AdminPage = () => {
     }
   };
 
+  // 5. Fetch Appeals (Đơn khiếu nại của Môi giới)
+  const fetchAppeals = async () => {
+    setLoadingAppeals(true);
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/api/appeals/admin`);
+      if (res.ok) {
+        const data = await res.json();
+        const list = Array.isArray(data) ? data : (data.appeals || []);
+        setAppealsList(list);
+        if (list.length > 0) {
+          setSelectedAppealId(prev => list.some(a => a.id === prev) ? prev : list[0].id);
+        } else {
+          setSelectedAppealId(null);
+        }
+      }
+    } catch (err) {
+      console.error('Lỗi khi tải danh sách khiếu nại:', err);
+    } finally {
+      setLoadingAppeals(false);
+    }
+  };
+
+  // Handle Approve Appeal
+  const handleApproveAppeal = async (appealId) => {
+    const appeal = appealsList.find(a => a.id === appealId);
+    if (!appeal) return;
+
+    if (!window.confirm('XÁC NHẬN CHẤP THUẬN KHÁNG CÁO:\nBạn có chắc chắn muốn chấp thuận đơn khiếu nại này?\nHệ thống sẽ:\n1. Tự động HOÀN LẠI toàn bộ điểm Trust Score đã phạt cho Môi giới.\n2. Tự động MỞ LẠI bài đăng trên sàn (is_hidden = false).\n3. Cập nhật trạng thái đơn thành APPROVED và lưu lịch sử đối soát.')) {
+      return;
+    }
+
+    const note = window.prompt('Nhập ghi chú phản hồi cho Môi giới (tùy chọn):', 'Chấp thuận khiếu nại. Đã hoàn điểm phạt và khôi phục hiển thị tin đăng.');
+    if (note === null) return;
+
+    setAppealActionLoading(true);
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/api/appeals/admin/${appealId}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminNote: note })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert(data.message || 'Chấp thuận khiếu nại thành công!');
+        fetchAppeals();
+        fetchReports();
+      } else {
+        alert(data.error || 'Thao tác thất bại');
+      }
+    } catch (err) {
+      console.error('Lỗi chấp thuận khiếu nại:', err);
+      alert('Lỗi kết nối máy chủ');
+    } finally {
+      setAppealActionLoading(false);
+    }
+  };
+
+  // Handle Reject Appeal
+  const handleRejectAppeal = async (appealId) => {
+    const note = window.prompt('Nhập lý do bác bỏ khiếu nại (bắt buộc để phản hồi cho Môi giới):', 'Bằng chứng không đủ thuyết phục hoặc thông tin giải trình không chính xác.');
+    if (!note || !note.trim()) return;
+
+    setAppealActionLoading(true);
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/api/appeals/admin/${appealId}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminNote: note.trim() })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert(data.message || 'Đã bác bỏ khiếu nại thành công.');
+        fetchAppeals();
+      } else {
+        alert(data.error || 'Thao tác thất bại');
+      }
+    } catch (err) {
+      console.error('Lỗi bác bỏ khiếu nại:', err);
+      alert('Lỗi kết nối máy chủ');
+    } finally {
+      setAppealActionLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (activeTab === 'account-verification') {
       fetchRejectedKyc();
@@ -194,6 +285,8 @@ const AdminPage = () => {
       fetchReports(reportStatusFilter);
     } else if (activeTab === 'review-moderation') {
       fetchAdminReviews();
+    } else if (activeTab === 'appeal-moderation') {
+      fetchAppeals();
     }
   }, [activeTab, reportStatusFilter]);
 
@@ -411,6 +504,35 @@ const AdminPage = () => {
 
   const selectedReview = (Array.isArray(reviewsList) ? reviewsList : []).find(r => r.id === selectedReviewId);
 
+  const appealStats = {
+    total: (Array.isArray(appealsList) ? appealsList : []).length,
+    pending: (Array.isArray(appealsList) ? appealsList : []).filter(a => a.status === 'PENDING').length,
+    approved: (Array.isArray(appealsList) ? appealsList : []).filter(a => a.status === 'APPROVED').length,
+    rejected: (Array.isArray(appealsList) ? appealsList : []).filter(a => a.status === 'REJECTED').length
+  };
+
+  const filteredAppealsList = (Array.isArray(appealsList) ? appealsList : []).filter(item => {
+    if (appealStatusFilter !== 'ALL' && item.status !== appealStatusFilter) {
+      return false;
+    }
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    const agentName = item.agent?.name || '';
+    const agentEmail = item.agent?.email || '';
+    const propTitle = item.report?.property?.title || '';
+    const reason = item.reason || '';
+    const idStr = `#${item.id}`;
+    return (
+      agentName.toLowerCase().includes(q) ||
+      agentEmail.toLowerCase().includes(q) ||
+      propTitle.toLowerCase().includes(q) ||
+      reason.toLowerCase().includes(q) ||
+      idStr.includes(q)
+    );
+  });
+
+  const selectedAppeal = (Array.isArray(appealsList) ? appealsList : []).find(a => a.id === selectedAppealId);
+
   const initials = currentUser.name
     ? currentUser.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
     : 'AD';
@@ -466,6 +588,17 @@ const AdminPage = () => {
             <Star size={20} />
             <span>Kiểm duyệt đánh giá</span>
           </button>
+
+          <button
+            className={`admin-nav-btn ${activeTab === 'appeal-moderation' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTab('appeal-moderation');
+              setSearchQuery('');
+            }}
+          >
+            <Scale size={20} />
+            <span>Xử lý khiếu nại</span>
+          </button>
         </nav>
 
         <div className="admin-sidebar-bottom">
@@ -494,7 +627,9 @@ const AdminPage = () => {
                   ? "Tìm kiếm tài khoản theo tên, email, ID..."
                   : activeTab === 'report-moderation'
                   ? "Tìm kiếm báo cáo theo bất động sản, lý do, người gửi..."
-                  : "Tìm kiếm đánh giá theo người gửi, bất động sản, nội dung..."
+                  : activeTab === 'review-moderation'
+                  ? "Tìm kiếm đánh giá theo người gửi, bất động sản, nội dung..."
+                  : "Tìm kiếm khiếu nại theo môi giới, bài đăng, lý do..."
               }
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -542,6 +677,12 @@ const AdminPage = () => {
                 onClick={() => setActiveTab('review-moderation')}
               >
                 Kiểm duyệt đánh giá
+              </button>
+              <button
+                className={`admin-pill-btn ${activeTab === 'appeal-moderation' ? 'active' : ''}`}
+                onClick={() => setActiveTab('appeal-moderation')}
+              >
+                Xử lý khiếu nại
               </button>
             </div>
           </div>
@@ -1296,6 +1437,295 @@ const AdminPage = () => {
                           </button>
                         )}
                       </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: XỬ LÝ KHIẾU NẠI (APPEAL MODERATION) */}
+          {activeTab === 'appeal-moderation' && (
+            <div>
+              {/* Filter Pills Bar */}
+              <div className="report-filter-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button
+                    className={`report-filter-btn ${appealStatusFilter === 'ALL' ? 'active' : ''}`}
+                    onClick={() => setAppealStatusFilter('ALL')}
+                  >
+                    Tất cả ({appealStats.total})
+                  </button>
+                  <button
+                    className={`report-filter-btn ${appealStatusFilter === 'PENDING' ? 'active' : ''}`}
+                    onClick={() => setAppealStatusFilter('PENDING')}
+                    style={{ color: appealStatusFilter === 'PENDING' ? '#ffffff' : '#d97706' }}
+                  >
+                    Chờ duyệt ({appealStats.pending})
+                  </button>
+                  <button
+                    className={`report-filter-btn ${appealStatusFilter === 'APPROVED' ? 'active' : ''}`}
+                    onClick={() => setAppealStatusFilter('APPROVED')}
+                    style={{ color: appealStatusFilter === 'APPROVED' ? '#ffffff' : '#16a34a' }}
+                  >
+                    Đã chấp thuận ({appealStats.approved})
+                  </button>
+                  <button
+                    className={`report-filter-btn ${appealStatusFilter === 'REJECTED' ? 'active' : ''}`}
+                    onClick={() => setAppealStatusFilter('REJECTED')}
+                    style={{ color: appealStatusFilter === 'REJECTED' ? '#ffffff' : '#dc2626' }}
+                  >
+                    Đã bác bỏ ({appealStats.rejected})
+                  </button>
+                </div>
+              </div>
+
+              <div className="admin-grid-container" style={{ marginTop: 20 }}>
+                {/* LEFT COLUMN: APPEALS LIST */}
+                <div className="admin-list-column">
+                  {loadingAppeals ? (
+                    <div className="admin-empty-state">Đang tải danh sách khiếu nại...</div>
+                  ) : filteredAppealsList.length === 0 ? (
+                    <div className="admin-empty-state">
+                      <Scale size={40} color="#cbd5e1" />
+                      <h4>Không có đơn khiếu nại nào ({appealStatusFilter})</h4>
+                      <p>Hệ thống không tìm thấy đơn khiếu nại nào phù hợp với bộ lọc hiện tại.</p>
+                    </div>
+                  ) : (
+                    filteredAppealsList.map((item) => {
+                      const agentName = item.agent?.name || 'Môi giới';
+                      const propTitle = item.report?.property?.title || `Bất động sản #${item.report?.property_id}`;
+                      const dateStr = item.created_at ? new Date(item.created_at).toLocaleDateString('vi-VN') : '';
+                      const isSelected = selectedAppealId === item.id;
+                      const origReason = item.report?.reason;
+                      const origReasonInfo = REASON_LABELS[origReason] || { label: origReason || 'Vi phạm', penalty: 0, color: '#64748b', bg: '#f1f5f9' };
+
+                      return (
+                        <div
+                          key={item.id}
+                          className={`admin-card-item ${isSelected ? 'active' : ''}`}
+                          onClick={() => setSelectedAppealId(item.id)}
+                        >
+                          <div className="admin-card-top">
+                            <div className="admin-card-avatar" style={{ backgroundColor: '#eef2ff', color: '#4f46e5' }}>
+                              <Scale size={24} />
+                            </div>
+                            <div className="admin-card-info">
+                              <span className="admin-card-name">{agentName}</span>
+                              <span className="admin-card-date">{propTitle} ({dateStr})</span>
+                              <span className="admin-card-id">Khiếu nại #{item.id} • Report #{item.report_id}</span>
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                            <span
+                              className="admin-card-badge"
+                              style={{ backgroundColor: origReasonInfo.bg, color: origReasonInfo.color, border: `1px solid ${origReasonInfo.color}40` }}
+                            >
+                              Lỗi: <strong>{origReasonInfo.label}</strong> ({origReasonInfo.penalty}đ)
+                            </span>
+
+                            <span
+                              className={`admin-card-badge ${
+                                item.status === 'APPROVED' ? 'admin-badge-approved' :
+                                item.status === 'REJECTED' ? 'admin-badge-rejected' : 'admin-badge-pending'
+                              }`}
+                            >
+                              {item.status === 'APPROVED' ? '✓ Đã chấp thuận' :
+                               item.status === 'REJECTED' ? '✕ Đã bác bỏ' : '⏳ Chờ xem xét'}
+                            </span>
+                          </div>
+
+                          <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: 6, fontStyle: 'italic', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                            "{item.reason}"
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* RIGHT COLUMN: APPEAL DETAIL VIEW */}
+                <div className="admin-detail-panel">
+                  {!selectedAppeal ? (
+                    <div className="admin-empty-state">
+                      <Scale size={48} />
+                      <h4>Chưa chọn đơn khiếu nại nào</h4>
+                      <p>Vui lòng chọn một đơn khiếu nại từ danh sách bên trái để đối soát và ra quyết định.</p>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="admin-detail-header">
+                        <div>
+                          <h3>HỒ SƠ ĐỐI SOÁT KHIẾU NẠI #{selectedAppeal.id}</h3>
+                          <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                            Nộp ngày: {selectedAppeal.created_at ? new Date(selectedAppeal.created_at).toLocaleString('vi-VN') : 'N/A'}
+                          </span>
+                        </div>
+                        <div
+                          className={`admin-card-badge ${
+                            selectedAppeal.status === 'APPROVED' ? 'admin-badge-approved' :
+                            selectedAppeal.status === 'REJECTED' ? 'admin-badge-rejected' : 'admin-badge-pending'
+                          }`}
+                          style={{ fontSize: '0.9rem', padding: '8px 16px' }}
+                        >
+                          Trạng thái: <strong>{selectedAppeal.status}</strong>
+                        </div>
+                      </div>
+
+                      {/* Summary Grid: Agent Info & Property Info */}
+                      <div className="admin-info-grid" style={{ marginTop: 16 }}>
+                        <div className="admin-info-item">
+                          <span className="admin-info-label"><User size={14} style={{ display: 'inline', marginRight: 4 }}/> Môi giới nộp đơn (Agent)</span>
+                          <span className="admin-info-value">{selectedAppeal.agent?.name} ({selectedAppeal.agent?.email})</span>
+                          <span style={{ fontSize: '0.8rem', color: '#4f46e5', fontWeight: 700, marginTop: 2 }}>
+                            Trust Score: {selectedAppeal.agent?.trust_score ?? 100} điểm
+                          </span>
+                        </div>
+                        <div className="admin-info-item">
+                          <span className="admin-info-label"><Home size={14} style={{ display: 'inline', marginRight: 4 }}/> Bất động sản liên quan</span>
+                          <span className="admin-info-value">{selectedAppeal.report?.property?.title || 'N/A'}</span>
+                          <span style={{ fontSize: '0.8rem', color: selectedAppeal.report?.property?.is_hidden ? '#dc2626' : '#16a34a', fontWeight: 600, marginTop: 2 }}>
+                            {selectedAppeal.report?.property?.is_hidden ? '⛔ Đang bị ẩn khỏi sàn' : '✓ Đang hiển thị'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Original Report Box */}
+                      <div className="admin-reject-alert" style={{ backgroundColor: '#fff7ed', borderColor: '#fdba74', marginTop: 16 }}>
+                        <div className="admin-reject-icon" style={{ color: '#ea580c' }}>
+                          <AlertTriangle size={24} />
+                        </div>
+                        <div className="admin-reject-content">
+                          <h4 style={{ color: '#c2410c' }}>
+                            Báo cáo vi phạm gốc #{selectedAppeal.report_id}
+                          </h4>
+                          <p style={{ color: '#1e293b', fontWeight: 600, marginTop: 4 }}>
+                            Lý do phạt: <span style={{ color: '#ea580c' }}>{REASON_LABELS[selectedAppeal.report?.reason]?.label || selectedAppeal.report?.reason}</span> ({REASON_LABELS[selectedAppeal.report?.reason]?.penalty} điểm)
+                          </p>
+                          <p style={{ color: '#475569', fontSize: '0.85rem', marginTop: 4 }}>
+                            Người báo cáo: <strong>{selectedAppeal.report?.reporter?.name || 'Khách hàng'}</strong> ({selectedAppeal.report?.reporter?.email})
+                          </p>
+                          <p style={{ color: '#334155', fontSize: '0.85rem', fontStyle: 'italic', marginTop: 4, background: '#ffffff', padding: '8px 12px', borderRadius: 8, border: '1px solid #fed7aa' }}>
+                            "{selectedAppeal.report?.description || 'Không có mô tả chi tiết từ người báo cáo'}"
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Agent's Appeal Explanation & Evidence */}
+                      <div className="admin-evidence-box" style={{ marginTop: 16 }}>
+                        <h4 style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '0 0 10px 0', color: '#1e293b', fontSize: '1rem', fontWeight: 700 }}>
+                          <FileText size={18} color="#4f46e5" />
+                          Văn bản giải trình của Môi giới
+                        </h4>
+                        <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 14, fontSize: '0.95rem', color: '#0f172a', lineHeight: 1.5 }}>
+                          {selectedAppeal.reason}
+                        </div>
+
+                        {(() => {
+                          const evImages = (selectedAppeal.evidence_urls && selectedAppeal.evidence_urls.length > 0)
+                            ? selectedAppeal.evidence_urls
+                            : (selectedAppeal.evidence_url ? (
+                                (selectedAppeal.evidence_url.startsWith('[') ? (() => { try { return JSON.parse(selectedAppeal.evidence_url); } catch(e) { return [selectedAppeal.evidence_url]; } })() : [selectedAppeal.evidence_url])
+                              ) : []);
+
+                          if (evImages.length === 0) return null;
+
+                          return (
+                            <div style={{ marginTop: 16 }}>
+                              <span className="admin-info-label" style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
+                                <ImageIcon size={16} style={{ color: '#4f46e5' }} />
+                                Danh sách ảnh bằng chứng đính kèm ({evImages.length} ảnh):
+                              </span>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
+                                {evImages.map((imgUrl, idx) => (
+                                  <div
+                                    key={idx}
+                                    style={{
+                                      border: '1px solid #e2e8f0',
+                                      borderRadius: 10,
+                                      overflow: 'hidden',
+                                      backgroundColor: '#ffffff',
+                                      display: 'flex',
+                                      flexDirection: 'column'
+                                    }}
+                                  >
+                                    <a href={imgUrl} target="_blank" rel="noreferrer" style={{ display: 'block', overflow: 'hidden', height: 140 }}>
+                                      <img
+                                        src={imgUrl}
+                                        alt={`Bằng chứng ${idx + 1}`}
+                                        style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.2s' }}
+                                        onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+                                        onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                                      />
+                                    </a>
+                                    <div style={{ padding: '8px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0' }}>
+                                      <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#334155' }}>
+                                        Ảnh #{idx + 1}
+                                      </span>
+                                      <a
+                                        href={imgUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#4f46e5', fontWeight: 600, fontSize: '0.75rem', textDecoration: 'none' }}
+                                      >
+                                        Xem ảnh <ExternalLink size={12} />
+                                      </a>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+
+                      {/* Admin Decision History Note if already handled */}
+                      {selectedAppeal.status !== 'PENDING' && (
+                        <div
+                          style={{
+                            marginTop: 16,
+                            padding: 14,
+                            borderRadius: 10,
+                            backgroundColor: selectedAppeal.status === 'APPROVED' ? '#f0fdf4' : '#fef2f2',
+                            border: `1px solid ${selectedAppeal.status === 'APPROVED' ? '#bbf7d0' : '#fecaca'}`,
+                            fontSize: '0.85rem'
+                          }}
+                        >
+                          <strong style={{ color: selectedAppeal.status === 'APPROVED' ? '#16a34a' : '#dc2626' }}>
+                            {selectedAppeal.status === 'APPROVED' ? '✓ Đã chấp thuận khiếu nại' : '✕ Đã bác bỏ khiếu nại'}
+                          </strong>
+                          <p style={{ margin: '4px 0 0 0', color: '#334155' }}>
+                            Ghi chú Admin: {selectedAppeal.admin_note || 'Không có ghi chú'}
+                          </p>
+                          <span style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'block', marginTop: 4 }}>
+                            Xử lý bởi Admin {selectedAppeal.admin?.name || `ID #${selectedAppeal.handled_by}`} vào {selectedAppeal.handled_at ? new Date(selectedAppeal.handled_at).toLocaleString('vi-VN') : 'N/A'}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Actions for PENDING appeals */}
+                      {selectedAppeal.status === 'PENDING' && (
+                        <div className="admin-actions-bar" style={{ marginTop: 24, display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+                          <button
+                            className="admin-btn admin-btn-reject"
+                            onClick={() => handleRejectAppeal(selectedAppeal.id)}
+                            disabled={appealActionLoading}
+                          >
+                            <XCircle size={18} />
+                            <span>Bác bỏ khiếu nại</span>
+                          </button>
+
+                          <button
+                            className="admin-btn admin-btn-approve"
+                            onClick={() => handleApproveAppeal(selectedAppeal.id)}
+                            disabled={appealActionLoading}
+                          >
+                            <CheckCircle size={18} />
+                            <span>Chấp thuận & Hoàn lại điểm</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
