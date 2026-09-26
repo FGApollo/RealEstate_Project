@@ -16,14 +16,38 @@ const trustScoreRoutes = require('./routes/trustScoreRoutes');
 const userProfileRoutes = require('./routes/userProfileRoutes');
 const subscriptionRoutes = require('./routes/subscriptionRoutes');
 const { getJwtConfig, getCookieOptions } = require('./services/authSessionService');
-const { allowedOrigins } = require('./middleware/trustedOrigin');
+const { corsOptions } = require('./middleware/trustedOrigin');
+const { rateLimiters } = require('./middleware/rateLimiters');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+const configuredTrustProxyHops = process.env.TRUST_PROXY_HOPS;
+const trustProxyHops = configuredTrustProxyHops === undefined
+  ? (process.env.RENDER === 'true' ? 1 : 0)
+  : Number(configuredTrustProxyHops);
+if (!Number.isSafeInteger(trustProxyHops) || trustProxyHops < 0) {
+  throw new Error('TRUST_PROXY_HOPS must be a non-negative integer');
+}
+app.set('trust proxy', trustProxyHops);
+
 getJwtConfig();
 getCookieOptions();
-app.use(cors({ origin: allowedOrigins, credentials: true }));
+app.use(cors(corsOptions));
+// Count API requests before parsing large JSON or multipart payloads.
+app.use('/api', rateLimiters.api);
+// Authentication DTOs contain no large payloads; cap them separately from listing JSON.
+const authJsonParser = express.json({ limit: '24kb' });
+const authUrlencodedParser = express.urlencoded({ limit: '24kb', extended: true });
+[
+  '/api/register',
+  '/api/login',
+  '/api/google-login',
+  '/api/auth'
+].forEach((routePath) => {
+  app.use(routePath, authJsonParser);
+  app.use(routePath, authUrlencodedParser);
+});
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 

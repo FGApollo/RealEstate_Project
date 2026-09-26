@@ -2,6 +2,30 @@ const propertyService = require('../services/propertyService');
 const reviewService = require('../services/reviewService');
 const geminiService = require('../services/geminiService');
 
+const MAX_PROPERTY_IMAGE_COUNT = 6;
+const MAX_PROPERTY_IMAGE_BYTES = 5 * 1024 * 1024;
+
+const validatePropertyImages = (body = {}) => {
+  const images = body.images || [];
+  if (!Array.isArray(images)) return 'images must be an array';
+  if (images.length > MAX_PROPERTY_IMAGE_COUNT) {
+    return `A listing can contain at most ${MAX_PROPERTY_IMAGE_COUNT} images`;
+  }
+
+  for (const image of [body.thumbnail, ...images]) {
+    if (typeof image !== 'string' || !image.startsWith('data:image/')) continue;
+    const comma = image.indexOf(',');
+    const encoded = comma >= 0 ? image.slice(comma + 1) : '';
+    const padding = encoded.endsWith('==') ? 2 : encoded.endsWith('=') ? 1 : 0;
+    const sizeBytes = Math.floor((encoded.length * 3) / 4) - padding;
+    if (sizeBytes > MAX_PROPERTY_IMAGE_BYTES) {
+      return 'Each listing image must be 5 MB or smaller';
+    }
+  }
+
+  return null;
+};
+
 const getProperties = async (req, res) => {
   try {
     const properties = await propertyService.getProperties();
@@ -14,6 +38,8 @@ const getProperties = async (req, res) => {
 
 const createProperty = async (req, res) => {
   try {
+    const imageError = validatePropertyImages(req.body);
+    if (imageError) return res.status(413).json({ error: imageError });
     const property = await propertyService.createProperty({ ...req.body, owner_id: req.user.id });
     res.status(201).json({ success: true, property });
   } catch (error) {
@@ -38,6 +64,8 @@ const getPropertyById = async (req, res) => {
 
 const updateProperty = async (req, res) => {
   try {
+    const imageError = validatePropertyImages(req.body);
+    if (imageError) return res.status(413).json({ error: imageError });
     const { id } = req.params;
     const property = await propertyService.updateProperty(id, req.user.id, req.body);
     res.status(200).json({ success: true, property });
@@ -61,7 +89,8 @@ const deleteProperty = async (req, res) => {
 const getPropertyReviews = async (req, res) => {
   try {
     const { id } = req.params;
-    const reviews = await reviewService.getPropertyReviews(id);
+    const currentUserId = req.user ? req.user.id : null;
+    const reviews = await reviewService.getPropertyReviews(id, currentUserId);
     res.status(200).json({ reviews });
   } catch (error) {
     console.error('Error fetching property reviews:', error);
@@ -78,16 +107,18 @@ const createPropertyReview = async (req, res) => {
       return res.status(400).json({ error: 'Missing rating' });
     }
 
-    const review = await reviewService.createPropertyReview(id, req.user.id, rating, comment, false, images);
+    const review = await reviewService.createPropertyReview(id, req.user.id, rating, comment, images);
     res.status(201).json({ success: true, review });
   } catch (error) {
     console.error('Error creating property review:', error);
-    res.status(500).json({ error: error.message || 'Internal server error' });
+    res.status(error.statusCode || 500).json({ error: error.message || 'Internal server error' });
   }
 };
 
 const checkBeforeSave = async (req, res) => {
   try {
+    const imageError = validatePropertyImages(req.body);
+    if (imageError) return res.status(413).json({ error: imageError });
     const { excludeId } = req.query;
     const propertyData = { ...req.body, owner_id: req.user.id };
 
@@ -127,7 +158,39 @@ const getSimilarProperties = async (req, res) => {
   }
 };
 
+const createReviewReply = async (req, res) => {
+  const userId = req.user.id;
+  const { reviewId } = req.params;
+  const { reply_text } = req.body;
+
+  if (!reply_text || !reply_text.trim()) {
+    return res.status(400).json({ error: 'Nội dung phản hồi không được để trống' });
+  }
+
+  try {
+    const reply = await reviewService.createReviewReply(reviewId, userId, reply_text);
+    res.status(201).json(reply);
+  } catch (error) {
+    console.error('Error replying to review:', error);
+    res.status(error.statusCode || 500).json({ error: error.message || 'Internal server error' });
+  }
+};
+
+const toggleReviewHelpful = async (req, res) => {
+  try {
+    const { reviewId } = req.params;
+    const userId = req.user.id;
+    const result = await reviewService.toggleReviewHelpful(reviewId, userId);
+    res.status(200).json(result);
+  } catch (error) {
+    console.error('Error toggling review helpful vote:', error);
+    res.status(error.statusCode || 500).json({ error: error.message || 'Internal server error' });
+  }
+};
+
 module.exports = {
+  MAX_PROPERTY_IMAGE_COUNT,
+  MAX_PROPERTY_IMAGE_BYTES,
   getProperties,
   createProperty,
   getPropertyById,
@@ -135,6 +198,9 @@ module.exports = {
   deleteProperty,
   getPropertyReviews,
   createPropertyReview,
+  createReviewReply,
+  toggleReviewHelpful,
   checkBeforeSave,
   getSimilarProperties
 };
+

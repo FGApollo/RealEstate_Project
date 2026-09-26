@@ -152,40 +152,56 @@ const getKycStatus = async (userId) => {
 
   let kycDetails = null;
   if (latestVerification) {
-    try {
-      if (latestVerification.reject_reason && latestVerification.reject_reason.startsWith('{')) {
-        kycDetails = JSON.parse(latestVerification.reject_reason);
+    if (latestVerification.ocr_data && typeof latestVerification.ocr_data === 'object') {
+      kycDetails = latestVerification.ocr_data;
+    } else if (typeof latestVerification.ocr_data === 'string') {
+      try {
+        kycDetails = JSON.parse(latestVerification.ocr_data);
+      } catch (e) {
+        console.error('Error parsing ocr_data string:', e);
       }
-    } catch (e) {
-      console.error('Error parsing ocr details:', e);
+    } else if (latestVerification.reject_reason && latestVerification.reject_reason.startsWith('{')) {
+      try {
+        kycDetails = JSON.parse(latestVerification.reject_reason);
+      } catch (e) {
+        console.error('Error parsing legacy ocr details:', e);
+      }
     }
   }
 
-  // If user is verified but no kycDetails was found/parsed, return the mock details from Image 2
+  // If user is verified but no kycDetails was found/parsed, fallback to user's real info
   if (!kycDetails && user.verification_status === VERIFIED_STATUS) {
     kycDetails = {
-      fullName: 'CAO THANH VÂN',
-      idNumber: '012345678910',
-      dob: '15/05/1985',
-      sex: 'Nữ',
-      placeOfOrigin: 'P. Sài Gòn, TP. Hồ Chí Minh',
-      placeOfResidence: '49 Bùi Thị Xuân, P. Sài Gòn, TP. Hồ Chí Minh',
-      issueDate: '20/10/2021',
-      issuePlace: 'Cục Cảnh sát QLHC về TTXH'
+      fullName: latestVerification?.full_name || user.name || 'Người dùng đã xác minh',
+      idNumber: latestVerification?.id_number || '---',
+      dob: '---',
+      sex: '---',
+      placeOfOrigin: '---',
+      placeOfResidence: '---',
+      issueDate: '---',
+      issuePlace: '---'
     };
   }
+
+  const hasCardUploaded = Boolean(
+    latestVerificationStatus === PENDING_STATUS &&
+    latestVerification?.id_card_front_url &&
+    latestVerification?.id_card_back_url
+  );
 
   return {
     verificationStatus: user.verification_status || 'UNVERIFIED',
     latestVerificationStatus,
     rejectReason: latestVerificationStatus === REJECTED_STATUS ? latestVerification?.reject_reason : null,
     hasPendingVerification: latestVerificationStatus === PENDING_STATUS,
+    hasCardUploaded,
+    pendingStep: (latestVerificationStatus === PENDING_STATUS && hasCardUploaded) ? 3 : 1,
     canStartKyc: user.verification_status !== VERIFIED_STATUS,
     selfieAttemptsUsed: attemptsUsed,
     selfieAttemptsLeft: latestVerificationStatus === PENDING_STATUS
       ? Math.max(0, MAX_SELFIE_ATTEMPTS - attemptsUsed)
       : null,
-    kycDetails
+    kycDetails: user.verification_status === VERIFIED_STATUS ? kycDetails : null
   };
 };
 
@@ -258,16 +274,21 @@ const createOrUpdatePendingVerification = async ({
   phone,
   frontImageUrl,
   backImageUrl,
-  ocrDataString
+  ocrData,
+  idNumber
 }) => {
   const existingPending = await getLatestPendingVerification(userId);
+  const now = new Date().toISOString();
   const payload = {
     full_name: fullName || null,
     phone: phone || null,
     id_card_front_url: frontImageUrl,
     id_card_back_url: backImageUrl,
     status: PENDING_STATUS,
-    reject_reason: ocrDataString || null
+    ocr_data: ocrData || null,
+    id_number: idNumber || null,
+    reject_reason: null,
+    updated_at: now
   };
 
   if (existingPending) {
@@ -304,7 +325,10 @@ const createOrUpdatePendingVerification = async ({
 const updateUserVerificationStatus = async (userId, status) => {
   const { error } = await supabase
     .from('users')
-    .update({ verification_status: status })
+    .update({ 
+      verification_status: status,
+      updated_at: new Date().toISOString()
+    })
     .eq('id', userId);
 
   if (error) {
@@ -326,21 +350,42 @@ const uploadCard = async ({ userId, fullName, phone, frontImage, backImage }) =>
     };
   }
 
+  const ocrData = ocrResult.data || null;
+  const idNumber = ocrResult.data?.idNumber || null;
+
+  // Chống gian lận: Kiểm tra số CCCD này đã được tài khoản khác xác minh thành công chưa
+  if (idNumber) {
+    const { data: existingVerified, error: checkError } = await supabase
+      .from('identity_verifications')
+      .select('id, user_id')
+      .eq('id_number', idNumber)
+      .eq('status', APPROVED_STATUS)
+      .neq('user_id', userId)
+      .limit(1)
+      .maybeSingle();
+
+    if (existingVerified) {
+      return {
+        success: false,
+        error: 'Số CCCD này đã được sử dụng và xác minh cho một tài khoản khác.'
+      };
+    }
+  }
+
   const frontPath = buildStoragePath(userId, 'front', frontImage.mimetype);
   const backPath = buildStoragePath(userId, 'back', backImage.mimetype);
 
   const uploadedFront = await uploadKycFile(frontImage.buffer, frontPath, frontImage.mimetype);
   const uploadedBack = await uploadKycFile(backImage.buffer, backPath, backImage.mimetype);
 
-  const ocrDataString = ocrResult.data ? JSON.stringify(ocrResult.data) : null;
-
   const verification = await createOrUpdatePendingVerification({
     userId,
-    fullName,
+    fullName: fullName || ocrResult.data?.fullName,
     phone,
     frontImageUrl: uploadedFront.url,
     backImageUrl: uploadedBack.url,
-    ocrDataString
+    ocrData,
+    idNumber
   });
 
   await updateUserVerificationStatus(userId, PENDING_STATUS);
@@ -372,11 +417,13 @@ const getLatestPendingVerification = async (userId) => {
 };
 
 const rejectVerification = async (userId, verificationId, rejectReason) => {
+  const now = new Date().toISOString();
   const { error: verificationError } = await supabase
     .from('identity_verifications')
     .update({
       status: REJECTED_STATUS,
-      reject_reason: rejectReason
+      reject_reason: rejectReason,
+      updated_at: now
     })
     .eq('id', verificationId);
 
@@ -389,13 +436,15 @@ const rejectVerification = async (userId, verificationId, rejectReason) => {
 
 const approveVerification = async (userId, verificationId, selfieUrl) => {
   const currentUser = await getUserVerificationStatus(userId);
+  const now = new Date().toISOString();
 
   const { error: verificationError } = await supabase
     .from('identity_verifications')
     .update({
       selfie_url: selfieUrl,
       status: APPROVED_STATUS,
-      reject_reason: null
+      reject_reason: null,
+      updated_at: now
     })
     .eq('id', verificationId);
 

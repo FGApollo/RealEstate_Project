@@ -62,7 +62,7 @@ const getOverview = async (userId) => {
   };
 };
 
-const getAgentReviews = async (agentId) => {
+const getAgentReviews = async (agentId, currentUserId = null) => {
   // 1. Get properties owned by the agent
   const { data: properties, error: propError } = await supabase
     .from('properties')
@@ -90,7 +90,19 @@ const getAgentReviews = async (agentId) => {
       user_id,
       property_id,
       user:users!user_id(name, avatar, role),
-      images:property_review_images(image_url)
+      images:property_review_images(image_url),
+      replies:property_review_replies(
+        id,
+        review_id,
+        user_id,
+        reply_text,
+        created_at,
+        user:users!user_id(id, name, avatar, role)
+      ),
+      helpful_votes:property_review_helpful_votes(
+        id,
+        user_id
+      )
     `)
     .in('property_id', propertyIds)
     .eq('status', 'APPROVED')
@@ -104,10 +116,15 @@ const getAgentReviews = async (agentId) => {
     propertyTitleMap[p.id] = p.title;
   });
 
-  return (reviews || []).map(r => ({
-    ...r,
-    propertyTitle: propertyTitleMap[r.property_id] || ''
-  }));
+  return (reviews || []).map(r => {
+    const votes = r.helpful_votes || [];
+    return {
+      ...r,
+      propertyTitle: propertyTitleMap[r.property_id] || '',
+      helpful_count: votes.length,
+      user_has_voted: currentUserId ? votes.some(v => Number(v.user_id) === Number(currentUserId)) : false
+    };
+  });
 };
 
 module.exports = {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   X, ChevronLeft, ChevronRight, Sparkles, MapPin, 
@@ -31,6 +31,12 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
 
   const [localRating, setLocalRating] = useState(property?.average_rating || 0);
   const [localReviewCount, setLocalReviewCount] = useState(property?.review_count || 0);
+
+  // States for review replies in modal
+  const [showReplyBox, setShowReplyBox] = useState({});
+  const [replyTextMap, setReplyTextMap] = useState({});
+  const [submittingReplyMap, setSubmittingReplyMap] = useState({});
+  const [togglingHelpfulMap, setTogglingHelpfulMap] = useState({});
 
   const navigate = useNavigate();
 
@@ -128,10 +134,14 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
       list = list.filter(r => r.user_id === user.id);
     }
     
-    // Star filter
+    // Star / verified filter
     if (ratingFilter !== 'all') {
-      const stars = parseInt(ratingFilter);
-      list = list.filter(r => r.rating === stars);
+      if (ratingFilter === 'verified') {
+        list = list.filter(r => Boolean(r.is_verified_review));
+      } else {
+        const stars = parseInt(ratingFilter);
+        list = list.filter(r => r.rating === stars);
+      }
     }
     
     // Sorting
@@ -156,6 +166,10 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
     if (!property) return;
     if (!user) {
       alert('Vui lòng đăng nhập để gửi đánh giá!');
+      return;
+    }
+    if (user.id === property.owner_id) {
+      alert('Chủ sở hữu không thể tự đánh giá bất động sản của mình!');
       return;
     }
 
@@ -206,6 +220,115 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
     } catch (err) {
       console.error(err);
       alert('Lỗi khi gửi đánh giá: ' + err.message);
+    }
+  };
+
+  const handleToggleReplyBox = (reviewId) => {
+    setShowReplyBox(prev => ({
+      ...prev,
+      [reviewId]: !prev[reviewId]
+    }));
+  };
+
+  const handleSendReviewReply = async (reviewId) => {
+    if (!user) {
+      alert('Vui lòng đăng nhập để phản hồi đánh giá này!');
+      return;
+    }
+
+    const text = (replyTextMap[reviewId] || '').trim();
+    if (!text) return;
+
+    setSubmittingReplyMap(prev => ({ ...prev, [reviewId]: true }));
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/api/properties/reviews/${reviewId}/reply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reply_text: text })
+      });
+
+      if (res.ok) {
+        const newReply = await res.json();
+        setReviews(prev => prev.map(rev => {
+          if (rev.id === reviewId) {
+            return {
+              ...rev,
+              replies: [...(rev.replies || []), newReply]
+            };
+          }
+          return rev;
+        }));
+        setReplyTextMap(prev => ({ ...prev, [reviewId]: '' }));
+        setShowReplyBox(prev => ({ ...prev, [reviewId]: false }));
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || 'Có lỗi xảy ra khi gửi phản hồi.');
+      }
+    } catch (err) {
+      console.error('Error sending reply:', err);
+      alert('Lỗi kết nối khi gửi phản hồi.');
+    } finally {
+      setSubmittingReplyMap(prev => ({ ...prev, [reviewId]: false }));
+    }
+  };
+
+  const handleToggleHelpful = async (reviewId) => {
+    if (!user) {
+      alert('Vui lòng đăng nhập để bình chọn đánh giá này!');
+      return;
+    }
+
+    if (togglingHelpfulMap[reviewId]) return;
+
+    // Optimistic update
+    setReviews(prev => prev.map(r => {
+      if (r.id === reviewId) {
+        const currentlyVoted = Boolean(r.user_has_voted);
+        const currentCount = r.helpful_count || 0;
+        return {
+          ...r,
+          user_has_voted: !currentlyVoted,
+          helpful_count: currentlyVoted ? Math.max(0, currentCount - 1) : currentCount + 1
+        };
+      }
+      return r;
+    }));
+    setTogglingHelpfulMap(prev => ({ ...prev, [reviewId]: true }));
+
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/api/properties/reviews/${reviewId}/helpful`, {
+        method: 'POST'
+      });
+      if (res.ok) {
+        const result = await res.json();
+        setReviews(prev => prev.map(r => {
+          if (r.id === reviewId) {
+            return {
+              ...r,
+              user_has_voted: result.has_voted,
+              helpful_count: result.helpful_count
+            };
+          }
+          return r;
+        }));
+      } else {
+        const refetch = await apiFetch(`${API_BASE_URL}/api/properties/${property?.id || prop?.id}/reviews`);
+        if (refetch.ok) {
+          const freshData = await refetch.json();
+          setReviews(freshData.reviews || []);
+        }
+        const errData = await res.json().catch(() => ({}));
+        alert(errData.error || 'Không thể thực hiện bình chọn lúc này.');
+      }
+    } catch (err) {
+      console.error('Error toggling review helpful in modal:', err);
+      const refetch = await apiFetch(`${API_BASE_URL}/api/properties/${property?.id || prop?.id}/reviews`);
+      if (refetch.ok) {
+        const freshData = await refetch.json();
+        setReviews(freshData.reviews || []);
+      }
+    } finally {
+      setTogglingHelpfulMap(prev => ({ ...prev, [reviewId]: false }));
     }
   };
 
@@ -684,6 +807,7 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
                     <div className="select-wrapper">
                       <select value={ratingFilter} onChange={(e) => setRatingFilter(e.target.value)}>
                         <option value="all">Tất cả sao</option>
+                        <option value="verified">✓ Đã xác thực giao dịch</option>
                         <option value="5">5 sao</option>
                         <option value="4">4 sao</option>
                         <option value="3">3 sao</option>
@@ -703,7 +827,7 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
                       filteredReviewsList.map((rev) => {
                         const avatarInitial = rev.user?.name ? rev.user.name.charAt(0).toUpperCase() : 'U';
                         const reviewDate = new Date(rev.created_at).toLocaleDateString('vi-VN');
-                        const isVerified = rev.is_verified_review || rev.user_id === property.owner_id;
+                        const isVerified = Boolean(rev.is_verified_review);
                         
                         return (
                           <div key={rev.id} className="review-item-card">
@@ -719,6 +843,11 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
                                 <div className="reviewer-name-date">
                                   <div className="reviewer-name-row">
                                     <span className="reviewer-name">{rev.user?.name || 'Người dùng'}</span>
+                                    {isVerified && (
+                                      <span className="purchased-badge" title="Đánh giá đã được xác thực qua giao dịch thực tế">
+                                        ✓ Đã giao dịch
+                                      </span>
+                                    )}
                                   </div>
                                   <span className="review-date">{reviewDate}</span>
                                 </div>
@@ -746,13 +875,166 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
                             )}
                             
                             <div className="review-actions-footer">
-                              <button className="helpful-btn">
+                              <button 
+                                className={`helpful-btn ${rev.user_has_voted ? 'voted' : ''}`}
+                                onClick={() => handleToggleHelpful(rev.id)}
+                                title={rev.user_has_voted ? "Bỏ bình chọn hữu ích" : "Bình chọn hữu ích"}
+                                disabled={Boolean(togglingHelpfulMap[rev.id])}
+                              >
                                 <span>👍 Hữu ích ({rev.helpful_count || 0})</span>
                               </button>
-                              <button className="reply-btn">
-                                <span>💬 Trả lời</span>
+                              <button 
+                                className="reply-btn"
+                                onClick={() => handleToggleReplyBox(rev.id)}
+                              >
+                                <span>💬 Phản hồi</span>
                               </button>
                             </div>
+
+                            {/* Reply Input Box in Modal */}
+                            {showReplyBox[rev.id] && (
+                              <div style={{
+                                marginTop: '10px',
+                                padding: '12px',
+                                backgroundColor: '#f8fafc',
+                                borderRadius: '8px',
+                                border: '1px solid #e2e8f0'
+                              }}>
+                                <textarea
+                                  placeholder={user ? "Nhập phản hồi hoặc ý kiến của bạn..." : "Vui lòng đăng nhập để phản hồi..."}
+                                  value={replyTextMap[rev.id] || ''}
+                                  onChange={(e) => setReplyTextMap(prev => ({ ...prev, [rev.id]: e.target.value }))}
+                                  disabled={Boolean(submittingReplyMap[rev.id]) || !user}
+                                  rows={3}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 10px',
+                                    borderRadius: '6px',
+                                    border: '1px solid #cbd5e1',
+                                    fontSize: '13px',
+                                    resize: 'vertical',
+                                    outline: 'none',
+                                    boxSizing: 'border-box'
+                                  }}
+                                />
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '8px' }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleReplyBox(rev.id)}
+                                    disabled={Boolean(submittingReplyMap[rev.id])}
+                                    style={{
+                                      background: '#e2e8f0',
+                                      border: 'none',
+                                      padding: '6px 12px',
+                                      borderRadius: '6px',
+                                      fontSize: '12px',
+                                      fontWeight: 600,
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    Hủy
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSendReviewReply(rev.id)}
+                                    disabled={Boolean(submittingReplyMap[rev.id]) || !(replyTextMap[rev.id] || '').trim() || !user}
+                                    style={{
+                                      background: '#2563eb',
+                                      color: '#fff',
+                                      border: 'none',
+                                      padding: '6px 14px',
+                                      borderRadius: '6px',
+                                      fontSize: '12px',
+                                      fontWeight: 600,
+                                      cursor: 'pointer',
+                                      opacity: !(replyTextMap[rev.id] || '').trim() ? 0.6 : 1
+                                    }}
+                                  >
+                                    {submittingReplyMap[rev.id] ? 'Đang gửi...' : 'Gửi phản hồi'}
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Replies List */}
+                            {rev.replies && rev.replies.length > 0 && (
+                              <div className="property-review-replies-list" style={{
+                                marginTop: '10px',
+                                paddingLeft: '14px',
+                                borderLeft: '3px solid #e2e8f0',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '8px'
+                              }}>
+                                {rev.replies.map((reply) => {
+                                  const isOwner = Number(reply.user_id) === Number(property?.owner_id);
+                                  const isAdmin = reply.user?.role === 'ADMIN';
+                                  const isAgent = reply.user?.role === 'AGENT';
+                                  return (
+                                    <div key={reply.id} style={{
+                                      backgroundColor: '#f8fafc',
+                                      borderRadius: '8px',
+                                      padding: '8px 12px',
+                                      textAlign: 'left'
+                                    }}>
+                                      <div style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        fontSize: '12px',
+                                        marginBottom: '4px'
+                                      }}>
+                                        <span style={{ fontWeight: 700, color: '#0f172a' }}>
+                                          {reply.user?.name || 'Người dùng'}
+                                        </span>
+                                        {isOwner && (
+                                          <span style={{
+                                            backgroundColor: '#dbeafe',
+                                            color: '#1e40af',
+                                            fontSize: '10px',
+                                            fontWeight: 800,
+                                            padding: '1px 5px',
+                                            borderRadius: '4px'
+                                          }}>
+                                            Tác giả
+                                          </span>
+                                        )}
+                                        {!isOwner && isAdmin && (
+                                          <span style={{
+                                            backgroundColor: '#fce7f3',
+                                            color: '#be185d',
+                                            fontSize: '10px',
+                                            fontWeight: 800,
+                                            padding: '1px 5px',
+                                            borderRadius: '4px'
+                                          }}>
+                                            Quản trị viên
+                                          </span>
+                                        )}
+                                        {!isOwner && !isAdmin && isAgent && (
+                                          <span style={{
+                                            backgroundColor: '#e0f2fe',
+                                            color: '#0369a1',
+                                            fontSize: '10px',
+                                            fontWeight: 700,
+                                            padding: '1px 5px',
+                                            borderRadius: '4px'
+                                          }}>
+                                            Môi giới
+                                          </span>
+                                        )}
+                                        <span style={{ color: '#64748b' }}>
+                                          · {new Date(reply.created_at).toLocaleDateString('vi-VN')}
+                                        </span>
+                                      </div>
+                                      <p style={{ margin: 0, fontSize: '13px', color: '#334155', lineHeight: 1.4 }}>
+                                        {reply.reply_text}
+                                      </p>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
                           </div>
                         );
                       })

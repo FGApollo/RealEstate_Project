@@ -98,7 +98,18 @@ const EditListingWizard = ({ propertyId, setActiveTab, setData, currentUser }) =
             <ShieldCheck size={20} color="#b45309" />
             <span>Tài khoản của bạn chưa được xác minh. Tin vẫn có thể đăng, nhưng sẽ chưa có badge Verified Seller.</span>
           </div>
-          <button className="alert-verify-btn" onClick={(e) => e.preventDefault()}>Xác minh ngay</button>
+          <button 
+            type="button"
+            className="alert-verify-btn" 
+            onClick={(e) => {
+              e.preventDefault();
+              if (typeof setActiveTab === 'function') {
+                setActiveTab('profile');
+              }
+            }}
+          >
+            Xác minh ngay
+          </button>
         </div>
       )}
 

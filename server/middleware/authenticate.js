@@ -13,6 +13,13 @@ const authenticate = async (req, res, next) => {
       return res.status(401).json({ error: 'Invalid or expired session' });
     }
 
+    if (!user.email_verified_at) {
+      return res.status(403).json({
+        error: 'Hãy xác minh email trước khi sử dụng tài khoản này',
+        code: 'EMAIL_VERIFICATION_REQUIRED'
+      });
+    }
+
     req.user = user;
     return next();
   } catch (error) {
@@ -33,4 +40,23 @@ const requireRole = (...allowedRoles) => (req, res, next) => {
   return next();
 };
 
-module.exports = { authenticate, requireRole };
+const optionalAuthenticate = async (req, res, next) => {
+  const authorization = req.get('authorization') || '';
+  const match = /^Bearer\s+([^\s]+)$/i.exec(authorization);
+  if (!match) {
+    return next();
+  }
+
+  try {
+    const user = await authSessionService.getAuthenticatedUser(match[1]);
+    if (user) {
+      req.user = user;
+    }
+  } catch (error) {
+    // Silently continue for optional auth
+  }
+
+  return next();
+};
+
+module.exports = { authenticate, requireRole, optionalAuthenticate };

@@ -20,6 +20,7 @@ const Chat = () => {
   const [activeConversation, setActiveConversation] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
+  const [sendError, setSendError] = useState('');
   const [activeProperty, setActiveProperty] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -124,8 +125,8 @@ const Chat = () => {
     e.preventDefault();
     if (!newMessage.trim() || !currentUser || !activeConversation) return;
 
-    const msgText = newMessage;
-    setNewMessage('');
+    const msgText = newMessage.trim();
+    setSendError('');
 
     try {
       const res = await apiFetch(`${API_BASE_URL}/api/chat/messages`, {
@@ -138,19 +139,26 @@ const Chat = () => {
         })
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        setMessages(prev => [...prev, data.message]);
-        
-        // Refresh conversations list to update last message preview
-        const convRes = await apiFetch(`${API_BASE_URL}/api/chat/conversations`);
-        if (convRes.ok) {
-          const convData = await convRes.json();
-          setConversations(convData.conversations || []);
-        }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setSendError(data.error || (res.status === 429
+          ? 'Bạn đang gửi tin nhắn quá nhanh. Vui lòng thử lại sau.'
+          : 'Không thể gửi tin nhắn. Vui lòng thử lại.'));
+        return;
+      }
+
+      setNewMessage('');
+      setMessages(prev => [...prev, data.message]);
+
+      // Refresh conversations list to update last message preview
+      const convRes = await apiFetch(`${API_BASE_URL}/api/chat/conversations`);
+      if (convRes.ok) {
+        const convData = await convRes.json();
+        setConversations(convData.conversations || []);
       }
     } catch (err) {
       console.error('Error sending message:', err);
+      setSendError('Lỗi kết nối. Tin nhắn vẫn được giữ lại để bạn thử gửi lại.');
     }
   };
 
@@ -369,11 +377,13 @@ const Chat = () => {
               </div>
 
               {/* Message Input Box */}
+              {sendError && <p role="alert" style={{ color: '#b91c1c', margin: '4px 12px' }}>{sendError}</p>}
               <form className="message-input-form" onSubmit={handleSendMessage}>
                 <input 
                   type="text" 
                   placeholder="Nhập tin nhắn..." 
                   value={newMessage}
+                  maxLength={2000}
                   onChange={(e) => setNewMessage(e.target.value)}
                 />
                 <button type="submit" className="send-msg-btn">

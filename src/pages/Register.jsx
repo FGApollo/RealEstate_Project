@@ -6,11 +6,12 @@ import GoogleAuthButton from '../components/GoogleAuthButton';
 import Input from '../components/ui/Input';
 import Button from '../components/ui/Button';
 import { API_BASE_URL } from '../config';
+import { validateRegistration } from '../auth/registrationValidation';
 
 const Register = () => {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
-  const [formData, setFormData] = useState({ name: '', email: '', password: '' });
+  const [formData, setFormData] = useState({ name: '', email: '', password: '', confirmPassword: '' });
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -25,13 +26,24 @@ const Register = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    const validationErrors = validateRegistration({ ...formData, intent: 'USER_SIGNUP' });
+    if (Object.keys(validationErrors).length) {
+      setError(Object.values(validationErrors)[0]);
+      return;
+    }
     setIsLoading(true);
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...formData, intent: 'USER_SIGNUP' })
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email.trim().toLowerCase(),
+          password: formData.password,
+          confirmPassword: formData.confirmPassword,
+          intent: 'USER_SIGNUP'
+        })
       });
 
       const data = await response.json();
@@ -40,7 +52,7 @@ const Register = () => {
         throw new Error(data.error || 'Failed to register');
       }
 
-      navigate('/login', { state: { message: 'Đăng ký thành công! Vui lòng đăng nhập.' } });
+      navigate('/login', { state: { message: data.message, email: formData.email } });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -64,6 +76,7 @@ const Register = () => {
           type="text"
           value={formData.name}
           onChange={handleChange}
+          autoComplete="name"
           required
         />
 
@@ -75,6 +88,7 @@ const Register = () => {
           type="email"
           value={formData.email}
           onChange={handleChange}
+          autoComplete="email"
           required
         />
         
@@ -86,8 +100,27 @@ const Register = () => {
           onRightIconClick={togglePasswordVisibility}
           placeholder="Tạo mật khẩu"
           type={showPassword ? "text" : "password"}
+          minLength={10}
           value={formData.password}
           onChange={handleChange}
+          autoComplete="new-password"
+          required
+        />
+
+        <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '0.35rem 0 1rem' }}>
+          Tối thiểu 10 ký tự; có thể dùng cụm từ và khoảng trắng. Không cần quy tắc ký tự hoa/số/ký hiệu.
+        </p>
+
+        <Input
+          label="XÁC NHẬN MẬT KHẨU"
+          icon={Lock}
+          name="confirmPassword"
+          placeholder="Nhập lại mật khẩu"
+          type="password"
+          minLength={10}
+          value={formData.confirmPassword}
+          onChange={handleChange}
+          autoComplete="new-password"
           required
         />
 

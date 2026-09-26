@@ -6,11 +6,12 @@ import GoogleAuthButton from '../components/GoogleAuthButton';
 import Input from '../components/ui/Input';
 import Button from '../components/ui/Button';
 import { API_BASE_URL } from '../config';
+import { validateRegistration, normalizeVietnamPhone } from '../auth/registrationValidation';
 
 const RegisterAgent = () => {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
-  const [formData, setFormData] = useState({ name: '', email: '', phone: '', password: '' });
+  const [formData, setFormData] = useState({ name: '', email: '', phone: '', password: '', confirmPassword: '' });
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -25,6 +26,11 @@ const RegisterAgent = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    const validationErrors = validateRegistration({ ...formData, intent: 'AGENT_SIGNUP' });
+    if (Object.keys(validationErrors).length) {
+      setError(Object.values(validationErrors)[0]);
+      return;
+    }
     setIsLoading(true);
 
     try {
@@ -32,7 +38,11 @@ const RegisterAgent = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...formData,
+          name: formData.name,
+          email: formData.email.trim().toLowerCase(),
+          phone: normalizeVietnamPhone(formData.phone),
+          password: formData.password,
+          confirmPassword: formData.confirmPassword,
           intent: 'AGENT_SIGNUP'
         })
       });
@@ -43,7 +53,7 @@ const RegisterAgent = () => {
         throw new Error(data.error || 'Failed to register');
       }
 
-      navigate('/login/agent', { state: { message: 'Đăng ký tài khoản Môi giới thành công! Vui lòng đăng nhập.' } });
+      navigate('/login/agent', { state: { message: data.message, email: formData.email } });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -68,6 +78,7 @@ const RegisterAgent = () => {
           type="text"
           value={formData.name}
           onChange={handleChange}
+          autoComplete="name"
           required
         />
 
@@ -79,6 +90,7 @@ const RegisterAgent = () => {
           type="email"
           value={formData.email}
           onChange={handleChange}
+          autoComplete="email"
           required
         />
 
@@ -90,6 +102,7 @@ const RegisterAgent = () => {
           type="tel"
           value={formData.phone}
           onChange={handleChange}
+          autoComplete="tel"
           required
         />
         
@@ -101,8 +114,27 @@ const RegisterAgent = () => {
           onRightIconClick={togglePasswordVisibility}
           placeholder="Tạo mật khẩu đăng nhập"
           type={showPassword ? "text" : "password"}
+          minLength={10}
           value={formData.password}
           onChange={handleChange}
+          autoComplete="new-password"
+          required
+        />
+
+        <p style={{ fontSize: '0.78rem', color: '#94a3b8', margin: '0.35rem 0 1rem' }}>
+          Mật khẩu tối thiểu 10 ký tự; không cần quy tắc ký tự hoa/số/ký hiệu.
+        </p>
+
+        <Input
+          label="XÁC NHẬN MẬT KHẨU"
+          icon={Lock}
+          name="confirmPassword"
+          placeholder="Nhập lại mật khẩu"
+          type="password"
+          minLength={10}
+          value={formData.confirmPassword}
+          onChange={handleChange}
+          autoComplete="new-password"
           required
         />
 

@@ -1,9 +1,19 @@
 const bcrypt = require('bcrypt');
 const { supabase } = require('../config/supabase');
 const googleIdentityService = require('./googleIdentityService');
+const emailVerificationService = require('./emailVerificationService');
 const { resolvePublicRegistration } = require('./registrationPolicy');
+const {
+  createValidationError,
+  normalizeEmail,
+  normalizeVietnamPhone,
+  validateRegistration
+} = require('./registrationValidation');
 
-const PUBLIC_USER_FIELDS = ['id', 'name', 'email', 'avatar', 'role', 'phone', 'verification_status', 'trust_score'];
+const PUBLIC_USER_FIELDS = [
+  'id', 'name', 'email', 'avatar', 'role', 'phone', 'email_verified_at',
+  'verification_status', 'trust_score'
+];
 const toPublicUser = (user) => Object.fromEntries(
   PUBLIC_USER_FIELDS.filter((field) => user[field] !== undefined).map((field) => [field, user[field]])
 );
@@ -14,8 +24,6 @@ const serviceError = (message, statusCode, code) => {
   if (code) error.code = code;
   return error;
 };
-
-const normalizeEmail = (email) => String(email || '').trim().toLowerCase();
 
 const findUserByEmail = async (email) => {
   const { data, error } = await supabase.from('users').select('*').eq('email', email).maybeSingle();
@@ -36,34 +44,49 @@ const findGoogleIdentity = async (field, value) => {
   return data;
 };
 
-const registerUser = async ({ name, email, password, intent = 'USER_SIGNUP', phone = null, role }) => {
+const registerUser = async ({
+  name,
+  email,
+  password,
+  confirmPassword,
+  intent = 'USER_SIGNUP',
+  phone = null,
+  role
+}) => {
   if (role !== undefined) {
     throw serviceError('Invalid registration role', 400);
   }
-  const registration = resolvePublicRegistration(intent, phone);
-  const normalizedEmail = normalizeEmail(email);
+  const registration = validateRegistration({ name, email, password, confirmPassword, intent, phone });
+  emailVerificationService.prepareRegistrationDelivery();
 
-  // Check if user exists
-  const existingUser = await findUserByEmail(normalizedEmail);
+  // Keep duplicate and new-account requests closer in cost to reduce timing-based email enumeration.
+  const hashedPassword = await bcrypt.hash(registration.password, 12);
+  const existingUser = await findUserByEmail(registration.email);
+  if (existingUser) return { accepted: true };
 
-  if (existingUser) {
-    throw new Error('User with this email already exists');
-  }
-
-  // Hash password
-  const saltRounds = 10;
-  const hashedPassword = await bcrypt.hash(password, saltRounds);
-
-  // Insert
   const { data, error } = await supabase
     .from('users')
-    .insert([{ name, email: normalizedEmail, password: hashedPassword, ...registration }])
+    .insert([{
+      name: registration.name,
+      email: registration.email,
+      password: hashedPassword,
+      role: registration.role,
+      phone: registration.phone,
+      email_verified_at: null
+    }])
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error?.code === '23505') return { accepted: true };
+  if (error) {
+    // Log only the database error code; never log submitted identity or password data.
+    console.error('Registration user insert failed:', error.code || error.name || 'database_error');
+    throw serviceError('Registration is temporarily unavailable', 503, 'REGISTRATION_UNAVAILABLE');
+  }
 
-  return toPublicUser(data);
+  await emailVerificationService.issueAndSend(data);
+
+  return { accepted: true };
 };
 
 const loginUser = async ({ email, password }) => {
@@ -82,7 +105,31 @@ const loginUser = async ({ email, password }) => {
     throw new Error('Invalid email or password');
   }
 
+  if (!user.email_verified_at) {
+    throw serviceError(
+      'Hãy xác minh email trước khi đăng nhập. Bạn có thể yêu cầu gửi lại liên kết xác minh.',
+      403,
+      'EMAIL_VERIFICATION_REQUIRED'
+    );
+  }
+
   return toPublicUser(user);
+};
+
+const markGoogleEmailVerified = async (user, googleEmail) => {
+  if (normalizeEmail(user.email) !== googleEmail || user.email_verified_at) {
+    return toPublicUser(user);
+  }
+
+  const verifiedAt = new Date().toISOString();
+  const { data, error } = await supabase.from('users')
+    .update({ email_verified_at: verifiedAt })
+    .eq('id', user.id)
+    .is('email_verified_at', null)
+    .select('*')
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return toPublicUser(data || { ...user, email_verified_at: verifiedAt });
 };
 
 const googleLogin = async (credential, intent = 'LOGIN', phone = null, linkPassword = null) => {
@@ -95,7 +142,7 @@ const googleLogin = async (credential, intent = 'LOGIN', phone = null, linkPassw
   if (linkedIdentity) {
     const linkedUser = await findUserById(linkedIdentity.user_id);
     if (!linkedUser) throw serviceError('Linked account not found', 409);
-    return toPublicUser(linkedUser);
+    return markGoogleEmailVerified(linkedUser, identity.email);
   }
 
   const existingUser = await findUserByEmail(identity.email);
@@ -125,7 +172,7 @@ const googleLogin = async (credential, intent = 'LOGIN', phone = null, linkPassw
         }
       }
     }
-    return toPublicUser(existingUser);
+    return markGoogleEmailVerified(existingUser, identity.email);
   }
 
   if (intent === 'LOGIN') {
@@ -135,7 +182,11 @@ const googleLogin = async (credential, intent = 'LOGIN', phone = null, linkPassw
     throw serviceError('Google cannot confirm current ownership of this third-party email', 409);
   }
 
-  const registration = resolvePublicRegistration(intent, phone);
+  const normalizedPhone = intent === 'AGENT_SIGNUP' ? normalizeVietnamPhone(phone) : phone;
+  if (intent === 'AGENT_SIGNUP' && !normalizedPhone) {
+    throw createValidationError({ phone: 'Enter a valid Vietnamese mobile number' });
+  }
+  const registration = resolvePublicRegistration(intent, normalizedPhone);
   const { data: userId, error: provisionError } = await supabase.rpc('provision_google_user', {
     p_subject: identity.subject,
     p_email: identity.email,
@@ -153,7 +204,7 @@ const googleLogin = async (credential, intent = 'LOGIN', phone = null, linkPassw
 
   const newUser = await findUserById(userId);
   if (!newUser) throw new Error('Provisioned user not found');
-  return toPublicUser(newUser);
+  return markGoogleEmailVerified(newUser, identity.email);
 };
 
 const getUserById = async (id) => {
@@ -172,5 +223,6 @@ module.exports = {
   loginUser,
   googleLogin,
   getUserById,
-  toPublicUser
+  toPublicUser,
+  normalizeEmail
 };
