@@ -18,7 +18,7 @@ const getAgentReviews = async (req, res) => {
   const userId = req.user.id;
 
   try {
-    const reviews = await agentService.getAgentReviews(userId);
+    const reviews = await agentService.getAgentReviews(userId, userId);
     res.status(200).json(reviews);
   } catch (error) {
     console.error('Error fetching agent reviews:', error);
@@ -44,9 +44,23 @@ const replyToReview = async (req, res) => {
   }
 };
 
+const toggleReviewHelpful = async (req, res) => {
+  const userId = req.user.id;
+  const { reviewId } = req.params;
+
+  try {
+    const result = await reviewService.toggleReviewHelpful(reviewId, userId);
+    res.status(200).json(result);
+  } catch (error) {
+    console.error('Error toggling review helpful in agentController:', error);
+    res.status(error.statusCode || 500).json({ error: error.message || 'Internal server error' });
+  }
+};
+
 module.exports = {
   getOverview,
   getAgentReviews,
-  replyToReview
+  replyToReview,
+  toggleReviewHelpful
 };
 

@@ -46,7 +46,7 @@ const saveBase64Image = (base64Str) => {
   }
 };
 
-const getPropertyReviews = async (propertyId) => {
+const getPropertyReviews = async (propertyId, currentUserId = null) => {
   const { data, error } = await supabase
     .from('property_reviews')
     .select(`
@@ -60,6 +60,10 @@ const getPropertyReviews = async (propertyId) => {
         reply_text,
         created_at,
         user:users!user_id(id, name, avatar, role)
+      ),
+      helpful_votes:property_review_helpful_votes(
+        id,
+        user_id
       )
     `)
     .eq('property_id', propertyId)
@@ -69,7 +73,15 @@ const getPropertyReviews = async (propertyId) => {
   if (error) {
     throw new Error(error.message);
   }
-  return data;
+
+  return (data || []).map(r => {
+    const votes = r.helpful_votes || [];
+    return {
+      ...r,
+      helpful_count: votes.length,
+      user_has_voted: currentUserId ? votes.some(v => Number(v.user_id) === Number(currentUserId)) : false
+    };
+  });
 };
 
 const checkUserVerifiedTransaction = async (userId, propertyId) => {
@@ -303,10 +315,79 @@ const createReviewReply = async (reviewId, userId, replyText) => {
   };
 };
 
+const toggleReviewHelpful = async (reviewId, userId) => {
+  const rId = parseInt(reviewId, 10);
+  const uId = parseInt(userId, 10);
+
+  if (!rId || isNaN(rId)) {
+    const error = new Error('Mã đánh giá không hợp lệ');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  // 1. Verify review exists
+  const { data: review, error: revError } = await supabase
+    .from('property_reviews')
+    .select('id')
+    .eq('id', rId)
+    .single();
+
+  if (revError || !review) {
+    const error = new Error('Đánh giá không tồn tại');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  // 2. Check if user already voted
+  const { data: existingVote, error: checkError } = await supabase
+    .from('property_review_helpful_votes')
+    .select('id')
+    .eq('review_id', rId)
+    .eq('user_id', uId)
+    .maybeSingle();
+
+  if (checkError) {
+    throw new Error(checkError.message);
+  }
+
+  let hasVoted = false;
+  if (existingVote) {
+    // Already voted -> Unvote (remove)
+    const { error: delError } = await supabase
+      .from('property_review_helpful_votes')
+      .delete()
+      .eq('id', existingVote.id);
+    if (delError) throw new Error(delError.message);
+    hasVoted = false;
+  } else {
+    // Has not voted -> Vote (insert)
+    const { error: insError } = await supabase
+      .from('property_review_helpful_votes')
+      .insert([{ review_id: rId, user_id: uId }]);
+    if (insError) throw new Error(insError.message);
+    hasVoted = true;
+  }
+
+  // 3. Count total helpful votes for this review
+  const { count, error: countError } = await supabase
+    .from('property_review_helpful_votes')
+    .select('*', { count: 'exact', head: true })
+    .eq('review_id', rId);
+
+  if (countError) throw new Error(countError.message);
+
+  return {
+    review_id: rId,
+    has_voted: hasVoted,
+    helpful_count: count || 0
+  };
+};
+
 module.exports = {
   getPropertyReviews,
   createPropertyReview,
   checkUserVerifiedTransaction,
-  createReviewReply
+  createReviewReply,
+  toggleReviewHelpful
 };
 

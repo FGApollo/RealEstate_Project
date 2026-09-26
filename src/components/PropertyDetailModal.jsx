@@ -36,6 +36,7 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
   const [showReplyBox, setShowReplyBox] = useState({});
   const [replyTextMap, setReplyTextMap] = useState({});
   const [submittingReplyMap, setSubmittingReplyMap] = useState({});
+  const [togglingHelpfulMap, setTogglingHelpfulMap] = useState({});
 
   const navigate = useNavigate();
 
@@ -268,6 +269,66 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
       alert('Lỗi kết nối khi gửi phản hồi.');
     } finally {
       setSubmittingReplyMap(prev => ({ ...prev, [reviewId]: false }));
+    }
+  };
+
+  const handleToggleHelpful = async (reviewId) => {
+    if (!user) {
+      alert('Vui lòng đăng nhập để bình chọn đánh giá này!');
+      return;
+    }
+
+    if (togglingHelpfulMap[reviewId]) return;
+
+    // Optimistic update
+    setReviews(prev => prev.map(r => {
+      if (r.id === reviewId) {
+        const currentlyVoted = Boolean(r.user_has_voted);
+        const currentCount = r.helpful_count || 0;
+        return {
+          ...r,
+          user_has_voted: !currentlyVoted,
+          helpful_count: currentlyVoted ? Math.max(0, currentCount - 1) : currentCount + 1
+        };
+      }
+      return r;
+    }));
+    setTogglingHelpfulMap(prev => ({ ...prev, [reviewId]: true }));
+
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/api/properties/reviews/${reviewId}/helpful`, {
+        method: 'POST'
+      });
+      if (res.ok) {
+        const result = await res.json();
+        setReviews(prev => prev.map(r => {
+          if (r.id === reviewId) {
+            return {
+              ...r,
+              user_has_voted: result.has_voted,
+              helpful_count: result.helpful_count
+            };
+          }
+          return r;
+        }));
+      } else {
+        const refetch = await apiFetch(`${API_BASE_URL}/api/properties/${property?.id || prop?.id}/reviews`);
+        if (refetch.ok) {
+          const freshData = await refetch.json();
+          setReviews(freshData.reviews || []);
+        }
+        const errData = await res.json().catch(() => ({}));
+        alert(errData.error || 'Không thể thực hiện bình chọn lúc này.');
+      }
+    } catch (err) {
+      console.error('Error toggling review helpful in modal:', err);
+      const refetch = await apiFetch(`${API_BASE_URL}/api/properties/${property?.id || prop?.id}/reviews`);
+      if (refetch.ok) {
+        const freshData = await refetch.json();
+        setReviews(freshData.reviews || []);
+      }
+    } finally {
+      setTogglingHelpfulMap(prev => ({ ...prev, [reviewId]: false }));
     }
   };
 
@@ -813,7 +874,12 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
                             )}
                             
                             <div className="review-actions-footer">
-                              <button className="helpful-btn">
+                              <button 
+                                className={`helpful-btn ${rev.user_has_voted ? 'voted' : ''}`}
+                                onClick={() => handleToggleHelpful(rev.id)}
+                                title={rev.user_has_voted ? "Bỏ bình chọn hữu ích" : "Bình chọn hữu ích"}
+                                disabled={Boolean(togglingHelpfulMap[rev.id])}
+                              >
                                 <span>👍 Hữu ích ({rev.helpful_count || 0})</span>
                               </button>
                               <button 

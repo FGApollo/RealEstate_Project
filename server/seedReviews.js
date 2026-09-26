@@ -105,6 +105,29 @@ const seed = async () => {
       }
     }
   }
+
+  // 4. Seed initial helpful votes if table is empty
+  const { count: voteCount } = await supabase
+    .from('property_review_helpful_votes')
+    .select('*', { count: 'exact', head: true });
+
+  if (!voteCount || voteCount === 0) {
+    const { data: revList } = await supabase.from('property_reviews').select('id').limit(5);
+    const { data: usrList } = await supabase.from('users').select('id').limit(5);
+    if (revList && revList.length > 0 && usrList && usrList.length > 0) {
+      const votesToInsert = [];
+      revList.forEach((r, idx) => {
+        const uSub = usrList.slice(0, Math.min(usrList.length, (idx % 3) + 1));
+        uSub.forEach(u => {
+          votesToInsert.push({ review_id: r.id, user_id: u.id });
+        });
+      });
+      if (votesToInsert.length > 0) {
+        await supabase.from('property_review_helpful_votes').insert(votesToInsert);
+        console.log(`Seeded ${votesToInsert.length} initial helpful votes.`);
+      }
+    }
+  }
   
   console.log('Seeding finished successfully.');
 };

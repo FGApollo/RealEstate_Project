@@ -311,6 +311,61 @@ const Home = () => {
     }
   };
 
+  const handleToggleHelpful = async (reviewId) => {
+    if (!user) {
+      alert('Vui lòng đăng nhập để bình chọn đánh giá này!');
+      return;
+    }
+
+    // Optimistic update
+    setReviews(prev => prev.map(r => {
+      if (r.id === reviewId) {
+        const currentlyVoted = Boolean(r.user_has_voted);
+        const currentCount = r.helpful_count || 0;
+        return {
+          ...r,
+          user_has_voted: !currentlyVoted,
+          helpful_count: currentlyVoted ? Math.max(0, currentCount - 1) : currentCount + 1
+        };
+      }
+      return r;
+    }));
+
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/api/properties/reviews/${reviewId}/helpful`, {
+        method: 'POST'
+      });
+      if (res.ok) {
+        const result = await res.json();
+        setReviews(prev => prev.map(r => {
+          if (r.id === reviewId) {
+            return {
+              ...r,
+              user_has_voted: result.has_voted,
+              helpful_count: result.helpful_count
+            };
+          }
+          return r;
+        }));
+      } else {
+        const refetch = await apiFetch(`${API_BASE_URL}/api/properties/${selectedProperty.id}/reviews`);
+        if (refetch.ok) {
+          const freshData = await refetch.json();
+          setReviews(freshData.reviews || []);
+        }
+        const errData = await res.json().catch(() => ({}));
+        alert(errData.error || 'Không thể thực hiện bình chọn lúc này.');
+      }
+    } catch (err) {
+      console.error('Error toggling review helpful in Home:', err);
+      const refetch = await apiFetch(`${API_BASE_URL}/api/properties/${selectedProperty.id}/reviews`);
+      if (refetch.ok) {
+        const freshData = await refetch.json();
+        setReviews(freshData.reviews || []);
+      }
+    }
+  };
+
   const categories = useMemo(() => {
     const counts = {};
     properties.forEach(p => {
@@ -1617,7 +1672,11 @@ const Home = () => {
                             )}
                             
                             <div className="review-actions-footer">
-                              <button className="helpful-btn">
+                              <button 
+                                className={`helpful-btn ${rev.user_has_voted ? 'voted' : ''}`}
+                                onClick={() => handleToggleHelpful(rev.id)}
+                                title={rev.user_has_voted ? "Bỏ bình chọn hữu ích" : "Bình chọn hữu ích"}
+                              >
                                 <span>👍 Hữu ích ({rev.helpful_count || 0})</span>
                               </button>
                               <button className="reply-btn">

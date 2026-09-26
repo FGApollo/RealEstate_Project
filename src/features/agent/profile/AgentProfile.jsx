@@ -109,6 +109,8 @@ const AgentProfile = ({
 
   // Interactive Reviews states
   const [helpfulCounts, setHelpfulCounts] = useState({});
+  const [userVotedReviews, setUserVotedReviews] = useState({});
+  const [togglingHelpful, setTogglingHelpful] = useState({});
   const [reviewReplies, setReviewReplies] = useState({});
   const [showReplyInput, setShowReplyInput] = useState({});
   const [replyText, setReplyText] = useState({});
@@ -189,12 +191,15 @@ const AgentProfile = ({
             });
             setReviewReplies(loadedReplies);
 
-            // Initialize helpful counts
+            // Initialize helpful counts and user voted state from server database
             const counts = {};
-            (data || []).forEach((r, idx) => {
-              counts[r.id] = idx === 0 ? 12 : idx === 1 ? 5 : 8;
+            const voted = {};
+            (data || []).forEach((r) => {
+              counts[r.id] = r.helpful_count || 0;
+              voted[r.id] = Boolean(r.user_has_voted);
             });
             setHelpfulCounts(counts);
+            setUserVotedReviews(voted);
           }
         } catch (err) {
           console.error('Error fetching reviews:', err);
@@ -260,18 +265,55 @@ const AgentProfile = ({
     return date.toLocaleDateString('vi-VN');
   };
 
-  const getReviewerRole = (name) => {
-    if (name === 'Courtney Henry') return 'Marketing Coordinator';
-    if (name === 'Jerome Bell') return 'Nhà đầu tư cá nhân';
-    if (name === 'Albert Flores') return 'Khách thuê căn hộ';
-    return 'Người dùng xem tin';
+  const getReviewerRole = (review) => {
+    if (review?.is_verified_review) {
+      return 'Khách đã giao dịch';
+    }
+    const role = review?.user?.role?.toUpperCase();
+    if (role === 'AGENT') return 'Môi giới';
+    if (role === 'ADMIN') return 'Quản trị viên';
+    return 'Khách hàng xem tin';
   };
 
-  const handleHelpfulClick = (reviewId) => {
-    setHelpfulCounts(prev => ({
-      ...prev,
-      [reviewId]: (prev[reviewId] || 0) + 1
-    }));
+  const handleHelpfulClick = async (reviewId) => {
+    if (!currentUser?.id) {
+      alert('Vui lòng đăng nhập để bình chọn đánh giá này!');
+      return;
+    }
+
+    if (togglingHelpful[reviewId]) return;
+
+    const currentlyVoted = Boolean(userVotedReviews[reviewId]);
+    const currentCount = helpfulCounts[reviewId] || 0;
+    const newCount = currentlyVoted ? Math.max(0, currentCount - 1) : currentCount + 1;
+
+    // Optimistic UI update
+    setUserVotedReviews(prev => ({ ...prev, [reviewId]: !currentlyVoted }));
+    setHelpfulCounts(prev => ({ ...prev, [reviewId]: newCount }));
+    setTogglingHelpful(prev => ({ ...prev, [reviewId]: true }));
+
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/api/properties/reviews/${reviewId}/helpful`, {
+        method: 'POST'
+      });
+      if (res.ok) {
+        const result = await res.json();
+        setUserVotedReviews(prev => ({ ...prev, [reviewId]: result.has_voted }));
+        setHelpfulCounts(prev => ({ ...prev, [reviewId]: result.helpful_count }));
+      } else {
+        // Revert on failure
+        setUserVotedReviews(prev => ({ ...prev, [reviewId]: currentlyVoted }));
+        setHelpfulCounts(prev => ({ ...prev, [reviewId]: currentCount }));
+        const errData = await res.json().catch(() => ({}));
+        alert(errData.error || 'Không thể thực hiện bình chọn lúc này.');
+      }
+    } catch (err) {
+      console.error('Error toggling helpful vote:', err);
+      setUserVotedReviews(prev => ({ ...prev, [reviewId]: currentlyVoted }));
+      setHelpfulCounts(prev => ({ ...prev, [reviewId]: currentCount }));
+    } finally {
+      setTogglingHelpful(prev => ({ ...prev, [reviewId]: false }));
+    }
   };
 
   const handleToggleReplyInput = (reviewId) => {
@@ -1172,9 +1214,16 @@ const AgentProfile = ({
                                   {initialLetter}
                                 </div>
                                 <div className="reviewer-meta-text">
-                                  <h4>{rev.user?.name || 'Khách hàng'}</h4>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <h4>{rev.user?.name || 'Khách hàng'}</h4>
+                                    {rev.is_verified_review && (
+                                      <span className="verified-review-badge" title="Đánh giá đã được xác thực qua giao dịch thực tế">
+                                        ✓ Đã xác thực
+                                      </span>
+                                    )}
+                                  </div>
                                   <span className="reviewer-role-time">
-                                    {getReviewerRole(rev.user?.name)} · {formatTimeAgo(rev.created_at)}
+                                    {getReviewerRole(rev)} · {formatTimeAgo(rev.created_at)}
                                   </span>
                                 </div>
                               </div>
@@ -1211,10 +1260,12 @@ const AgentProfile = ({
 
                             <div className="review-card-footer">
                               <button
-                                className="action-btn helpful-btn"
+                                className={`action-btn helpful-btn ${userVotedReviews[rev.id] ? 'voted' : ''}`}
                                 onClick={() => handleHelpfulClick(rev.id)}
+                                title={userVotedReviews[rev.id] ? "Bỏ bình chọn hữu ích" : "Bình chọn hữu ích"}
+                                disabled={Boolean(togglingHelpful[rev.id])}
                               >
-                                <ThumbsUp size={14} />
+                                <ThumbsUp size={14} fill={userVotedReviews[rev.id] ? "#0284c7" : "none"} color={userVotedReviews[rev.id] ? "#0284c7" : "currentColor"} />
                                 <span>Hữu ích ({helpfulCounts[rev.id] || 0})</span>
                               </button>
                               <button

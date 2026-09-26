@@ -1418,6 +1418,14 @@
   color: #1a42b8;
 }
 
+.review-actions-footer button.helpful-btn.voted {
+  color: #0284c7;
+  background-color: #f0f9ff;
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-weight: 800;
+}
+
 @keyframes ratingFadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
