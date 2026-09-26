@@ -3,7 +3,8 @@ import { useNavigate, Link, useOutletContext } from 'react-router-dom';
 import {
   ShieldCheck, AlertTriangle, Search, LogOut, HelpCircle, UserX, CheckCircle,
   XCircle, FileText, Image, ImageIcon, User, Check, X, ShieldAlert, Flag, Home, Mail, Clock, Award,
-  Star, EyeOff, Eye, Scale, ExternalLink, Activity, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, RotateCcw, History
+  Star, EyeOff, Eye, Scale, ExternalLink, Activity, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, RotateCcw, History,
+  SlidersHorizontal
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import { apiFetch } from '../auth/apiClient';
@@ -26,7 +27,8 @@ const ACTION_TYPE_LABELS = {
   'ACCOUNT_30_DAYS_CLEAN': { label: '30 ngày sạch lỗi', color: '#9333ea', bg: '#faf5ff' },
   'REPORT_PENALTY': { label: 'Phạt vi phạm báo cáo', color: '#dc2626', bg: '#fef2f2' },
   'PROPERTY_HIDDEN': { label: 'Ẩn bài đăng vi phạm', color: '#ea580c', bg: '#fff7ed' },
-  'APPEAL_PENALTY_REFUND': { label: 'Hoàn trả điểm khiếu nại', color: '#059669', bg: '#ecfdf5' }
+  'APPEAL_PENALTY_REFUND': { label: 'Hoàn trả điểm khiếu nại', color: '#059669', bg: '#ecfdf5' },
+  'ADMIN_MANUAL_ADJUSTMENT': { label: 'Admin can thiệp', color: '#0284c7', bg: '#f0f9ff' }
 };
 
 const AdminPage = () => {
@@ -78,6 +80,22 @@ const AdminPage = () => {
   const [auditPage, setAuditPage] = useState(1);
   const [auditPagination, setAuditPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
   const [auditStats, setAuditStats] = useState({ totalLogs: 0, totalBonus: 0, totalPenalty: 0, totalRefund: 0 });
+
+  // State for Manual Trust Score Adjustment Modal
+  const [showAdjustModal, setShowAdjustModal] = useState(false);
+  const [adjustTargetUser, setAdjustTargetUser] = useState(null);
+  const [adjustTargetEmailInput, setAdjustTargetEmailInput] = useState('');
+  const [adjustTargetUserIdInput, setAdjustTargetUserIdInput] = useState('');
+  const [adjustPointType, setAdjustPointType] = useState('ADD'); // 'ADD' | 'SUBTRACT'
+  const [adjustPointsAmount, setAdjustPointsAmount] = useState(10);
+  const [adjustReason, setAdjustReason] = useState('');
+  const [adjustLoading, setAdjustLoading] = useState(false);
+
+  // State for Approve Appeal Modal (with custom refund points)
+  const [showApproveAppealModal, setShowApproveAppealModal] = useState(false);
+  const [approvingAppeal, setApprovingAppeal] = useState(null);
+  const [approveRefundPoints, setApproveRefundPoints] = useState(5);
+  const [approveAdminNote, setApproveAdminNote] = useState('');
 
   // Logout handler
   const handleLogout = async (e) => {
@@ -234,30 +252,44 @@ const AdminPage = () => {
     }
   };
 
-  // Handle Approve Appeal
-  const handleApproveAppeal = async (appealId) => {
-    const appeal = appealsList.find(a => a.id === appealId);
+  // Handle Approve Appeal Modal & Submission
+  const handleOpenApproveAppealModal = (appeal) => {
     if (!appeal) return;
+    const defaultPoints = REASON_LABELS[appeal.report?.reason]?.penalty
+      ? Math.abs(REASON_LABELS[appeal.report?.reason]?.penalty)
+      : 5;
+    setApprovingAppeal(appeal);
+    setApproveRefundPoints(defaultPoints);
+    setApproveAdminNote('Chấp thuận khiếu nại. Đã hoàn điểm phạt và khôi phục hiển thị tin đăng.');
+    setShowApproveAppealModal(true);
+  };
 
-    if (!window.confirm('XÁC NHẬN CHẤP THUẬN KHÁNG CÁO:\nBạn có chắc chắn muốn chấp thuận đơn khiếu nại này?\nHệ thống sẽ:\n1. Tự động HOÀN LẠI toàn bộ điểm Trust Score đã phạt cho Môi giới.\n2. Tự động MỞ LẠI bài đăng trên sàn (is_hidden = false).\n3. Cập nhật trạng thái đơn thành APPROVED và lưu lịch sử đối soát.')) {
+  const handleConfirmApproveAppeal = async () => {
+    if (!approvingAppeal) return;
+    const parsedPoints = Number(approveRefundPoints);
+    if (!Number.isFinite(parsedPoints) || parsedPoints < 0 || parsedPoints > 100) {
+      alert('Vui lòng nhập số điểm hoàn lại hợp lệ (0 - 100 điểm).');
       return;
     }
 
-    const note = window.prompt('Nhập ghi chú phản hồi cho Môi giới (tùy chọn):', 'Chấp thuận khiếu nại. Đã hoàn điểm phạt và khôi phục hiển thị tin đăng.');
-    if (note === null) return;
-
     setAppealActionLoading(true);
     try {
-      const res = await apiFetch(`${API_BASE_URL}/api/appeals/admin/${appealId}/approve`, {
+      const res = await apiFetch(`${API_BASE_URL}/api/appeals/admin/${approvingAppeal.id}/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ adminNote: note })
+        body: JSON.stringify({
+          adminNote: approveAdminNote.trim(),
+          customRefundPoints: parsedPoints
+        })
       });
       const data = await res.json();
       if (res.ok) {
         alert(data.message || 'Chấp thuận khiếu nại thành công!');
+        setShowApproveAppealModal(false);
+        setApprovingAppeal(null);
         fetchAppeals();
         fetchReports();
+        fetchAuditLogs();
       } else {
         alert(data.error || 'Thao tác thất bại');
       }
@@ -266,6 +298,75 @@ const AdminPage = () => {
       alert('Lỗi kết nối máy chủ');
     } finally {
       setAppealActionLoading(false);
+    }
+  };
+
+  // Handle Manual Trust Score Adjustment
+  const handleOpenAdjustModal = (user = null) => {
+    setAdjustTargetUser(user);
+    setAdjustTargetEmailInput(user?.email || '');
+    setAdjustTargetUserIdInput(user ? String(user.id) : '');
+    setAdjustPointType('ADD');
+    setAdjustPointsAmount(10);
+    setAdjustReason('');
+    setShowAdjustModal(true);
+  };
+
+  const handleSubmitAdjustTrustScore = async () => {
+    const email = adjustTargetEmailInput.trim();
+    const rawUserId = adjustTargetUser?.id || adjustTargetUserIdInput.trim();
+
+    if (!email && !rawUserId) {
+      alert('Vui lòng nhập Email (hoặc User ID) của tài khoản cần điều chỉnh điểm.');
+      return;
+    }
+
+    const amount = Number(adjustPointsAmount);
+    if (!Number.isInteger(amount) || amount <= 0 || amount > 100) {
+      alert('Vui lòng nhập số điểm điều chỉnh từ 1 đến 100.');
+      return;
+    }
+
+    if (!adjustReason || adjustReason.trim().length < 5) {
+      alert('Vui lòng nhập lý do cụ thể (tối thiểu 5 ký tự) để lưu vào sổ cái kiểm toán.');
+      return;
+    }
+
+    const delta = adjustPointType === 'ADD' ? amount : -amount;
+
+    setAdjustLoading(true);
+    try {
+      const payload = {
+        pointChange: delta,
+        reason: adjustReason.trim()
+      };
+
+      if (email) {
+        payload.email = email;
+      }
+      if (rawUserId) {
+        payload.userId = Number(rawUserId);
+      }
+
+      const res = await apiFetch(`${API_BASE_URL}/api/admin/trust-score/adjust`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        alert(data.message || 'Điều chỉnh điểm uy tín thành công!');
+        setShowAdjustModal(false);
+        fetchAuditLogs();
+      } else {
+        alert(data.error || 'Điều chỉnh điểm thất bại');
+      }
+    } catch (err) {
+      console.error('Lỗi điều chỉnh điểm:', err);
+      alert('Lỗi kết nối máy chủ');
+    } finally {
+      setAdjustLoading(false);
     }
   };
 
@@ -1798,7 +1899,7 @@ const AdminPage = () => {
 
                           <button
                             className="admin-btn admin-btn-approve"
-                            onClick={() => handleApproveAppeal(selectedAppeal.id)}
+                            onClick={() => handleOpenApproveAppealModal(selectedAppeal)}
                             disabled={appealActionLoading}
                           >
                             <CheckCircle size={18} />
@@ -1824,15 +1925,25 @@ const AdminPage = () => {
                     Tra cứu và kiểm toán toàn bộ lịch sử thưởng/phạt/hoàn điểm của các tài khoản trên hệ thống
                   </p>
                 </div>
-                <button
-                  className="admin-btn-refresh"
-                  onClick={() => fetchAuditLogs(1, auditTypeFilter, auditActionFilter, searchQuery)}
-                  disabled={loadingAuditLogs}
-                  title="Tải lại dữ liệu"
-                >
-                  <RotateCcw size={16} className={loadingAuditLogs ? 'spin-icon' : ''} />
-                  <span>Làm mới</span>
-                </button>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                  <button
+                    className="admin-btn-adjust-main"
+                    onClick={() => handleOpenAdjustModal(null)}
+                    title="Điều chỉnh điểm uy tín thủ công cho một tài khoản"
+                  >
+                    <SlidersHorizontal size={16} />
+                    <span>Điều chỉnh điểm thủ công</span>
+                  </button>
+                  <button
+                    className="admin-btn-refresh"
+                    onClick={() => fetchAuditLogs(1, auditTypeFilter, auditActionFilter, searchQuery)}
+                    disabled={loadingAuditLogs}
+                    title="Tải lại dữ liệu"
+                  >
+                    <RotateCcw size={16} className={loadingAuditLogs ? 'spin-icon' : ''} />
+                    <span>Làm mới</span>
+                  </button>
+                </div>
               </div>
 
               {/* Stat Summary Cards */}
@@ -1924,6 +2035,7 @@ const AdminPage = () => {
                     <option value="REPORT_PENALTY">Xử phạt báo cáo vi phạm</option>
                     <option value="PROPERTY_HIDDEN">Ẩn bài đăng vi phạm</option>
                     <option value="APPEAL_PENALTY_REFUND">Hoàn điểm sau kháng cáo</option>
+                    <option value="ADMIN_MANUAL_ADJUSTMENT">Admin can thiệp điều chỉnh</option>
                   </select>
                 </div>
               </div>
@@ -1953,6 +2065,7 @@ const AdminPage = () => {
                             <th>Biến động</th>
                             <th>Điểm số</th>
                             <th>Lý do & Đối tượng liên quan</th>
+                            <th style={{ textAlign: 'center' }}>Thao tác</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -2043,6 +2156,17 @@ const AdminPage = () => {
                                     )}
                                   </div>
                                 </td>
+
+                                <td className="audit-cell-actions" style={{ textAlign: 'center' }}>
+                                  <button
+                                    className="audit-adjust-quick-btn"
+                                    onClick={() => handleOpenAdjustModal(log.user || { id: log.user_id, name: `User #${log.user_id}` })}
+                                    title="Điều chỉnh điểm cho người dùng này"
+                                  >
+                                    <SlidersHorizontal size={13} />
+                                    <span>Chỉnh điểm</span>
+                                  </button>
+                                </td>
                               </tr>
                             );
                           })}
@@ -2080,6 +2204,268 @@ const AdminPage = () => {
           )}
         </div>
       </main>
+
+      {/* APPROVE APPEAL WITH CUSTOM REFUND POINTS MODAL */}
+      {showApproveAppealModal && approvingAppeal && (
+        <div className="admin-reject-modal-overlay">
+          <div className="admin-adjust-modal">
+            <div className="admin-adjust-modal-header">
+              <div className="admin-adjust-modal-title">
+                <CheckCircle size={22} color="#10b981" />
+                <h3>Chấp thuận Khiếu nại #{approvingAppeal.id}</h3>
+              </div>
+              <button
+                className="admin-modal-close-btn"
+                onClick={() => { setShowApproveAppealModal(false); setApprovingAppeal(null); }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="admin-adjust-modal-body">
+              <div className="appeal-approve-summary-box">
+                <div className="appeal-approve-info-row">
+                  <span className="label">Môi giới / Đương sự:</span>
+                  <span className="value font-bold">{approvingAppeal.user?.name || `User #${approvingAppeal.user_id}`}</span>
+                </div>
+                {approvingAppeal.report && (
+                  <div className="appeal-approve-info-row">
+                    <span className="label">Lý do phạt ban đầu:</span>
+                    <span className="value" style={{ color: '#dc2626' }}>
+                      {REASON_LABELS[approvingAppeal.report.reason]?.label || approvingAppeal.report.reason}
+                    </span>
+                  </div>
+                )}
+                {approvingAppeal.property && (
+                  <div className="appeal-approve-info-row">
+                    <span className="label">Bất động sản:</span>
+                    <span className="value">{approvingAppeal.property.title}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="admin-form-group" style={{ marginTop: 16 }}>
+                <label className="admin-form-label">
+                  Số điểm Trust Score hoàn lại:
+                  <span className="text-hint"> (Mặc định tính theo mức đã phạt trước đó)</span>
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    className="admin-number-input"
+                    value={approveRefundPoints}
+                    onChange={(e) => setApproveRefundPoints(e.target.value)}
+                    placeholder="Điểm hoàn lại (0 - 100)"
+                  />
+                  <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#10b981' }}>+ điểm</span>
+                </div>
+                <p className="admin-field-helper">
+                  💡 Hệ thống sẽ cộng số điểm này vào điểm hiện tại của người dùng (tối đa 100 điểm) và mở khóa bài đăng công khai.
+                </p>
+              </div>
+
+              <div className="admin-form-group" style={{ marginTop: 14 }}>
+                <label className="admin-form-label">Ghi chú phản hồi cho Môi giới:</label>
+                <textarea
+                  className="admin-reject-textarea"
+                  style={{ height: 80 }}
+                  value={approveAdminNote}
+                  onChange={(e) => setApproveAdminNote(e.target.value)}
+                  placeholder="Nhập ghi chú phản hồi..."
+                />
+              </div>
+            </div>
+
+            <div className="admin-modal-actions">
+              <button
+                className="admin-btn-cancel"
+                onClick={() => { setShowApproveAppealModal(false); setApprovingAppeal(null); }}
+                disabled={appealActionLoading}
+              >
+                Hủy bỏ
+              </button>
+              <button
+                className="admin-btn admin-btn-approve"
+                onClick={handleConfirmApproveAppeal}
+                disabled={appealActionLoading}
+              >
+                <Check size={18} />
+                <span>{appealActionLoading ? 'Đang xử lý...' : 'Xác nhận Chấp thuận & Hoàn điểm'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MANUAL TRUST SCORE ADJUSTMENT MODAL */}
+      {showAdjustModal && (
+        <div className="admin-reject-modal-overlay">
+          <div className="admin-adjust-modal">
+            <div className="admin-adjust-modal-header">
+              <div className="admin-adjust-modal-title">
+                <SlidersHorizontal size={22} color="#0284c7" />
+                <h3>Điều chỉnh Điểm Uy Tín Thủ Công</h3>
+              </div>
+              <button
+                className="admin-modal-close-btn"
+                onClick={() => { setShowAdjustModal(false); setAdjustTargetUser(null); }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="admin-adjust-modal-body">
+              {/* Target User */}
+              <div className="admin-form-group">
+                <label className="admin-form-label">Tài khoản áp dụng:</label>
+                {adjustTargetUser ? (
+                  <div className="adjust-user-selected-pill">
+                    <User size={16} />
+                    <span className="font-bold">{adjustTargetUser.name || `User #${adjustTargetUser.id}`}</span>
+                    <span style={{ color: '#64748b', fontSize: '0.85rem' }}>({adjustTargetUser.email || `ID: ${adjustTargetUser.id}`})</span>
+                    <button
+                      type="button"
+                      className="adjust-user-change-btn"
+                      onClick={() => {
+                        setAdjustTargetUser(null);
+                        setAdjustTargetEmailInput('');
+                        setAdjustTargetUserIdInput('');
+                      }}
+                    >
+                      Đổi tài khoản khác
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <div>
+                      <label style={{ fontSize: '0.84rem', fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
+                        <Mail size={15} color="#0284c7" />
+                        <span>Email tài khoản (Chính <span style={{ color: '#dc2626' }}>*</span>)</span>
+                      </label>
+                      <input
+                        type="email"
+                        className="admin-number-input"
+                        style={{ width: '100%', boxSizing: 'border-box' }}
+                        placeholder="Ví dụ: nguyenvana@gmail.com..."
+                        value={adjustTargetEmailInput}
+                        onChange={(e) => setAdjustTargetEmailInput(e.target.value)}
+                      />
+                      <p className="admin-field-helper">
+                        Nhập địa chỉ Email tài khoản cần điều chỉnh điểm để hệ thống tìm kiếm tự động.
+                      </p>
+                    </div>
+
+                    <div style={{ paddingTop: 8, borderTop: '1px dashed #e2e8f0' }}>
+                      <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
+                        <User size={13} color="#94a3b8" />
+                        <span>Hoặc nhập User ID (Phụ / Tùy chọn nếu không nhớ Email):</span>
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        className="admin-number-input"
+                        style={{ width: '100%', boxSizing: 'border-box' }}
+                        placeholder="Ví dụ: 12"
+                        value={adjustTargetUserIdInput}
+                        onChange={(e) => setAdjustTargetUserIdInput(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Point Type (ADD / SUBTRACT) */}
+              <div className="admin-form-group" style={{ marginTop: 14 }}>
+                <label className="admin-form-label">Loại điều chỉnh:</label>
+                <div className="adjust-type-toggle-group">
+                  <button
+                    type="button"
+                    className={`adjust-type-toggle-btn add ${adjustPointType === 'ADD' ? 'active' : ''}`}
+                    onClick={() => setAdjustPointType('ADD')}
+                  >
+                    <TrendingUp size={16} />
+                    <span>Cộng thưởng điểm (+)</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`adjust-type-toggle-btn subtract ${adjustPointType === 'SUBTRACT' ? 'active' : ''}`}
+                    onClick={() => setAdjustPointType('SUBTRACT')}
+                  >
+                    <TrendingDown size={16} />
+                    <span>Trừ phạt điểm (-)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Point Amount */}
+              <div className="admin-form-group" style={{ marginTop: 14 }}>
+                <label className="admin-form-label">Số điểm biến động (1 - 100):</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    className="admin-number-input"
+                    value={adjustPointsAmount}
+                    onChange={(e) => setAdjustPointsAmount(e.target.value)}
+                  />
+                  <div className="adjust-preset-badges">
+                    {[5, 10, 15, 20].map((pts) => (
+                      <button
+                        key={pts}
+                        type="button"
+                        className="adjust-preset-pill"
+                        onClick={() => setAdjustPointsAmount(pts)}
+                      >
+                        {adjustPointType === 'ADD' ? `+${pts}` : `-${pts}`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Reason */}
+              <div className="admin-form-group" style={{ marginTop: 14 }}>
+                <label className="admin-form-label">
+                  Lý do can thiệp <span style={{ color: '#dc2626' }}>*</span>:
+                  <span className="text-hint"> (Bắt buộc, tối thiểu 5 ký tự)</span>
+                </label>
+                <textarea
+                  className="admin-reject-textarea"
+                  style={{ height: 85 }}
+                  value={adjustReason}
+                  onChange={(e) => setAdjustReason(e.target.value)}
+                  placeholder="Ví dụ: Đền bù lỗi gián đoạn hệ thống; Can thiệp bồi hoàn sau khiếu nại qua điện thoại; Xử phạt hành vi spam..."
+                />
+              </div>
+            </div>
+
+            <div className="admin-modal-actions">
+              <button
+                className="admin-btn-cancel"
+                onClick={() => { setShowAdjustModal(false); setAdjustTargetUser(null); }}
+                disabled={adjustLoading}
+              >
+                Hủy bỏ
+              </button>
+              <button
+                className={`admin-btn ${adjustPointType === 'ADD' ? 'admin-btn-approve' : 'admin-btn-reject'}`}
+                onClick={handleSubmitAdjustTrustScore}
+                disabled={adjustLoading}
+              >
+                <SlidersHorizontal size={18} />
+                <span>
+                  {adjustLoading
+                    ? 'Đang thực hiện...'
+                    : `Xác nhận ${adjustPointType === 'ADD' ? 'Cộng' : 'Trừ'} ${adjustPointsAmount || 0} điểm`}
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* REJECT MODAL FOR KYC */}
       {showRejectModal && (

@@ -30,7 +30,7 @@ test('trustScoreRoutes registers all expected bonus task and logs endpoints', ()
   assert.ok(cleanRoute.methods.includes('post'), 'POST /30-days-clean/check should be allowed');
 });
 
-test('adminRoutes registers audit log endpoint /trust-score-logs', () => {
+test('adminRoutes registers audit log endpoint /trust-score-logs and adjustment endpoint /trust-score/adjust', () => {
   const adminRoutes = adminRouter.stack
     .filter((layer) => layer.route)
     .map((layer) => ({
@@ -42,6 +42,10 @@ test('adminRoutes registers audit log endpoint /trust-score-logs', () => {
   assert.ok(paths.includes('/trust-score-logs'), 'Route /trust-score-logs should exist in adminRoutes');
   const auditRoute = adminRoutes.find((r) => r.path === '/trust-score-logs');
   assert.ok(auditRoute.methods.includes('get'), 'GET /trust-score-logs should be allowed');
+
+  assert.ok(paths.includes('/trust-score/adjust'), 'Route /trust-score/adjust should exist in adminRoutes');
+  const adjustRoute = adminRoutes.find((r) => r.path === '/trust-score/adjust');
+  assert.ok(adjustRoute.methods.includes('post'), 'POST /trust-score/adjust should be allowed');
 });
 
 test('profile completeness validation requires non-empty avatar, name, and phone', () => {

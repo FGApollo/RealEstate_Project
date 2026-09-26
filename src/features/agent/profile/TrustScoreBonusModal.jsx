@@ -15,7 +15,8 @@ const ACTION_CONFIG = {
   'ACCOUNT_30_DAYS_CLEAN': { label: 'Thưởng 30 ngày hoạt động không vi phạm', color: '#9333ea', bg: '#faf5ff' },
   'REPORT_PENALTY': { label: 'Trừ điểm do phản ánh vi phạm được xác thực', color: '#dc2626', bg: '#fef2f2' },
   'PROPERTY_HIDDEN': { label: 'Trừ điểm do tin đăng bị ẩn vi phạm', color: '#ea580c', bg: '#fff7ed' },
-  'APPEAL_PENALTY_REFUND': { label: 'Hoàn trả điểm phạt sau khiếu nại thành công', color: '#059669', bg: '#ecfdf5' }
+  'APPEAL_PENALTY_REFUND': { label: 'Hoàn trả điểm phạt sau khiếu nại thành công', color: '#059669', bg: '#ecfdf5' },
+  'ADMIN_MANUAL_ADJUSTMENT': { label: 'Admin can thiệp điều chỉnh', color: '#0284c7', bg: '#f0f9ff' }
 };
 
 const TrustScoreBonusModal = ({

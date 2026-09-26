@@ -553,7 +553,7 @@ const applyPropertyHiddenPenalty = async (propertyId, adminId, shouldPenalize = 
   };
 };
 
-const reverseReportPenalty = async (reportId, adminId, adminNote = '') => {
+const reverseReportPenalty = async (reportId, adminId, adminNote = '', customRefundPoints = null) => {
   // 1. Get report details
   const { data: report, error: reportErr } = await supabase
     .from('property_reports')
@@ -584,27 +584,36 @@ const reverseReportPenalty = async (reportId, adminId, adminNote = '') => {
     };
   }
 
-  // 3. Find original penalty log
-  const { data: penaltyLogs } = await supabase
-    .from('trust_score_logs')
-    .select('*')
-    .eq('related_report_id', reportId)
-    .lt('point_change', 0)
-    .order('created_at', { ascending: false });
-
-  // Calculate actual points deducted (preventing refund overshoot arbitrage)
+  // 3. Determine refund points (custom or auto-calculated)
   let refundPoints = 0;
-  if (penaltyLogs && penaltyLogs.length > 0) {
-    refundPoints = penaltyLogs.reduce((sum, log) => {
-      const hasScoreHistory = log.old_score !== undefined && log.old_score !== null &&
-                              log.new_score !== undefined && log.new_score !== null;
-      const actualDeducted = hasScoreHistory
-        ? Math.max(0, Number(log.old_score) - Number(log.new_score))
-        : Math.abs(Number(log.point_change));
-      return sum + actualDeducted;
-    }, 0);
+  if (customRefundPoints !== null && customRefundPoints !== undefined) {
+    const parsed = Number(customRefundPoints);
+    if (!Number.isFinite(parsed) || parsed < 0 || parsed > 100) {
+      throw new Error('Số điểm hoàn lại tùy chỉnh không hợp lệ (phải từ 0 đến 100).');
+    }
+    refundPoints = Math.round(parsed);
   } else {
-    refundPoints = Math.abs(REPORT_PENALTIES[report.reason] ?? 5);
+    // Find original penalty log
+    const { data: penaltyLogs } = await supabase
+      .from('trust_score_logs')
+      .select('*')
+      .eq('related_report_id', reportId)
+      .lt('point_change', 0)
+      .order('created_at', { ascending: false });
+
+    // Calculate actual points deducted (preventing refund overshoot arbitrage)
+    if (penaltyLogs && penaltyLogs.length > 0) {
+      refundPoints = penaltyLogs.reduce((sum, log) => {
+        const hasScoreHistory = log.old_score !== undefined && log.old_score !== null &&
+                                log.new_score !== undefined && log.new_score !== null;
+        const actualDeducted = hasScoreHistory
+          ? Math.max(0, Number(log.old_score) - Number(log.new_score))
+          : Math.abs(Number(log.point_change));
+        return sum + actualDeducted;
+      }, 0);
+    } else {
+      refundPoints = Math.abs(REPORT_PENALTIES[report.reason] ?? 5);
+    }
   }
 
   // 4. Refund trust score points
@@ -639,6 +648,103 @@ const reverseReportPenalty = async (reportId, adminId, adminNote = '') => {
     trustScore,
     propertyId,
     ownerId
+  };
+};
+
+const adjustTrustScoreManually = async ({
+  userId,
+  email,
+  adminId,
+  pointChange,
+  reason,
+  relatedPropertyId = null,
+  relatedReportId = null
+}) => {
+  if (!userId && !email) {
+    throw new Error('Vui lòng cung cấp Email hoặc User ID của tài khoản cần điều chỉnh điểm.');
+  }
+  if (!adminId) {
+    throw new Error('Thiếu ID Admin thực hiện thao tác.');
+  }
+
+  let targetUserId = userId ? Number(userId) : null;
+  if (!targetUserId && email) {
+    const trimmedEmail = String(email).trim().toLowerCase();
+    const { data: userByEmail, error: emailErr } = await supabase
+      .from('users')
+      .select('id, name, email')
+      .ilike('email', trimmedEmail)
+      .maybeSingle();
+
+    if (emailErr) {
+      throw new Error(`Lỗi khi tìm kiếm email: ${emailErr.message}`);
+    }
+    if (!userByEmail) {
+      throw new Error(`Không tìm thấy người dùng nào với email "${email}". Vui lòng kiểm tra lại.`);
+    }
+    targetUserId = userByEmail.id;
+  }
+
+  const delta = Number(pointChange);
+  if (!Number.isInteger(delta) || delta === 0) {
+    throw new Error('Số điểm điều chỉnh phải là số nguyên khác 0 (ví dụ: +10 hoặc -15).');
+  }
+
+  if (Math.abs(delta) > 100) {
+    throw new Error('Biên độ điều chỉnh điểm không được vượt quá 100 điểm.');
+  }
+
+  const trimmedReason = (reason || '').trim();
+  if (!trimmedReason || trimmedReason.length < 5) {
+    throw new Error('Vui lòng cung cấp lý do điều chỉnh cụ thể (tối thiểu 5 ký tự) để phục vụ kiểm toán.');
+  }
+
+  const user = await getUserForTrustScore(targetUserId, 'id, name, email, role, trust_score');
+  const oldScore = Number(user.trust_score ?? DEFAULT_TRUST_SCORE);
+  const newScore = clampTrustScore(oldScore + delta);
+
+  // Update user score
+  const { error: updateError } = await supabase
+    .from('users')
+    .update({ trust_score: newScore })
+    .eq('id', targetUserId);
+
+  if (updateError) {
+    throw new Error(updateError.message);
+  }
+
+  // Log in trust_score_logs
+  const { error: logError } = await supabase
+    .from('trust_score_logs')
+    .insert({
+      user_id: targetUserId,
+      action: 'ADMIN_MANUAL_ADJUSTMENT',
+      point_change: delta,
+      old_score: oldScore,
+      new_score: newScore,
+      reason: `[Admin can thiệp] ${trimmedReason}`,
+      related_property_id: relatedPropertyId || null,
+      related_report_id: relatedReportId || null
+    });
+
+  if (logError) {
+    throw new Error(logError.message);
+  }
+
+  return {
+    success: true,
+    message: `Đã điều chỉnh ${delta > 0 ? `+${delta}` : delta} điểm cho người dùng ${user.name || user.email} (Điểm mới: ${newScore}).`,
+    userId: targetUserId,
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role
+    },
+    oldScore,
+    newScore,
+    pointChange: delta,
+    reason: trimmedReason
   };
 };
 
@@ -831,5 +937,6 @@ module.exports = {
   reverseReportPenalty,
   getUserTrustScoreLogs,
   getAdminTrustScoreLogs,
-  getTrustScoreStats
+  getTrustScoreStats,
+  adjustTrustScoreManually
 };

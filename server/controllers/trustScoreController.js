@@ -56,10 +56,36 @@ const getAdminLogs = async (req, res) => {
   }
 };
 
+const adjustTrustScoreManually = async (req, res) => {
+  try {
+    const adminId = req.user.id;
+    const { userId, email, pointChange, reason, relatedPropertyId, relatedReportId } = req.body;
+
+    if ((!userId && !email) || pointChange === undefined || !reason) {
+      return res.status(400).json({ error: 'Vui lòng cung cấp Email (hoặc User ID), số điểm điều chỉnh và lý do.' });
+    }
+
+    const result = await trustScoreService.adjustTrustScoreManually({
+      userId,
+      email,
+      adminId,
+      pointChange: Number(pointChange),
+      reason,
+      relatedPropertyId,
+      relatedReportId
+    });
+
+    res.status(200).json(result);
+  } catch (error) {
+    res.status(400).json({ error: error.message || 'Lỗi điều chỉnh điểm uy tín' });
+  }
+};
+
 module.exports = {
   getBonusTasksStatus,
   checkProfileCompleted,
   checkThirtyDaysClean,
   getMyLogs,
-  getAdminLogs
+  getAdminLogs,
+  adjustTrustScoreManually
 };

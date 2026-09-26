@@ -20,4 +20,7 @@ router.post('/properties/:propertyId/unhide', rateLimiters.write, adminControlle
 // API Tra cứu Audit Log Biến động điểm uy tín (Trust Score Audit Logs)
 router.get('/trust-score-logs', rateLimiters.read, trustScoreController.getAdminLogs);
 
+// API Can thiệp / Điều chỉnh điểm uy tín thủ công (Admin Manual Trust Score Adjustment)
+router.post('/trust-score/adjust', rateLimiters.write, trustScoreController.adjustTrustScoreManually);
+
 module.exports = router;
