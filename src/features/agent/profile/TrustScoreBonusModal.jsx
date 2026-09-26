@@ -157,6 +157,41 @@ const TrustScoreBonusModal = ({
     }
   };
 
+  const handleClaimKycBonus = async () => {
+    try {
+      setActionLoading('KYC_VERIFIED');
+      setNotification(null);
+      const res = await apiFetch(`${API_BASE_URL}/api/trust-score/kyc-completed/check`, {
+        method: 'POST'
+      });
+      const result = await res.json();
+
+      if (res.ok && result.applied) {
+        setNotification({
+          type: 'success',
+          message: `🎉 Chúc mừng! Bạn nhận được +20 điểm tín nhiệm cho nhiệm vụ Xác thực định danh (KYC)!`
+        });
+        if (result.trustScore !== undefined) {
+          updateUser({ trust_score: result.trustScore });
+          if (onScoreUpdated) onScoreUpdated(result.trustScore);
+        }
+        await fetchBonusStatus();
+      } else {
+        setNotification({
+          type: 'info',
+          message: result.message || 'Không thể nhận thưởng KYC lúc này.'
+        });
+      }
+    } catch (err) {
+      setNotification({
+        type: 'error',
+        message: err.message || 'Lỗi kết nối khi nhận thưởng.'
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const currentScore = data?.trustScore ?? Number(currentUser?.trust_score ?? 50);
 
   let scoreTier = 'Bình thường';
@@ -415,7 +450,7 @@ const TrustScoreBonusModal = ({
               </div>
 
               {/* TASK 3: KYC VERIFICATION */}
-              <div className={`trust-task-card ${kycTask?.claimed ? 'claimed' : ''}`}>
+              <div className={`trust-task-card ${kycTask?.claimed ? 'claimed' : kycTask?.eligible ? 'eligible' : ''}`}>
                 <div className="trust-task-header">
                   <div className="trust-task-icon-wrapper">
                     <ShieldCheck size={20} />
@@ -435,8 +470,27 @@ const TrustScoreBonusModal = ({
                   {kycTask?.claimed ? (
                     <div className="trust-claimed-badge">
                       <CheckCircle2 size={16} />
-                      <span>Đã xác thực (+20đ)</span>
+                      <span>Đã nhận thưởng (+20đ)</span>
                     </div>
+                  ) : kycTask?.eligible ? (
+                    <button
+                      type="button"
+                      className="trust-claim-btn"
+                      onClick={handleClaimKycBonus}
+                      disabled={actionLoading === 'KYC_VERIFIED'}
+                    >
+                      {actionLoading === 'KYC_VERIFIED' ? (
+                        <>
+                          <RefreshCw size={14} className="spin-icon" />
+                          <span>Đang nhận...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles size={15} />
+                          <span>Nhận thưởng (+20đ)</span>
+                        </>
+                      )}
+                    </button>
                   ) : kycTask?.isPending ? (
                     <div className="trust-pending-badge">
                       <Clock size={16} />

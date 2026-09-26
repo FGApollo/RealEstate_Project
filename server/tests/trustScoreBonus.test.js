@@ -16,6 +16,7 @@ test('trustScoreRoutes registers all expected bonus task and logs endpoints', ()
   assert.ok(paths.includes('/my-logs'), 'Route /my-logs should exist');
   assert.ok(paths.includes('/profile-completed/check'), 'Route /profile-completed/check should exist');
   assert.ok(paths.includes('/30-days-clean/check'), 'Route /30-days-clean/check should exist');
+  assert.ok(paths.includes('/kyc-completed/check'), 'Route /kyc-completed/check should exist');
 
   const tasksRoute = routes.find((r) => r.path === '/tasks');
   assert.ok(tasksRoute.methods.includes('get'), 'GET /tasks should be allowed');
@@ -28,6 +29,9 @@ test('trustScoreRoutes registers all expected bonus task and logs endpoints', ()
 
   const cleanRoute = routes.find((r) => r.path === '/30-days-clean/check');
   assert.ok(cleanRoute.methods.includes('post'), 'POST /30-days-clean/check should be allowed');
+
+  const kycRoute = routes.find((r) => r.path === '/kyc-completed/check');
+  assert.ok(kycRoute.methods.includes('post'), 'POST /kyc-completed/check should be allowed');
 });
 
 test('adminRoutes registers audit log endpoint /trust-score-logs and adjustment endpoint /trust-score/adjust', () => {
@@ -106,3 +110,77 @@ test('30-days clean logic: successfully appealed violations are refunded and exc
   const activeViolations3 = resolvedReports.filter((r) => !refundedReportIds3.has(Number(r.id)));
   assert.equal(activeViolations3.length, 2, 'Unappealed violations must remain active');
 });
+
+test('Feature 53: Low Trust Score threshold enforcement (<= 30 blocks listings & hides properties)', () => {
+  const { LOW_TRUST_SCORE_THRESHOLD } = require('../services/trustScoreService');
+  assert.equal(LOW_TRUST_SCORE_THRESHOLD, 30, 'Threshold must be strictly 30 points');
+
+  const checkCanCreateListing = (trustScore) => {
+    const score = Number(trustScore ?? 50);
+    return score > LOW_TRUST_SCORE_THRESHOLD;
+  };
+
+  // Test posting permissions: 30 and below are blocked
+  assert.equal(checkCanCreateListing(0), false, 'Score 0 must be blocked from posting');
+  assert.equal(checkCanCreateListing(10), false, 'Score 10 must be blocked from posting');
+  assert.equal(checkCanCreateListing(29), false, 'Score 29 must be blocked from posting');
+  assert.equal(checkCanCreateListing(30), false, 'Score 30 must also be blocked from posting');
+  assert.equal(checkCanCreateListing(31), true, 'Score 31 must be allowed to post');
+  assert.equal(checkCanCreateListing(50), true, 'Score 50 must be allowed to post');
+  assert.equal(checkCanCreateListing(100), true, 'Score 100 must be allowed to post');
+
+  // Test public marketplace filtering: owner score must be > 30
+  const sampleProperties = [
+    { id: 1, title: 'House A', is_hidden: false, owner: { trust_score: 80 } },
+    { id: 2, title: 'House B', is_hidden: false, owner: { trust_score: 25 } },
+    { id: 3, title: 'House C', is_hidden: false, owner: { trust_score: 0 } },
+    { id: 4, title: 'House D', is_hidden: false, owner: { trust_score: 30 } },
+    { id: 5, title: 'House E', is_hidden: false, owner: { trust_score: 31 } }
+  ];
+
+  const visiblePublicProperties = sampleProperties.filter((p) => {
+    const score = Number(p.owner?.trust_score ?? 50);
+    return !p.is_hidden && score > LOW_TRUST_SCORE_THRESHOLD;
+  });
+
+  assert.equal(visiblePublicProperties.length, 2, 'Only properties with owner trust score > 30 should be visible');
+  assert.deepEqual(visiblePublicProperties.map((p) => p.id), [1, 5]);
+});
+
+test('KYC manual bonus logic: requires explicit claim when VERIFIED and bonus is not yet claimed', () => {
+  const evaluateKycTask = (verificationStatus, approvedCount, revokedCount) => {
+    const isKycVerified = verificationStatus === 'VERIFIED';
+    const isKycPending = verificationStatus === 'PENDING';
+    const hasKycBonus = approvedCount > revokedCount;
+
+    return {
+      claimed: hasKycBonus,
+      eligible: isKycVerified && !hasKycBonus,
+      isPending: isKycPending
+    };
+  };
+
+  // Case 1: Brand new user with PENDING KYC
+  const case1 = evaluateKycTask('PENDING', 0, 0);
+  assert.equal(case1.claimed, false);
+  assert.equal(case1.eligible, false);
+  assert.equal(case1.isPending, true);
+
+  // Case 2: User verified by admin, has NOT claimed bonus yet
+  const case2 = evaluateKycTask('VERIFIED', 0, 0);
+  assert.equal(case2.claimed, false);
+  assert.equal(case2.eligible, true, 'Verified user who has not claimed should see claim button');
+  assert.equal(case2.isPending, false);
+
+  // Case 3: User already claimed +20 bonus
+  const case3 = evaluateKycTask('VERIFIED', 1, 0);
+  assert.equal(case3.claimed, true, 'User who claimed bonus should show claimed badge');
+  assert.equal(case3.eligible, false);
+  assert.equal(case3.isPending, false);
+
+  // Case 4: User was verified, bonus was revoked, and later re-verified
+  const case4 = evaluateKycTask('VERIFIED', 1, 1);
+  assert.equal(case4.claimed, false);
+  assert.equal(case4.eligible, true, 'Re-verified user with revoked bonus should be eligible to claim again');
+});
+

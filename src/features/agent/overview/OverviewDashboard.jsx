@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { 
   Home, Eye, Heart, ChevronRight, Plus, SlidersHorizontal, 
   MapPin, Bed, Bath, Maximize, ShieldAlert, ShieldCheck, Search,
-  Edit3, Trash2, ExternalLink, X
+  Edit3, Trash2, ExternalLink, X, Lock, EyeOff
 } from 'lucide-react';
 import PropertyDetailModal from '../../../components/PropertyDetailModal';
 import DeleteConfirmModal from './DeleteConfirmModal';
@@ -481,21 +481,59 @@ const OverviewDashboard = ({
 
           {/* Listings cards grid */}
           <div className="listings-grid-layout">
-            <div 
-              className="listing-card dashed-create-card"
-              onClick={() => setActiveTab('create-listing')}
-            >
-              <div className="dashed-create-content">
-                <div className="dashed-plus-icon">
-                  <Plus size={32} />
+            {Number(currentUser?.trust_score ?? 50) <= 30 ? (
+              <div 
+                className="listing-card dashed-create-card disabled-locked"
+                onClick={() => alert(`Quyền đăng tin của bạn đang bị khóa do điểm uy tín hiện tại là ${currentUser?.trust_score ?? 0} (từ 30 điểm trở xuống).\nBạn cần đạt tối thiểu từ 31 điểm trở lên để mở lại quyền đăng bài.\nVui lòng giải quyết khiếu nại hoặc thực hiện nhiệm vụ phục hồi điểm uy tín.`)}
+                title="Quyền đăng tin bị khóa do điểm uy tín <= 30"
+                style={{ cursor: 'not-allowed', borderColor: '#fca5a5', backgroundColor: '#fef2f2' }}
+              >
+                <div className="dashed-create-content">
+                  <div className="dashed-plus-icon locked" style={{ backgroundColor: '#fee2e2', color: '#dc2626' }}>
+                    <Lock size={32} />
+                  </div>
+                  <h3 style={{ color: '#dc2626' }}>Đăng tin mới (Đã khóa)</h3>
+                  <p style={{ color: '#991b1b' }}>Điểm uy tín hiện tại &le; 30. Cần đạt từ 31 điểm để mở lại.</p>
                 </div>
-                <h3>Tạo tin đăng mới</h3>
-                <p>Đăng tải bất động sản của bạn lên hệ thống</p>
               </div>
-            </div>
+            ) : (
+              <div 
+                className="listing-card dashed-create-card"
+                onClick={() => setActiveTab('create-listing')}
+              >
+                <div className="dashed-create-content">
+                  <div className="dashed-plus-icon">
+                    <Plus size={32} />
+                  </div>
+                  <h3>Tạo tin đăng mới</h3>
+                  <p>Đăng tải bất động sản của bạn lên hệ thống</p>
+                </div>
+              </div>
+            )}
 
             {paginatedListings.map(listing => (
               <div key={listing.id} className="listing-card property-card">
+                {/* Status Badges */}
+                {listing.is_hidden && (
+                  <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 3 }}>
+                    <span style={{
+                      backgroundColor: 'rgba(220, 38, 38, 0.92)',
+                      backdropFilter: 'blur(4px)',
+                      color: '#ffffff',
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      padding: '4px 8px',
+                      borderRadius: '6px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.2)'
+                    }} title="Tin đăng đang bị ẩn khỏi sàn do chế tài điểm uy tín hoặc vi phạm">
+                      <EyeOff size={12} /> Đang bị ẩn
+                    </span>
+                  </div>
+                )}
+
                 {/* Full-image background */}
                 <img 
                   src={listing.thumbnail || 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800&q=80'} 

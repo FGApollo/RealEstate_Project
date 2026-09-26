@@ -1221,3 +1221,115 @@
 .cta-pill-btn:hover {
   background-color: #1e40af;
 }
+
+/* FEATURE 53: LOW TRUST SCORE BLOCKED VIEW */
+.agent-low-score-blocked-card {
+  background: #ffffff;
+  border-radius: 20px;
+  border: 1.5px solid #fecaca;
+  padding: 48px 36px;
+  max-width: 640px;
+  margin: 40px auto;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(220, 38, 38, 0.08);
+}
+
+.blocked-icon-circle {
+  width: 76px;
+  height: 76px;
+  background-color: #fee2e2;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px auto;
+}
+
+.agent-low-score-blocked-card h2 {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #991b1b;
+  margin: 0 0 12px 0;
+}
+
+.blocked-desc {
+  font-size: 0.95rem;
+  color: #475569;
+  line-height: 1.6;
+  margin: 0 0 24px 0;
+}
+
+.blocked-notice-box {
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  padding: 16px 20px;
+  text-align: left;
+  margin-bottom: 28px;
+}
+
+.blocked-notice-box h4 {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #b91c1c;
+  margin: 0 0 8px 0;
+}
+
+.blocked-notice-box ul {
+  margin: 0;
+  padding-left: 20px;
+  color: #7f1d1d;
+  font-size: 0.88rem;
+  line-height: 1.6;
+}
+
+.blocked-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.btn-blocked-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border-radius: 12px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s ease;
+}
+
+.btn-blocked-action.primary {
+  background-color: #dc2626;
+  color: #ffffff;
+}
+
+.btn-blocked-action.primary:hover {
+  background-color: #b91c1c;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.25);
+}
+
+.btn-blocked-action.secondary {
+  background-color: #f1f5f9;
+  color: #334155;
+}
+
+.btn-blocked-action.secondary:hover {
+  background-color: #e2e8f0;
+}
+
+.btn-blocked-action.outline {
+  background: transparent;
+  color: #64748b;
+  border: 1px solid #cbd5e1;
+}
+
+.btn-blocked-action.outline:hover {
+  background-color: #f8fafc;
+  color: #1e293b;
+}
+

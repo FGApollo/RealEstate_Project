@@ -3,6 +3,7 @@ const { supabase } = require('../config/supabase');
 const DEFAULT_TRUST_SCORE = 50;
 const MIN_TRUST_SCORE = 0;
 const MAX_TRUST_SCORE = 100;
+const LOW_TRUST_SCORE_THRESHOLD = 30;
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
 const REPORT_PENALTIES = {
@@ -54,6 +55,78 @@ const getCurrentTrustScore = async (userId) => {
   return Number(user.trust_score ?? DEFAULT_TRUST_SCORE);
 };
 
+const enforceTrustScoreThresholds = async (userId, oldScore, newScore) => {
+  if (!userId) return;
+
+  // Case 1: Trust score drops to 30 or below (<= 30)
+  if (newScore <= LOW_TRUST_SCORE_THRESHOLD) {
+    const { error: hideError } = await supabase
+      .from('properties')
+      .update({ is_hidden: true })
+      .eq('owner_id', userId)
+      .or('is_hidden.is.null,is_hidden.eq.false');
+
+    if (hideError) {
+      console.error(`[Threshold Enforcement] Error auto-hiding properties for user ${userId}:`, hideError.message);
+    } else {
+      console.log(`[Threshold Enforcement] Auto-hid active properties for user ${userId} (Score: ${newScore} <= ${LOW_TRUST_SCORE_THRESHOLD}).`);
+    }
+  }
+
+  // Case 2: Trust score recovers back to strictly above 30 (> 30) from 30 or below
+  if (oldScore <= LOW_TRUST_SCORE_THRESHOLD && newScore > LOW_TRUST_SCORE_THRESHOLD) {
+    const { data: hiddenProps } = await supabase
+      .from('properties')
+      .select('id')
+      .eq('owner_id', userId)
+      .eq('is_hidden', true);
+
+    if (hiddenProps && hiddenProps.length > 0) {
+      const hiddenPropIds = hiddenProps.map((p) => p.id);
+
+      const { data: violatingReports } = await supabase
+        .from('property_reports')
+        .select('id, property_id')
+        .in('property_id', hiddenPropIds)
+        .eq('status', 'RESOLVED');
+
+      let activeViolatingPropIds = new Set();
+      if (violatingReports && violatingReports.length > 0) {
+        const reportIds = violatingReports.map((r) => r.id);
+        const { data: refundedLogs } = await supabase
+          .from('trust_score_logs')
+          .select('related_report_id')
+          .in('related_report_id', reportIds)
+          .eq('action', 'APPEAL_PENALTY_REFUND');
+
+        const refundedReportIds = new Set(
+          (refundedLogs || [])
+            .filter((l) => l.related_report_id != null)
+            .map((l) => Number(l.related_report_id))
+        );
+
+        activeViolatingPropIds = new Set(
+          violatingReports
+            .filter((r) => !refundedReportIds.has(Number(r.id)))
+            .map((r) => r.property_id)
+            .filter(Boolean)
+        );
+      }
+
+      const propsToUnhide = hiddenPropIds.filter((id) => !activeViolatingPropIds.has(id));
+
+      if (propsToUnhide.length > 0) {
+        await supabase
+          .from('properties')
+          .update({ is_hidden: false })
+          .in('id', propsToUnhide);
+
+        console.log(`[Threshold Enforcement] Restored ${propsToUnhide.length} properties for user ${userId} (Score recovered to ${newScore} > ${LOW_TRUST_SCORE_THRESHOLD}).`);
+      }
+    }
+  }
+};
+
 const updateTrustScore = async (userId, action, pointChange, reason, options = {}) => {
   const scoreDelta = Number(pointChange);
   if (!Number.isFinite(scoreDelta)) {
@@ -89,6 +162,9 @@ const updateTrustScore = async (userId, action, pointChange, reason, options = {
   if (logError) {
     throw new Error(logError.message);
   }
+
+  // Trigger low trust score threshold enforcement
+  await enforceTrustScoreThresholds(userId, oldScore, newScore);
 
   return newScore;
 };
@@ -245,6 +321,69 @@ const applyThirtyDaysNoViolationBonus = async (userId) => {
   );
 };
 
+const hasActiveKycBonus = async (userId) => {
+  const { data: approvedLogs, error: approvedError } = await supabase
+    .from('trust_score_logs')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('action', 'KYC_APPROVED');
+
+  if (approvedError) {
+    throw new Error(approvedError.message);
+  }
+
+  const { data: revokedLogs, error: revokedError } = await supabase
+    .from('trust_score_logs')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('action', 'KYC_REVOKED');
+
+  if (revokedError) {
+    throw new Error(revokedError.message);
+  }
+
+  const approvedCount = approvedLogs ? approvedLogs.length : 0;
+  const revokedCount = revokedLogs ? revokedLogs.length : 0;
+  return approvedCount > revokedCount;
+};
+
+const applyKycCompletenessBonus = async (userId) => {
+  const user = await getUserForTrustScore(userId, 'id, trust_score, verification_status');
+
+  if (user.verification_status !== 'VERIFIED') {
+    return {
+      success: true,
+      applied: false,
+      message: 'Tài khoản chưa hoàn tất xác thực định danh (KYC).',
+      trustScore: Number(user.trust_score ?? DEFAULT_TRUST_SCORE)
+    };
+  }
+
+  const hasActiveBonus = await hasActiveKycBonus(userId);
+  if (hasActiveBonus) {
+    return {
+      success: true,
+      applied: false,
+      message: 'Điểm thưởng xác thực KYC đã được nhận trước đó.',
+      trustScore: Number(user.trust_score ?? DEFAULT_TRUST_SCORE)
+    };
+  }
+
+  const trustScore = await updateTrustScore(
+    userId,
+    'KYC_APPROVED',
+    20,
+    'Xác thực định danh môi giới (KYC) thành công'
+  );
+
+  return {
+    success: true,
+    applied: true,
+    message: 'Nhận điểm thưởng KYC thành công (+20đ)',
+    trustScore
+  };
+};
+
 const getBonusTasksStatus = async (userId) => {
   const user = await getUserForTrustScore(
     userId,
@@ -285,7 +424,7 @@ const getBonusTasksStatus = async (userId) => {
       .in('property_id', propertyIds)
       .eq('status', 'RESOLVED');
 
-    if (resolvedReports && resolvedReports.length > 0) {
+  if (resolvedReports && resolvedReports.length > 0) {
       const reportIds = resolvedReports.map((r) => r.id);
       const { data: refundedLogs } = await supabase
         .from('trust_score_logs')
@@ -317,30 +456,10 @@ const getBonusTasksStatus = async (userId) => {
 
   const cleanEligible = isOldEnough && activeViolationsCount === 0 && !hasCleanBonus;
 
-  // 3. Task: KYC verification
+  // 3. Task: KYC verification (manual claim)
   const isKycVerified = user.verification_status === 'VERIFIED';
   const isKycPending = user.verification_status === 'PENDING';
-  let hasKycBonus = await hasActionLog(userId, 'KYC_APPROVED');
-
-  // If user is already VERIFIED in database but has not received the +20 bonus log yet
-  // (e.g. status was edited directly in DB, or verified prior to trust score system),
-  // automatically synchronize and grant the +20 bonus now!
-  if (isKycVerified && !hasKycBonus) {
-    try {
-      const bonusRes = await applyOneTimeBonus(
-        userId,
-        'KYC_APPROVED',
-        20,
-        'KYC/ID card verification approved'
-      );
-      if (bonusRes && bonusRes.applied) {
-        hasKycBonus = true;
-        user.trust_score = bonusRes.trustScore;
-      }
-    } catch (e) {
-      console.error('Failed to sync KYC bonus for verified user:', e);
-    }
-  }
+  const hasKycBonus = await hasActiveKycBonus(userId);
 
   return {
     trustScore: Number(user.trust_score ?? DEFAULT_TRUST_SCORE),
@@ -383,8 +502,8 @@ const getBonusTasksStatus = async (userId) => {
         title: 'Xác thực định danh môi giới (KYC)',
         description: 'Xác minh CCCD/CMND để nâng cao uy tín với khách hàng và bảo mật tài khoản.',
         points: 20,
-        claimed: isKycVerified,
-        eligible: false,
+        claimed: hasKycBonus,
+        eligible: isKycVerified && !hasKycBonus,
         isPending: isKycPending,
         status: user.verification_status
       }
@@ -731,6 +850,9 @@ const adjustTrustScoreManually = async ({
     throw new Error(logError.message);
   }
 
+  // Trigger low trust score threshold enforcement
+  await enforceTrustScoreThresholds(targetUserId, oldScore, newScore);
+
   return {
     success: true,
     message: `Đã điều chỉnh ${delta > 0 ? `+${delta}` : delta} điểm cho người dùng ${user.name || user.email} (Điểm mới: ${newScore}).`,
@@ -931,6 +1053,8 @@ module.exports = {
   applyOneTimeBonus,
   applyProfileCompletenessBonus,
   applyThirtyDaysNoViolationBonus,
+  hasActiveKycBonus,
+  applyKycCompletenessBonus,
   getBonusTasksStatus,
   applyReportPenalty,
   applyPropertyHiddenPenalty,
@@ -938,5 +1062,7 @@ module.exports = {
   getUserTrustScoreLogs,
   getAdminTrustScoreLogs,
   getTrustScoreStats,
-  adjustTrustScoreManually
+  adjustTrustScoreManually,
+  LOW_TRUST_SCORE_THRESHOLD,
+  enforceTrustScoreThresholds
 };

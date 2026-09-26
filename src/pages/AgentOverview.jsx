@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import {
   Home, Search, LayoutDashboard, Settings, LogOut, BarChart2, HelpCircle, MessageSquare, Shield,
-  User, Star, CreditCard, Scale
+  User, Star, CreditCard, Scale, ShieldAlert
 } from 'lucide-react';
 import OverviewDashboard from '../features/agent/overview/OverviewDashboard';
 import CreateListingWizard from '../features/agent/create-listing/CreateListingWizard';
@@ -243,6 +243,37 @@ const AgentOverview = () => {
         )}
 
         <div className="dashboard-content">
+          {/* LOW TRUST SCORE WARNING & SUSPENSION BANNER (<= 30) */}
+          {Number(currentUser?.trust_score ?? 50) <= 30 && (
+            <div className="agent-low-score-alert-banner">
+              <div className="alert-banner-icon">
+                <ShieldAlert size={28} />
+              </div>
+              <div className="alert-banner-content">
+                <div className="alert-banner-title">
+                  Tài khoản đang bị tạm đình chỉ đăng tin (Điểm uy tín: {currentUser?.trust_score ?? 0} / 100 điểm)
+                </div>
+                <div className="alert-banner-desc">
+                  Điểm tín nhiệm của bạn đang ở mức <strong>từ 30 điểm trở xuống</strong>. Hệ thống đã <strong>tự động tạm ẩn toàn bộ tin đăng</strong> của bạn trên sàn và <strong>tạm khóa quyền đăng tin mới</strong>. Bạn cần đạt từ 31 điểm trở lên để được khôi phục quyền hoạt động.
+                </div>
+                <div className="alert-banner-actions">
+                  <button
+                    className="alert-banner-btn primary"
+                    onClick={() => handleTabChange('violations')}
+                  >
+                    Xem Vi phạm & Gửi khiếu nại
+                  </button>
+                  <button
+                    className="alert-banner-btn secondary"
+                    onClick={() => handleTabChange('profile')}
+                  >
+                    Nhiệm vụ phục hồi điểm uy tín
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* TAB 1 & 2: OVERVIEW / LISTINGS */}
           {(activeTab === 'overview' || activeTab === 'listings') && (
             <OverviewDashboard

@@ -33,6 +33,17 @@ const checkThirtyDaysClean = async (req, res) => {
   }
 };
 
+const checkKycCompleted = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const result = await trustScoreService.applyKycCompletenessBonus(userId);
+    res.status(200).json(result);
+  } catch (error) {
+    res.status(400).json({ error: error.message || 'Failed to claim KYC bonus' });
+  }
+};
+
 const getMyLogs = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -85,6 +96,7 @@ module.exports = {
   getBonusTasksStatus,
   checkProfileCompleted,
   checkThirtyDaysClean,
+  checkKycCompleted,
   getMyLogs,
   getAdminLogs,
   adjustTrustScoreManually

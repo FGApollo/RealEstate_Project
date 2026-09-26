@@ -375,17 +375,12 @@ const approveVerification = async (adminId, verificationId) => {
     throw new Error(userError.message || 'Failed to update user verification status');
   }
 
-  let trustScore;
-  try {
-    trustScore = await applyKycApprovedTrustScore(verification.user_id);
-  } catch (error) {
-    trustScore = {
-      applied: false,
-      action: TRUST_ACTION_KYC_APPROVED,
-      skipped: true,
-      error: error.message || 'Failed to apply trust score bonus'
-    };
-  }
+  // Note: Trust score bonus (+20đ) is claimed manually by the user, not granted automatically
+  const trustScore = {
+    applied: false,
+    action: TRUST_ACTION_KYC_APPROVED,
+    reason: 'Manual claim required'
+  };
 
   return {
     message: 'KYC verification approved successfully',
