@@ -243,7 +243,7 @@ const getAdminAppeals = async (status) => {
   return { appeals: formattedAppeals };
 };
 
-const approveAppeal = async (appealId, adminId, adminNote = '') => {
+const approveAppeal = async (appealId, adminId, adminNote = '', customRefundPoints = null) => {
   if (!appealId || !adminId) {
     const error = new Error('Thiếu thông tin appealId hoặc adminId.');
     error.statusCode = 400;
@@ -269,11 +269,12 @@ const approveAppeal = async (appealId, adminId, adminNote = '') => {
     throw error;
   }
 
-  // 2. Reverse report penalty & unhide property
+  // 2. Reverse report penalty & unhide property (with optional custom refund points)
   const refundResult = await trustScoreService.reverseReportPenalty(
     appeal.report_id,
     adminId,
-    adminNote || 'Chấp thuận khiếu nại vi phạm'
+    adminNote || 'Chấp thuận khiếu nại vi phạm',
+    customRefundPoints
   );
 
   // 3. Update appeal status

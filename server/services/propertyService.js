@@ -135,7 +135,12 @@ const getProperties = async () => {
   if (error) {
     throw new Error(error.message);
   }
-  return data;
+
+  // Filter out any properties whose owner trust_score is 30 or below (<= 30)
+  return (data || []).filter((p) => {
+    const ownerScore = Number(p.owner?.trust_score ?? 50);
+    return ownerScore > 30;
+  });
 };
 
 const createProperty = async (propertyData) => {
@@ -167,15 +172,24 @@ const createProperty = async (propertyData) => {
 
   console.log('createProperty service called. Title:', title);
   
-  // Verify owner is an AGENT
+  // Verify owner is an AGENT with adequate trust score (> 30)
   const { data: ownerUser, error: ownerError } = await supabase
     .from('users')
-    .select('role')
+    .select('role, trust_score')
     .eq('id', owner_id)
     .single();
 
   if (ownerError || !ownerUser || ownerUser.role !== 'AGENT') {
-    throw new Error('Chỉ tài khoản có vai trò Môi giới (AGENT) mới có quyền đăng tin.');
+    const err = new Error('Chỉ tài khoản có vai trò Môi giới (AGENT) mới có quyền đăng tin.');
+    err.statusCode = 403;
+    throw err;
+  }
+
+  const currentTrustScore = Number(ownerUser.trust_score ?? 50);
+  if (currentTrustScore <= 30) {
+    const err = new Error(`Điểm uy tín hiện tại của bạn là ${currentTrustScore} (từ 30 điểm trở xuống). Quyền đăng tin mới đã bị tạm đình chỉ do vi phạm quy định sàn. Bạn cần đạt từ 31 điểm trở lên để được mở lại quyền đăng bài.`);
+    err.statusCode = 403;
+    throw err;
   }
 
   console.log('thumbnail input length:', thumbnail ? thumbnail.length : 'empty');

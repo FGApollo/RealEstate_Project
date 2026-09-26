@@ -49,10 +49,15 @@ const getAdminAppeals = async (req, res) => {
 const approveAppeal = async (req, res) => {
   const { appealId } = req.params;
   const adminId = req.user.id;
-  const { adminNote } = req.body;
+  const { adminNote, customRefundPoints } = req.body;
 
   try {
-    const result = await appealService.approveAppeal(Number(appealId), adminId, adminNote);
+    const result = await appealService.approveAppeal(
+      Number(appealId),
+      adminId,
+      adminNote,
+      customRefundPoints
+    );
     return res.status(200).json(result);
   } catch (error) {
     console.error('Error in approveAppeal controller:', error);

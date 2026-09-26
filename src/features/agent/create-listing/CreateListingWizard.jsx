@@ -3,7 +3,8 @@ import {
   Car, Shield, Armchair, Waves, Dumbbell, Cctv, Cat, Bed, Bath, 
   Maximize, Globe, Lock, ArrowLeft, ArrowRight, CheckCircle2, 
   Megaphone, Info, ShieldCheck, Trash2, Image as ImageIcon, CheckCircle,
-  LayoutDashboard, Compass, Home, SlidersHorizontal, Send
+  LayoutDashboard, Compass, Home, SlidersHorizontal, Send, ShieldAlert,
+  Scale, Award
 } from 'lucide-react';
 import './CreateListingWizard.css';
 import useListingForm from './useListingForm';
@@ -27,6 +28,8 @@ const amenitiesList = [
 
 // ponytail: create-only wizard — edit logic lives in EditListingWizard
 const CreateListingWizard = ({ setActiveTab, setData, currentUser }) => {
+  const currentTrustScore = Number(currentUser?.trust_score ?? 50);
+
   const {
     listing, setListing,
     currentStep, setCurrentStep,
@@ -47,6 +50,41 @@ const CreateListingWizard = ({ setActiveTab, setData, currentUser }) => {
     setData,
     onSuccess: () => setActiveTab('listings')
   });
+
+  // Guard: If trust score is 30 or below (<= 30), block creation completely
+  if (currentTrustScore <= 30) {
+    return (
+      <div className="create-flow-container">
+        <div className="agent-low-score-blocked-card">
+          <div className="blocked-icon-circle">
+            <ShieldAlert size={44} color="#dc2626" />
+          </div>
+          <h2>Quyền đăng tin mới đã bị tạm đình chỉ</h2>
+          <p className="blocked-desc">
+            Điểm tín nhiệm hiện tại của bạn là <strong>{currentTrustScore} / 100 điểm</strong> (từ 30 điểm trở xuống). Hệ thống đã tự động khóa quyền đăng bài mới. Bạn cần đạt từ 31 điểm trở lên để được mở lại.
+          </p>
+          <div className="blocked-notice-box">
+            <h4>Chế tài đang được kích hoạt:</h4>
+            <ul>
+              <li>Toàn bộ tin đăng hiện tại của bạn đã được tự động tạm ẩn khỏi sàn công khai.</li>
+              <li>Tạm đình chỉ quyền tạo và đăng tải bất động sản mới.</li>
+            </ul>
+          </div>
+          <div className="blocked-actions">
+            <button className="btn-blocked-action primary" onClick={() => setActiveTab('violations')}>
+              <Scale size={16} /> Xem Lịch sử Vi phạm & Khiếu nại
+            </button>
+            <button className="btn-blocked-action secondary" onClick={() => setActiveTab('profile')}>
+              <Award size={16} /> Thực hiện Nhiệm vụ Phục hồi Điểm Uy tín
+            </button>
+            <button className="btn-blocked-action outline" onClick={() => setActiveTab('listings')}>
+              <ArrowLeft size={16} /> Quay lại danh sách bất động sản
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="create-flow-container">

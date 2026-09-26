@@ -43,8 +43,8 @@ const createProperty = async (req, res) => {
     const property = await propertyService.createProperty({ ...req.body, owner_id: req.user.id });
     res.status(201).json({ success: true, property });
   } catch (error) {
-    console.error('Error creating property:', error);
-    res.status(500).json({ error: error.message || 'Internal server error' });
+    if (!error.statusCode || error.statusCode >= 500) console.error('Error creating property:', error);
+    res.status(error.statusCode || 500).json({ error: error.message || 'Internal server error' });
   }
 };
 

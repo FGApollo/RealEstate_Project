@@ -454,14 +454,7 @@ const approveVerification = async (userId, verificationId, selfieUrl) => {
 
   await updateUserVerificationStatus(userId, VERIFIED_STATUS);
 
-  if (currentUser.verification_status !== VERIFIED_STATUS) {
-    await trustScoreService.applyOneTimeBonus(
-      userId,
-      'KYC_APPROVED',
-      20,
-      'KYC/ID card verification approved'
-    );
-  }
+  // Note: Trust score bonus (+20đ) is claimed manually by the user, not granted automatically
 };
 
 const uploadSelfie = async ({ userId, selfieImage }) => {
