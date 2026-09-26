@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-const saveBase64Image = (base64Str) => {
+const saveBase64Image = async (base64Str) => {
   const isPlaceholder = !base64Str || base64Str === 'https://via.placeholder.com/400';
   
   if (isPlaceholder) {
@@ -28,10 +28,36 @@ const saveBase64Image = (base64Str) => {
     const imageType = matches[1];
     const base64Data = matches[2];
     const buffer = Buffer.from(base64Data, 'base64');
-
     const filename = `${crypto.randomUUID()}.${imageType}`;
+
+    // 1. Try Supabase Storage 'property-images' bucket under 'reviews/' folder
+    try {
+      const BUCKET = 'property-images';
+      const filePath = `reviews/${filename}`;
+      const { error: uploadError } = await supabase.storage
+        .from(BUCKET)
+        .upload(filePath, buffer, {
+          contentType: `image/${imageType}`,
+          upsert: true
+        });
+
+      if (!uploadError) {
+        const { data: urlData } = supabase.storage
+          .from(BUCKET)
+          .getPublicUrl(filePath);
+        if (urlData?.publicUrl) {
+          console.log('Successfully uploaded review image to Supabase Storage:', urlData.publicUrl);
+          return urlData.publicUrl;
+        }
+      } else {
+        console.warn('Supabase review image upload failed, falling back to local file storage:', uploadError.message);
+      }
+    } catch (storageErr) {
+      console.warn('Supabase review storage error:', storageErr.message);
+    }
+
+    // 2. Local fallback
     const uploadDir = path.join(__dirname, '../public/uploads');
-    
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
@@ -189,9 +215,10 @@ const createPropertyReview = async (propertyId, userId, rating, comment, images 
 
   // 5. Insert review images if provided
   if (images && images.length > 0) {
-    const imageRecords = images.map((img, index) => ({
+    const savedUrls = await Promise.all(images.map((img) => saveBase64Image(img)));
+    const imageRecords = savedUrls.map((url, index) => ({
       review_id: review.id,
-      image_url: saveBase64Image(img),
+      image_url: url,
       sort_order: index
     }));
 

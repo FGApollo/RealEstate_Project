@@ -350,9 +350,24 @@ const AgentViolations = ({ currentUser }) => {
                           <strong>Giải trình của bạn:</strong> {appeal.reason}
                         </p>
                         {(() => {
-                          const evUrls = appeal.evidence_urls && appeal.evidence_urls.length > 0
-                            ? appeal.evidence_urls
-                            : (appeal.evidence_url ? (appeal.evidence_url.startsWith('[') ? (() => { try { return JSON.parse(appeal.evidence_url); } catch(e) { return [appeal.evidence_url]; } })() : [appeal.evidence_url]) : []);
+                          let evUrls = [];
+                          if (Array.isArray(appeal.evidence_urls) && appeal.evidence_urls.length > 0) {
+                            evUrls = appeal.evidence_urls.filter(Boolean);
+                          } else if (Array.isArray(appeal.evidence_url)) {
+                            evUrls = appeal.evidence_url.filter(Boolean);
+                          } else if (typeof appeal.evidence_url === 'string') {
+                            const trimmed = appeal.evidence_url.trim();
+                            if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+                              try {
+                                const parsed = JSON.parse(trimmed);
+                                if (Array.isArray(parsed)) evUrls = parsed.filter(Boolean);
+                              } catch (e) {
+                                evUrls = [trimmed];
+                              }
+                            } else if (trimmed) {
+                              evUrls = [trimmed];
+                            }
+                          }
                           if (evUrls.length === 0) return null;
                           return (
                             <div className="v-submitted-evidence-box">
