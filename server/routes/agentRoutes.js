@@ -9,6 +9,7 @@ router.use(authenticate, requireRole('AGENT', 'ADMIN'));
 router.get('/overview', rateLimiters.read, agentController.getOverview);
 router.get('/reviews', rateLimiters.read, agentController.getAgentReviews);
 router.post('/reviews/:reviewId/reply', rateLimiters.write, agentController.replyToReview);
+router.post('/reviews/:reviewId/helpful', rateLimiters.write, agentController.toggleReviewHelpful);
 
 module.exports = router;
 

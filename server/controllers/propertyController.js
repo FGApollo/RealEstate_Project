@@ -89,7 +89,8 @@ const deleteProperty = async (req, res) => {
 const getPropertyReviews = async (req, res) => {
   try {
     const { id } = req.params;
-    const reviews = await reviewService.getPropertyReviews(id);
+    const currentUserId = req.user ? req.user.id : null;
+    const reviews = await reviewService.getPropertyReviews(id, currentUserId);
     res.status(200).json({ reviews });
   } catch (error) {
     console.error('Error fetching property reviews:', error);
@@ -175,6 +176,18 @@ const createReviewReply = async (req, res) => {
   }
 };
 
+const toggleReviewHelpful = async (req, res) => {
+  try {
+    const { reviewId } = req.params;
+    const userId = req.user.id;
+    const result = await reviewService.toggleReviewHelpful(reviewId, userId);
+    res.status(200).json(result);
+  } catch (error) {
+    console.error('Error toggling review helpful vote:', error);
+    res.status(error.statusCode || 500).json({ error: error.message || 'Internal server error' });
+  }
+};
+
 module.exports = {
   MAX_PROPERTY_IMAGE_COUNT,
   MAX_PROPERTY_IMAGE_BYTES,
@@ -186,6 +199,7 @@ module.exports = {
   getPropertyReviews,
   createPropertyReview,
   createReviewReply,
+  toggleReviewHelpful,
   checkBeforeSave,
   getSimilarProperties
 };

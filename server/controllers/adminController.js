@@ -24,14 +24,17 @@ const updateReviewStatus = async (req, res) => {
   const { reviewId } = req.params;
   const { status } = req.body;
 
-  if (!['APPROVED', 'REJECTED', 'REMOVED'].includes(status)) {
-    return res.status(400).json({ error: 'Trạng thái đánh giá không hợp lệ (APPROVED, REJECTED, REMOVED)' });
+  let normalizedStatus = (status || '').toUpperCase();
+  if (normalizedStatus === 'REMOVED') normalizedStatus = 'HIDDEN';
+
+  if (!['APPROVED', 'REJECTED', 'HIDDEN', 'PENDING'].includes(normalizedStatus)) {
+    return res.status(400).json({ error: 'Trạng thái đánh giá không hợp lệ (APPROVED, REJECTED, HIDDEN, PENDING)' });
   }
 
   try {
     const { data: updatedReview, error } = await supabase
       .from('property_reviews')
-      .update({ status })
+      .update({ status: normalizedStatus })
       .eq('id', reviewId)
       .select()
       .single();
