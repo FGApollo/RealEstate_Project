@@ -342,7 +342,7 @@ const applyReportPenalty = async (reportId, adminId) => {
   };
 };
 
-const applyPropertyHiddenPenalty = async (propertyId, adminId) => {
+const applyPropertyHiddenPenalty = async (propertyId, adminId, shouldPenalize = true) => {
   const property = await getPropertyById(propertyId);
 
   if (property.is_hidden === true) {
@@ -362,21 +362,26 @@ const applyPropertyHiddenPenalty = async (propertyId, adminId) => {
     throw new Error(propertyUpdateError.message);
   }
 
-  const trustScore = await updateTrustScore(
-    property.owner_id,
-    'PROPERTY_HIDDEN_BY_ADMIN',
-    -15,
-    'Property hidden by admin',
-    {
-      related_property_id: propertyId,
-      handled_by: adminId
-    }
-  );
+  let trustScore = null;
+  if (shouldPenalize) {
+    trustScore = await updateTrustScore(
+      property.owner_id,
+      'PROPERTY_HIDDEN_BY_ADMIN',
+      -15,
+      'Property hidden by admin',
+      {
+        related_property_id: propertyId,
+        handled_by: adminId
+      }
+    );
+  }
 
   return {
     success: true,
     applied: true,
-    message: 'Property hidden and trust score penalty applied',
+    message: shouldPenalize
+      ? 'Property hidden and trust score penalty applied'
+      : 'Property hidden successfully',
     trustScore,
     propertyId,
     ownerId: property.owner_id

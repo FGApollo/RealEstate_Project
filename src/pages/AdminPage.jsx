@@ -276,7 +276,7 @@ const AdminPage = () => {
     if (!rep) return;
     const reasonInfo = REASON_LABELS[rep.reason] || { label: rep.reason, penalty: 0 };
 
-    if (!window.confirm(`XÁC NHẬN VI PHẠM:\nBạn có chắc chắn báo cáo "${reasonInfo.label}" là ĐÚNG?\nChủ bài đăng sẽ bị trừ ${reasonInfo.penalty} điểm Trust Score và ghi lịch sử.`)) {
+    if (!window.confirm(`XÁC NHẬN VI PHẠM & ẨN BÀI ĐĂNG:\nBạn có chắc chắn báo cáo "${reasonInfo.label}" là ĐÚNG?\nHệ thống sẽ:\n1. Xác nhận báo cáo RESOLVED và phạt ${reasonInfo.penalty} điểm Trust Score theo quy định (${reasonInfo.label}).\n2. Tự động ẨN BÀI ĐĂNG khỏi sàn để bảo vệ người xem tin.`)) {
       return;
     }
 
@@ -296,6 +296,35 @@ const AdminPage = () => {
       }
     } catch (err) {
       console.error('Lỗi duyệt report:', err);
+      alert('Lỗi kết nối máy chủ');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+
+  // Handle Direct Unhide Property (Khôi phục hiển thị tin vi phạm)
+  const handleDirectUnhideProperty = async (propertyId) => {
+    if (!propertyId) return;
+    if (!window.confirm('Bạn có chắc chắn muốn KHÔI PHỤC hiển thị bài đăng này? Bài đăng sẽ lại xuất hiện công khai trên sàn.')) {
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/api/admin/properties/${propertyId}/unhide`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert(data.message || 'Đã mở khóa hiển thị bài đăng thành công!');
+        fetchReports();
+      } else {
+        alert(data.error || 'Mở khóa thất bại');
+      }
+    } catch (err) {
+      console.error('Lỗi khi mở khóa bài đăng:', err);
       alert('Lỗi kết nối máy chủ');
     } finally {
       setActionLoading(false);
@@ -865,6 +894,42 @@ const AdminPage = () => {
                           <span className="admin-info-label">Trust Score của Owner</span>
                           <span className="admin-info-value" style={{ color: (selectedReport.property?.owner?.trust_score ?? 100) < 50 ? '#dc2626' : '#059669', fontWeight: 800 }}>
                             {selectedReport.property?.owner?.trust_score ?? 100} điểm
+                          </span>
+                        </div>
+                        <div className="admin-info-item" style={{ gridColumn: '1 / -1' }}>
+                          <span className="admin-info-label">Trạng thái bài đăng trên sàn:</span>
+                          <span className="admin-info-value" style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
+                            {selectedReport.property?.is_hidden ? (
+                              <>
+                                <span className="admin-card-badge admin-badge-rejected" style={{ margin: 0 }}>
+                                  ⛔ Đã ẩn khỏi sàn (is_hidden = true)
+                                </span>
+                                <button
+                                  style={{
+                                    backgroundColor: '#f0fdf4',
+                                    border: '1px solid #86efac',
+                                    color: '#16a34a',
+                                    borderRadius: 8,
+                                    padding: '4px 10px',
+                                    fontSize: '0.8rem',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 4
+                                  }}
+                                  onClick={() => handleDirectUnhideProperty(selectedReport.property_id)}
+                                  disabled={actionLoading}
+                                  title="Khôi phục hiển thị tin đăng trên sàn"
+                                >
+                                  <Eye size={14} /> Mở lại tin (Khôi phục hiển thị)
+                                </button>
+                              </>
+                            ) : (
+                              <span className="admin-card-badge admin-badge-approved" style={{ margin: 0 }}>
+                                ✓ Đang hiển thị công khai
+                              </span>
+                            )}
                           </span>
                         </div>
                       </div>

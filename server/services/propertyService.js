@@ -129,7 +129,8 @@ const getProperties = async () => {
       property_images(image_url),
       lifestyle_tags(tag_name),
       owner:users!owner_id(name, role, avatar, trust_score, created_at, verification_status)
-    `);
+    `)
+    .or('is_hidden.is.null,is_hidden.eq.false');
 
   if (error) {
     throw new Error(error.message);
@@ -548,7 +549,8 @@ const getSimilarProperties = async (propertyId) => {
       lifestyle_tags(tag_name),
       owner:users!owner_id(name, role, avatar, trust_score, created_at)
     `)
-    .in('id', similarIds);
+    .in('id', similarIds)
+    .or('is_hidden.is.null,is_hidden.eq.false');
 
   if (propsError) {
     console.error('Error fetching similar properties details:', propsError);
