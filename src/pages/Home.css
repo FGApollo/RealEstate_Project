@@ -3166,31 +3166,6 @@
   box-shadow: 0 9px 22px rgba(6, 103, 249, 0.34);
 }
 
-.popular-searches {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  min-height: 45px;
-  padding: 9px 0 0;
-  color: #9aa3b1;
-  font-size: 0.6rem;
-}
-
-.popular-searches button {
-  padding: 4px 9px;
-  color: #5f697a;
-  background: #f0f3f7;
-  border-radius: 99px;
-  font-size: 0.58rem;
-  transition: all 0.2s ease;
-}
-
-.popular-searches button:hover {
-  color: var(--home-blue);
-  background: #e7f1ff;
-}
-
 .home-container .location-autocomplete-dropdown {
   top: calc(100% + 16px);
   left: 0;
@@ -3662,11 +3637,6 @@
     margin: 0;
   }
 
-  .popular-searches {
-    flex-wrap: wrap;
-    padding: 13px 0 22px;
-  }
-
   .home-container .categories-section,
   .home-container .recommended-section {
     padding-left: 20px;
@@ -4013,9 +3983,14 @@
   min-height: 0;
   padding: 26px clamp(20px, 4vw, 64px) 0;
   overflow: visible;
-  background:
+  background-color: #eaf6ff;
+  background-image:
+    url('/hero-background-saigon-vinhomes-readable.png'),
     radial-gradient(ellipse at 76% 0%, rgba(123, 198, 255, 0.24), transparent 38%),
     linear-gradient(180deg, #eaf6ff 0%, #f5faff 56%, #f8fafc 100%);
+  background-position: left 56%, center, center;
+  background-repeat: no-repeat;
+  background-size: cover, auto, auto;
 }
 
 .home-container .hero-content {
@@ -4094,8 +4069,8 @@
 }
 
 .home-container .mascot-speech-bubble {
-  top: 0;
-  right: -24px;
+  top: 10px;
+  right: -12px;
   padding: 8px 11px;
   border: 1px solid #d7eaff;
   border-radius: 17px;
@@ -4209,11 +4184,6 @@
   border-radius: 12px;
 }
 
-.home-container .popular-searches {
-  min-height: 40px;
-  padding: 8px 0 0;
-}
-
 @media (max-width: 980px) {
   .home-container .hero-section {
     padding-right: 24px;
@@ -4235,7 +4205,7 @@
   }
 
   .home-container .mascot-speech-bubble {
-    right: -16px;
+    right: -8px;
     font-size: 0.59rem;
   }
 
@@ -4302,8 +4272,8 @@
   }
 
   .home-container .mascot-speech-bubble {
-    top: -8px;
-    right: -95px;
+    top: 0;
+    right: -76px;
   }
 
   .home-container .search-bar-container {
@@ -4363,7 +4333,7 @@
   }
 
   .home-container .mascot-speech-bubble {
-    right: -104px;
+    right: -84px;
     font-size: 0.54rem;
   }
 
@@ -4491,6 +4461,7 @@
 /* Give the desktop homepage a little more breathing room on wide screens. */
 @media (min-width: 1200px) {
   .home-container .hero-section {
+    min-height: max(370px, 15vw);
     padding-right: clamp(32px, 3.2vw, 62px);
     padding-left: clamp(32px, 3.2vw, 62px);
   }
@@ -4523,6 +4494,7 @@
   .home-container .search-bar-container {
     min-height: 74px;
     margin-top: -43px;
+    transform: translateY(-12px);
   }
 
   .home-container .categories-section,
@@ -4664,14 +4636,6 @@
     font-size: 0.87rem;
   }
 
-  .home-container .popular-searches {
-    font-size: 0.7rem;
-  }
-
-  .home-container .popular-searches button {
-    font-size: 0.67rem;
-  }
-
   .home-container .categories-section h2,
   .home-container .listings-heading h2 {
     font-size: 1.4rem;
@@ -4743,5 +4707,74 @@
 @media (min-width: 1200px) {
   .home-container .hero-title-container h1 {
     font-size: clamp(2.2rem, 3.4vw, 3.12rem);
+  }
+}
+
+.home-container .hero-photo-note {
+  position: absolute;
+  z-index: 7;
+  top: -36px;
+  right: -136px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: max-content;
+  color: #28569a;
+  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", cursive;
+  font-size: clamp(0.62rem, 0.72vw, 0.82rem);
+  font-weight: 600;
+  line-height: 1.18;
+  white-space: nowrap;
+  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.95), 0 0 7px rgba(255, 255, 255, 0.72);
+  transform: rotate(-5deg);
+  pointer-events: none;
+}
+
+.home-container .hero-photo-note span + span {
+  margin-left: 5px;
+}
+
+.home-container .hero-photo-note svg {
+  position: absolute;
+  top: calc(100% - 2px);
+  left: -45px;
+  right: auto;
+  width: 112px;
+  height: 64px;
+  overflow: visible;
+  fill: none;
+  stroke: #28569a;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+@media (max-width: 1749px) {
+  .home-container .hero-photo-note {
+    right: 8px;
+  }
+}
+
+@media (max-width: 900px) {
+  .home-container .hero-visual {
+    margin-top: 44px;
+  }
+}
+
+@media (max-width: 520px) {
+  .home-container .hero-photo-note {
+    top: -36px;
+    right: 8px;
+    font-size: 0.62rem;
+  }
+
+  .home-container .hero-visual {
+    margin-top: 44px;
+  }
+
+  .home-container .hero-photo-note svg {
+    width: 94px;
+    height: 54px;
+    left: -38px;
   }
 }
