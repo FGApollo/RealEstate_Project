@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 
 const SwipeMainSection = ({
-  currentProperty, isAlreadyFavorite, formatPrice, onOpenFilters, activeFiltersCount,
+  discoveryTitle, currentProperty, isAlreadyFavorite, formatPrice, onOpenFilters, activeFiltersCount,
   onPrevious, onNext, onToggleFavorite, onShowDetails, onRestart, isLoading, hasError,
   cardMotion, cardController, handleDragEnd, currentIndex, propertyCount
 }) => {
@@ -22,7 +22,7 @@ const SwipeMainSection = ({
           <div className="swipe-discovery-copy">
             <span className="swipe-discovery-icon"><Compass size={23} /></span>
             <div>
-              <h1>Khám phá tất cả</h1>
+              <h1>{discoveryTitle}</h1>
               <p>Tìm ngôi nhà mơ ước phù hợp với phong cách sống của bạn</p>
             </div>
           </div>
@@ -91,7 +91,7 @@ const SwipeMainSection = ({
               <button type="button" className="swipe-action-button details" onClick={onShowDetails} aria-label="Xem thông tin chi tiết"><Info size={24} /></button>
               <button type="button" className={`swipe-action-button like ${isAlreadyFavorite ? 'active' : ''}`} onClick={onToggleFavorite} aria-label="Thêm yêu thích"><Heart size={29} fill={isAlreadyFavorite ? 'currentColor' : 'none'} /></button>
             </div>
-            <div className="swipe-discover-hint"><ChevronLeft size={15} /><span>Vuốt để khám phá thêm</span><ChevronRight size={15} /></div>
+            <div className="swipe-discover-hint"><span>Vuốt để khám phá thêm</span></div>
             <div className="swipe-pagination" aria-label={`Bất động sản ${currentIndex + 1} trên ${propertyCount}`}>
               {Array.from({ length: pageCount }, (_, index) => <span key={index} className={index === activeDot ? 'active' : ''} />)}
             </div>

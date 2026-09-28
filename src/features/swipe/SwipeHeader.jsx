@@ -2,6 +2,7 @@ import { useState } from 'react';
 import {
   Bell, ChevronDown, Compass, Heart, Home, LogOut, Menu, MessageCircle, Search, X
 } from 'lucide-react';
+import SwipeNestMark from '../../components/SwipeNestMark';
 
 const SwipeHeader = ({ user, activeView, onHome, onDiscover, onFavorites, onChat, onSearch, onLogout }) => {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -17,7 +18,7 @@ const SwipeHeader = ({ user, activeView, onHome, onDiscover, onFavorites, onChat
     <>
       <header className="swipe-experience-header">
         <div className="swipe-brand" role="button" tabIndex={0} onClick={onHome} onKeyDown={(event) => event.key === 'Enter' && onHome()}>
-          <span className="swipe-brand-mark" aria-hidden="true"><Home size={22} strokeWidth={2.5} /></span>
+          <span className="swipe-brand-mark"><SwipeNestMark /></span>
           <span>Swipe Nest</span>
         </div>
 
