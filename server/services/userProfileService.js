@@ -1,5 +1,7 @@
+const bcrypt = require('bcrypt');
 const { supabase } = require('../config/supabase');
 const trustScoreService = require('./trustScoreService');
+const { validatePassword, normalizeVietnamPhone } = require('./registrationValidation');
 
 const AVATAR_BUCKET = 'avatars';
 
@@ -94,6 +96,114 @@ const uploadAvatar = async (userId, file) => {
   };
 };
 
+const getUserProfile = async (userId) => {
+  const { data: user, error } = await supabase
+    .from('users')
+    .select('id, name, email, phone, role, avatar, trust_score, verification_status, created_at, password')
+    .eq('id', userId)
+    .single();
+
+  if (error || !user) {
+    throw new Error('User not found');
+  }
+
+  const { password, ...safeUser } = user;
+  return {
+    ...safeUser,
+    has_password: Boolean(password)
+  };
+};
+
+const updateUserProfile = async (userId, { name, phone }) => {
+  const user = await ensureUserExists(userId);
+
+  const updates = {
+    updated_at: new Date().toISOString()
+  };
+
+  if (name !== undefined) {
+    const trimmedName = String(name || '').trim();
+    if (!trimmedName || trimmedName.length > 120) {
+      throw new Error('Họ và tên phải từ 1 đến 120 ký tự');
+    }
+    updates.name = trimmedName;
+  }
+
+  if (phone !== undefined) {
+    const trimmedPhone = String(phone || '').trim();
+    if (trimmedPhone === '') {
+      updates.phone = null;
+    } else {
+      const normalized = normalizeVietnamPhone(trimmedPhone);
+      if (!normalized) {
+        throw new Error('Số điện thoại không hợp lệ (định dạng 10 số Việt Nam)');
+      }
+      updates.phone = normalized;
+    }
+  }
+
+  const { data: updated, error } = await supabase
+    .from('users')
+    .update(updates)
+    .eq('id', userId)
+    .select('id, name, email, phone, role, avatar, trust_score, verification_status, created_at')
+    .single();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return updated;
+};
+
+const changeUserPassword = async (userId, { currentPassword, newPassword }) => {
+  const { data: user, error } = await supabase
+    .from('users')
+    .select('id, password')
+    .eq('id', userId)
+    .single();
+
+  if (error || !user) {
+    throw new Error('User not found');
+  }
+
+  // If user already has a password, verify current password
+  if (user.password) {
+    if (!currentPassword) {
+      throw new Error('Vui lòng nhập mật khẩu hiện tại');
+    }
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      throw new Error('Mật khẩu hiện tại không chính xác');
+    }
+  }
+
+  // Validate new password strength
+  const validationError = validatePassword(newPassword);
+  if (validationError) {
+    throw new Error(validationError);
+  }
+
+  const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+  const { error: updateError } = await supabase
+    .from('users')
+    .update({
+      password: hashedPassword,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', userId);
+
+  if (updateError) {
+    throw new Error(updateError.message);
+  }
+
+  return { success: true, message: 'Đổi mật khẩu thành công' };
+};
+
 module.exports = {
-  uploadAvatar
+  uploadAvatar,
+  getUserProfile,
+  updateUserProfile,
+  changeUserPassword
 };

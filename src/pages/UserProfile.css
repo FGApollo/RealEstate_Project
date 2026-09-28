@@ -1,0 +1,612 @@
+/* UserProfile.css - Modern, Clean & High-End Design (Fully Scoped) */
+
+.uprofile-page-wrapper {
+  min-height: 100vh;
+  background-color: #f8fafc;
+  color: #1e293b;
+  display: flex;
+  flex-direction: column;
+}
+
+
+
+/* Container */
+.uprofile-main-container {
+  max-width: 1080px;
+  width: 100%;
+  margin: 2rem auto;
+  padding: 0 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+/* Hero Section Card */
+.uprofile-hero-card {
+  position: relative;
+  background: #ffffff;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e2e8f0;
+}
+
+.uprofile-hero-banner {
+  height: 120px;
+  background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 50%, #60a5fa 100%);
+  position: relative;
+}
+
+.uprofile-hero-banner::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.2) 0%, transparent 60%);
+}
+
+.uprofile-hero-content {
+  padding: 0 2rem 2rem 2rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 2rem;
+  margin-top: -55px;
+  position: relative;
+  z-index: 2;
+}
+
+/* Avatar Box & Camera Button */
+.uprofile-avatar-box {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.uprofile-avatar-circle {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  border: 4px solid #ffffff;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  position: relative;
+  background: #e2e8f0;
+}
+
+.uprofile-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.uprofile-avatar-loading {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.7);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: 0.75rem;
+  gap: 4px;
+}
+
+.uprofile-camera-btn {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #1a3683;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(26, 54, 131, 0.3);
+  transition: all 0.2s ease;
+  border: 2px solid #ffffff;
+  cursor: pointer;
+}
+
+.uprofile-camera-btn:hover:not(:disabled) {
+  background: #2563eb;
+  transform: scale(1.08);
+}
+
+.uprofile-camera-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.uprofile-file-input {
+  display: none;
+}
+
+/* Hero Details */
+.uprofile-user-meta {
+  flex: 1;
+  padding-top: 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.uprofile-name-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.uprofile-name-heading {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.uprofile-role-tag {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  letter-spacing: 0.04em;
+}
+
+.uprofile-role-tag.role-user {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+.uprofile-role-tag.role-agent {
+  background: #f0fdf4;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+
+.uprofile-role-tag.role-admin {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.uprofile-email-subtext {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #64748b;
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+/* User Badges Row - Clean and NOT absolutely positioned */
+.uprofile-pills-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 0.25rem;
+}
+
+.uprofile-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.85rem;
+  border-radius: 9999px;
+  font-size: 0.825rem;
+  line-height: 1;
+}
+
+.uprofile-pill-trust {
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  color: #15803d;
+  border: 1px solid #86efac;
+  font-weight: 600;
+}
+
+.uprofile-pill-status {
+  background: #f8fafc;
+  color: #334155;
+  border: 1px solid #e2e8f0;
+  font-weight: 500;
+}
+
+.uprofile-pill-status svg {
+  color: #0284c7;
+}
+
+.uprofile-pill-date {
+  background: #ffffff;
+  color: #64748b;
+  border: 1px solid #f1f5f9;
+  font-weight: 500;
+}
+
+/* Toast Messages */
+.uprofile-toast-message {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  padding: 0.5rem 0.875rem;
+  border-radius: 8px;
+  margin-top: 0.5rem;
+  width: fit-content;
+  animation: uprofileFadeIn 0.2s ease-in-out;
+}
+
+.uprofile-toast-message.success {
+  background: #f0fdf4;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+
+.uprofile-toast-message.error {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+/* Layout Grid */
+.uprofile-body-grid {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 2rem;
+  align-items: start;
+}
+
+/* Sidebar */
+.uprofile-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.uprofile-tab-box {
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+}
+
+.uprofile-tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-radius: 10px;
+  font-size: 0.925rem;
+  font-weight: 500;
+  color: #64748b;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.uprofile-tab-btn:hover {
+  background: #f8fafc;
+  color: #1e293b;
+}
+
+.uprofile-tab-btn.active {
+  background: #eff6ff;
+  color: #1a3683;
+  font-weight: 600;
+}
+
+.uprofile-quicklinks-box {
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.uprofile-box-title {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
+  font-weight: 600;
+  margin: 0 0 0.25rem 0;
+}
+
+.uprofile-quicklink-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.65rem 0.5rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  color: #475569;
+  text-decoration: none;
+  border: none;
+  background: none;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  transition: all 0.2s ease;
+}
+
+.uprofile-quicklink-item:hover {
+  background: #f8fafc;
+  color: #1a3683;
+}
+
+.uprofile-quicklink-item.logout-link {
+  color: #ef4444;
+  border-top: 1px solid #f1f5f9;
+  margin-top: 0.25rem;
+  padding-top: 0.85rem;
+}
+
+.uprofile-quicklink-item.logout-link:hover {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.text-red { color: #ef4444; }
+.text-blue { color: #2563eb; }
+
+/* Main Content Area */
+.uprofile-content-area {
+  min-width: 0;
+}
+
+.uprofile-card-panel {
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  padding: 2rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+}
+
+.uprofile-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid #f1f5f9;
+  margin-bottom: 1.75rem;
+}
+
+.uprofile-header-icon-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #eff6ff;
+  color: #1a3683;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.uprofile-panel-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.uprofile-panel-desc {
+  font-size: 0.875rem;
+  color: #64748b;
+  margin: 0.15rem 0 0 0;
+}
+
+/* Alert Banners */
+.uprofile-alert {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  margin-bottom: 1.5rem;
+}
+
+.uprofile-alert.success {
+  background: #f0fdf4;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+
+.uprofile-alert.error {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+/* Forms */
+.uprofile-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.uprofile-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.uprofile-form-group label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+/* Pixel-perfect input container with centered icons */
+.uprofile-input-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.uprofile-leading-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.uprofile-trailing-icon {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  z-index: 2;
+}
+
+.uprofile-eye-btn {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  color: #94a3b8;
+  cursor: pointer;
+  z-index: 2;
+  transition: color 0.15s ease;
+}
+
+.uprofile-eye-btn:hover {
+  color: #1e293b;
+}
+
+.uprofile-input-field {
+  width: 100%;
+  height: 48px;
+  padding: 0 42px 0 44px;
+  background: #f8fafc;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 12px;
+  font-size: 0.95rem;
+  color: #1e293b;
+  outline: none;
+  transition: all 0.2s ease;
+  line-height: normal;
+}
+
+.uprofile-input-field:focus {
+  border-color: #1a3683;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(26, 54, 131, 0.1);
+}
+
+.uprofile-input-container.disabled .uprofile-input-field {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #64748b;
+  cursor: not-allowed;
+}
+
+.uprofile-hint-text {
+  font-size: 0.775rem;
+  color: #94a3b8;
+  margin-top: 0.1rem;
+}
+
+.uprofile-submit-row {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 0.75rem;
+}
+
+.uprofile-submit-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.85rem 1.75rem;
+  border-radius: 10px;
+  background: #1a3683;
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 0.95rem;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(26, 54, 131, 0.25);
+}
+
+.uprofile-submit-btn:hover:not(:disabled) {
+  background: #2563eb;
+  transform: translateY(-1px);
+}
+
+.uprofile-submit-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.uprofile-spinner {
+  animation: uprofileSpin 1s linear infinite;
+}
+
+@keyframes uprofileSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes uprofileFadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Responsiveness */
+@media (max-width: 768px) {
+  .uprofile-body-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .uprofile-hero-content {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 1rem;
+  }
+
+  .uprofile-user-meta {
+    padding-top: 0;
+    align-items: center;
+  }
+
+  .uprofile-name-row {
+    justify-content: center;
+  }
+
+  .uprofile-pills-row {
+    justify-content: center;
+  }
+}

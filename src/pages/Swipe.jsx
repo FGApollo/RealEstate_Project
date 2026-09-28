@@ -3,10 +3,12 @@ import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { 
   Search, Heart, Map, User, X, Info, MapPin, Menu,
   Bed, Bath, Maximize, SlidersHorizontal, RefreshCw, ChevronLeft, ChevronRight,
-  Compass, MessageSquare, Calendar, Eye, ShieldCheck, Phone, Shield, Share2, Sparkles, Home as HomeIcon
+  Compass, MessageSquare, Calendar, Eye, ShieldCheck, Phone, Shield, Share2, Sparkles, Home as HomeIcon,
+  ChevronDown, LogOut
 } from 'lucide-react';
 import { motion, useMotionValue, useTransform, useAnimation } from 'framer-motion';
 import PropertyDetailModal from '../components/PropertyDetailModal';
+import Header from '../components/Header';
 import './Swipe.css';
 import { API_BASE_URL } from '../config';
 import { apiFetch } from '../auth/apiClient';
@@ -130,11 +132,30 @@ const categorySuggestionDetails = {
   }
 };
 
+const SwipeNestMark = () => (
+  <svg className="brand-mark-art" viewBox="0 0 150 150" aria-hidden="true" focusable="false" style={{ width: '28px', height: '28px' }}>
+    <path d="M75 7 139 53v61a25 25 0 0 1-25 25H36a25 25 0 0 1-25-25V53L75 7Z" fill="#25499b" />
+    <path d="M75 7 24 55v57a27 27 0 0 0 27 27h24V7Z" fill="#fff" opacity=".055" />
+    <path d="M29 72c27-14 65-15 92-1" fill="none" stroke="#f3c52f" strokeWidth="8" strokeLinecap="round" />
+    <path d="M57 49v54m0-54 39 54V49" fill="none" stroke="#fff" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
 const Swipe = () => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const [showDropdown, setShowDropdown] = useState(false);
   const { categoryName } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/login');
+    } catch (err) {
+      alert(err.message);
+    }
+  };
 
   const initialFilters = useMemo(() => location.state?.filters || {}, [location.state]);
 
@@ -664,38 +685,22 @@ const Swipe = () => {
 
   const headerElement = useMemo(() => {
     return (
-      <header className="swipe-header">
-        <div className="swipe-header-left">
-          <button className="swipe-menu-btn" onClick={() => setShowSidebar(true)}>
-            <Menu size={20} />
-          </button>
-          <Link to="/" className="back-home-btn">
-            <ChevronLeft size={20} />
-          </Link>
-          <span className="swipe-logo" onClick={() => navigate('/')}>Swipe Nest</span>
-        </div>
-        
-        <div className="swipe-header-right">
-          <div className={`header-nav-item ${activeView === 'swipe' ? 'active' : ''}`} onClick={() => setActiveView('swipe')}>
-            <Compass size={18} />
-            <span>KHÁM PHÁ</span>
-          </div>
-          <div className={`header-nav-item ${activeView === 'saved' ? 'active' : ''}`} onClick={() => setActiveView('saved')}>
-            <Heart size={18} />
-            <span>YÊU THÍCH</span>
-          </div>
-          <div className="header-nav-item" onClick={() => navigate('/chat')}>
-            <MessageSquare size={18} />
-            <span>CHAT</span>
-          </div>
-          <div className="header-nav-item">
-            <User size={18} />
-            <span>PROFILE</span>
-          </div>
-        </div>
-      </header>
+      <Header
+        activeTab={activeView === 'saved' ? 'saved' : 'swipe'}
+        onTabChange={(tab) => {
+          if (tab === 'swipe') {
+            setActiveView('swipe');
+            return true;
+          }
+          if (tab === 'saved') {
+            setActiveView('saved');
+            return true;
+          }
+          return false;
+        }}
+      />
     );
-  }, [activeView, navigate]);
+  }, [activeView]);
 
   const suggestionsSidebar = useMemo(() => {
     return (
@@ -747,26 +752,6 @@ const Swipe = () => {
     <div className="swipe-page-container">
       {/* Premium Header */}
       {headerElement}
-
-      {/* Mobile Sidebar Drawer */}
-      {showSidebar && (
-        <div className="mobile-sidebar-backdrop" onClick={() => setShowSidebar(false)}>
-          <div className="mobile-sidebar-drawer" onClick={(e) => e.stopPropagation()}>
-            <div className="mobile-sidebar-header">
-              <span className="logo-text" onClick={() => { navigate('/'); setShowSidebar(false); }} style={{ cursor: 'pointer' }}>Swipe Nest</span>
-              <button className="close-sidebar-btn" onClick={() => setShowSidebar(false)}>
-                <X size={20} />
-              </button>
-            </div>
-            <nav className="mobile-sidebar-nav">
-              <button className="mobile-nav-link" onClick={() => { navigate('/'); setShowSidebar(false); }}>Trang Chủ</button>
-              <button className="mobile-nav-link active" onClick={() => { setActiveView('swipe'); setShowSidebar(false); }}>Khám Phá</button>
-              <button className="mobile-nav-link" onClick={() => { setActiveView('saved'); setShowSidebar(false); }}>Yêu thích</button>
-              <button className="mobile-nav-link" onClick={() => { navigate('/chat'); setShowSidebar(false); }}>Chat</button>
-            </nav>
-          </div>
-        </div>
-      )}
 
       {/* Main Content Layout */}
       {activeView === 'swipe' && (

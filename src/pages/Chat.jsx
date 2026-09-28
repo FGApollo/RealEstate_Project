@@ -7,6 +7,7 @@ import {
 import { API_BASE_URL } from '../config';
 import { apiFetch } from '../auth/apiClient';
 import { useAuth } from '../auth/useAuth';
+import Header from '../components/Header';
 import './Chat.css';
 
 const Chat = () => {
@@ -179,33 +180,7 @@ const Chat = () => {
   return (
     <div className="chat-page-container">
       {/* Header */}
-      <header className="chat-header">
-        <div className="chat-header-left">
-          <Link to="/" className="back-home-btn">
-            <ChevronLeft size={20} />
-          </Link>
-          <span className="chat-logo" onClick={() => navigate('/')}>Swipe Nest Chat</span>
-        </div>
-        
-        <div className="chat-header-right">
-          <div className="header-nav-item" onClick={() => navigate('/swipe/Tất cả')}>
-            <Compass size={18} />
-            <span>KHÁM PHÁ</span>
-          </div>
-          <div className="header-nav-item" onClick={() => navigate('/swipe/Tất cả', { state: { activeView: 'saved' } })}>
-            <Heart size={18} />
-            <span>YÊU THÍCH</span>
-          </div>
-          <div className="header-nav-item">
-            <Map size={18} />
-            <span>MAP</span>
-          </div>
-          <div className="header-nav-item">
-            <User size={18} />
-            <span>PROFILE</span>
-          </div>
-        </div>
-      </header>
+      <Header activeTab="chat" />
 
       {/* Main Container */}
       <div className="chat-main-layout">

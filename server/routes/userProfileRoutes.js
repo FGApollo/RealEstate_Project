@@ -7,6 +7,10 @@ const { rateLimiters } = require('../middleware/rateLimiters');
 
 router.use(authenticate);
 
+router.get('/profile', rateLimiters.read, userProfileController.getProfile);
+router.put('/profile', rateLimiters.write, userProfileController.updateProfile);
+router.put('/password', rateLimiters.write, userProfileController.changePassword);
+
 router.post(
   '/avatar',
   rateLimiters.upload,

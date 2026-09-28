@@ -14,6 +14,7 @@ import Swipe from './pages/Swipe'
 import AgentOverview from './pages/AgentOverview'
 import Chat from './pages/Chat'
 import AdminPage from './pages/AdminPage'
+import UserProfile from './pages/UserProfile'
 import './App.css'
 
 function App() {
@@ -30,6 +31,7 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/swipe/:categoryName" element={<Swipe />} />
         <Route path="/chat" element={<Chat />} />
+        <Route path="/profile" element={<UserProfile />} />
       </Route>
       <Route element={<ProtectedRoute allowedRoles={['AGENT']} />}>
         <Route path="/sale/overview" element={<AgentOverview />} />
