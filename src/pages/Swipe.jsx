@@ -1,16 +1,22 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
+import { useState, useEffect, useMemo } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { 
-  Search, Heart, Map, User, X, Info, MapPin, Menu,
-  Bed, Bath, Maximize, SlidersHorizontal, RefreshCw, ChevronLeft, ChevronRight,
-  Compass, MessageSquare, Calendar, Eye, ShieldCheck, Phone, Shield, Share2, Sparkles, Home as HomeIcon
+  Heart, X, MapPin,
+  Bed, Bath, Maximize,
+  MessageSquare
 } from 'lucide-react';
-import { motion, useMotionValue, useTransform, useAnimation } from 'framer-motion';
+import { useMotionValue, useTransform, useAnimation } from 'framer-motion';
 import PropertyDetailModal from '../components/PropertyDetailModal';
 import './Swipe.css';
+import '../features/swipe/SwipeExperience.css';
 import { API_BASE_URL } from '../config';
 import { apiFetch } from '../auth/apiClient';
 import { useAuth } from '../auth/useAuth';
+import SwipeHeader from '../features/swipe/SwipeHeader';
+import SwipeHistoryPanel from '../features/swipe/SwipeHistoryPanel';
+import SwipeMainSection from '../features/swipe/SwipeMainSection';
+import SwipeSuggestionsPanel from '../features/swipe/SwipeSuggestionsPanel';
+import SwipeChatPrompt from '../features/swipe/SwipeChatPrompt';
 
 const WARDS_BY_REGION = {
   'TP.HCM': [
@@ -77,26 +83,6 @@ const getCategoryKey = (name) => {
   return 'Căn Hộ';
 };
 
-const getLowResBlurUrl = (url) => {
-  if (!url) return '';
-  if (url.includes('unsplash.com')) {
-    let optimized = url;
-    if (optimized.includes('w=')) {
-      optimized = optimized.replace(/w=\d+/, 'w=80');
-    } else {
-      optimized += '&w=80';
-    }
-    if (optimized.includes('q=')) {
-      optimized = optimized.replace(/q=\d+/, 'q=30');
-    } else {
-      optimized += '&q=30';
-    }
-    return optimized;
-  }
-  return url;
-};
-
-
 const categorySuggestionDetails = {
   'Căn Hộ': {
     title: 'Căn Hộ Cao Cấp',
@@ -131,7 +117,7 @@ const categorySuggestionDetails = {
 };
 
 const Swipe = () => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { categoryName } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -139,6 +125,9 @@ const Swipe = () => {
   const initialFilters = useMemo(() => location.state?.filters || {}, [location.state]);
 
   const [dbProperties, setDbProperties] = useState([]);
+  const [isLoadingProperties, setIsLoadingProperties] = useState(true);
+  const [propertiesError, setPropertiesError] = useState(false);
+  const [propertiesReloadKey, setPropertiesReloadKey] = useState(0);
   const [currentProperties, setCurrentProperties] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [swipeHistory, setSwipeHistory] = useState(() => {
@@ -150,7 +139,6 @@ const Swipe = () => {
     }
   });
   const [showDetailModal, setShowDetailModal] = useState(false);
-  const [activeSliderIdx, setActiveSliderIdx] = useState(0);
   const [showFilterModal, setShowFilterModal] = useState(false);
   // Price filters
   const [minPrice, setMinPrice] = useState(initialFilters.minPrice || '');
@@ -197,7 +185,6 @@ const Swipe = () => {
   const [selectedSavedCategory, setSelectedSavedCategory] = useState('Tất cả');
   const [sortBy, setSortBy] = useState('recent');
   const [selectedSavedProperty, setSelectedSavedProperty] = useState(null);
-  const [showSidebar, setShowSidebar] = useState(false);
 
   const [dbFavorites, setDbFavorites] = useState([]);
   const [isLoadingSaved, setIsLoadingSaved] = useState(false);
@@ -365,21 +352,25 @@ const Swipe = () => {
 
   // Fetch properties from DB
   useEffect(() => {
+    let isCurrentRequest = true;
     const fetchProperties = async () => {
+      setIsLoadingProperties(true);
+      setPropertiesError(false);
       try {
         const response = await apiFetch(`${API_BASE_URL}/api/properties`);
-        if (response.ok) {
-          const data = await response.json();
-          if (data.properties && data.properties.length > 0) {
-            setDbProperties(data.properties.filter(p => !p.is_hidden));
-          }
-        }
+        if (!response.ok) throw new Error(`Properties request failed (${response.status})`);
+        const data = await response.json();
+        if (isCurrentRequest) setDbProperties((data.properties || []).filter(p => !p.is_hidden));
       } catch (err) {
-        console.warn('API error, using full mock data stack:', err);
+        console.warn('Could not load swipe properties:', err);
+        if (isCurrentRequest) setPropertiesError(true);
+      } finally {
+        if (isCurrentRequest) setIsLoadingProperties(false);
       }
     };
     fetchProperties();
-  }, []);
+    return () => { isCurrentRequest = false; };
+  }, [propertiesReloadKey]);
 
   // Filter properties based on current category and active applied filters
   useEffect(() => {
@@ -566,28 +557,28 @@ const Swipe = () => {
     setSwipeHistory([]);
   };
 
-  const toggleFavorite = async () => {
-    if (!currentProperty || !user?.id) return;
+  const toggleFavorite = async (property = currentProperty) => {
+    if (!property || !user?.id) return;
     
-    const isFav = dbFavorites.some(fav => fav.id === currentProperty.id);
+    const isFav = dbFavorites.some(fav => fav.id === property.id);
     if (isFav) {
-      setDbFavorites(prev => prev.filter(fav => fav.id !== currentProperty.id));
+      setDbFavorites(prev => prev.filter(fav => fav.id !== property.id));
       try {
         await apiFetch(`${API_BASE_URL}/api/favorites/delete`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ propertyId: currentProperty.id })
+          body: JSON.stringify({ propertyId: property.id })
         });
       } catch (err) {
         console.error('Error removing favorite:', err);
       }
     } else {
-      setDbFavorites(prev => [...prev, currentProperty]);
+      setDbFavorites(prev => [...prev, property]);
       try {
         await apiFetch(`${API_BASE_URL}/api/favorites`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ propertyId: currentProperty.id })
+          body: JSON.stringify({ propertyId: property.id })
         });
       } catch (err) {
         console.error('Error adding favorite:', err);
@@ -662,301 +653,80 @@ const Swipe = () => {
     return dbFavorites.filter(p => getCategoryKey(p.property_type) === category).length;
   };
 
-  const headerElement = useMemo(() => {
-    return (
-      <header className="swipe-header">
-        <div className="swipe-header-left">
-          <button className="swipe-menu-btn" onClick={() => setShowSidebar(true)}>
-            <Menu size={20} />
-          </button>
-          <Link to="/" className="back-home-btn">
-            <ChevronLeft size={20} />
-          </Link>
-          <span className="swipe-logo" onClick={() => navigate('/')}>Swipe Nest</span>
-        </div>
-        
-        <div className="swipe-header-right">
-          <div className={`header-nav-item ${activeView === 'swipe' ? 'active' : ''}`} onClick={() => setActiveView('swipe')}>
-            <Compass size={18} />
-            <span>KHÁM PHÁ</span>
-          </div>
-          <div className={`header-nav-item ${activeView === 'saved' ? 'active' : ''}`} onClick={() => setActiveView('saved')}>
-            <Heart size={18} />
-            <span>YÊU THÍCH</span>
-          </div>
-          <div className="header-nav-item" onClick={() => navigate('/chat')}>
-            <MessageSquare size={18} />
-            <span>CHAT</span>
-          </div>
-          <div className="header-nav-item">
-            <User size={18} />
-            <span>PROFILE</span>
-          </div>
-        </div>
-      </header>
-    );
-  }, [activeView, navigate]);
+  const openFilters = () => {
+    setTempMinPrice(minPrice);
+    setTempMaxPrice(maxPrice);
+    setTempSelectedWards([...selectedWards]);
+    setTempSelectedLifestyles([...selectedLifestyles]);
+    setTempMinArea(minArea);
+    setTempMaxArea(maxArea);
+    setTempSelectedBedrooms([...selectedBedrooms]);
+    setTempSelectedCategories([...selectedCategories]);
+    setShowFilterModal(true);
+  };
 
-  const suggestionsSidebar = useMemo(() => {
-    return (
-      <aside className="swipe-suggestions-sidebar">
-        <h3>Gợi ý cho bạn</h3>
-        <div className="suggestions-list">
-          {suggestedCategories.map((cat) => {
-            const details = categorySuggestionDetails[cat];
-            return (
-              <div 
-                key={cat} 
-                className="suggestion-card"
-                onClick={() => navigate(`/swipe/${encodeURIComponent(cat)}`)}
-              >
-                <img src={details.image} alt={details.title} className="suggestion-img" />
-                <div className="suggestion-gradient" />
-                <div className="suggestion-info">
-                  <h4>{details.title}</h4>
-                  <p className="suggestion-loc">
-                    <MapPin size={12} style={{ marginRight: '4px', verticalAlign: 'middle' }} />
-                    {details.location}
-                  </p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </aside>
-    );
-  }, [suggestedCategories, navigate]);
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/login');
+    } catch (error) {
+      alert(error.message);
+    }
+  };
 
   const activePropertyForModal = selectedSavedProperty || currentProperty;
 
-  useEffect(() => {
-    setActiveSliderIdx(0);
-  }, [activePropertyForModal?.id]);
-
-  const getLifestyleChips = (property) => {
-    if (!property?.lifestyle_tags || property.lifestyle_tags.length === 0) return [];
-    return property.lifestyle_tags.map(t => t.tag_name);
-  };
-
-  const getAmenityChips = (property) => {
-    if (!property?.property_features || property.property_features.length === 0) return [];
-    return property.property_features.map(f => f.feature_name);
-  };
-
   return (
     <div className="swipe-page-container">
-      {/* Premium Header */}
-      {headerElement}
-
-      {/* Mobile Sidebar Drawer */}
-      {showSidebar && (
-        <div className="mobile-sidebar-backdrop" onClick={() => setShowSidebar(false)}>
-          <div className="mobile-sidebar-drawer" onClick={(e) => e.stopPropagation()}>
-            <div className="mobile-sidebar-header">
-              <span className="logo-text" onClick={() => { navigate('/'); setShowSidebar(false); }} style={{ cursor: 'pointer' }}>Swipe Nest</span>
-              <button className="close-sidebar-btn" onClick={() => setShowSidebar(false)}>
-                <X size={20} />
-              </button>
-            </div>
-            <nav className="mobile-sidebar-nav">
-              <button className="mobile-nav-link" onClick={() => { navigate('/'); setShowSidebar(false); }}>Trang Chủ</button>
-              <button className="mobile-nav-link active" onClick={() => { setActiveView('swipe'); setShowSidebar(false); }}>Khám Phá</button>
-              <button className="mobile-nav-link" onClick={() => { setActiveView('saved'); setShowSidebar(false); }}>Yêu thích</button>
-              <button className="mobile-nav-link" onClick={() => { navigate('/chat'); setShowSidebar(false); }}>Chat</button>
-            </nav>
-          </div>
-        </div>
-      )}
+      <SwipeHeader
+        user={user}
+        activeView={activeView}
+        onHome={() => navigate('/')}
+        onDiscover={() => setActiveView('swipe')}
+        onFavorites={() => setActiveView('saved')}
+        onChat={() => navigate('/chat')}
+        onSearch={openFilters}
+        onLogout={handleLogout}
+      />
 
       {/* Main Content Layout */}
       {activeView === 'swipe' && (
         <div className="swipe-main-layout">
-          
-          {/* Left Sidebar - Lịch sử vuốt */}
-          <aside className="swipe-history-sidebar">
-            <h3>Lịch sử vuốt</h3>
-            <div className="history-list">
-              {swipeHistory.length === 0 ? (
-                <div className="empty-history">
-                  <p>Chưa có bài đăng nào được vuốt qua.</p>
-                </div>
-              ) : (
-                swipeHistory.map((item) => {
-                  const isFav = dbFavorites.some(fav => fav.id === item.id);
-                  return (
-                    <div 
-                      key={item.id} 
-                      className={`history-card-item ${isFav ? 'right' : 'left'}`}
-                      onClick={() => handleHistoryCardClick(item)}
-                    >
-                      <img src={item.thumbnail} alt={item.title} className="history-thumb" />
-                      <div className="history-badge">
-                        {isFav ? <Heart size={10} fill="white" /> : <X size={10} />}
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </aside>
-
-          {/* Center Container - Swipe Card area */}
-          <main className="swipe-card-center-container">
-            
-            {/* Blur Background for premium depth effect */}
-            {currentProperty && (
-              <div 
-                className="blurry-bg-image" 
-                style={{ backgroundImage: `url(${getLowResBlurUrl(currentProperty.thumbnail)})` }}
-              />
-            )}
-
-            {/* Filter button */}
-            <button 
-              className={`floating-filter-btn ${activeFiltersCount > 0 ? 'active' : ''}`}
-              onClick={() => {
-                setTempMinPrice(minPrice);
-                setTempMaxPrice(maxPrice);
-                setTempSelectedWards([...selectedWards]);
-                setTempSelectedLifestyles([...selectedLifestyles]);
-                setShowFilterModal(true);
-              }}
-            >
-              <SlidersHorizontal size={16} />
-              <span>Lọc</span>
-              {activeFiltersCount > 0 && (
-                <span className="filter-active-badge">
-                  {activeFiltersCount}
-                </span>
-              )}
-            </button>
-
-            {/* Discovery Title */}
-            <div className="swipe-discovery-title">
-              Khám phá <span className="category-accent">{categoryName || 'Bất Động Sản'}</span>
-            </div>
-
-            {/* Tinder Card Container */}
-            <div className="swipe-deck">
-              {currentProperty && (
-                <>
-                  <button type="button" className="card-nav-arrow left outside" onClick={() => swipeCard('left')} aria-label="Bỏ qua">
-                    <ChevronLeft size={20} />
-                  </button>
-                  <button type="button" className="card-nav-arrow right outside" onClick={() => swipeCard('right')} aria-label="Thích">
-                    <ChevronRight size={20} />
-                  </button>
-                </>
-              )}
-
-              {currentProperty ? (
-                <motion.div
-                  className="tinder-card"
-                  drag="x"
-                  dragConstraints={{ left: -1000, right: 1000 }}
-                  dragElastic={1}
-                  dragTransition={{ bounceStiffness: 600, bounceDamping: 30 }}
-                  style={{ x, rotate, opacity }}
-                  onDragEnd={handleDragEnd}
-                  animate={cardController}
-                  whileDrag={{ scale: 1.02 }}
-                >
-                  {/* Property Main Image */}
-                  <div className="tinder-img-wrapper">
-                    <img 
-                      src={currentProperty.thumbnail} 
-                      alt={currentProperty.title} 
-                      className="tinder-card-img"
-                      draggable="false"
-                    />
-                    
-                    {/* Verified Top Badge */}
-                    <span className="verified-badge">
-                      ĐÃ XÁC THỰC
-                    </span>
-
-                    {isAlreadyFavorite && (
-                      <span className="already-liked-badge">
-                        <Heart size={12} fill="white" /> ĐÃ YÊU THÍCH
-                      </span>
-                    )}
-
-                    {/* Bottom Info Gradient Overlay */}
-                    <div className="tinder-card-bottom-overlay">
-                      <div className="tinder-card-info-content">
-                        <h2 className="tinder-prop-title-new">{currentProperty.title}</h2>
-                        <div className="tinder-prop-address-new">
-                          <MapPin size={14} />
-                          <span>{currentProperty.address}</span>
-                        </div>
-                      </div>
-
-                      <div className="tinder-card-specs-row">
-                        <div className="tinder-price-tag-new">
-                          {formatPrice(currentProperty.price)}<span className="price-period">/tháng</span>
-                        </div>
-
-                        <div className="tinder-specs-pill">
-                          <div className="spec-item-vertical">
-                            <Bed size={16} />
-                            <span>{currentProperty.bedrooms || 0}</span>
-                          </div>
-                          <div className="spec-item-vertical">
-                            <Bath size={16} />
-                            <span>{currentProperty.bathrooms || 0}</span>
-                          </div>
-                          <div className="spec-item-vertical">
-                            <Maximize size={16} />
-                            <span>{currentProperty.area}m²</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              ) : (
-                <div className="no-more-cards">
-                  <RefreshCw size={48} className="spin-on-hover" onClick={resetSwipes} />
-                  <h3>Không còn bài đăng nào</h3>
-                  <p>Bạn đã vuốt qua tất cả các bài viết trong danh mục này.</p>
-                  <button className="restart-btn" onClick={resetSwipes}>Vuốt lại từ đầu</button>
-                </div>
-              )}
-            </div>
-
-            {/* Action Buttons Under the Card */}
-            {currentProperty && (
-              <div className="swipe-action-buttons">
-                <button 
-                  className="swipe-btn dislike" 
-                  onClick={() => swipeCard('left')}
-                  aria-label="Bỏ qua"
-                >
-                  <X size={26} />
-                </button>
-                
-                <button 
-                  className="swipe-btn info" 
-                  onClick={() => setShowDetailModal(true)}
-                  aria-label="Thông tin chi tiết"
-                >
-                  <Info size={22} />
-                </button>
-
-                <button 
-                  className={`swipe-btn like ${isAlreadyFavorite ? 'already-liked' : ''}`}
-                  onClick={toggleFavorite}
-                  aria-label="Thích"
-                >
-                  <Heart size={26} fill={isAlreadyFavorite ? "white" : "none"} />
-                </button>
-              </div>
-            )}
-
-          </main>
-
-          {suggestionsSidebar}
-
+          <SwipeHistoryPanel
+            history={swipeHistory}
+            favorites={dbFavorites}
+            onSelect={handleHistoryCardClick}
+            onExplore={() => setCurrentIndex(0)}
+          />
+          <SwipeMainSection
+            currentProperty={currentProperty}
+            isAlreadyFavorite={isAlreadyFavorite}
+            formatPrice={formatPrice}
+            onOpenFilters={openFilters}
+            activeFiltersCount={activeFiltersCount}
+            onPrevious={() => swipeCard('left')}
+            onNext={() => swipeCard('right')}
+            onToggleFavorite={toggleFavorite}
+            onShowDetails={() => setShowDetailModal(true)}
+            onRestart={() => propertiesError ? setPropertiesReloadKey((key) => key + 1) : resetSwipes()}
+            isLoading={isLoadingProperties}
+            hasError={propertiesError}
+            cardMotion={{ x, rotate, opacity }}
+            cardController={cardController}
+            handleDragEnd={handleDragEnd}
+            currentIndex={currentIndex}
+            propertyCount={currentProperties.length}
+          />
+          <SwipeSuggestionsPanel
+            categories={suggestedCategories}
+            detailsByCategory={categorySuggestionDetails}
+            properties={dbProperties}
+            favorites={dbFavorites}
+            getCategoryKey={getCategoryKey}
+            onSelectCategory={(category) => navigate(`/swipe/${encodeURIComponent(category)}`)}
+            onToggleFavorite={toggleFavorite}
+          />
+          <SwipeChatPrompt onClick={() => navigate('/chat')} />
         </div>
       )}
 

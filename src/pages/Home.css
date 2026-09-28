@@ -3090,6 +3090,8 @@
 .home-container .search-field select {
   width: 100%;
   padding-right: 12px;
+  appearance: none;
+  -webkit-appearance: none;
 }
 
 .home-container .search-field-divider {
@@ -4804,7 +4806,7 @@
 .home-container .hero-copy::before {
   position: absolute;
   z-index: -1;
-  inset: -26px -30px -22px;
+  inset: -8px -12px;
   content: "";
   background: radial-gradient(
     ellipse at 42% 50%,
@@ -4815,8 +4817,8 @@
   );
   -webkit-mask-image: radial-gradient(ellipse at 42% 50%, #000 0%, rgba(0, 0, 0, 0.94) 42%, rgba(0, 0, 0, 0.62) 64%, transparent 82%);
   mask-image: radial-gradient(ellipse at 42% 50%, #000 0%, rgba(0, 0, 0, 0.94) 42%, rgba(0, 0, 0, 0.62) 64%, transparent 82%);
-  -webkit-backdrop-filter: blur(18px) saturate(0.9);
-  backdrop-filter: blur(18px) saturate(0.9);
+  -webkit-backdrop-filter: blur(12px) saturate(0.92);
+  backdrop-filter: blur(12px) saturate(0.92);
   pointer-events: none;
 }
 
@@ -4860,7 +4862,7 @@
   }
 
   .home-container .hero-copy::before {
-    inset: -22px -24px -20px;
+    inset: -8px -10px;
   }
 
   .home-container .hero-title-container h1 {
@@ -4953,9 +4955,7 @@
   }
 
   .home-container .hero-copy::before {
-    inset: -22px -20px -20px;
-    -webkit-backdrop-filter: blur(18px) saturate(0.9);
-    backdrop-filter: blur(18px) saturate(0.9);
+    inset: -8px;
   }
 
   .home-container .hero-title-container h1 {
@@ -4975,7 +4975,7 @@
   }
 
   .home-container .hero-copy::before {
-    inset: -16px -14px -16px;
+    inset: -6px;
   }
 
   .home-container .hero-title-container h1 {
