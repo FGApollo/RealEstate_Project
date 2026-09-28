@@ -195,16 +195,22 @@
 .suggestions-heading > button { display: inline-flex; align-items: center; gap: 4px; padding: 4px 0; border: 0; background: transparent; color: #0870ff; font: inherit; font-size: 12px; font-weight: 650; white-space: nowrap; cursor: pointer; }
 
 .swipe-history-empty { display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center; min-height: 400px; padding: 4px 8px 18px; text-align: center; }
-.swipe-history-mascot-scene { position: relative; display: flex; align-items: flex-end; justify-content: center; width: 100%; max-width: 250px; height: 195px; margin: 0 auto 17px; }
-.swipe-history-mascot { position: relative; z-index: 2; margin-bottom: 0; }
-.mascot-home-bubble { position: absolute; top: 6px; right: 1px; z-index: 3; display: grid; place-items: center; width: 70px; height: 70px; border-radius: 50%; background: #eef5ff; color: #6e99e7; font-size: 40px; }
-.mascot-skyline { position: absolute; right: 0; bottom: 0; left: 0; height: 77px; display: flex; align-items: flex-end; justify-content: space-around; padding: 0 6px; opacity: .65; }
-.mascot-skyline::before { position: absolute; bottom: 0; left: 0; right: 0; height: 19px; border-radius: 50% 50% 0 0; background: #eaf3ff; content: ""; }
-.mascot-skyline i { position: relative; width: 23px; height: 53px; background: #e5efff; clip-path: polygon(0 12%, 100% 12%, 100% 100%, 0 100%); }
-.mascot-skyline i:nth-child(2) { height: 77px; width: 32px; }
-.mascot-skyline i:nth-child(3) { height: 40px; }
-.mascot-skyline i:nth-child(4) { height: 65px; width: 29px; }
-.mascot-skyline i:nth-child(5) { height: 48px; }
+.swipe-history-mascot-scene { position: relative; width: 100%; max-width: 230px; height: 157px; margin: 0 auto 14px; isolation: isolate; }
+.swipe-history-mascot { position: absolute; z-index: 2; bottom: -1px; left: 50%; display: block; width: 128px; height: 128px; background: url('/mascots/otter-builder-directions.webp') 50% 50% / 300% 300% no-repeat; transform: translateX(-50%); }
+.mascot-home-bubble { position: absolute; z-index: 4; top: 1px; right: 19px; display: grid; place-items: center; width: 56px; height: 56px; border-radius: 50%; background: #eef5ff; color: #6e99e7; }
+.mascot-cloud { position: absolute; z-index: 0; display: block; height: 13px; border-radius: 20px; background: #eaf2ff; opacity: .9; }
+.mascot-cloud::before,.mascot-cloud::after { position: absolute; bottom: 4px; border-radius: 50%; background: inherit; content: ""; }
+.mascot-cloud::before { left: 7px; width: 19px; height: 19px; }
+.mascot-cloud::after { left: 20px; width: 14px; height: 14px; }
+.mascot-cloud.cloud-left { top: 33px; left: 20px; width: 43px; }
+.mascot-cloud.cloud-right { top: 58px; right: 0; width: 35px; opacity: .65; }
+.mascot-skyline { position: absolute; z-index: 1; right: 0; bottom: 0; left: 0; height: 72px; display: flex; align-items: flex-end; justify-content: space-around; padding: 0 6px; opacity: .8; }
+.mascot-skyline::before { position: absolute; z-index: 1; bottom: 0; left: -2%; width: 104%; height: 18px; border-radius: 52% 48% 0 0 / 100% 100% 0 0; background: #edf4ff; content: ""; }
+.mascot-skyline i { position: relative; z-index: 0; width: 22px; height: 43px; background: linear-gradient(90deg, rgba(255,255,255,.45) 1px, transparent 1px) 0 0 / 8px 100%, #e5efff; clip-path: polygon(0 12%, 50% 0, 100% 12%, 100% 100%, 0 100%); }
+.mascot-skyline i:nth-child(2) { height: 60px; width: 28px; }
+.mascot-skyline i:nth-child(3) { height: 34px; width: 19px; }
+.mascot-skyline i:nth-child(4) { height: 54px; width: 25px; }
+.mascot-skyline i:nth-child(5) { height: 39px; width: 22px; }
 .swipe-history-empty h3 { margin: 6px 0 10px; color: #10214d; font-size: 18px; line-height: 1.38; font-weight: 750; }
 .swipe-history-empty p { max-width: 245px; margin: 0; color: #7886a0; font-size: 13px; line-height: 1.65; }
 .swipe-history-cta { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-width: 205px; margin-top: 28px; padding: 13px 20px; border: 0; border-radius: 18px; background: #e9f1ff; color: #075cf1; font: inherit; font-size: 14px; font-weight: 720; cursor: pointer; transition: background .18s, transform .18s; }
@@ -346,8 +352,7 @@
   .swipe-experience-main { min-height: 805px; }
   .swipe-history-panel { min-height: 260px; }
   .swipe-history-empty { min-height: 195px; }
-  .swipe-history-mascot-scene { height: 120px; margin-bottom: 5px; }
-  .swipe-history-mascot { transform: scale(.78); transform-origin: bottom center; }
+  .swipe-history-mascot-scene { height: 150px; margin-bottom: 7px; }
   .swipe-history-empty h3 br { display: none; }
   .swipe-history-empty p { max-width: 460px; }
   .swipe-suggestion-card { min-height: 126px; }
