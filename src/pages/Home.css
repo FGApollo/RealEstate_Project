@@ -4800,24 +4800,30 @@
   width: min(100%, 560px);
 }
 
-/* A stronger, softly feathered glass layer blurs only the busy sky behind copy. */
+/* Diffuse mist keeps the scene visible and fades away without a card-shaped edge. */
 .home-container .hero-copy::before {
   position: absolute;
   z-index: -1;
-  inset: -22px -28px -20px -28px;
+  inset: -66px -78px -58px;
   content: "";
-  border: 1px solid rgba(255, 255, 255, 0.34);
-  border-radius: 30px;
-  background:
-    linear-gradient(100deg, rgba(255, 255, 255, 0.78) 0%, rgba(255, 255, 255, 0.58) 68%, rgba(255, 255, 255, 0.12) 100%);
-  box-shadow: 0 14px 38px rgba(40, 77, 123, 0.08);
-  -webkit-backdrop-filter: blur(22px) saturate(0.86);
-  backdrop-filter: blur(22px) saturate(0.86);
+  background: radial-gradient(
+    ellipse at 42% 50%,
+    rgba(245, 249, 255, 0.58) 0%,
+    rgba(245, 249, 255, 0.42) 42%,
+    rgba(245, 249, 255, 0.19) 66%,
+    rgba(245, 249, 255, 0) 83%
+  );
+  -webkit-mask-image: radial-gradient(ellipse at 42% 50%, #000 0%, rgba(0, 0, 0, 0.94) 42%, rgba(0, 0, 0, 0.62) 64%, transparent 82%);
+  mask-image: radial-gradient(ellipse at 42% 50%, #000 0%, rgba(0, 0, 0, 0.94) 42%, rgba(0, 0, 0, 0.62) 64%, transparent 82%);
+  -webkit-backdrop-filter: blur(18px) saturate(0.9);
+  backdrop-filter: blur(18px) saturate(0.9);
   pointer-events: none;
 }
 
 .home-container .hero-title-container h1 {
   font-size: clamp(2.15rem, calc(1.55rem + 1.55vw), 3.12rem);
+  line-height: 1.08;
+  overflow: visible;
   text-wrap: balance;
 }
 
@@ -4854,8 +4860,7 @@
   }
 
   .home-container .hero-copy::before {
-    inset: -18px -18px -16px -18px;
-    border-radius: 24px;
+    inset: -48px -42px -46px;
   }
 
   .home-container .hero-title-container h1 {
@@ -4948,9 +4953,7 @@
   }
 
   .home-container .hero-copy::before {
-    inset: -16px -14px -14px;
-    border-radius: 22px;
-    background: linear-gradient(110deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.48));
+    inset: -46px -34px -42px;
     -webkit-backdrop-filter: blur(18px) saturate(0.9);
     backdrop-filter: blur(18px) saturate(0.9);
   }
@@ -4972,8 +4975,7 @@
   }
 
   .home-container .hero-copy::before {
-    inset: -13px -10px -12px;
-    border-radius: 18px;
+    inset: -34px -24px -32px;
   }
 
   .home-container .hero-title-container h1 {
@@ -4989,6 +4991,17 @@
   .home-container .hero-visual {
     height: clamp(180px, 54vw, 250px);
   }
+}
+
+/* Keep the hand-drawn photo caption fully inside the hero and away from clipping. */
+.home-container .hero-photo-note {
+  top: 10px;
+  right: 14px;
+  max-width: calc(100% - 28px);
+}
+
+.home-container .hero-photo-note span {
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.96), 0 0 10px rgba(255, 255, 255, 0.92);
 }
 
 @media (max-width: 360px) {
