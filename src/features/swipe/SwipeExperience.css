@@ -196,7 +196,7 @@
 
 .swipe-history-empty { display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center; min-height: 400px; padding: 4px 8px 18px; text-align: center; }
 .swipe-history-mascot-scene { position: relative; width: 100%; max-width: 230px; height: 157px; margin: 0 auto 14px; isolation: isolate; }
-.swipe-history-mascot { position: absolute; z-index: 2; bottom: -1px; left: 50%; display: block; width: 128px; height: 128px; background: url('/mascots/otter-builder-directions.webp') 50% 50% / 300% 300% no-repeat; transform: translateX(-50%); }
+.swipe-history-mascot { position: absolute; z-index: 2; bottom: -4px; left: 50%; display: block; width: 152px; height: 135px; object-fit: contain; object-position: center bottom; filter: drop-shadow(0 3px 2px rgba(55, 99, 165, .08)); transform: translateX(-50%); }
 .mascot-home-bubble { position: absolute; z-index: 4; top: 1px; right: 19px; display: grid; place-items: center; width: 56px; height: 56px; border-radius: 50%; background: #eef5ff; color: #6e99e7; }
 .mascot-cloud { position: absolute; z-index: 0; display: block; height: 13px; border-radius: 20px; background: #eaf2ff; opacity: .9; }
 .mascot-cloud::before,.mascot-cloud::after { position: absolute; bottom: 4px; border-radius: 50%; background: inherit; content: ""; }
