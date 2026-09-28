@@ -1,0 +1,309 @@
+.auth-loading {
+  position: fixed;
+  z-index: 9999;
+  inset: 0;
+  display: grid;
+  min-height: 100vh;
+  min-height: 100svh;
+  place-items: center;
+  overflow: hidden;
+  isolation: isolate;
+  padding: 28px 20px;
+  color: #142851;
+  background:
+    radial-gradient(ellipse at 50% 34%, rgba(255, 255, 255, 0.98) 0%, rgba(250, 253, 255, 0.86) 30%, rgba(240, 248, 255, 0.42) 66%, transparent 100%),
+    linear-gradient(180deg, #f5faff 0%, #eef7ff 63%, #e8f3ff 100%);
+}
+
+.auth-loading__cloud {
+  position: absolute;
+  z-index: 0;
+  width: min(46vw, 620px);
+  height: min(25vw, 300px);
+  border-radius: 50%;
+  opacity: 0.54;
+  filter: blur(2px);
+  pointer-events: none;
+  background: radial-gradient(ellipse, rgba(213, 233, 255, 0.74) 0%, rgba(219, 237, 255, 0.48) 43%, rgba(229, 243, 255, 0) 72%);
+}
+
+.auth-loading__cloud--left {
+  top: 21%;
+  left: -20%;
+  transform: rotate(12deg);
+}
+
+.auth-loading__cloud--right {
+  top: 18%;
+  right: -21%;
+  transform: rotate(-10deg);
+}
+
+.auth-loading__skyline {
+  position: absolute;
+  z-index: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: clamp(145px, 32vh, 320px);
+  color: #fff;
+  pointer-events: none;
+}
+
+.auth-loading__skyline svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.auth-loading__content {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 520px);
+  margin-top: -12px;
+  text-align: center;
+}
+
+.auth-loading__illustration {
+  position: relative;
+  display: grid;
+  height: clamp(160px, 26vh, 246px);
+  place-items: center;
+  margin-bottom: 7px;
+}
+
+.auth-loading__mascot {
+  z-index: 2;
+  filter: drop-shadow(0 14px 14px rgba(57, 94, 143, 0.16));
+  animation: auth-loading-bob 3.2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.auth-loading__property-card {
+  position: absolute;
+  z-index: 1;
+  display: flex;
+  min-width: 126px;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 13px;
+  border: 1px solid rgba(255, 255, 255, 0.94);
+  border-radius: 15px;
+  color: #3573c9;
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: 0 9px 25px rgba(65, 113, 174, 0.12);
+  font-size: 0.68rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.auth-loading__property-card--left {
+  top: 27%;
+  left: calc(50% - 184px);
+  transform: rotate(-9deg);
+  animation: auth-loading-float-left 4.2s ease-in-out infinite;
+}
+
+.auth-loading__property-card--right {
+  top: 31%;
+  right: calc(50% - 184px);
+  transform: rotate(8deg);
+  animation: auth-loading-float-right 4.6s ease-in-out infinite;
+}
+
+.auth-loading__heart {
+  position: absolute;
+  right: -5px;
+  bottom: -6px;
+  padding: 3px;
+  box-sizing: content-box;
+  border-radius: 50%;
+  color: #f48b91;
+  background: #fff;
+  box-shadow: 0 2px 7px rgba(107, 137, 174, 0.14);
+}
+
+.auth-loading__spark {
+  position: absolute;
+  z-index: 3;
+  color: #f7bd42;
+  animation: auth-loading-twinkle 1.8s ease-in-out infinite;
+}
+
+.auth-loading__spark--one {
+  top: 16%;
+  left: calc(50% + 49px);
+}
+
+.auth-loading__spark--two {
+  top: 22%;
+  left: calc(50% + 71px);
+  animation-delay: 0.55s;
+}
+
+.auth-loading__eyebrow {
+  margin-bottom: 4px;
+  color: #4382d0;
+  font-size: 0.61rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+.auth-loading__title {
+  color: #15284d;
+  font-size: clamp(1.45rem, 3vw, 1.8rem);
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  line-height: 1.2;
+}
+
+.auth-loading__description {
+  max-width: 360px;
+  margin: 7px auto 0;
+  color: #71829c;
+  font-size: 0.77rem;
+  line-height: 1.55;
+}
+
+.auth-loading__progress {
+  position: relative;
+  width: min(100%, 260px);
+  height: 7px;
+  margin: 18px auto 19px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #dceaff;
+  box-shadow: inset 0 1px 2px rgba(39, 83, 143, 0.08);
+}
+
+.auth-loading__progress span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 42%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #3c9bff, #2169f6);
+  box-shadow: 0 2px 8px rgba(38, 119, 248, 0.25);
+  animation: auth-loading-progress 1.65s ease-in-out infinite;
+}
+
+.auth-loading__features {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(12px, 2.1vw, 25px);
+  color: #71829b;
+  font-size: 0.59rem;
+  font-weight: 600;
+}
+
+.auth-loading__features span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.auth-loading__features svg {
+  flex: 0 0 auto;
+  color: #4384dc;
+}
+
+@keyframes auth-loading-bob {
+  0%, 100% { transform: translateY(1px); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes auth-loading-float-left {
+  0%, 100% { margin-top: 0; }
+  50% { margin-top: -7px; }
+}
+
+@keyframes auth-loading-float-right {
+  0%, 100% { margin-top: 0; }
+  50% { margin-top: 7px; }
+}
+
+@keyframes auth-loading-twinkle {
+  0%, 100% { opacity: 0.55; transform: scale(0.84) rotate(-8deg); }
+  50% { opacity: 1; transform: scale(1.12) rotate(10deg); }
+}
+
+@keyframes auth-loading-progress {
+  0% { left: -42%; width: 38%; }
+  55% { left: 35%; width: 50%; }
+  100% { left: 104%; width: 38%; }
+}
+
+@media (max-width: 520px) {
+  .auth-loading {
+    padding: 22px 16px;
+  }
+
+  .auth-loading__illustration {
+    height: clamp(150px, 24vh, 205px);
+  }
+
+  .auth-loading__mascot {
+    width: 150px !important;
+    height: 150px !important;
+  }
+
+  .auth-loading__property-card {
+    min-width: auto;
+    gap: 6px;
+    padding: 9px 10px;
+    font-size: 0.59rem;
+  }
+
+  .auth-loading__property-card--left {
+    left: calc(50% - 158px);
+  }
+
+  .auth-loading__property-card--right {
+    right: calc(50% - 158px);
+  }
+
+  .auth-loading__features {
+    flex-wrap: wrap;
+    gap: 9px 14px;
+    max-width: 330px;
+    margin: 0 auto;
+    font-size: 0.56rem;
+  }
+}
+
+@media (max-height: 560px) {
+  .auth-loading {
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+
+  .auth-loading__content {
+    margin-top: 0;
+  }
+
+  .auth-loading__illustration {
+    height: clamp(112px, 32vh, 158px);
+    margin-bottom: 0;
+  }
+
+  .auth-loading__mascot {
+    width: 126px !important;
+    height: 126px !important;
+  }
+
+  .auth-loading__progress {
+    margin-top: 11px;
+    margin-bottom: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-loading__mascot,
+  .auth-loading__property-card,
+  .auth-loading__spark,
+  .auth-loading__progress span {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
