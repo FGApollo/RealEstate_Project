@@ -1,11 +1,12 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
+import AuthLoading from './AuthLoading';
 
 const ProtectedRoute = ({ allowedRoles }) => {
   const { user, loading } = useAuth();
   const location = useLocation();
 
-  if (loading) return <div role="status">Đang xác thực...</div>;
+  if (loading) return <AuthLoading />;
 
   if (!user) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
