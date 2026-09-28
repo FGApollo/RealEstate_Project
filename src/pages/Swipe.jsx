@@ -699,6 +699,7 @@ const Swipe = () => {
             onExplore={() => setCurrentIndex(0)}
           />
           <SwipeMainSection
+            discoveryTitle={activeCategoryKey === 'Tất cả' ? 'Khám phá tất cả' : `Khám phá ${categoryName}`}
             currentProperty={currentProperty}
             isAlreadyFavorite={isAlreadyFavorite}
             formatPrice={formatPrice}
