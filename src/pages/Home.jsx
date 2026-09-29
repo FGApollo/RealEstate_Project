@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Mascot } from 'page-mascot';
+import SwipeNestMark from '../components/SwipeNestMark';
 import { 
   Menu, Search, MapPin, Home as HomeIcon, 
   Bed, Bath, Maximize, LogOut, User,
@@ -12,7 +13,7 @@ import './Home.css';
 import { API_BASE_URL } from '../config';
 import { apiFetch } from '../auth/apiClient';
 import { useAuth } from '../auth/useAuth';
-import Header, { SwipeNestMark } from '../components/Header';
+import Header from '../components/Header';
 
 const getCategoryIllustration = (name = '') => {
   const normalized = String(name).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -762,7 +763,6 @@ const Home = () => {
   };
 
   const featuredProperties = filteredProperties.slice(0, 4);
-  const popularAreas = ['Quận 1', 'Quận 7', 'Thủ Đức', 'Căn hộ', 'Nhà phố', 'Dưới 3 tỷ'];
 
   return (
     <div className="home-container">
@@ -808,13 +808,14 @@ const Home = () => {
                   src="https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=85"
                   alt="House"
                 />
-                <div className="hero-photo-badge">
-                  <div className="badge-icon-box"><HomeIcon size={14} color="#1a42b8" /></div>
-                  <div className="badge-text-box">
-                    <span className="badge-title">Good Homes</span>
-                    <span className="badge-subtitle">Brighter Tomorrows</span>
-                  </div>
-                </div>
+              </div>
+              <div className="hero-photo-note" aria-label="Good Homes, Brighter Tomorrows">
+                <span>Good Homes</span>
+                <span>Brighter Tomorrows</span>
+                <svg viewBox="0 0 112 64" aria-hidden="true" focusable="false">
+                  <path d="M108 2C91 21 69 40 12 52" />
+                  <path d="M12 52L22 43M12 52L24 56" />
+                </svg>
               </div>
             </div>
           </div>
@@ -934,10 +935,6 @@ const Home = () => {
             </div>
           </form>
 
-          <div className="popular-searches">
-            <span>Tìm kiếm phổ biến:</span>
-            {popularAreas.map(area => <button key={area} type="button" onClick={() => setSearchLoc(area)}>{area}</button>)}
-          </div>
         </div>
       </section>
 

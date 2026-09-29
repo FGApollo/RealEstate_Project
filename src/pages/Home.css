@@ -3090,6 +3090,8 @@
 .home-container .search-field select {
   width: 100%;
   padding-right: 12px;
+  appearance: none;
+  -webkit-appearance: none;
 }
 
 .home-container .search-field-divider {
@@ -3164,31 +3166,6 @@
 .home-container .search-btn:hover {
   background: var(--home-blue-dark);
   box-shadow: 0 9px 22px rgba(6, 103, 249, 0.34);
-}
-
-.popular-searches {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  min-height: 45px;
-  padding: 9px 0 0;
-  color: #9aa3b1;
-  font-size: 0.6rem;
-}
-
-.popular-searches button {
-  padding: 4px 9px;
-  color: #5f697a;
-  background: #f0f3f7;
-  border-radius: 99px;
-  font-size: 0.58rem;
-  transition: all 0.2s ease;
-}
-
-.popular-searches button:hover {
-  color: var(--home-blue);
-  background: #e7f1ff;
 }
 
 .home-container .location-autocomplete-dropdown {
@@ -3662,11 +3639,6 @@
     margin: 0;
   }
 
-  .popular-searches {
-    flex-wrap: wrap;
-    padding: 13px 0 22px;
-  }
-
   .home-container .categories-section,
   .home-container .recommended-section {
     padding-left: 20px;
@@ -4013,9 +3985,14 @@
   min-height: 0;
   padding: 26px clamp(20px, 4vw, 64px) 0;
   overflow: visible;
-  background:
+  background-color: #eaf6ff;
+  background-image:
+    url('/hero-background-saigon-vinhomes-readable.png'),
     radial-gradient(ellipse at 76% 0%, rgba(123, 198, 255, 0.24), transparent 38%),
     linear-gradient(180deg, #eaf6ff 0%, #f5faff 56%, #f8fafc 100%);
+  background-position: left 56%, center, center;
+  background-repeat: no-repeat;
+  background-size: cover, auto, auto;
 }
 
 .home-container .hero-content {
@@ -4094,8 +4071,8 @@
 }
 
 .home-container .mascot-speech-bubble {
-  top: 0;
-  right: -24px;
+  top: 10px;
+  right: -12px;
   padding: 8px 11px;
   border: 1px solid #d7eaff;
   border-radius: 17px;
@@ -4209,11 +4186,6 @@
   border-radius: 12px;
 }
 
-.home-container .popular-searches {
-  min-height: 40px;
-  padding: 8px 0 0;
-}
-
 @media (max-width: 980px) {
   .home-container .hero-section {
     padding-right: 24px;
@@ -4235,7 +4207,7 @@
   }
 
   .home-container .mascot-speech-bubble {
-    right: -16px;
+    right: -8px;
     font-size: 0.59rem;
   }
 
@@ -4302,8 +4274,8 @@
   }
 
   .home-container .mascot-speech-bubble {
-    top: -8px;
-    right: -95px;
+    top: 0;
+    right: -76px;
   }
 
   .home-container .search-bar-container {
@@ -4363,7 +4335,7 @@
   }
 
   .home-container .mascot-speech-bubble {
-    right: -104px;
+    right: -84px;
     font-size: 0.54rem;
   }
 
@@ -4491,6 +4463,7 @@
 /* Give the desktop homepage a little more breathing room on wide screens. */
 @media (min-width: 1200px) {
   .home-container .hero-section {
+    min-height: max(370px, 15vw);
     padding-right: clamp(32px, 3.2vw, 62px);
     padding-left: clamp(32px, 3.2vw, 62px);
   }
@@ -4523,6 +4496,7 @@
   .home-container .search-bar-container {
     min-height: 74px;
     margin-top: -43px;
+    transform: translateY(-12px);
   }
 
   .home-container .categories-section,
@@ -4664,14 +4638,6 @@
     font-size: 0.87rem;
   }
 
-  .home-container .popular-searches {
-    font-size: 0.7rem;
-  }
-
-  .home-container .popular-searches button {
-    font-size: 0.67rem;
-  }
-
   .home-container .categories-section h2,
   .home-container .listings-heading h2 {
     font-size: 1.4rem;
@@ -4743,5 +4709,323 @@
 @media (min-width: 1200px) {
   .home-container .hero-title-container h1 {
     font-size: clamp(2.2rem, 3.4vw, 3.12rem);
+  }
+}
+
+.home-container .hero-photo-note {
+  position: absolute;
+  z-index: 7;
+  top: -36px;
+  right: -136px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: max-content;
+  color: #28569a;
+  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", cursive;
+  font-size: clamp(0.62rem, 0.72vw, 0.82rem);
+  font-weight: 600;
+  line-height: 1.18;
+  white-space: nowrap;
+  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.95), 0 0 7px rgba(255, 255, 255, 0.72);
+  transform: rotate(-5deg);
+  pointer-events: none;
+}
+
+.home-container .hero-photo-note span + span {
+  margin-left: 5px;
+}
+
+.home-container .hero-photo-note svg {
+  position: absolute;
+  top: calc(100% - 2px);
+  left: -45px;
+  right: auto;
+  width: 112px;
+  height: 64px;
+  overflow: visible;
+  fill: none;
+  stroke: #28569a;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+@media (max-width: 1749px) {
+  .home-container .hero-photo-note {
+    right: 8px;
+  }
+}
+
+@media (max-width: 900px) {
+  .home-container .hero-visual {
+    margin-top: 44px;
+  }
+}
+
+@media (max-width: 520px) {
+  .home-container .hero-photo-note {
+    top: -36px;
+    right: 8px;
+    font-size: 0.62rem;
+  }
+
+  .home-container .hero-visual {
+    margin-top: 44px;
+  }
+
+  .home-container .hero-photo-note svg {
+    width: 94px;
+    height: 54px;
+    left: -38px;
+  }
+}
+
+/*
+ * Responsive hero guardrails
+ *
+ * Keep this block last: Home.css still contains a few historical hero passes,
+ * so these rules are the single source of truth for current viewport handling.
+ */
+.home-container .hero-section {
+  overflow: clip;
+  background-position: center 56%, center, center;
+}
+
+.home-container .hero-top-row {
+  grid-template-columns: minmax(0, 1.08fr) minmax(140px, 0.46fr) minmax(0, 1.12fr);
+}
+
+.home-container .hero-copy {
+  position: relative;
+  isolation: isolate;
+  width: min(100%, 560px);
+}
+
+/* Diffuse mist keeps the scene visible and fades away without a card-shaped edge. */
+.home-container .hero-copy::before {
+  position: absolute;
+  z-index: -1;
+  inset: -8px -12px;
+  content: "";
+  background: radial-gradient(
+    ellipse at 42% 50%,
+    rgba(245, 249, 255, 0.58) 0%,
+    rgba(245, 249, 255, 0.42) 42%,
+    rgba(245, 249, 255, 0.19) 66%,
+    rgba(245, 249, 255, 0) 83%
+  );
+  -webkit-mask-image: radial-gradient(ellipse at 42% 50%, #000 0%, rgba(0, 0, 0, 0.94) 42%, rgba(0, 0, 0, 0.62) 64%, transparent 82%);
+  mask-image: radial-gradient(ellipse at 42% 50%, #000 0%, rgba(0, 0, 0, 0.94) 42%, rgba(0, 0, 0, 0.62) 64%, transparent 82%);
+  -webkit-backdrop-filter: blur(12px) saturate(0.92);
+  backdrop-filter: blur(12px) saturate(0.92);
+  pointer-events: none;
+}
+
+.home-container .hero-title-container h1 {
+  font-size: clamp(2.15rem, calc(1.55rem + 1.55vw), 3.12rem);
+  line-height: 1.08;
+  overflow: visible;
+  text-wrap: balance;
+}
+
+.home-container .hero-description {
+  color: #40516d;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.home-container .hero-photo-frame img {
+  object-position: center 54%;
+}
+
+/* Large laptop / desktop: use the available width without stretching the layout. */
+@media (min-width: 1440px) {
+  .home-container .hero-content {
+    max-width: 1520px;
+  }
+
+  .home-container .hero-top-row {
+    grid-template-columns: minmax(0, 1.12fr) minmax(170px, 0.45fr) minmax(0, 1.16fr);
+  }
+}
+
+/* Compact laptops: keep all three hero subjects readable and inside the canvas. */
+@media (min-width: 901px) and (max-width: 1199px) {
+  .home-container .hero-section {
+    padding-right: clamp(22px, 3vw, 34px);
+    padding-left: clamp(22px, 3vw, 34px);
+  }
+
+  .home-container .hero-top-row {
+    grid-template-columns: minmax(0, 1.12fr) minmax(118px, 0.38fr) minmax(0, 0.98fr);
+    gap: 10px;
+  }
+
+  .home-container .hero-copy::before {
+    inset: -8px -10px;
+  }
+
+  .home-container .hero-title-container h1 {
+    font-size: clamp(2rem, 3.75vw, 2.65rem);
+  }
+
+  .home-container .hero-mascot-img {
+    transform: scale(0.88);
+    transform-origin: center bottom;
+  }
+}
+
+/* The search row needs an earlier reflow than the hero itself on narrow laptops. */
+@media (min-width: 901px) and (max-width: 1100px) {
+  .home-container .search-bar-container {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin-top: -20px;
+    padding: 9px;
+    gap: 7px;
+    border-radius: 20px;
+  }
+
+  .home-container .search-field.location-field-wrapper,
+  .home-container .search-btn-wrapper {
+    grid-column: 1 / -1;
+  }
+
+  .home-container .search-field-divider {
+    display: none;
+  }
+
+  .home-container .search-field {
+    min-height: 52px;
+    border: 1px solid #edf0f4;
+    border-radius: 13px;
+  }
+
+  .home-container .search-btn-wrapper {
+    padding: 0 !important;
+  }
+
+  .home-container .search-btn {
+    width: 100%;
+    height: 46px;
+  }
+}
+
+/* Short laptop windows (browser bars/docks visible): retain the whole hero above the fold. */
+@media (min-width: 901px) and (max-height: 720px) {
+  .home-container .hero-section {
+    min-height: 0;
+    padding-top: 20px;
+  }
+
+  .home-container .hero-top-row {
+    min-height: 232px;
+  }
+
+  .home-container .hero-copy {
+    padding-bottom: 34px;
+  }
+
+  .home-container .hero-mascot-container {
+    height: 202px;
+  }
+
+  .home-container .hero-visual {
+    height: 215px;
+  }
+
+  .home-container .search-bar-container {
+    margin-top: -35px;
+    transform: none;
+  }
+}
+
+/* Tablet and phone: stack content, soften the glass edge, and prevent side overflow. */
+@media (max-width: 900px) {
+  .home-container .hero-section {
+    overflow: hidden;
+  }
+
+  .home-container .hero-top-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .home-container .hero-copy {
+    width: min(100%, 640px);
+  }
+
+  .home-container .hero-copy::before {
+    inset: -8px;
+  }
+
+  .home-container .hero-title-container h1 {
+    max-width: 650px;
+  }
+}
+
+@media (min-width: 521px) and (max-width: 900px) {
+  .home-container .search-bar-container {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .home-container .hero-section {
+    padding-top: 20px;
+  }
+
+  .home-container .hero-copy::before {
+    inset: -6px;
+  }
+
+  .home-container .hero-title-container h1 {
+    font-size: clamp(1.82rem, 9vw, 2.35rem);
+    letter-spacing: -0.045em;
+  }
+
+  .home-container .hero-description {
+    max-width: 36rem;
+    line-height: 1.48;
+  }
+
+  .home-container .hero-visual {
+    height: clamp(180px, 54vw, 250px);
+  }
+}
+
+/* Keep the hand-drawn photo caption fully inside the hero and away from clipping. */
+.home-container .hero-photo-note {
+  top: 10px;
+  right: 14px;
+  max-width: calc(100% - 28px);
+}
+
+.home-container .hero-photo-note span {
+  color: #fff;
+  -webkit-text-stroke: 0.45px rgba(22, 57, 112, 0.9);
+  paint-order: stroke fill;
+  text-shadow:
+    0 1px 2px rgba(13, 43, 91, 0.9),
+    0 0 4px rgba(13, 43, 91, 0.72),
+    0 0 7px rgba(255, 255, 255, 0.82);
+}
+
+.home-container .hero-photo-note svg {
+  stroke: #173f82;
+  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.98)) drop-shadow(0 1px 2px rgba(22, 57, 112, 0.55));
+}
+
+@media (max-width: 360px) {
+  .home-container .hero-section {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .home-container .hero-eyebrow {
+    letter-spacing: 0.015em;
+  }
+
+  .home-container .hero-title-container h1 {
+    font-size: clamp(1.7rem, 8.8vw, 2rem);
   }
 }

@@ -1,0 +1,429 @@
+.swipe-page-container {
+  min-height: 100vh;
+  background: #f2f7ff;
+  color: #10214d;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.swipe-experience-header {
+  height: 72px;
+  flex: 0 0 72px;
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) auto minmax(290px, 1fr);
+  align-items: center;
+  gap: 28px;
+  padding: 0 clamp(24px, 4.3vw, 74px);
+  background: rgba(255, 255, 255, .97);
+  border-bottom: 1px solid #e9eef7;
+  box-shadow: 0 3px 16px rgba(33, 65, 120, .035);
+  position: relative;
+  z-index: 30;
+}
+
+.swipe-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 13px;
+  width: fit-content;
+  color: #111d45;
+  font-size: 22px;
+  font-weight: 760;
+  letter-spacing: -.7px;
+  cursor: pointer;
+}
+
+.swipe-brand-mark {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 46px;
+  filter: drop-shadow(0 4px 5px rgba(28, 62, 137, .2));
+}
+
+.swipe-brand-mark .brand-mark-art { display: block; width: 100%; height: 100%; }
+
+.swipe-primary-nav {
+  align-self: stretch;
+  display: flex;
+  align-items: stretch;
+  gap: clamp(16px, 2.5vw, 43px);
+}
+
+.swipe-nav-link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 7px;
+  border: 0;
+  background: transparent;
+  color: #59657e;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 620;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color .18s ease;
+}
+
+.swipe-nav-link:hover,
+.swipe-nav-link.active { color: #0866f5; }
+
+.swipe-nav-link.active::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  border-radius: 5px 5px 0 0;
+  background: #0870ff;
+  content: "";
+}
+
+.swipe-header-tools {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 21px;
+  min-width: 0;
+}
+
+.swipe-header-icon,
+.swipe-header-notification {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 34px;
+  color: #394968;
+}
+
+.swipe-header-icon { border: 0; background: transparent; cursor: pointer; }
+.swipe-header-icon:hover { color: #0870ff; }
+.swipe-header-notification i { position: absolute; top: 3px; right: 2px; width: 7px; height: 7px; border-radius: 50%; background: #ff5365; border: 1px solid white; }
+
+.swipe-profile-wrap { position: relative; }
+
+.swipe-profile-button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 235px;
+  padding: 4px 0 4px 2px;
+  border: 0;
+  background: transparent;
+  color: #15203d;
+  font: inherit;
+  font-weight: 680;
+  cursor: pointer;
+}
+
+.swipe-profile-button img,
+.swipe-profile-initial {
+  width: 39px;
+  height: 39px;
+  flex: 0 0 auto;
+  border: 3px solid #edf2fb;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.swipe-profile-initial { display: grid; place-items: center; color: #fff; background: #3159ae; font-size: 14px; }
+.swipe-profile-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.swipe-profile-menu {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 12px);
+  right: 0;
+  width: 225px;
+  padding: 8px;
+  border: 1px solid #e8edf5;
+  border-radius: 14px;
+  background: white;
+  box-shadow: 0 15px 36px rgba(23, 46, 92, .15);
+}
+
+.swipe-profile-email { display: block; overflow: hidden; padding: 9px 10px 11px; color: #73809b; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; border-bottom: 1px solid #edf1f7; }
+.swipe-profile-menu button { display: flex; align-items: center; gap: 9px; width: 100%; padding: 10px; border: 0; border-radius: 8px; background: white; color: #32405c; text-align: left; cursor: pointer; }
+.swipe-profile-menu button:hover { background: #f3f7ff; color: #0866f5; }
+.swipe-mobile-menu-button,.swipe-mobile-nav,.swipe-mobile-menu-backdrop { display: none; }
+
+.swipe-main-layout {
+  display: grid;
+  grid-template-columns: minmax(250px, .82fr) minmax(550px, 2.12fr) minmax(300px, 1fr);
+  grid-template-areas: "history main suggestions";
+  align-items: stretch;
+  gap: 18px;
+  width: 100%;
+  max-width: 1740px;
+  min-height: calc(100vh - 72px);
+  margin: 0 auto;
+  padding: 22px clamp(22px, 1.8vw, 30px) 28px;
+  overflow: visible;
+  box-sizing: border-box;
+}
+
+.swipe-experience-panel {
+  min-width: 0;
+  min-height: 0;
+  padding: 23px 21px;
+  border: 1px solid rgba(255, 255, 255, .9);
+  border-radius: 21px;
+  background: rgba(255, 255, 255, .93);
+  box-shadow: 0 10px 32px rgba(47, 88, 153, .055);
+}
+
+.swipe-history-panel { grid-area: history; display: flex; flex-direction: column; }
+.swipe-suggestions-panel { grid-area: suggestions; display: flex; flex-direction: column; }
+
+.swipe-panel-heading {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-height: 42px;
+  margin-bottom: 19px;
+}
+
+.swipe-panel-heading h2 { min-width: 0; margin: 0; color: #102451; font-size: 19px; font-weight: 760; letter-spacing: -.45px; }
+.swipe-panel-icon { display: grid; place-items: center; width: 43px; height: 43px; flex: 0 0 auto; border-radius: 13px; color: #086bff; background: #eaf2ff; }
+.suggestions-icon { color: #f2a900; background: #fff8e9; }
+.suggestions-heading { gap: 10px; }
+.suggestions-heading h2 { flex: 1; }
+.suggestions-heading > button { display: inline-flex; align-items: center; gap: 4px; padding: 4px 0; border: 0; background: transparent; color: #0870ff; font: inherit; font-size: 12px; font-weight: 650; white-space: nowrap; cursor: pointer; }
+
+.swipe-history-empty { display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center; min-height: 400px; padding: 4px 8px 18px; text-align: center; }
+.swipe-history-mascot-scene { position: relative; width: 100%; max-width: 230px; height: 157px; margin: 0 auto 14px; isolation: isolate; }
+.swipe-history-mascot { position: absolute; z-index: 2; bottom: -4px; left: 50%; display: block; width: 152px; height: 135px; object-fit: contain; object-position: center bottom; filter: drop-shadow(0 3px 2px rgba(55, 99, 165, .08)); transform: translateX(-50%); }
+.mascot-home-bubble { position: absolute; z-index: 4; top: 1px; right: 19px; display: grid; place-items: center; width: 56px; height: 56px; border-radius: 50%; background: #eef5ff; color: #6e99e7; }
+.mascot-cloud { position: absolute; z-index: 0; display: block; height: 13px; border-radius: 20px; background: #eaf2ff; opacity: .9; }
+.mascot-cloud::before,.mascot-cloud::after { position: absolute; bottom: 4px; border-radius: 50%; background: inherit; content: ""; }
+.mascot-cloud::before { left: 7px; width: 19px; height: 19px; }
+.mascot-cloud::after { left: 20px; width: 14px; height: 14px; }
+.mascot-cloud.cloud-left { top: 33px; left: 20px; width: 43px; }
+.mascot-cloud.cloud-right { top: 58px; right: 0; width: 35px; opacity: .65; }
+.mascot-skyline { position: absolute; z-index: 1; right: 0; bottom: 0; left: 0; height: 72px; display: flex; align-items: flex-end; justify-content: space-around; padding: 0 6px; opacity: .8; }
+.mascot-skyline::before { position: absolute; z-index: 1; bottom: 0; left: -2%; width: 104%; height: 18px; border-radius: 52% 48% 0 0 / 100% 100% 0 0; background: #edf4ff; content: ""; }
+.mascot-skyline i { position: relative; z-index: 0; width: 22px; height: 43px; background: linear-gradient(90deg, rgba(255,255,255,.45) 1px, transparent 1px) 0 0 / 8px 100%, #e5efff; clip-path: polygon(0 12%, 50% 0, 100% 12%, 100% 100%, 0 100%); }
+.mascot-skyline i:nth-child(2) { height: 60px; width: 28px; }
+.mascot-skyline i:nth-child(3) { height: 34px; width: 19px; }
+.mascot-skyline i:nth-child(4) { height: 54px; width: 25px; }
+.mascot-skyline i:nth-child(5) { height: 39px; width: 22px; }
+.swipe-history-empty h3 { margin: 6px 0 10px; color: #10214d; font-size: 18px; line-height: 1.38; font-weight: 750; }
+.swipe-history-empty p { max-width: 245px; margin: 0; color: #7886a0; font-size: 13px; line-height: 1.65; }
+.swipe-history-cta { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-width: 205px; margin-top: 28px; padding: 13px 20px; border: 0; border-radius: 18px; background: #e9f1ff; color: #075cf1; font: inherit; font-size: 14px; font-weight: 720; cursor: pointer; transition: background .18s, transform .18s; }
+.swipe-history-cta:hover { background: #dceaff; transform: translateY(-1px); }
+.swipe-history-list { display: flex; flex-direction: column; gap: 10px; overflow-y: auto; padding-right: 2px; }
+.swipe-history-item { display: grid; grid-template-columns: 58px minmax(0, 1fr) 28px; align-items: center; gap: 10px; width: 100%; padding: 8px; border: 1px solid #edf1f7; border-radius: 13px; background: #fff; text-align: left; cursor: pointer; }
+.swipe-history-item:hover { border-color: #cbdcff; background: #f9fbff; }
+.swipe-history-item > img { width: 58px; height: 54px; border-radius: 9px; object-fit: cover; }
+.swipe-history-item-copy { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.swipe-history-item-copy strong { overflow: hidden; color: #233458; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.swipe-history-item-copy small { display: flex; align-items: center; gap: 3px; overflow: hidden; color: #7f8aa0; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.swipe-history-result { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: #fff0f1; color: #fb6573; }
+.swipe-history-result.liked { background: #eaf2ff; color: #096bff; }
+
+.swipe-experience-main {
+  grid-area: main;
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 790px;
+  overflow: hidden;
+  border-radius: 22px;
+  isolation: isolate;
+  background: #d9ebff;
+  box-shadow: 0 13px 38px rgba(41, 78, 137, .12);
+}
+
+.swipe-main-backdrop { position: absolute; z-index: -2; inset: 0; background: url('/hero-background-saigon-vinhomes-readable.png') center / cover no-repeat, linear-gradient(135deg, #8dcaff, #f1f8ff 70%); }
+.swipe-main-backdrop::after { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(128, 194, 255, .20) 0%, rgba(238, 247, 255, .18) 57%, rgba(244, 249, 255, .34) 100%); content: ""; }
+.swipe-main-content { display: flex; flex: 1; flex-direction: column; align-items: center; min-width: 0; padding: 26px 24px 18px; }
+
+.swipe-discovery-heading { display: flex; align-items: center; justify-content: space-between; gap: 15px; width: 100%; margin: 0 auto 18px; }
+.swipe-discovery-copy { display: flex; align-items: center; gap: 13px; min-width: 0; }
+.swipe-discovery-icon { display: grid; place-items: center; width: 42px; height: 42px; flex: 0 0 auto; border: 1px solid rgba(255,255,255,.8); border-radius: 50%; background: #0869f2; color: white; box-shadow: 0 5px 14px rgba(18, 83, 190, .18); }
+.swipe-discovery-copy h1 { margin: 0; color: #102657; font-size: clamp(22px, 1.8vw, 29px); font-weight: 790; letter-spacing: -.9px; line-height: 1.13; }
+.swipe-discovery-copy p { margin: 5px 0 0; color: #536987; font-size: 13px; line-height: 1.4; }
+.swipe-filter-pill { display: inline-flex; align-items: center; justify-content: center; gap: 9px; flex: 0 0 auto; min-width: 106px; padding: 12px 17px; border: 1px solid rgba(255,255,255,.94); border-radius: 28px; background: rgba(255,255,255,.92); box-shadow: 0 5px 18px rgba(38, 74, 135, .12); color: #182747; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; transition: transform .2s, box-shadow .2s; }
+.swipe-filter-pill:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(38, 74, 135, .17); }
+.swipe-filter-pill.has-filters b { display: grid; place-items: center; width: 19px; height: 19px; border-radius: 50%; background: #096bff; color: white; font-size: 10px; }
+
+.swipe-experience-deck { position: relative; display: flex; flex: 1; align-items: center; justify-content: center; width: 100%; min-height: 445px; }
+.swipe-property-card { position: relative; width: min(100%, 650px); height: clamp(435px, 57vh, 560px); overflow: hidden; border: 2px solid rgba(255,255,255,.92); border-radius: 27px; background: #9fb9d3; box-shadow: 0 18px 42px rgba(18, 40, 79, .24); cursor: grab; user-select: none; touch-action: pan-y; }
+.swipe-property-card:active { cursor: grabbing; }
+.swipe-property-image,.swipe-property-image-placeholder { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.swipe-property-image-placeholder { background: linear-gradient(135deg, #9fc6ed, #e7eff7); }
+.swipe-property-image-shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(12, 29, 61, .05) 28%, rgba(9, 21, 48, .02) 45%, rgba(8, 20, 48, .84) 100%); pointer-events: none; }
+.swipe-verified-badge { position: absolute; top: 21px; left: 21px; display: inline-flex; align-items: center; gap: 7px; padding: 9px 13px; border-radius: 22px; background: rgba(255,255,255,.96); color: #009d95; box-shadow: 0 5px 15px rgba(23, 54, 99, .15); font-size: 12px; font-weight: 760; letter-spacing: .2px; }
+.swipe-property-favorite { position: absolute; top: 20px; right: 20px; display: grid; place-items: center; width: 54px; height: 54px; border: 1px solid rgba(255,255,255,.56); border-radius: 50%; background: rgba(38, 53, 86, .36); color: white; backdrop-filter: blur(9px); cursor: pointer; transition: transform .18s, background .18s; }
+.swipe-property-favorite:hover { transform: scale(1.06); background: rgba(22, 76, 170, .72); }
+.swipe-property-favorite.active { background: #0870ff; }
+.swipe-property-overlay { position: absolute; right: 0; bottom: 0; left: 0; display: flex; flex-direction: column; gap: 14px; padding: 22px 24px 21px; color: white; }
+.swipe-property-heading h2 { margin: 0 0 7px; color: white; font-size: clamp(21px, 1.7vw, 27px); font-weight: 770; letter-spacing: -.55px; text-shadow: 0 2px 9px rgba(0,0,0,.22); }
+.swipe-property-heading p { display: flex; align-items: center; gap: 7px; margin: 0; color: rgba(255,255,255,.93); font-size: 13px; line-height: 1.4; text-shadow: 0 1px 7px rgba(0,0,0,.4); }
+.swipe-property-heading p span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.swipe-property-facts-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.swipe-property-price { color: white; font-size: clamp(21px, 1.8vw, 28px); font-weight: 800; letter-spacing: -.6px; white-space: nowrap; text-shadow: 0 2px 8px rgba(0,0,0,.32); }
+.swipe-property-price span { margin-left: 4px; font-size: 13px; font-weight: 500; letter-spacing: 0; }
+.swipe-property-facts { display: flex; align-items: stretch; padding: 8px 1px; border: 1px solid rgba(255,255,255,.24); border-radius: 14px; background: rgba(9, 24, 54, .50); backdrop-filter: blur(12px); }
+.swipe-property-facts > span { display: grid; grid-template-columns: auto; justify-items: center; align-content: center; gap: 2px; min-width: 70px; padding: 0 10px; color: white; }
+.swipe-property-facts > span + span { border-left: 1px solid rgba(255,255,255,.21); }
+.swipe-property-facts svg { margin-bottom: 2px; opacity: .95; }
+.swipe-property-facts b { font-size: 13px; font-weight: 750; }
+.swipe-property-facts small { color: rgba(255,255,255,.83); font-size: 10px; white-space: nowrap; }
+.swipe-deck-arrow { position: absolute; z-index: 5; top: 50%; display: grid; place-items: center; width: 52px; height: 52px; border: 1px solid #f1f4fa; border-radius: 50%; background: rgba(255,255,255,.96); color: #11295d; box-shadow: 0 7px 20px rgba(31, 64, 115, .15); cursor: pointer; transform: translateY(-50%); transition: color .16s, transform .16s, box-shadow .16s; }
+.swipe-deck-arrow:hover { color: #086bff; box-shadow: 0 9px 24px rgba(31, 64, 115, .22); }
+.swipe-deck-arrow.previous { left: 1px; }
+.swipe-deck-arrow.next { right: 1px; }
+.swipe-card-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; width: min(100%, 520px); min-height: 360px; padding: 40px; border: 1px solid rgba(255,255,255,.85); border-radius: 26px; background: rgba(255,255,255,.8); box-shadow: 0 12px 34px rgba(35, 65, 112, .13); text-align: center; }
+.swipe-card-empty > svg { color: #1871f6; }
+.swipe-card-empty h2 { margin: 17px 0 8px; color: #132650; font-size: 21px; }
+.swipe-card-empty p { max-width: 350px; margin: 0; color: #71809a; font-size: 13px; line-height: 1.6; }
+.swipe-loading-spinner { width: 38px; height: 38px; border: 3px solid #d7e5fb; border-top-color: #0870ff; border-radius: 50%; animation: swipe-spin .8s linear infinite; }
+@keyframes swipe-spin { to { transform: rotate(360deg); } }
+.swipe-restart-button { margin-top: 19px; padding: 11px 19px; border: 0; border-radius: 12px; background: #086bff; color: white; font: inherit; font-size: 13px; font-weight: 680; cursor: pointer; }
+.swipe-experience-actions { display: flex; align-items: center; justify-content: center; gap: 31px; margin: 8px 0 11px; }
+.swipe-action-button { display: grid; place-items: center; width: 68px; height: 68px; border: 0; border-radius: 50%; background: white; box-shadow: 0 9px 25px rgba(43, 75, 127, .17); cursor: pointer; transition: transform .18s, box-shadow .18s; }
+.swipe-action-button:hover { transform: translateY(-3px) scale(1.035); box-shadow: 0 13px 27px rgba(43, 75, 127, .22); }
+.swipe-action-button.dislike { color: #fb6570; }
+.swipe-action-button.details { width: 60px; height: 60px; color: #0870ff; }
+.swipe-action-button.like { width: 80px; height: 80px; background: #0870f5; color: white; box-shadow: 0 10px 24px rgba(0, 96, 236, .31); }
+.swipe-action-button.like:hover { background: #005fe4; }
+.swipe-action-button.like.active { background: #075bda; }
+.swipe-discover-hint { display: inline-flex; align-items: center; gap: 9px; color: #869aba; font-size: 12px; }
+.swipe-pagination { display: flex; align-items: center; justify-content: center; gap: 9px; min-height: 24px; margin-top: 7px; }
+.swipe-pagination span { width: 27px; height: 6px; border-radius: 5px; background: rgba(100, 127, 170, .22); transition: width .18s, background .18s; }
+.swipe-pagination span.active { width: 44px; background: #0870ff; }
+
+.swipe-suggestion-list { display: flex; flex: 1; flex-direction: column; gap: 14px; min-height: 0; }
+.swipe-suggestion-card { position: relative; display: flex; flex: 1 1 0; min-height: 118px; overflow: hidden; padding: 0; border: 0; border-radius: 17px; background: #d4e2f2; text-align: left; cursor: pointer; isolation: isolate; }
+.swipe-suggestion-card > img { position: absolute; z-index: -2; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform .35s; }
+.swipe-suggestion-card:hover > img { transform: scale(1.04); }
+.swipe-suggestion-shade { position: absolute; z-index: -1; inset: 0; background: linear-gradient(180deg, rgba(4, 16, 38, .04) 20%, rgba(7, 18, 39, .78) 100%); }
+.swipe-suggestion-open { position: absolute; z-index: 0; inset: 0; width: 100%; border: 0; background: transparent; cursor: pointer; }
+.swipe-suggestion-heart { position: absolute; z-index: 3; top: 11px; right: 11px; display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 1px solid rgba(255,255,255,.6); border-radius: 50%; background: rgba(36, 52, 77, .37); color: white; backdrop-filter: blur(7px); cursor: pointer; }
+.swipe-suggestion-heart.active { background: #0870ff; }
+.swipe-suggestion-copy { position: relative; z-index: 1; display: flex; flex-direction: column; justify-content: flex-end; align-self: stretch; gap: 5px; width: 100%; padding: 16px; color: white; pointer-events: none; }
+.swipe-suggestion-copy strong { overflow: hidden; font-size: 17px; line-height: 1.2; font-weight: 750; text-overflow: ellipsis; text-shadow: 0 2px 8px rgba(0,0,0,.34); white-space: nowrap; }
+.swipe-suggestion-copy small { display: flex; align-items: center; gap: 5px; overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; text-shadow: 0 1px 5px rgba(0,0,0,.4); }
+
+.swipe-chat-prompt { position: fixed; z-index: 20; right: 19px; bottom: 20px; display: flex; align-items: flex-end; gap: 0; pointer-events: none; }
+.swipe-chat-prompt-copy { position: relative; z-index: 2; margin: 0 -7px 38px 0; padding: 11px 15px; border: 1px solid #e8f0ff; border-radius: 17px 17px 5px 17px; background: white; color: #075eea; box-shadow: 0 6px 17px rgba(41, 92, 179, .18); font: inherit; font-size: 12px; font-weight: 720; line-height: 1.35; transform: rotate(-3deg); cursor: pointer; pointer-events: auto; }
+.swipe-chat-mascot { position: relative; z-index: 1; margin-right: -4px; pointer-events: auto; }
+.swipe-chat-prompt-button { position: relative; z-index: 3; display: grid; place-items: center; width: 49px; height: 49px; margin: 0 0 1px -13px; border: 3px solid white; border-radius: 50%; background: #0870f5; color: white; box-shadow: 0 7px 18px rgba(0, 91, 223, .3); cursor: pointer; pointer-events: auto; transition: transform .18s; }
+.swipe-chat-prompt-button:hover { transform: translateY(-2px); }
+
+@media (max-width: 1240px) {
+  .swipe-main-layout { grid-template-columns: minmax(220px, .75fr) minmax(500px, 2fr) minmax(270px, .95fr); gap: 14px; padding-right: 18px; padding-left: 18px; }
+  .swipe-experience-panel { padding: 19px 16px; }
+  .swipe-panel-heading h2 { font-size: 17px; }
+  .swipe-property-facts > span { min-width: 61px; padding: 0 7px; }
+  .swipe-experience-main { min-height: 745px; }
+}
+
+@media (min-width: 1081px) and (max-height: 820px) {
+  .swipe-main-layout { min-height: calc(100vh - 72px); padding-top: 15px; padding-bottom: 15px; }
+  .swipe-experience-main { min-height: 0; }
+  .swipe-main-content { min-height: 0; padding-top: 18px; padding-bottom: 11px; }
+  .swipe-discovery-heading { margin-bottom: 10px; }
+  .swipe-experience-deck { min-height: 350px; }
+  .swipe-property-card { height: clamp(350px, 53vh, 455px); }
+  .swipe-experience-actions { gap: 23px; margin-top: 4px; margin-bottom: 5px; }
+  .swipe-action-button { width: 58px; height: 58px; }
+  .swipe-action-button.details { width: 52px; height: 52px; }
+  .swipe-action-button.like { width: 68px; height: 68px; }
+  .swipe-pagination { margin-top: 2px; }
+  .swipe-experience-panel { padding-top: 18px; padding-bottom: 18px; }
+  .swipe-suggestion-list { gap: 10px; }
+  .swipe-suggestion-card { min-height: 104px; }
+}
+
+@media (max-width: 1080px) {
+  .swipe-experience-header { grid-template-columns: minmax(190px, 1fr) auto minmax(195px, 1fr); gap: 12px; padding: 0 24px; }
+  .swipe-brand { font-size: 19px; }
+  .swipe-primary-nav { gap: 14px; }
+  .swipe-nav-link { font-size: 13px; }
+  .swipe-header-tools { gap: 11px; }
+  .swipe-profile-name { display: none; }
+  .swipe-main-layout { grid-template-columns: minmax(0, 1.7fr) minmax(265px, .88fr); grid-template-areas: "main suggestions" "history history"; min-height: unset; }
+  .swipe-experience-main { min-height: 805px; }
+  .swipe-history-panel { min-height: 260px; }
+  .swipe-history-empty { min-height: 195px; }
+  .swipe-history-mascot-scene { height: 150px; margin-bottom: 7px; }
+  .swipe-history-empty h3 br { display: none; }
+  .swipe-history-empty p { max-width: 460px; }
+  .swipe-suggestion-card { min-height: 126px; }
+  .swipe-suggestion-list { gap: 11px; }
+}
+
+@media (max-width: 820px) {
+  .swipe-experience-header { height: 66px; flex-basis: 66px; grid-template-columns: 1fr auto; padding: 0 19px; }
+  .swipe-brand { font-size: 18px; }
+  .swipe-brand-mark { width: 37px; height: 40px; }
+  .swipe-primary-nav { display: none; }
+  .swipe-header-tools { gap: 13px; }
+  .swipe-header-notification,.swipe-profile-name,.swipe-profile-button > svg { display: none; }
+  .swipe-profile-button img,.swipe-profile-initial { width: 36px; height: 36px; }
+  .swipe-mobile-menu-button { display: grid; place-items: center; position: absolute; right: 132px; top: 16px; width: 34px; height: 34px; border: 0; background: transparent; color: #354765; cursor: pointer; }
+  .swipe-header-tools { grid-column: 2; }
+  .swipe-mobile-menu-backdrop { display: block; position: fixed; z-index: 39; inset: 66px 0 0; border: 0; background: rgba(16, 31, 60, .23); }
+  .swipe-mobile-nav { position: absolute; z-index: 40; top: 66px; right: 12px; display: flex; flex-direction: column; width: min(280px, calc(100vw - 24px)); padding: 9px; border: 1px solid #e8edf5; border-radius: 16px; background: #fff; box-shadow: 0 18px 36px rgba(23,46,92,.18); }
+  .swipe-mobile-nav button { display: flex; align-items: center; gap: 12px; padding: 13px 12px; border: 0; border-radius: 10px; background: white; color: #344361; text-align: left; font: inherit; cursor: pointer; }
+  .swipe-mobile-nav button:hover { background: #f2f6ff; color: #086bff; }
+  .swipe-main-layout { grid-template-columns: minmax(0, 1fr); grid-template-areas: "main" "suggestions" "history"; gap: 14px; padding: 14px 14px 30px; }
+  .swipe-experience-main { min-height: 770px; }
+  .swipe-main-content { padding: 21px 20px 17px; }
+  .swipe-experience-panel { padding: 19px; }
+  .swipe-suggestion-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .swipe-suggestion-card { min-height: 145px; }
+  .swipe-history-panel { min-height: 255px; }
+  .swipe-history-empty { min-height: 210px; }
+  .swipe-chat-prompt { right: 10px; bottom: 12px; transform: scale(.88); transform-origin: bottom right; }
+}
+
+@media (max-width: 560px) {
+  .swipe-experience-header { padding: 0 14px; }
+  .swipe-brand { gap: 9px; font-size: 17px; }
+  .swipe-mobile-menu-button { right: 99px; }
+  .swipe-header-tools { gap: 8px; }
+  .swipe-profile-button img,.swipe-profile-initial { width: 33px; height: 33px; border-width: 2px; }
+  .swipe-main-layout { padding: 10px 10px 26px; }
+  .swipe-experience-main { min-height: auto; border-radius: 18px; }
+  .swipe-main-content { padding: 17px 12px 14px; }
+  .swipe-discovery-heading { align-items: flex-start; gap: 8px; margin-bottom: 12px; }
+  .swipe-discovery-copy { align-items: flex-start; gap: 9px; }
+  .swipe-discovery-icon { width: 35px; height: 35px; }
+  .swipe-discovery-icon svg { width: 19px; height: 19px; }
+  .swipe-discovery-copy h1 { font-size: 19px; }
+  .swipe-discovery-copy p { max-width: 225px; font-size: 11px; }
+  .swipe-filter-pill { min-width: 75px; gap: 6px; padding: 10px 11px; font-size: 12px; }
+  .swipe-filter-pill svg { width: 16px; height: 16px; }
+  .swipe-experience-deck { min-height: 0; }
+  .swipe-property-card { width: 100%; height: min(62vh, 520px); min-height: 390px; border-radius: 20px; }
+  .swipe-deck-arrow { width: 39px; height: 39px; }
+  .swipe-deck-arrow svg { width: 20px; height: 20px; }
+  .swipe-deck-arrow.previous { left: -7px; }
+  .swipe-deck-arrow.next { right: -7px; }
+  .swipe-property-overlay { gap: 11px; padding: 18px 14px 14px; }
+  .swipe-property-heading h2 { font-size: 20px; }
+  .swipe-property-heading p { font-size: 11px; }
+  .swipe-property-facts-row { align-items: flex-end; flex-direction: column; gap: 9px; }
+  .swipe-property-price { align-self: flex-start; font-size: 23px; }
+  .swipe-property-facts { align-self: stretch; justify-content: center; }
+  .swipe-property-facts > span { flex: 1; min-width: 0; padding: 0 4px; }
+  .swipe-property-facts small { font-size: 9px; }
+  .swipe-property-favorite { top: 13px; right: 13px; width: 44px; height: 44px; }
+  .swipe-verified-badge { top: 13px; left: 13px; padding: 7px 10px; font-size: 10px; }
+  .swipe-experience-actions { gap: 19px; margin: 13px 0 7px; }
+  .swipe-action-button { width: 57px; height: 57px; }
+  .swipe-action-button.details { width: 51px; height: 51px; }
+  .swipe-action-button.like { width: 68px; height: 68px; }
+  .swipe-card-empty { min-height: 330px; padding: 27px 18px; }
+  .swipe-suggestion-list { grid-template-columns: minmax(0, 1fr); }
+  .swipe-suggestion-card { min-height: 155px; }
+  .swipe-history-panel { min-height: 0; }
+  .swipe-chat-prompt { right: 3px; bottom: 6px; transform: scale(.76); }
+}

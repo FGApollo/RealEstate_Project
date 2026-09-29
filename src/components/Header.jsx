@@ -2,19 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Menu, X, Search, Bell, ChevronDown, User, LogOut, 
-  Home as HomeIcon, Compass, Heart, MessageSquare 
+  Home as HomeIcon, Compass, Heart, MessageCircle 
 } from 'lucide-react';
 import { useAuth } from '../auth/useAuth';
+import SwipeNestMark from './SwipeNestMark';
 import './Header.css';
 
-export const SwipeNestMark = () => (
-  <svg className="app-brand-mark" viewBox="0 0 150 150" aria-hidden="true" focusable="false">
-    <path d="M75 7 139 53v61a25 25 0 0 1-25 25H36a25 25 0 0 1-25-25V53L75 7Z" fill="#25499b" />
-    <path d="M75 7 24 55v57a27 27 0 0 0 27 27h24V7Z" fill="#fff" opacity=".055" />
-    <path d="M29 72c27-14 65-15 92-1" fill="none" stroke="#f3c52f" strokeWidth="8" strokeLinecap="round" />
-    <path d="M57 49v54m0-54 39 54V49" fill="none" stroke="#fff" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
+export { SwipeNestMark };
 
 export default function Header({
   activeTab, // 'home' | 'swipe' | 'saved' | 'chat' | 'profile'
@@ -22,14 +16,23 @@ export default function Header({
   onTabChange,
   showSearch = false,
   showNotifications = false,
-  onSearchClick
+  onSearchClick,
+  onSearch, // alias for onSearchClick
+  user: userProp,
+  onLogout: onLogoutProp
 }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout } = useAuth();
+  const auth = useAuth();
+  const user = userProp !== undefined ? userProp : auth?.user;
+  const logout = onLogoutProp || auth?.logout;
+
   const [showDropdown, setShowDropdown] = useState(false);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const dropdownRef = useRef(null);
+
+  const handleSearchAction = onSearchClick || onSearch;
+  const shouldShowSearch = showSearch || Boolean(handleSearchAction);
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -72,6 +75,7 @@ export default function Header({
 
   const handleTabClick = (tab, path, state) => {
     setMobileDrawerOpen(false);
+    setShowDropdown(false);
     if (onTabChange) {
       const handled = onTabChange(tab);
       if (handled) return;
@@ -87,104 +91,135 @@ export default function Header({
     try {
       setShowDropdown(false);
       setMobileDrawerOpen(false);
-      await logout();
+      if (logout) {
+        await logout();
+      }
       navigate('/login');
     } catch (err) {
       alert(err.message || 'Đăng xuất thất bại');
     }
   };
 
-  const defaultAvatar = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=100&q=80';
+  const displayName = user?.name || user?.email?.split('@')[0] || 'Tài khoản';
 
   return (
     <>
       <header className="app-header-navbar">
-        <div className="app-header-left">
-          <button 
-            className="app-header-menu-btn" 
-            aria-label="Menu" 
-            onClick={() => {
-              if (onMenuClick) {
-                onMenuClick();
-              } else {
-                setMobileDrawerOpen(true);
-              }
-            }}
-          >
-            <Menu size={20} />
-          </button>
-          <button className="app-header-brand" onClick={() => navigate('/')} aria-label="Về trang chủ">
-            <span className="app-header-logo-icon"><SwipeNestMark /></span>
-            <span className="app-header-logo-text">Swipe Nest</span>
-          </button>
+        {/* Left: Brand with unified redesign styling */}
+        <div 
+          className="app-header-brand" 
+          role="button" 
+          tabIndex={0} 
+          onClick={() => handleTabClick('home', '/')}
+          onKeyDown={(e) => e.key === 'Enter' && handleTabClick('home', '/')}
+          aria-label="Về trang chủ Swipe Nest"
+        >
+          <span className="app-header-brand-mark">
+            <SwipeNestMark />
+          </span>
+          <span className="app-header-brand-title">Swipe Nest</span>
         </div>
 
-        <nav className="app-header-middle">
+        {/* Middle: Primary Navigation (Desktop) */}
+        <nav className="app-header-nav" aria-label="Điều hướng chính">
           <button 
+            type="button"
             className={`app-header-nav-link ${currentTab === 'home' ? 'active' : ''}`}
             onClick={() => handleTabClick('home', '/')}
           >
-            Trang Chủ
+            <span>Trang chủ</span>
           </button>
           <button 
+            type="button"
             className={`app-header-nav-link ${currentTab === 'swipe' ? 'active' : ''}`}
             onClick={() => handleTabClick('swipe', '/swipe/Tất cả')}
           >
-            Khám Phá
+            <Compass size={17} />
+            <span>Khám phá</span>
           </button>
           <button 
+            type="button"
             className={`app-header-nav-link ${currentTab === 'saved' ? 'active' : ''}`}
             onClick={() => handleTabClick('saved', '/swipe/Tất cả', { activeView: 'saved' })}
           >
-            Yêu thích
+            <Heart size={17} />
+            <span>Yêu thích</span>
           </button>
           <button 
+            type="button"
             className={`app-header-nav-link ${currentTab === 'chat' ? 'active' : ''}`}
             onClick={() => handleTabClick('chat', '/chat')}
           >
-            Chat
+            <MessageCircle size={17} />
+            <span>Chat</span>
           </button>
         </nav>
 
-        <div className="app-header-right">
-          {showSearch && (
-            <button className="app-header-icon-btn" aria-label="Tìm kiếm" onClick={onSearchClick}>
-              <Search size={18} />
+        {/* Right: Tools & Profile & Mobile Hamburger Menu Button */}
+        <div className="app-header-tools">
+          {shouldShowSearch && (
+            <button 
+              type="button" 
+              className="app-header-tool-btn" 
+              aria-label="Tìm kiếm hoặc bộ lọc" 
+              onClick={handleSearchAction}
+            >
+              <Search size={20} />
             </button>
           )}
 
           {showNotifications && (
-            <button className="app-header-icon-btn notification" aria-label="Thông báo">
-              <Bell size={18} />
-              <span className="app-header-badge-dot"></span>
+            <button type="button" className="app-header-notification-btn" aria-label="Thông báo">
+              <Bell size={20} />
+              <i className="app-header-badge-dot" />
             </button>
           )}
 
-          {user && (
-            <div className="app-header-user-wrapper" ref={dropdownRef}>
+          {/* Mobile Hamburger Button - ĐẶT Ở BÊN PHẢI CẠNH TOOLS VÀ PROFILE */}
+          <button 
+            className="app-header-mobile-toggle" 
+            type="button" 
+            aria-label={mobileDrawerOpen ? 'Đóng menu' : 'Mở menu'} 
+            onClick={() => {
+              if (onMenuClick) {
+                onMenuClick();
+              } else {
+                setMobileDrawerOpen(!mobileDrawerOpen);
+              }
+            }}
+          >
+            {mobileDrawerOpen ? <X size={22} /> : <Menu size={22} />}
+          </button>
+
+          {/* User Profile or Login */}
+          {user ? (
+            <div className="app-header-profile-wrap" ref={dropdownRef}>
               <button 
-                className={`app-header-user-btn ${currentTab === 'profile' ? 'profile-active' : ''}`}
+                type="button" 
+                className="app-header-profile-btn" 
                 onClick={(e) => {
                   e.stopPropagation();
                   setShowDropdown((prev) => !prev);
                 }}
-                aria-label="Tài khoản cá nhân"
+                aria-expanded={showDropdown}
+                aria-label="Menu tài khoản"
               >
-                <img 
-                  src={user.avatar || defaultAvatar} 
-                  alt={user.name || 'User Avatar'} 
-                  className="app-header-avatar-img" 
-                />
-                <span className="app-header-user-name">{user.name || 'Người dùng'}</span>
-                <ChevronDown size={14} className={`app-header-chevron ${showDropdown ? 'open' : ''}`} />
+                {user.avatar ? (
+                  <img src={user.avatar} alt={displayName} className="app-header-avatar" />
+                ) : (
+                  <span className="app-header-avatar-initial">
+                    {displayName.slice(0, 1).toUpperCase()}
+                  </span>
+                )}
+                <span className="app-header-profile-name">{displayName}</span>
+                <ChevronDown size={15} className={`app-header-chevron ${showDropdown ? 'open' : ''}`} />
               </button>
 
               {showDropdown && (
                 <div className="app-header-dropdown-menu">
-                  <div className="app-header-dropdown-email">
-                    {user.email}
-                  </div>
+                  {user.email && <div className="app-header-dropdown-email">{user.email}</div>}
                   <button 
+                    type="button" 
                     className={`app-header-dropdown-item ${currentTab === 'profile' ? 'active' : ''}`}
                     onClick={() => {
                       setShowDropdown(false);
@@ -195,6 +230,7 @@ export default function Header({
                     <span>Hồ sơ cá nhân</span>
                   </button>
                   <button 
+                    type="button" 
                     className="app-header-dropdown-item logout-btn"
                     onClick={handleLogout}
                   >
@@ -204,26 +240,37 @@ export default function Header({
                 </div>
               )}
             </div>
+          ) : (
+            <button 
+              type="button" 
+              className="app-header-login-btn"
+              onClick={() => navigate('/login')}
+            >
+              Đăng nhập
+            </button>
           )}
         </div>
       </header>
 
       {/* Unified Mobile Navigation Drawer */}
       {mobileDrawerOpen && (
-        <div className="app-header-drawer-backdrop" onClick={() => setMobileDrawerOpen(false)}>
-          <div className="app-header-drawer" onClick={(e) => e.stopPropagation()}>
+        <div className="app-header-mobile-backdrop" onClick={() => setMobileDrawerOpen(false)}>
+          <div className="app-header-mobile-drawer" onClick={(e) => e.stopPropagation()}>
             <div className="app-header-drawer-top">
-              <button 
+              <div 
                 className="app-header-brand" 
                 onClick={() => { 
                   setMobileDrawerOpen(false); 
-                  navigate('/'); 
+                  handleTabClick('home', '/'); 
                 }}
               >
-                <span className="app-header-logo-icon"><SwipeNestMark /></span>
-                <span className="app-header-logo-text">Swipe Nest</span>
-              </button>
+                <span className="app-header-brand-mark">
+                  <SwipeNestMark />
+                </span>
+                <span className="app-header-brand-title">Swipe Nest</span>
+              </div>
               <button 
+                type="button"
                 className="app-header-drawer-close" 
                 onClick={() => setMobileDrawerOpen(false)}
                 aria-label="Đóng menu"
@@ -234,20 +281,23 @@ export default function Header({
 
             <nav className="app-header-drawer-nav">
               <button 
+                type="button"
                 className={`app-header-drawer-link ${currentTab === 'home' ? 'active' : ''}`}
                 onClick={() => handleTabClick('home', '/')}
               >
                 <HomeIcon size={18} />
-                <span>Trang Chủ</span>
+                <span>Trang chủ</span>
               </button>
               <button 
+                type="button"
                 className={`app-header-drawer-link ${currentTab === 'swipe' ? 'active' : ''}`}
                 onClick={() => handleTabClick('swipe', '/swipe/Tất cả')}
               >
                 <Compass size={18} />
-                <span>Khám Phá</span>
+                <span>Khám phá</span>
               </button>
               <button 
+                type="button"
                 className={`app-header-drawer-link ${currentTab === 'saved' ? 'active' : ''}`}
                 onClick={() => handleTabClick('saved', '/swipe/Tất cả', { activeView: 'saved' })}
               >
@@ -255,42 +305,62 @@ export default function Header({
                 <span>Yêu thích</span>
               </button>
               <button 
+                type="button"
                 className={`app-header-drawer-link ${currentTab === 'chat' ? 'active' : ''}`}
                 onClick={() => handleTabClick('chat', '/chat')}
               >
-                <MessageSquare size={18} />
+                <MessageCircle size={18} />
                 <span>Chat</span>
               </button>
-              <button 
-                className={`app-header-drawer-link ${currentTab === 'profile' ? 'active' : ''}`}
-                onClick={() => handleTabClick('profile', '/profile')}
-              >
-                <User size={18} />
-                <span>Hồ sơ cá nhân</span>
-              </button>
+              {shouldShowSearch && (
+                <button 
+                  type="button"
+                  className="app-header-drawer-link"
+                  onClick={() => {
+                    setMobileDrawerOpen(false);
+                    if (handleSearchAction) handleSearchAction();
+                  }}
+                >
+                  <Search size={18} />
+                  <span>Bộ lọc tìm kiếm</span>
+                </button>
+              )}
+              {user && (
+                <button 
+                  type="button"
+                  className={`app-header-drawer-link ${currentTab === 'profile' ? 'active' : ''}`}
+                  onClick={() => handleTabClick('profile', '/profile')}
+                >
+                  <User size={18} />
+                  <span>Hồ sơ cá nhân</span>
+                </button>
+              )}
             </nav>
 
-            {user ? (
-              <div className="app-header-drawer-footer">
-                <div className="app-header-drawer-user">
-                  <img 
-                    src={user.avatar || defaultAvatar} 
-                    alt={user.name} 
-                    className="app-header-drawer-avatar" 
-                  />
-                  <div className="app-header-drawer-user-info">
-                    <span className="app-header-drawer-user-name">{user.name || 'Người dùng'}</span>
-                    <span className="app-header-drawer-user-email">{user.email}</span>
+            <div className="app-header-drawer-footer">
+              {user ? (
+                <>
+                  <div className="app-header-drawer-user">
+                    {user.avatar ? (
+                      <img src={user.avatar} alt={displayName} className="app-header-drawer-avatar" />
+                    ) : (
+                      <span className="app-header-avatar-initial drawer-avatar-initial">
+                        {displayName.slice(0, 1).toUpperCase()}
+                      </span>
+                    )}
+                    <div className="app-header-drawer-user-info">
+                      <span className="app-header-drawer-user-name">{displayName}</span>
+                      {user.email && <span className="app-header-drawer-user-email">{user.email}</span>}
+                    </div>
                   </div>
-                </div>
-                <button className="app-header-drawer-logout" onClick={handleLogout}>
-                  <LogOut size={16} />
-                  <span>Đăng xuất</span>
-                </button>
-              </div>
-            ) : (
-              <div className="app-header-drawer-footer">
+                  <button type="button" className="app-header-drawer-logout" onClick={handleLogout}>
+                    <LogOut size={16} />
+                    <span>Đăng xuất</span>
+                  </button>
+                </>
+              ) : (
                 <button 
+                  type="button"
                   className="app-header-drawer-login-btn" 
                   onClick={() => {
                     setMobileDrawerOpen(false);
@@ -299,8 +369,8 @@ export default function Header({
                 >
                   Đăng nhập
                 </button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       )}
