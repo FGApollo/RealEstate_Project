@@ -4,7 +4,7 @@ import { Mascot } from 'page-mascot';
 import SwipeNestMark from '../components/SwipeNestMark';
 import { 
   Menu, Search, MapPin, Home as HomeIcon, 
-  Bed, Bath, Maximize, LogOut,
+  Bed, Bath, Maximize, LogOut, User,
   ChevronDown, ArrowRight, Heart, X, SlidersHorizontal,
   ChevronLeft, ChevronRight, MessageSquare, Calendar, Eye, ShieldCheck, Phone, Shield, Share2, Sparkles,
   Ruler, Star, Bell, Zap
@@ -13,6 +13,7 @@ import './Home.css';
 import { API_BASE_URL } from '../config';
 import { apiFetch } from '../auth/apiClient';
 import { useAuth } from '../auth/useAuth';
+import Header from '../components/Header';
 
 const getCategoryIllustration = (name = '') => {
   const normalized = String(name).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -766,86 +767,11 @@ const Home = () => {
   return (
     <div className="home-container">
       {/* Navbar */}
-      <header className="navbar">
-        <div className="nav-left">
-          <button className="menu-btn" aria-label="Menu" onClick={() => setShowSidebar(true)}>
-            <Menu size={20} />
-          </button>
-          <button className="brand-lockup" onClick={() => navigate('/')} aria-label="Về trang chủ">
-            <span className="brand-mark"><SwipeNestMark /></span>
-            <span className="logo-text">Swipe Nest</span>
-          </button>
-        </div>
-
-        <nav className="nav-middle">
-          <button className="nav-link active" onClick={() => navigate('/')}>Trang Chủ</button>
-          <button className="nav-link" onClick={() => navigate('/swipe/Tất cả')}>Khám Phá</button>
-          <button className="nav-link" onClick={() => navigate('/swipe/Tất cả', { state: { activeView: 'saved' } })}>Yêu thích</button>
-          <button className="nav-link" onClick={() => navigate('/chat')}>Chat</button>
-        </nav>
-
-        <div className="nav-right">
-          <button className="search-icon-btn" aria-label="Search button">
-            <Search size={18} />
-          </button>
-          <button className="notification-btn" aria-label="Thông báo">
-            <Bell size={18} />
-            <span className="notification-dot"></span>
-          </button>
-          
-          {user && (
-            <div className="user-profile">
-              <button 
-                className="user-avatar-btn" 
-                onClick={() => setShowDropdown(!showDropdown)}
-              >
-                <img 
-                  src={user.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=100&q=80'} 
-                  alt={user.name} 
-                  className="user-img" 
-                />
-                <span className="user-name">{user.name}</span>
-                <ChevronDown size={14} />
-              </button>
-
-              {showDropdown && (
-                <div className="dropdown-menu">
-                  <div className="dropdown-item" style={{ fontWeight: 600, borderBottom: '1px solid #f1f5f9' }}>
-                    {user.email}
-                  </div>
-                  <button className="dropdown-item logout-btn" onClick={handleLogout}>
-                    <LogOut size={14} style={{ marginRight: '8px', display: 'inline-block', verticalAlign: 'middle' }} />
-                    Đăng xuất
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </header>
-
-      {/* Mobile Sidebar Drawer */}
-      {showSidebar && (
-        <div className="mobile-sidebar-backdrop" onClick={() => setShowSidebar(false)}>
-          <div className="mobile-sidebar-drawer" onClick={(e) => e.stopPropagation()}>
-            <div className="mobile-sidebar-header">
-              <button className="brand-lockup mobile-sidebar-brand" onClick={() => { navigate('/'); setShowSidebar(false); }} aria-label="Về trang chủ">
-                <span className="brand-mark"><SwipeNestMark /></span>
-                <span className="logo-text">Swipe Nest</span>
-              </button>
-              <button className="close-sidebar-btn" onClick={() => setShowSidebar(false)}>
-                <X size={20} />
-              </button>
-            </div>
-            <nav className="mobile-sidebar-nav">
-              <button className="mobile-nav-link active" onClick={() => { navigate('/'); setShowSidebar(false); }}>Trang Chủ</button>
-              <button className="mobile-nav-link" onClick={() => { navigate('/swipe/Tất cả'); setShowSidebar(false); }}>Khám Phá</button>
-              <button className="mobile-nav-link" onClick={() => { navigate('/swipe/Tất cả', { state: { activeView: 'saved' } }); setShowSidebar(false); }}>Yêu thích</button>
-              <button className="mobile-nav-link" onClick={() => { navigate('/chat'); setShowSidebar(false); }}>Chat</button>
-            </nav>
-          </div>
-        </div>
-      )}
+      <Header
+        activeTab="home"
+        // showSearch
+        // showNotifications
+      />
 
       {/* Hero Section */}
       <section className="hero-section">
