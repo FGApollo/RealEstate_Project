@@ -9,6 +9,7 @@ import './PropertyDetailModal.css';
 import { API_BASE_URL } from '../config';
 import { apiFetch } from '../auth/apiClient';
 import { useAuth } from '../auth/useAuth';
+import PropertyLocationMap from './PropertyLocationMap';
 
 const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = false, isFavorite = false, onToggleFavorite, onSelectProperty }) => {
   const [fetchedProperty, setFetchedProperty] = useState(null);
@@ -538,6 +539,9 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
                 </div>
               </div>
             </div>
+
+            {/* Interactive Leaflet Location Map & Nearby Amenities (F19) */}
+            <PropertyLocationMap property={property} />
 
             {/* 6.5. Similar Properties from other agents */}
             {!isLoadingSimilar && similarProperties.length > 0 && (
