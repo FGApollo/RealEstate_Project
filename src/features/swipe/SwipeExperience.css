@@ -20,6 +20,12 @@
   z-index: 30;
 }
 
+.swipe-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .swipe-brand {
   display: inline-flex;
   align-items: center;
@@ -367,10 +373,11 @@
   .swipe-header-tools { gap: 13px; }
   .swipe-header-notification,.swipe-profile-name,.swipe-profile-button > svg { display: none; }
   .swipe-profile-button img,.swipe-profile-initial { width: 36px; height: 36px; }
-  .swipe-mobile-menu-button { display: grid; place-items: center; position: absolute; right: 132px; top: 16px; width: 34px; height: 34px; border: 0; background: transparent; color: #354765; cursor: pointer; }
+  .swipe-mobile-menu-button { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border: 0; border-radius: 50%; background: transparent; color: #354765; cursor: pointer; transition: background-color 0.2s; }
+  .swipe-mobile-menu-button:hover { background-color: rgba(226, 232, 240, 0.6); }
   .swipe-header-tools { grid-column: 2; }
   .swipe-mobile-menu-backdrop { display: block; position: fixed; z-index: 39; inset: 66px 0 0; border: 0; background: rgba(16, 31, 60, .23); }
-  .swipe-mobile-nav { position: absolute; z-index: 40; top: 66px; right: 12px; display: flex; flex-direction: column; width: min(280px, calc(100vw - 24px)); padding: 9px; border: 1px solid #e8edf5; border-radius: 16px; background: #fff; box-shadow: 0 18px 36px rgba(23,46,92,.18); }
+  .swipe-mobile-nav { position: absolute; z-index: 40; top: 66px; left: 14px; display: flex; flex-direction: column; width: min(280px, calc(100vw - 28px)); padding: 9px; border: 1px solid #e8edf5; border-radius: 16px; background: #fff; box-shadow: 0 18px 36px rgba(23,46,92,.18); }
   .swipe-mobile-nav button { display: flex; align-items: center; gap: 12px; padding: 13px 12px; border: 0; border-radius: 10px; background: white; color: #344361; text-align: left; font: inherit; cursor: pointer; }
   .swipe-mobile-nav button:hover { background: #f2f6ff; color: #086bff; }
   .swipe-main-layout { grid-template-columns: minmax(0, 1fr); grid-template-areas: "main" "suggestions" "history"; gap: 14px; padding: 14px 14px 30px; }
@@ -387,7 +394,6 @@
 @media (max-width: 560px) {
   .swipe-experience-header { padding: 0 14px; }
   .swipe-brand { gap: 9px; font-size: 17px; }
-  .swipe-mobile-menu-button { right: 99px; }
   .swipe-header-tools { gap: 8px; }
   .swipe-profile-button img,.swipe-profile-initial { width: 33px; height: 33px; border-width: 2px; }
   .swipe-main-layout { padding: 10px 10px 26px; }

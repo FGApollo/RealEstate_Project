@@ -73,66 +73,6 @@
   transform: translateY(-1px);
 }
 
-/* Amenity Chips */
-.location-amenities-bar {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  padding-bottom: 12px;
-  margin-bottom: 12px;
-  scrollbar-width: thin;
-}
-
-.location-amenities-bar::-webkit-scrollbar {
-  height: 4px;
-}
-
-.location-amenities-bar::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 4px;
-}
-
-.amenity-chip-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 9999px;
-  font-size: 0.78rem;
-  font-weight: 500;
-  color: #475569;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all 0.15s ease;
-}
-
-.amenity-chip-btn:hover {
-  border-color: #93c5fd;
-  color: #1d4ed8;
-  background: #eff6ff;
-}
-
-.amenity-chip-btn.active {
-  background: #2563eb;
-  color: #ffffff;
-  border-color: #2563eb;
-  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
-}
-
-.amenity-dist {
-  font-size: 0.7rem;
-  opacity: 0.85;
-  background: rgba(0, 0, 0, 0.06);
-  padding: 2px 6px;
-  border-radius: 8px;
-}
-
-.amenity-chip-btn.active .amenity-dist {
-  background: rgba(255, 255, 255, 0.2);
-}
-
 /* Map Canvas */
 .map-canvas-container {
   position: relative;
@@ -280,3 +220,4 @@
   color: #2563eb;
   margin: 0;
 }
+

@@ -14,16 +14,7 @@ import DeleteConfirmModal from '../overview/DeleteConfirmModal';
 import TrustScoreBonusModal from './TrustScoreBonusModal';
 import './AgentProfile.css';
 
-import { WARDS_BY_REGION, ALL_WARDS } from '../../../services/administrativeService';
-
-const normalizeWard = (ward) => {
-  if (!ward) return '';
-  return ward
-    .normalize('NFC')
-    .toLowerCase()
-    .replace(/^(phường|p\.)\s+/i, '')
-    .trim();
-};
+import { WARDS_BY_REGION, ALL_WARDS, normalizeWard } from '../../../services/administrativeService';
 
 const AgentProfile = ({
   currentUser,

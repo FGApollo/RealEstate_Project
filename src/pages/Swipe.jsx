@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { 
   Heart, X, MapPin,
@@ -17,17 +17,7 @@ import SwipeHistoryPanel from '../features/swipe/SwipeHistoryPanel';
 import SwipeMainSection from '../features/swipe/SwipeMainSection';
 import SwipeSuggestionsPanel from '../features/swipe/SwipeSuggestionsPanel';
 import SwipeChatPrompt from '../features/swipe/SwipeChatPrompt';
-
-import { WARDS_BY_REGION, ALL_WARDS } from '../services/administrativeService';
-
-const normalizeWard = (ward) => {
-  if (!ward) return '';
-  return ward
-    .normalize('NFC')
-    .toLowerCase()
-    .replace(/^(phường|p\.)\s+/i, '')
-    .trim();
-};
+import { WARDS_BY_REGION, ALL_WARDS, normalizeWard } from '../services/administrativeService';
 
 // Mock Properties for categories
 const mockProperties = {};
@@ -187,17 +177,13 @@ const Swipe = () => {
     }
   }, [swipeHistory]);
 
+  const targetSelectIdRef = useRef(location.state?.selectPropertyId ? Number(location.state.selectPropertyId) : null);
+
   useEffect(() => {
     if (location.state?.selectPropertyId) {
-      navigate(location.pathname, {
-        replace: true,
-        state: {
-          ...location.state,
-          selectPropertyId: undefined
-        }
-      });
+      targetSelectIdRef.current = Number(location.state.selectPropertyId);
     }
-  }, [currentIndex, location.state?.selectPropertyId, location.pathname, navigate]);
+  }, [location.state?.selectPropertyId]);
 
   // Framer Motion controllers
   const cardController = useAnimation();
@@ -233,7 +219,14 @@ const Swipe = () => {
     dbProperties.forEach(p => {
       if (p.property_features) {
         p.property_features.forEach(f => {
-          if (f.feature_name) featuresSet.add(f.feature_name);
+          const name = typeof f === 'string' ? f : f.feature_name;
+          if (name) featuresSet.add(name);
+        });
+      }
+      if (p.lifestyle_tags) {
+        p.lifestyle_tags.forEach(t => {
+          const name = typeof t === 'string' ? t : t.tag_name;
+          if (name) featuresSet.add(name);
         });
       }
     });
@@ -379,9 +372,10 @@ const Swipe = () => {
     }
     if (selectedLifestyles.length > 0) {
       combined = combined.filter(p => {
-        if (!p.property_features) return false;
-        const pFeats = p.property_features.map(f => f.feature_name.toLowerCase());
-        return selectedLifestyles.every(tag => pFeats.includes(tag.toLowerCase()));
+        const pFeats = (p.property_features || []).map(f => (typeof f === 'string' ? f : f.feature_name || '').toLowerCase());
+        const pTags = (p.lifestyle_tags || []).map(t => (typeof t === 'string' ? t : t.tag_name || '').toLowerCase());
+        const allTags = [...pFeats, ...pTags];
+        return selectedLifestyles.every(tag => allTags.includes(tag.toLowerCase()));
       });
     }
     if (minArea) {
@@ -401,15 +395,15 @@ const Swipe = () => {
 
     // Check if there is a pre-selected property from navigation state
     let targetIndex = 0;
-    if (location.state?.selectPropertyId) {
-      const selectId = location.state.selectPropertyId;
-      let idx = combined.findIndex(p => p.id === selectId);
+    const targetSelectId = targetSelectIdRef.current || (location.state?.selectPropertyId ? Number(location.state.selectPropertyId) : null);
+    if (targetSelectId && combined.length > 0) {
+      let idx = combined.findIndex(p => Number(p.id) === targetSelectId);
       
       if (idx === -1) {
         // Bypassed by filters. Find it in unfiltered properties and add it
         const targetProp = (dbProperties && dbProperties.length > 0)
-          ? dbProperties.find(p => p.id === selectId)
-          : Object.values(mockProperties).flat().find(p => p.id === selectId);
+          ? dbProperties.find(p => Number(p.id) === targetSelectId)
+          : Object.values(mockProperties).flat().find(p => Number(p.id) === targetSelectId);
         
         if (targetProp) {
           combined = [targetProp, ...combined];
@@ -419,6 +413,14 @@ const Swipe = () => {
       
       if (idx !== -1) {
         targetIndex = idx;
+        setShowDetailModal(true);
+        targetSelectIdRef.current = null;
+        if (location.state?.selectPropertyId) {
+          navigate(location.pathname, {
+            replace: true,
+            state: { ...location.state, selectPropertyId: undefined }
+          });
+        }
       }
     }
 
@@ -436,13 +438,6 @@ const Swipe = () => {
       }
     }
   }, [currentIndex, currentProperties]);
-
-  // Open detail modal immediately when selectPropertyId is specified in navigation state
-  useEffect(() => {
-    if (location.state?.selectPropertyId) {
-      setShowDetailModal(true);
-    }
-  }, [location.state?.selectPropertyId]);
 
   const currentProperty = currentProperties[currentIndex];
   const isAlreadyFavorite = currentProperty && dbFavorites.some(fav => fav.id === currentProperty.id);
@@ -857,19 +852,24 @@ const Swipe = () => {
                       </div>
 
                       <div className="saved-card-footer">
-                        <button 
-                          className="saved-card-chat-btn"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (property.owner_id) {
-                              navigate(`/chat?agentId=${property.owner_id}&propertyId=${property.id}`);
-                            } else {
-                              alert('Bất động sản này không có thông tin chủ sở hữu.');
-                            }
-                          }}
-                        >
-                          <MessageSquare size={16} />
-                        </button>
+                        {user && Number(user.id) === Number(property.owner_id) ? (
+                          <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 500 }}>Tin của bạn</span>
+                        ) : (
+                          <button 
+                            className="saved-card-chat-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (property.owner_id) {
+                                navigate(`/chat?agentId=${property.owner_id}&propertyId=${property.id}`);
+                              } else {
+                                alert('Bất động sản này không có thông tin chủ sở hữu.');
+                              }
+                            }}
+                            title="Nhắn tin với môi giới"
+                          >
+                            <MessageSquare size={16} />
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>

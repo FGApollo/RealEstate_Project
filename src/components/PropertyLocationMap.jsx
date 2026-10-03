@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { MapPin, Navigation, ExternalLink, Compass, School, Hospital, ShoppingCart, TreePine, Bus } from 'lucide-react';
+import { MapPin, Navigation, ExternalLink, AlertCircle } from 'lucide-react';
 import './PropertyLocationMap.css';
 
 const DEFAULT_CENTER = { lat: 10.7769, lng: 106.7009 }; // TP. Hồ Chí Minh
@@ -11,16 +11,17 @@ const PropertyLocationMap = ({ property }) => {
   const circleRef = useRef(null);
 
   const [mapLoaded, setMapLoaded] = useState(false);
+  const [mapLoadError, setMapLoadError] = useState(false);
   const [coords, setCoords] = useState(null);
   const [isGeocoding, setIsGeocoding] = useState(false);
-  const [activeAmenity, setActiveAmenity] = useState('all');
 
-  // Load Leaflet once from CDN
+  // Load Leaflet once from CDN with error handling
   useEffect(() => {
     if (window.L) {
       setMapLoaded(true);
       return;
     }
+
     const link = document.createElement('link');
     link.rel = 'stylesheet';
     link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
@@ -29,7 +30,14 @@ const PropertyLocationMap = ({ property }) => {
     const script = document.createElement('script');
     script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
     script.async = true;
-    script.onload = () => setMapLoaded(true);
+    script.onload = () => {
+      setMapLoaded(true);
+      setMapLoadError(false);
+    };
+    script.onerror = () => {
+      console.error('Failed to load Leaflet CDN');
+      setMapLoadError(true);
+    };
     document.body.appendChild(script);
   }, []);
 
@@ -97,7 +105,7 @@ const PropertyLocationMap = ({ property }) => {
       maxZoom: 19
     }).addTo(map);
 
-    // Custom pulse marker icon
+    // Custom pulse marker icon for main property
     const customIcon = L.divIcon({
       className: 'leaflet-property-custom-pin',
       html: `
@@ -161,15 +169,6 @@ const PropertyLocationMap = ({ property }) => {
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
-  const amenities = [
-    { id: 'all', label: 'Tất cả tiện ích', icon: <Compass size={14} />, distance: '' },
-    { id: 'school', label: 'Trường học', icon: <School size={14} />, distance: '~500m' },
-    { id: 'hospital', label: 'Bệnh viện', icon: <Hospital size={14} />, distance: '~1.2km' },
-    { id: 'market', label: 'Siêu thị / Chợ', icon: <ShoppingCart size={14} />, distance: '~350m' },
-    { id: 'park', label: 'Công viên', icon: <TreePine size={14} />, distance: '~700m' },
-    { id: 'transit', label: 'Trạm xe bus / Metro', icon: <Bus size={14} />, distance: '~200m' }
-  ];
-
   return (
     <div className="property-location-map-wrapper">
       <div className="location-map-header">
@@ -178,7 +177,7 @@ const PropertyLocationMap = ({ property }) => {
             <MapPin size={18} />
           </div>
           <div>
-            <h3>Vị trí trên bản đồ & Tiện ích lân cận</h3>
+            <h3>Vị trí bất động sản</h3>
             <p className="location-sub-address">
               {property?.address || 'Đang cập nhật địa chỉ...'}
             </p>
@@ -196,29 +195,27 @@ const PropertyLocationMap = ({ property }) => {
         </button>
       </div>
 
-      {/* Amenity Filter Badges */}
-      <div className="location-amenities-bar">
-        {amenities.map(item => (
-          <button
-            key={item.id}
-            className={`amenity-chip-btn ${activeAmenity === item.id ? 'active' : ''}`}
-            onClick={() => setActiveAmenity(item.id)}
-          >
-            {item.icon}
-            <span>{item.label}</span>
-            {item.distance && <span className="amenity-dist">{item.distance}</span>}
-          </button>
-        ))}
-      </div>
-
       {/* Map Display Container */}
       <div className="map-canvas-container">
-        {(!mapLoaded || isGeocoding) && (
+        {mapLoadError ? (
+          <div className="map-loading-overlay" style={{ backgroundColor: '#fef2f2', color: '#991b1b' }}>
+            <AlertCircle size={24} color="#dc2626" />
+            <span>Không thể kết nối dịch vụ bản đồ vệ tinh. Bạn có thể mở trực tiếp trên Google Maps.</span>
+            <button 
+              className="google-maps-btn" 
+              style={{ marginTop: '8px' }} 
+              onClick={openGoogleMaps}
+            >
+              Mở vị trí trên Google Maps
+            </button>
+          </div>
+        ) : (!mapLoaded || isGeocoding) ? (
           <div className="map-loading-overlay">
             <div className="map-spinner"></div>
             <span>Đang tải bản đồ tương tác...</span>
           </div>
-        )}
+        ) : null}
+
         <div ref={mapContainerRef} className="map-leaflet-box" />
 
         {coords?.isDefault && (
@@ -230,10 +227,12 @@ const PropertyLocationMap = ({ property }) => {
       </div>
 
       <div className="location-footer-note">
-        <span>Bán kính vòng tròn màu xanh biểu thị khu vực đi bộ thuận tiện (500m) xung quanh bất động sản.</span>
+        <span>Bán kính vòng tròn màu xanh biểu thị phạm vi đi bộ 500m xung quanh bất động sản.</span>
       </div>
     </div>
   );
 };
 
 export default PropertyLocationMap;
+
+

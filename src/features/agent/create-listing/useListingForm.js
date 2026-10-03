@@ -79,6 +79,64 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
     fetchProvinces();
   }, []);
 
+  // Hierarchical geocoder to resolve Vietnamese addresses reliably with fallback
+  const geocodeAddressHierarchical = async ({ address_detail, ward, district, city }) => {
+    const cleanDetail = (address_detail || '').trim();
+    const cleanWard = (ward || '').trim();
+    const cleanDistrict = (district || '').trim();
+    const cleanCity = (city || '').trim();
+
+    const queries = [];
+    
+    // 1. Full detailed address
+    if (cleanDetail && cleanWard && cleanDistrict && cleanCity) {
+      queries.push(`${cleanDetail}, ${cleanWard}, ${cleanDistrict}, ${cleanCity}`);
+    }
+    
+    // 2. Road/number only without complex compound/building prefix
+    if (cleanDetail.includes(',')) {
+      const afterComma = cleanDetail.split(',').pop().trim();
+      if (afterComma && cleanWard && cleanDistrict && cleanCity) {
+        queries.push(`${afterComma}, ${cleanWard}, ${cleanDistrict}, ${cleanCity}`);
+      }
+    }
+
+    // 3. Ward + District + City
+    if (cleanWard && cleanDistrict && cleanCity) {
+      queries.push(`${cleanWard}, ${cleanDistrict}, ${cleanCity}`);
+    }
+
+    // 4. District + City
+    if (cleanDistrict && cleanCity) {
+      queries.push(`${cleanDistrict}, ${cleanCity}`);
+    }
+
+    // 5. City only
+    if (cleanCity) {
+      queries.push(cleanCity);
+    }
+
+    for (const q of queries) {
+      try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&accept-language=vi`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.length > 0) {
+            return {
+              lat: parseFloat(data[0].lat),
+              lon: parseFloat(data[0].lon),
+              display_name: data[0].display_name,
+              matchedQuery: q
+            };
+          }
+        }
+      } catch (err) {
+        console.warn(`Geocoding failed for "${q}":`, err);
+      }
+    }
+    return null;
+  };
+
   // Preload data when editing
   useEffect(() => {
     if (mode !== 'edit' || !editingPropertyId || provinces.length === 0) return;
@@ -99,6 +157,27 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
         })) || [];
         const lifestyle_tags = prop.lifestyle_tags?.map(t => t.tag_name) || [];
 
+        const lat = parseFloat(prop.latitude);
+        const lng = parseFloat(prop.longitude);
+        const hasValidCoords = !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0;
+
+        let finalLat = hasValidCoords ? lat : '';
+        let finalLng = hasValidCoords ? lng : '';
+
+        // If coordinates missing or zero in DB, auto-geocode from the address fields!
+        if (!hasValidCoords && (prop.city || prop.address_detail || prop.address)) {
+          const geocoded = await geocodeAddressHierarchical({
+            address_detail: prop.address_detail,
+            ward: prop.ward,
+            district: prop.district,
+            city: prop.city
+          });
+          if (geocoded) {
+            finalLat = geocoded.lat;
+            finalLng = geocoded.lon;
+          }
+        }
+
         setListing({
           title: prop.title || '',
           description: prop.description || '',
@@ -114,8 +193,8 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
           floor_range: prop.floor_range || '',
           address_detail: prop.address_detail || '',
           address: prop.address || '',
-          latitude: prop.latitude || '',
-          longitude: prop.longitude || '',
+          latitude: finalLat,
+          longitude: finalLng,
           features,
           images,
           lifestyle_tags,
@@ -124,6 +203,12 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
           channels: prop.channels || ['Homepage', 'Social'],
           thumbnail: prop.thumbnail || ''
         });
+
+        // Sync map if already mounted
+        if (finalLat && finalLng && mapRef.current && markerRef.current) {
+          mapRef.current.setView([finalLat, finalLng], 15);
+          markerRef.current.setLatLng([finalLat, finalLng]);
+        }
 
         // Preload province → district → ward codes
         if (prop.city) {
@@ -205,19 +290,24 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
     const lng = parseFloat(listing.longitude) || 108.2022;
     const container = document.getElementById('listing-map');
     if (!container) return;
+
     if (mapRef.current) {
-      mapRef.current.setView([lat, lng], 13);
-      if (markerRef.current) markerRef.current.setLatLng([lat, lng]);
+      if (listing.latitude && listing.longitude) {
+        mapRef.current.setView([lat, lng], 15);
+        if (markerRef.current) markerRef.current.setLatLng([lat, lng]);
+      }
       return;
     }
-    const map = window.L.map('listing-map', { zoomControl: true, scrollWheelZoom: true }).setView([lat, lng], 13);
+
+    const initialZoom = (listing.latitude && listing.longitude) ? 15 : 13;
+    const map = window.L.map('listing-map', { zoomControl: true, scrollWheelZoom: true }).setView([lat, lng], initialZoom);
     window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
     const marker = window.L.marker([lat, lng], { draggable: true }).addTo(map);
 
     const updateCoordinates = async (newLat, newLng) => {
       setListing(prev => ({ ...prev, latitude: newLat, longitude: newLng }));
       try {
-        const res = await apiFetch(`https://nominatim.openstreetmap.org/reverse?lat=${newLat}&lon=${newLng}&format=json&accept-language=vi`);
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${newLat}&lon=${newLng}&format=json&accept-language=vi`);
         if (res.ok) {
           const data = await res.json();
           const addr = data.address || {};
@@ -238,7 +328,21 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
     mapRef.current = map;
     markerRef.current = marker;
     return () => { if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; markerRef.current = null; } };
-  }, [mapLoaded, currentStep, provinces]);
+  }, [mapLoaded, currentStep]);
+
+  // Sync map center and marker whenever coordinates change from outside
+  useEffect(() => {
+    if (!mapRef.current || !markerRef.current) return;
+    const lat = parseFloat(listing.latitude);
+    const lng = parseFloat(listing.longitude);
+    if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+      const currentPos = markerRef.current.getLatLng();
+      if (Math.abs(currentPos.lat - lat) > 0.0001 || Math.abs(currentPos.lng - lng) > 0.0001) {
+        mapRef.current.setView([lat, lng], 15);
+        markerRef.current.setLatLng([lat, lng]);
+      }
+    }
+  }, [listing.latitude, listing.longitude]);
 
   const handleAutoLocation = () => {
     if (!navigator.geolocation) { alert('Trình duyệt không hỗ trợ Geolocation API'); return; }
@@ -248,7 +352,7 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
         setListing(prev => ({ ...prev, latitude: lat, longitude: lon }));
         if (mapRef.current && markerRef.current) { mapRef.current.setView([lat, lon], 15); markerRef.current.setLatLng([lat, lon]); }
         try {
-          const res = await apiFetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=vi`);
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=vi`);
           if (res.ok) {
             const data = await res.json();
             const addr = data.address || {};
@@ -268,22 +372,38 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
   };
 
   const handleSearchAddressOnMap = async () => {
-    if (!listing.address_detail || !listing.ward) { alert('Vui lòng chọn Tỉnh, Quận, Phường và nhập số nhà/tên đường trước khi tìm.'); return; }
-    const searchVal = `${listing.address_detail}, ${listing.ward}, ${listing.district}, ${listing.city}`;
+    if (!listing.city && !listing.district && !listing.ward && !listing.address_detail) {
+      alert('Vui lòng chọn Tỉnh, Quận, Phường hoặc nhập địa chỉ trước khi tìm.');
+      return;
+    }
+
     try {
-      const res = await apiFetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchVal)}&format=json&limit=1`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.length > 0) {
-          const lat = parseFloat(data[0].lat);
-          const lon = parseFloat(data[0].lon);
-          setListing(prev => ({ ...prev, latitude: lat, longitude: lon, address: data[0].display_name || prev.address }));
-          if (mapRef.current && markerRef.current) { mapRef.current.setView([lat, lon], 15); markerRef.current.setLatLng([lat, lon]); }
-        } else {
-          alert('Không tìm thấy toạ độ cho địa chỉ này.');
+      const geocoded = await geocodeAddressHierarchical({
+        address_detail: listing.address_detail,
+        ward: listing.ward,
+        district: listing.district,
+        city: listing.city
+      });
+
+      if (geocoded) {
+        const lat = geocoded.lat;
+        const lon = geocoded.lon;
+        setListing(prev => ({
+          ...prev,
+          latitude: lat,
+          longitude: lon,
+          address: geocoded.display_name || prev.address
+        }));
+        if (mapRef.current && markerRef.current) {
+          mapRef.current.setView([lat, lon], 15);
+          markerRef.current.setLatLng([lat, lon]);
         }
+      } else {
+        alert('Không tìm thấy toạ độ cho địa chỉ này. Bạn có thể kéo thả ghim trực tiếp trên bản đồ để chọn vị trí.');
       }
-    } catch (err) { console.error('Geocoding error:', err); }
+    } catch (err) {
+      alert('Lỗi tìm kiếm toạ độ: ' + err.message);
+    }
   };
 
   // Image handlers
@@ -510,6 +630,7 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
     mapLoaded, mapRef, markerRef,
     loadDistricts, loadWards,
     handleAutoLocation, handleSearchAddressOnMap,
+    geocodeAddress: geocodeAddressHierarchical,
     handleImageFileChange, handleDragOver, handleDrop,
     toggleSelectImage, setFeaturedImage, deleteSelectedImages,
     toggleAmenity, toggleLifestyleTag, toggleChannel,

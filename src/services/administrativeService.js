@@ -161,6 +161,15 @@ class AdministrativeService {
   }
 }
 
+export const normalizeWard = (ward) => {
+  if (!ward) return '';
+  return ward
+    .normalize('NFC')
+    .toLowerCase()
+    .replace(/^(phường|p\.)\s+/i, '')
+    .trim();
+};
+
 export const administrativeService = new AdministrativeService();
 export const WARDS_BY_REGION = FALLBACK_REGIONS;
 export const ALL_WARDS = Object.values(FALLBACK_REGIONS).flat();

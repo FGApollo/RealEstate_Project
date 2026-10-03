@@ -12,6 +12,7 @@ import { useAuth } from '../auth/useAuth';
 import PropertyLocationMap from './PropertyLocationMap';
 
 const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = false, isFavorite = false, onToggleFavorite, onSelectProperty }) => {
+  const [activePropertyId, setActivePropertyId] = useState(prop?.id);
   const [fetchedProperty, setFetchedProperty] = useState(null);
   const property = fetchedProperty || prop;
 
@@ -50,50 +51,64 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
     setLocalReviewCount(property?.review_count || 0);
   }, [property?.id, property?.average_rating, property?.review_count]);
 
+  // Handle ESC key press to close modal
   useEffect(() => {
-    if (prop?.id) {
-      // If property does not have owner information or full description/specs, fetch details by ID
-      if (!prop.owner || !prop.description) {
-        apiFetch(`${API_BASE_URL}/api/properties/${prop.id}`)
-          .then(res => res.json())
-          .then(data => {
-            if (data.property) {
-              setFetchedProperty(data.property);
-            }
-          })
-          .catch(err => console.error('Error fetching full property details:', err));
-      } else {
-        setFetchedProperty(null);
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && onClose) {
+        onClose();
       }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
-      setIsLoadingReviews(true);
-      apiFetch(`${API_BASE_URL}/api/properties/${prop.id}/reviews`)
-        .then(res => res.json())
-        .then(data => {
-          setReviews(data.reviews || []);
-          setIsLoadingReviews(false);
-        })
-        .catch(err => {
-          console.error('Error fetching reviews:', err);
-          setIsLoadingReviews(false);
-        });
+  useEffect(() => {
+    setActivePropertyId(prop?.id);
+    setFetchedProperty(null);
+    setActiveSliderIdx(0);
+  }, [prop?.id]);
 
-      setIsLoadingSimilar(true);
-      apiFetch(`${API_BASE_URL}/api/properties/${prop.id}/similar`)
-        .then(res => res.json())
-        .then(data => {
-          setSimilarProperties(data.properties || []);
-          setIsLoadingSimilar(false);
-        })
-        .catch(err => {
-          console.error('Error fetching similar properties:', err);
-          setIsLoadingSimilar(false);
-        });
-    } else {
+  useEffect(() => {
+    if (!activePropertyId) {
       setReviews([]);
       setSimilarProperties([]);
+      return;
     }
-  }, [property?.id]);
+
+    // Always fetch full details to ensure all relations (features, tags, images, owner) are up to date
+    apiFetch(`${API_BASE_URL}/api/properties/${activePropertyId}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.property) {
+          setFetchedProperty(data.property);
+        }
+      })
+      .catch(err => console.error('Error fetching full property details:', err));
+
+    setIsLoadingReviews(true);
+    apiFetch(`${API_BASE_URL}/api/properties/${activePropertyId}/reviews`)
+      .then(res => res.json())
+      .then(data => {
+        setReviews(data.reviews || []);
+        setIsLoadingReviews(false);
+      })
+      .catch(err => {
+        console.error('Error fetching reviews:', err);
+        setIsLoadingReviews(false);
+      });
+
+    setIsLoadingSimilar(true);
+    apiFetch(`${API_BASE_URL}/api/properties/${activePropertyId}/similar`)
+      .then(res => res.json())
+      .then(data => {
+        setSimilarProperties(data.properties || []);
+        setIsLoadingSimilar(false);
+      })
+      .catch(err => {
+        console.error('Error fetching similar properties:', err);
+        setIsLoadingSimilar(false);
+      });
+  }, [activePropertyId]);
 
   const handleImageSelect = (e) => {
     const files = Array.from(e.target.files);
@@ -339,10 +354,30 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
     ? property.property_images.map(img => img.image_url)
     : [property.thumbnail];
 
-  const lifestyleChips = property.lifestyle_tags?.map(t => t.tag_name) || property.lifestyle_tags || [];
-  const amenityChips = property.property_features?.map(f => f.feature_name) || property.features || [];
+  const lifestyleChips = useMemo(() => {
+    const raw = property.lifestyle_tags || [];
+    return raw.map(t => (typeof t === 'string' ? t : t?.tag_name)).filter(Boolean);
+  }, [property.lifestyle_tags]);
+
+  const amenityChips = useMemo(() => {
+    const raw = property.property_features || property.features || [];
+    return raw.map(f => (typeof f === 'string' ? f : f?.feature_name)).filter(Boolean);
+  }, [property.property_features, property.features]);
 
   const ownerDetails = property.owner;
+
+  const handleSelectSimilar = (sim) => {
+    setActiveSliderIdx(0);
+    const modalBody = document.querySelector('.modal-body.premium-body');
+    if (modalBody) modalBody.scrollTo({ top: 0, behavior: 'smooth' });
+
+    setFetchedProperty(sim);
+    setActivePropertyId(sim.id);
+
+    if (onSelectProperty) {
+      onSelectProperty(sim);
+    }
+  };
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -554,11 +589,7 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
                     <div 
                       key={sim.id} 
                       className="similar-property-card-small" 
-                      onClick={() => {
-                        if (onSelectProperty) {
-                          onSelectProperty(sim);
-                        }
-                      }}
+                      onClick={() => handleSelectSimilar(sim)}
                       style={{ 
                         minWidth: '220px', 
                         border: '1px solid #e2e8f0', 
@@ -635,29 +666,50 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
                       );
                     })()}
                     
-                    <div className="poster-contact-buttons">
-                      <button 
-                        className="contact-btn message-btn"
-                        onClick={() => {
-                          if (property.owner_id) {
-                            navigate(`/chat?agentId=${property.owner_id}&propertyId=${property.id}`);
-                          } else {
-                            alert('Bất động sản này không có thông tin chủ sở hữu.');
-                          }
-                        }}
-                      >
-                        <MessageSquare size={16} /> Nhắn tin
-                      </button>
-                      {property.contact_phone ? (
-                        <a href={`tel:${property.contact_phone}`} className="contact-btn call-btn">
-                          <Phone size={16} /> Gọi ngay
-                        </a>
-                      ) : (
-                        <button className="contact-btn call-btn" disabled style={{ opacity: 0.5, cursor: 'not-allowed' }}>
-                          <Phone size={16} /> Chưa có SĐT
+                    {user && Number(user.id) === Number(property.owner_id) ? (
+                      <div className="own-property-indicator" style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center',
+                        gap: '8px', 
+                        padding: '10px 16px', 
+                        background: '#f8fafc', 
+                        color: '#64748b', 
+                        borderRadius: '10px', 
+                        fontSize: '13px', 
+                        fontWeight: 600,
+                        border: '1px dashed #cbd5e1',
+                        width: '100%',
+                        marginTop: '12px'
+                      }}>
+                        <ShieldCheck size={16} color="#059669" />
+                        <span>Tin đăng của bạn (Không thể tự nhắn tin)</span>
+                      </div>
+                    ) : (
+                      <div className="poster-contact-buttons">
+                        <button 
+                          className="contact-btn message-btn"
+                          onClick={() => {
+                            if (property.owner_id) {
+                              navigate(`/chat?agentId=${property.owner_id}&propertyId=${property.id}`);
+                            } else {
+                              alert('Bất động sản này không có thông tin chủ sở hữu.');
+                            }
+                          }}
+                        >
+                          <MessageSquare size={16} /> Nhắn tin
                         </button>
-                      )}
-                    </div>
+                        {property.contact_phone ? (
+                          <a href={`tel:${property.contact_phone}`} className="contact-btn call-btn">
+                            <Phone size={16} /> Gọi ngay
+                          </a>
+                        ) : (
+                          <button className="contact-btn call-btn" disabled style={{ opacity: 0.5, cursor: 'not-allowed' }}>
+                            <Phone size={16} /> Chưa có SĐT
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : (

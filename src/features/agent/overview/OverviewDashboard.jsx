@@ -8,16 +8,7 @@ import PropertyDetailModal from '../../../components/PropertyDetailModal';
 import DeleteConfirmModal from './DeleteConfirmModal';
 import './OverviewDashboard.css';
 
-import { WARDS_BY_REGION, ALL_WARDS } from '../../../services/administrativeService';
-
-const normalizeWard = (ward) => {
-  if (!ward) return '';
-  return ward
-    .normalize('NFC')
-    .toLowerCase()
-    .replace(/^(phường|p\.)\s+/i, '')
-    .trim();
-};
+import { WARDS_BY_REGION, ALL_WARDS, normalizeWard } from '../../../services/administrativeService';
 
 // ponytail: extract overview and listings tab components into a single dashboard component
 const OverviewDashboard = ({ 
@@ -39,9 +30,11 @@ const OverviewDashboard = ({
   const [subTempSelectedWards, setSubTempSelectedWards] = useState([]);
   const [filterPriceSort, setFilterPriceSort] = useState('ALL');
   const [filterType, setFilterType] = useState('ALL');
+  const [filterStatus, setFilterStatus] = useState('ALL');
   const [appliedWards, setAppliedWards] = useState([]);
   const [appliedType, setAppliedType] = useState('ALL');
   const [appliedPriceSort, setAppliedPriceSort] = useState('ALL');
+  const [appliedStatus, setAppliedStatus] = useState('ALL');
 
   const [showFilters, setShowFilters] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -104,6 +97,7 @@ const OverviewDashboard = ({
     setAppliedWards([...tempSelectedWards]);
     setAppliedType(filterType);
     setAppliedPriceSort(filterPriceSort);
+    setAppliedStatus(filterStatus);
     setShowFilters(false);
   };
 
@@ -114,6 +108,8 @@ const OverviewDashboard = ({
     setAppliedType('ALL');
     setFilterPriceSort('ALL');
     setAppliedPriceSort('ALL');
+    setFilterStatus('ALL');
+    setAppliedStatus('ALL');
     setWardSearchQuery('');
   };
 
@@ -135,6 +131,11 @@ const OverviewDashboard = ({
       result = result.filter(p => p.property_type === appliedType);
     }
 
+    // Filter by Status (F30)
+    if (appliedStatus !== 'ALL') {
+      result = result.filter(p => p.status === appliedStatus);
+    }
+
     // Filter by Wards
     if (appliedWards.length > 0) {
       const normalizedWards = appliedWards.map(w => normalizeWard(w));
@@ -152,7 +153,7 @@ const OverviewDashboard = ({
     }
 
     return result;
-  }, [data.activeListings, appliedWards, appliedType, appliedPriceSort, searchQuery]);
+  }, [data.activeListings, appliedWards, appliedType, appliedPriceSort, appliedStatus, searchQuery]);
 
   // Paginated listings
   const totalPages = Math.ceil(filteredListings.length / itemsPerPage) || 1;
@@ -433,6 +434,18 @@ const OverviewDashboard = ({
                 </select>
               </div>
 
+              {/* Status / Trạng thái tin (F30) */}
+              <div className="filter-field">
+                <label className="filter-label">Trạng thái tin</label>
+                <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+                  <option value="ALL">Tất cả trạng thái</option>
+                  <option value="AVAILABLE">Đang hiển thị</option>
+                  <option value="RENTED">Đã cho thuê</option>
+                  <option value="SOLD">Đã bán</option>
+                  <option value="PENDING">Chờ duyệt</option>
+                </select>
+              </div>
+
               {/* Filter Actions */}
               <div className="filter-field filter-actions" style={{ gridColumn: 'span 3', display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '8px' }}>
                 <button className="filter-apply-btn" onClick={handleApplyFilter}>
@@ -507,17 +520,18 @@ const OverviewDashboard = ({
                   className="property-card-img"
                 />
 
-                {/* Status Badge */}
+                {/* Status Badge (Positioned at Top-Right to prevent collision with is_hidden at Top-Left) */}
                 <div style={{
                   position: 'absolute',
                   top: '12px',
-                  left: '12px',
+                  right: '12px',
                   zIndex: 2,
                   padding: '4px 8px',
                   borderRadius: '6px',
                   fontSize: '11px',
                   fontWeight: '600',
                   color: '#ffffff',
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
                   backgroundColor: 
                     listing.status === 'RENTED' ? '#3b82f6' :
                     listing.status === 'SOLD' ? '#ef4444' :
