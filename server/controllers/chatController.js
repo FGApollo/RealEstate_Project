@@ -21,6 +21,9 @@ const sendMessage = async (req, res) => {
     if (!receiverId || typeof message !== 'string' || !message.trim()) {
       return res.status(400).json({ error: 'receiverId and message are required' });
     }
+    if (Number(receiverId) === Number(req.user.id)) {
+      return res.status(400).json({ error: 'Bạn không thể tự gửi tin nhắn cho chính mình' });
+    }
     if (message.length > MAX_MESSAGE_LENGTH) {
       return res.status(413).json({ error: `Message must be ${MAX_MESSAGE_LENGTH} characters or fewer` });
     }

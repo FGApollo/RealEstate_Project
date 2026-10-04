@@ -326,7 +326,7 @@ const AgentChat = ({ currentUser }) => {
                         </div>
                       )}
                       <div className="msg-bubble">
-                        {msg.property ? (
+                        {msg.property && (
                           <div 
                             className="chat-property-card" 
                             style={{ 
@@ -337,7 +337,8 @@ const AgentChat = ({ currentUser }) => {
                               width: '260px',
                               boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
                               display: 'flex',
-                              flexDirection: 'column'
+                              flexDirection: 'column',
+                              marginBottom: msg.message && msg.message !== `[Bất động sản] ${msg.property?.title}` ? '8px' : '0'
                             }}
                           >
                             <img src={msg.property.thumbnail} alt={msg.property.title} style={{ width: '100%', height: '140px', objectFit: 'cover' }} />
@@ -349,7 +350,8 @@ const AgentChat = ({ currentUser }) => {
                               </div>
                             </div>
                           </div>
-                        ) : (
+                        )}
+                        {msg.message && msg.message !== `[Bất động sản] ${msg.property?.title}` && (
                           <p className="msg-txt">{msg.message}</p>
                         )}
                         <span className="msg-time">{formattedTime}</span>

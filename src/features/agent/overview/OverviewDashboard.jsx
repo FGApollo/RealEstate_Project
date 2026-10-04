@@ -8,50 +8,7 @@ import PropertyDetailModal from '../../../components/PropertyDetailModal';
 import DeleteConfirmModal from './DeleteConfirmModal';
 import './OverviewDashboard.css';
 
-const WARDS_BY_REGION = {
-  'TP.HCM': [
-    'Phường mới', 'Phường Sài Gòn', 'Phường Tân Định', 'Phường Bến Thành', 'Phường Cầu Ông Lãnh', 
-    'Phường Bàn Cờ', 'Phường Xuân Hòa', 'Phường Nhiêu Lộc', 'Phường Xóm Chiếu', 'Phường Khánh Hội', 
-    'Phường Vĩnh Hội', 'Phường Chợ Quán', 'Phường An Đông', 'Phường Chợ Lớn', 'Phường Bình Tây', 
-    'Phường Bình Tiên', 'Phường Bình Phú', 'Phường Phú Lâm', 'Phường Tân Thuận', 'Phường Phú Thuận', 
-    'Phường Tân Mỹ', 'Phường Tân Hưng', 'Phường Chánh Hưng', 'Phường Phú Định', 'Phường Bình Đông', 
-    'Phường Diên Hồng', 'Phường Vườn Lài', 'Phường Hòa Hưng', 'Phường Minh Phụng', 'Phường Bình Thới', 
-    'Phường Hòa Bình', 'Phường Phú Thọ', 'Phường Đông Hưng Thuận', 'Phường Trung Mỹ Tây', 
-    'Phường Tân Thới Hiệp', 'Phường Thới An', 'Phường An Phú Đông', 'Phường An Lạc', 'Phường Bình Tân', 
-    'Phường Tân Tạo', 'Phường Bình Trị Đông', 'Phường Bình Hưng Hòa', 'Phường Gia Định', 
-    'Phường Bình Thạnh', 'Phường Bình Lợi Trung', 'Phường Thạnh Mỹ Tây', 'Phường Bình Quới', 
-    'Phường Hạnh Thông', 'Phường An Nhơn', 'Phường Gò Vấp', 'Phường An Hội Đông', 'Phường Thông Tây Hội', 
-    'Phường An Hội Tây', 'Phường Đức Nhuận', 'Phường Cầu Kiệu', 'Phường Phú Nhuận', 'Phường Tân Sơn Hòa', 
-    'Phường Tân Sơn Nhất', 'Phường Tân Hòa', 'Phường Bảy Hiền', 'Phường Tân Bình', 'Phường Tân Sơn', 
-    'Phường Tây Thạnh', 'Phường Tân Sơn Nhì', 'Phường Phú Thọ Hòa', 'Phường Tân Phú', 'Phường Phú Thạnh', 
-    'Phường Hiệp Bình', 'Phường Thủ Đức', 'Phường Tam Bình', 'Phường Linh Xuân', 'Phường Tăng Nhơn Phú', 
-    'Phường Long Bình', 'Phường Long Phước', 'Phường Long Trường', 'Phường Cát Lái', 'Phường Bình Trưng', 
-    'Phường Phước Long', 'Phường An Khánh'
-  ],
-  'Bình Dương': [
-    'Phường Đông Hòa', 'Phường Dĩ An', 'Phường Tân Đông Hiệp', 'Phường An Phú', 'Phường Bình Hòa', 
-    'Phường Lái Thiêu', 'Phường Thuận An', 'Phường Thuận Giao', 'Phường Thủ Dầu Một', 'Phường Phú Lợi', 
-    'Phường Chánh Hiệp', 'Phường Bình Dương', 'Phường Hòa Lợi', 'Phường Phú An', 'Phường Tây Nam', 
-    'Phường Long Nguyên', 'Phường Bến Cát', 'Phường Chánh Phú Hòa', 'Phường Vĩnh Tân', 'Phường Bình Cơ', 
-    'Phường Tân Uyên', 'Phường Tân Hiệp', 'Phường Tân Khánh'
-  ],
-  'Bà Rịa - Vũng Tàu': [
-    'Phường Vũng Tàu', 'Phường Tam Thắng', 'Phường Rạch Dừa', 'Phường Phước Thắng', 'Phường Long Hương', 
-    'Phường Bà Rịa', 'Phường Tam Long', 'Phường Tân Hải', 'Phường Tân Phước', 'Phường Phú Mỹ', 
-    'Phường Tân Thành'
-  ]
-};
-
-const ALL_WARDS = Object.values(WARDS_BY_REGION).flat();
-
-const normalizeWard = (ward) => {
-  if (!ward) return '';
-  return ward
-    .normalize('NFC')
-    .toLowerCase()
-    .replace(/^(phường|p\.)\s+/i, '')
-    .trim();
-};
+import { WARDS_BY_REGION, ALL_WARDS, normalizeWard } from '../../../services/administrativeService';
 
 // ponytail: extract overview and listings tab components into a single dashboard component
 const OverviewDashboard = ({ 
@@ -73,9 +30,11 @@ const OverviewDashboard = ({
   const [subTempSelectedWards, setSubTempSelectedWards] = useState([]);
   const [filterPriceSort, setFilterPriceSort] = useState('ALL');
   const [filterType, setFilterType] = useState('ALL');
+  const [filterStatus, setFilterStatus] = useState('ALL');
   const [appliedWards, setAppliedWards] = useState([]);
   const [appliedType, setAppliedType] = useState('ALL');
   const [appliedPriceSort, setAppliedPriceSort] = useState('ALL');
+  const [appliedStatus, setAppliedStatus] = useState('ALL');
 
   const [showFilters, setShowFilters] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -138,6 +97,7 @@ const OverviewDashboard = ({
     setAppliedWards([...tempSelectedWards]);
     setAppliedType(filterType);
     setAppliedPriceSort(filterPriceSort);
+    setAppliedStatus(filterStatus);
     setShowFilters(false);
   };
 
@@ -148,6 +108,8 @@ const OverviewDashboard = ({
     setAppliedType('ALL');
     setFilterPriceSort('ALL');
     setAppliedPriceSort('ALL');
+    setFilterStatus('ALL');
+    setAppliedStatus('ALL');
     setWardSearchQuery('');
   };
 
@@ -169,6 +131,11 @@ const OverviewDashboard = ({
       result = result.filter(p => p.property_type === appliedType);
     }
 
+    // Filter by Status (F30)
+    if (appliedStatus !== 'ALL') {
+      result = result.filter(p => p.status === appliedStatus);
+    }
+
     // Filter by Wards
     if (appliedWards.length > 0) {
       const normalizedWards = appliedWards.map(w => normalizeWard(w));
@@ -186,7 +153,7 @@ const OverviewDashboard = ({
     }
 
     return result;
-  }, [data.activeListings, appliedWards, appliedType, appliedPriceSort, searchQuery]);
+  }, [data.activeListings, appliedWards, appliedType, appliedPriceSort, appliedStatus, searchQuery]);
 
   // Paginated listings
   const totalPages = Math.ceil(filteredListings.length / itemsPerPage) || 1;
@@ -464,6 +431,19 @@ const OverviewDashboard = ({
                   <option value="Căn Hộ">Căn hộ</option>
                   <option value="Nhà Ở">Nhà ở</option>
                   <option value="Mặt Bằng">Mặt bằng</option>
+                  <option value="Văn Phòng">Văn phòng</option>
+                </select>
+              </div>
+
+              {/* Status / Trạng thái tin (F30) */}
+              <div className="filter-field">
+                <label className="filter-label">Trạng thái tin</label>
+                <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+                  <option value="ALL">Tất cả trạng thái</option>
+                  <option value="AVAILABLE">Đang hiển thị</option>
+                  <option value="RENTED">Đã cho thuê</option>
+                  <option value="SOLD">Đã bán</option>
+                  <option value="PENDING">Chờ duyệt</option>
                 </select>
               </div>
 
@@ -541,17 +521,18 @@ const OverviewDashboard = ({
                   className="property-card-img"
                 />
 
-                {/* Status Badge */}
+                {/* Status Badge (Positioned at Top-Right to prevent collision with is_hidden at Top-Left) */}
                 <div style={{
                   position: 'absolute',
                   top: '12px',
-                  left: '12px',
+                  right: '12px',
                   zIndex: 2,
                   padding: '4px 8px',
                   borderRadius: '6px',
                   fontSize: '11px',
                   fontWeight: '600',
                   color: '#ffffff',
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
                   backgroundColor: 
                     listing.status === 'RENTED' ? '#3b82f6' :
                     listing.status === 'SOLD' ? '#ef4444' :
