@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { 
   Heart, X, MapPin,
@@ -17,51 +17,7 @@ import SwipeHistoryPanel from '../features/swipe/SwipeHistoryPanel';
 import SwipeMainSection from '../features/swipe/SwipeMainSection';
 import SwipeSuggestionsPanel from '../features/swipe/SwipeSuggestionsPanel';
 import SwipeChatPrompt from '../features/swipe/SwipeChatPrompt';
-
-const WARDS_BY_REGION = {
-  'TP.HCM': [
-    'Phường mới', 'Phường Sài Gòn', 'Phường Tân Định', 'Phường Bến Thành', 'Phường Cầu Ông Lãnh', 
-    'Phường Bàn Cờ', 'Phường Xuân Hòa', 'Phường Nhiêu Lộc', 'Phường Xóm Chiếu', 'Phường Khánh Hội', 
-    'Phường Vĩnh Hội', 'Phường Chợ Quán', 'Phường An Đông', 'Phường Chợ Lớn', 'Phường Bình Tây', 
-    'Phường Bình Tiên', 'Phường Bình Phú', 'Phường Phú Lâm', 'Phường Tân Thuận', 'Phường Phú Thuận', 
-    'Phường Tân Mỹ', 'Phường Tân Hưng', 'Phường Chánh Hưng', 'Phường Phú Định', 'Phường Bình Đông', 
-    'Phường Diên Hồng', 'Phường Vườn Lài', 'Phường Hòa Hưng', 'Phường Minh Phụng', 'Phường Bình Thới', 
-    'Phường Hòa Bình', 'Phường Phú Thọ', 'Phường Đông Hưng Thuận', 'Phường Trung Mỹ Tây', 
-    'Phường Tân Thới Hiệp', 'Phường Thới An', 'Phường An Phú Đông', 'Phường An Lạc', 'Phường Bình Tân', 
-    'Phường Tân Tạo', 'Phường Bình Trị Đông', 'Phường Bình Hưng Hòa', 'Phường Gia Định', 
-    'Phường Bình Thạnh', 'Phường Bình Lợi Trung', 'Phường Thạnh Mỹ Tây', 'Phường Bình Quới', 
-    'Phường Hạnh Thông', 'Phường An Nhơn', 'Phường Gò Vấp', 'Phường An Hội Đông', 'Phường Thông Tây Hội', 
-    'Phường An Hội Tây', 'Phường Đức Nhuận', 'Phường Cầu Kiệu', 'Phường Phú Nhuận', 'Phường Tân Sơn Hòa', 
-    'Phường Tân Sơn Nhất', 'Phường Tân Hòa', 'Phường Bảy Hiền', 'Phường Tân Bình', 'Phường Tân Sơn', 
-    'Phường Tây Thạnh', 'Phường Tân Sơn Nhì', 'Phường Phú Thọ Hòa', 'Phường Tân Phú', 'Phường Phú Thạnh', 
-    'Phường Hiệp Bình', 'Phường Thủ Đức', 'Phường Tam Bình', 'Phường Linh Xuân', 'Phường Tăng Nhơn Phú', 
-    'Phường Long Bình', 'Phường Long Phước', 'Phường Long Trường', 'Phường Cát Lái', 'Phường Bình Trưng', 
-    'Phường Phước Long', 'Phường An Khánh'
-  ],
-  'Bình Dương': [
-    'Phường Đông Hòa', 'Phường Dĩ An', 'Phường Tân Đông Hiệp', 'Phường An Phú', 'Phường Bình Hòa', 
-    'Phường Lái Thiêu', 'Phường Thuận An', 'Phường Thuận Giao', 'Phường Thủ Dầu Một', 'Phường Phú Lợi', 
-    'Phường Chánh Hiệp', 'Phường Bình Dương', 'Phường Hòa Lợi', 'Phường Phú An', 'Phường Tây Nam', 
-    'Phường Long Nguyên', 'Phường Bến Cát', 'Phường Chánh Phú Hòa', 'Phường Vĩnh Tân', 'Phường Bình Cơ', 
-    'Phường Tân Uyên', 'Phường Tân Hiệp', 'Phường Tân Khánh'
-  ],
-  'Bà Rịa - Vũng Tàu': [
-    'Phường Vũng Tàu', 'Phường Tam Thắng', 'Phường Rạch Dừa', 'Phường Phước Thắng', 'Phường Long Hương', 
-    'Phường Bà Rịa', 'Phường Tam Long', 'Phường Tân Hải', 'Phường Tân Phước', 'Phường Phú Mỹ', 
-    'Phường Tân Thành'
-  ]
-};
-
-const ALL_WARDS = Object.values(WARDS_BY_REGION).flat();
-
-const normalizeWard = (ward) => {
-  if (!ward) return '';
-  return ward
-    .normalize('NFC')
-    .toLowerCase()
-    .replace(/^(phường|p\.)\s+/i, '')
-    .trim();
-};
+import { WARDS_BY_REGION, ALL_WARDS, normalizeWard } from '../services/administrativeService';
 
 // Mock Properties for categories
 const mockProperties = {};
@@ -221,17 +177,13 @@ const Swipe = () => {
     }
   }, [swipeHistory]);
 
+  const targetSelectIdRef = useRef(location.state?.selectPropertyId ? Number(location.state.selectPropertyId) : null);
+
   useEffect(() => {
     if (location.state?.selectPropertyId) {
-      navigate(location.pathname, {
-        replace: true,
-        state: {
-          ...location.state,
-          selectPropertyId: undefined
-        }
-      });
+      targetSelectIdRef.current = Number(location.state.selectPropertyId);
     }
-  }, [currentIndex, location.state?.selectPropertyId, location.pathname, navigate]);
+  }, [location.state?.selectPropertyId]);
 
   // Framer Motion controllers
   const cardController = useAnimation();
@@ -267,7 +219,14 @@ const Swipe = () => {
     dbProperties.forEach(p => {
       if (p.property_features) {
         p.property_features.forEach(f => {
-          if (f.feature_name) featuresSet.add(f.feature_name);
+          const name = typeof f === 'string' ? f : f.feature_name;
+          if (name) featuresSet.add(name);
+        });
+      }
+      if (p.lifestyle_tags) {
+        p.lifestyle_tags.forEach(t => {
+          const name = typeof t === 'string' ? t : t.tag_name;
+          if (name) featuresSet.add(name);
         });
       }
     });
@@ -413,9 +372,10 @@ const Swipe = () => {
     }
     if (selectedLifestyles.length > 0) {
       combined = combined.filter(p => {
-        if (!p.property_features) return false;
-        const pFeats = p.property_features.map(f => f.feature_name.toLowerCase());
-        return selectedLifestyles.every(tag => pFeats.includes(tag.toLowerCase()));
+        const pFeats = (p.property_features || []).map(f => (typeof f === 'string' ? f : f.feature_name || '').toLowerCase());
+        const pTags = (p.lifestyle_tags || []).map(t => (typeof t === 'string' ? t : t.tag_name || '').toLowerCase());
+        const allTags = [...pFeats, ...pTags];
+        return selectedLifestyles.every(tag => allTags.includes(tag.toLowerCase()));
       });
     }
     if (minArea) {
@@ -435,15 +395,15 @@ const Swipe = () => {
 
     // Check if there is a pre-selected property from navigation state
     let targetIndex = 0;
-    if (location.state?.selectPropertyId) {
-      const selectId = location.state.selectPropertyId;
-      let idx = combined.findIndex(p => p.id === selectId);
+    const targetSelectId = targetSelectIdRef.current || (location.state?.selectPropertyId ? Number(location.state.selectPropertyId) : null);
+    if (targetSelectId && combined.length > 0) {
+      let idx = combined.findIndex(p => Number(p.id) === targetSelectId);
       
       if (idx === -1) {
         // Bypassed by filters. Find it in unfiltered properties and add it
         const targetProp = (dbProperties && dbProperties.length > 0)
-          ? dbProperties.find(p => p.id === selectId)
-          : Object.values(mockProperties).flat().find(p => p.id === selectId);
+          ? dbProperties.find(p => Number(p.id) === targetSelectId)
+          : Object.values(mockProperties).flat().find(p => Number(p.id) === targetSelectId);
         
         if (targetProp) {
           combined = [targetProp, ...combined];
@@ -453,6 +413,14 @@ const Swipe = () => {
       
       if (idx !== -1) {
         targetIndex = idx;
+        setShowDetailModal(true);
+        targetSelectIdRef.current = null;
+        if (location.state?.selectPropertyId) {
+          navigate(location.pathname, {
+            replace: true,
+            state: { ...location.state, selectPropertyId: undefined }
+          });
+        }
       }
     }
 
@@ -470,13 +438,6 @@ const Swipe = () => {
       }
     }
   }, [currentIndex, currentProperties]);
-
-  // Open detail modal immediately when selectPropertyId is specified in navigation state
-  useEffect(() => {
-    if (location.state?.selectPropertyId) {
-      setShowDetailModal(true);
-    }
-  }, [location.state?.selectPropertyId]);
 
   const currentProperty = currentProperties[currentIndex];
   const isAlreadyFavorite = currentProperty && dbFavorites.some(fav => fav.id === currentProperty.id);
@@ -891,19 +852,24 @@ const Swipe = () => {
                       </div>
 
                       <div className="saved-card-footer">
-                        <button 
-                          className="saved-card-chat-btn"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (property.owner_id) {
-                              navigate(`/chat?agentId=${property.owner_id}&propertyId=${property.id}`);
-                            } else {
-                              alert('Bất động sản này không có thông tin chủ sở hữu.');
-                            }
-                          }}
-                        >
-                          <MessageSquare size={16} />
-                        </button>
+                        {user && Number(user.id) === Number(property.owner_id) ? (
+                          <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 500 }}>Tin của bạn</span>
+                        ) : (
+                          <button 
+                            className="saved-card-chat-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (property.owner_id) {
+                                navigate(`/chat?agentId=${property.owner_id}&propertyId=${property.id}`);
+                              } else {
+                                alert('Bất động sản này không có thông tin chủ sở hữu.');
+                              }
+                            }}
+                            title="Nhắn tin với môi giới"
+                          >
+                            <MessageSquare size={16} />
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -973,7 +939,7 @@ const Swipe = () => {
                 <div className="filter-group">
                   <label className="filter-section-title">Loại bất động sản</label>
                   <div className="chips-grid">
-                    {['Căn Hộ', 'Nhà Ở', 'Chung Cư', 'Biệt Thự', 'Đất Nền'].map(cat => {
+                    {['Căn Hộ', 'Chung Cư', 'Nhà Ở', 'Phòng Trọ', 'Mặt Bằng', 'Văn Phòng'].map(cat => {
                       const isSelected = tempSelectedCategories.includes(cat);
                       return (
                         <button
@@ -988,7 +954,7 @@ const Swipe = () => {
                             }
                           }}
                         >
-                          {cat === 'Nhà Ở' ? 'Nhà ở' : cat === 'Căn Hộ' ? 'Căn hộ' : cat}
+                          {cat}
                         </button>
                       );
                     })}
