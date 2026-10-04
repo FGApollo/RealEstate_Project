@@ -8,7 +8,7 @@ const SwipeHeader = ({ user, activeView, onHome, onDiscover, onFavorites, onChat
   return (
     <Header
       user={user}
-      activeTab={activeView === 'saved' ? 'saved' : activeView === 'swipe' ? 'swipe' : undefined}
+      activeTab={activeView}
       onTabChange={(tab) => {
         if (tab === 'home' && onHome) { onHome(); return true; }
         if (tab === 'swipe' && onDiscover) { onDiscover(); return true; }

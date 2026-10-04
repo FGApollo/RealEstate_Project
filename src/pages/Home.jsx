@@ -2,18 +2,24 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Mascot } from 'page-mascot';
 import SwipeNestMark from '../components/SwipeNestMark';
+import SwipeHeader from '../features/swipe/SwipeHeader';
 import { 
-  Menu, Search, MapPin, Home as HomeIcon, 
-  Bed, Bath, Maximize, LogOut, User,
+  Search, MapPin, Home as HomeIcon, 
+  Bed, Bath,
   ChevronDown, ArrowRight, Heart, X, SlidersHorizontal,
-  ChevronLeft, ChevronRight, MessageSquare, Calendar, Eye, ShieldCheck, Phone, Shield, Share2, Sparkles,
-  Ruler, Star, Bell, Zap
+  ChevronRight, Sparkles,
+  Ruler, Zap
 } from 'lucide-react';
 import './Home.css';
 import { API_BASE_URL } from '../config';
 import { apiFetch } from '../auth/apiClient';
 import { useAuth } from '../auth/useAuth';
-import Header from '../components/Header';
+import PropertyDetailModal from '../components/PropertyDetailModal';
+import { 
+  WARDS_BY_REGION, 
+  ALL_WARDS, 
+  CUSTOM_LOCATION_SUGGESTIONS 
+} from '../services/administrativeService';
 
 const getCategoryIllustration = (name = '') => {
   const normalized = String(name).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -27,87 +33,11 @@ const getCategoryIllustration = (name = '') => {
   return '/icons/categories/house.webp';
 };
 
-const WARDS_BY_REGION = {
-  'TP.HCM': [
-    'Phường mới', 'Phường Sài Gòn', 'Phường Tân Định', 'Phường Bến Thành', 'Phường Cầu Ông Lãnh', 
-    'Phường Bàn Cờ', 'Phường Xuân Hòa', 'Phường Nhiêu Lộc', 'Phường Xóm Chiếu', 'Phường Khánh Hội', 
-    'Phường Vĩnh Hội', 'Phường Chợ Quán', 'Phường An Đông', 'Phường Chợ Lớn', 'Phường Bình Tây', 
-    'Phường Bình Tiên', 'Phường Bình Phú', 'Phường Phú Lâm', 'Phường Tân Thuận', 'Phường Phú Thuận', 
-    'Phường Tân Mỹ', 'Phường Tân Hưng', 'Phường Chánh Hưng', 'Phường Phú Định', 'Phường Bình Đông', 
-    'Phường Diên Hồng', 'Phường Vườn Lài', 'Phường Hòa Hưng', 'Phường Minh Phụng', 'Phường Bình Thới', 
-    'Phường Hòa Bình', 'Phường Phú Thọ', 'Phường Đông Hưng Thuận', 'Phường Trung Mỹ Tây', 
-    'Phường Tân Thới Hiệp', 'Phường Thới An', 'Phường An Phú Đông', 'Phường An Lạc', 'Phường Bình Tân', 
-    'Phường Tân Tạo', 'Phường Bình Trị Đông', 'Phường Bình Hưng Hòa', 'Phường Gia Định', 
-    'Phường Bình Thạnh', 'Phường Bình Lợi Trung', 'Phường Thạnh Mỹ Tây', 'Phường Bình Quới', 
-    'Phường Hạnh Thông', 'Phường An Nhơn', 'Phường Gò Vấp', 'Phường An Hội Đông', 'Phường Thông Tây Hội', 
-    'Phường An Hội Tây', 'Phường Đức Nhuận', 'Phường Cầu Kiệu', 'Phường Phú Nhuận', 'Phường Tân Sơn Hòa', 
-    'Phường Tân Sơn Nhất', 'Phường Tân Hòa', 'Phường Bảy Hiền', 'Phường Tân Bình', 'Phường Tân Sơn', 
-    'Phường Tây Thạnh', 'Phường Tân Sơn Nhì', 'Phường Phú Thọ Hòa', 'Phường Tân Phú', 'Phường Phú Thạnh', 
-    'Phường Hiệp Bình', 'Phường Thủ Đức', 'Phường Tam Bình', 'Phường Linh Xuân', 'Phường Tăng Nhơn Phú', 
-    'Phường Long Bình', 'Phường Long Phước', 'Phường Long Trường', 'Phường Cát Lái', 'Phường Bình Trưng', 
-    'Phường Phước Long', 'Phường An Khánh'
-  ],
-  'Bình Dương': [
-    'Phường Đông Hòa', 'Phường Dĩ An', 'Phường Tân Đông Hiệp', 'Phường An Phú', 'Phường Bình Hòa', 
-    'Phường Lái Thiêu', 'Phường Thuận An', 'Phường Thuận Giao', 'Phường Thủ Dầu Một', 'Phường Phú Lợi', 
-    'Phường Chánh Hiệp', 'Phường Bình Dương', 'Phường Hòa Lợi', 'Phường Phú An', 'Phường Tây Nam', 
-    'Phường Long Nguyên', 'Phường Bến Cát', 'Phường Chánh Phú Hòa', 'Phường Vĩnh Tân', 'Phường Bình Cơ', 
-    'Phường Tân Uyên', 'Phường Tân Hiệp', 'Phường Tân Khánh'
-  ],
-  'Bà Rịa - Vũng Tàu': [
-    'Phường Vũng Tàu', 'Phường Tam Thắng', 'Phường Rạch Dừa', 'Phường Phước Thắng', 'Phường Long Hương', 
-    'Phường Bà Rịa', 'Phường Tam Long', 'Phường Tân Hải', 'Phường Tân Phước', 'Phường Phú Mỹ', 
-    'Phường Tân Thành'
-  ]
-};
-
-const ALL_WARDS = Object.values(WARDS_BY_REGION).flat();
-
-const CUSTOM_LOCATION_SUGGESTIONS = [
-  {
-    name: 'Phường Sài Gòn',
-    subtext: 'Gồm: Bến Nghé, một phần Đa Kao, Nguyễn Thái Bình',
-    keywords: ['sai gon', 'sài gòn', 'ben nghe', 'bến nghé', 'da kao', 'đa kao', 'nguyen thai binh', 'nguyễn thái bình'],
-    ward: 'Phường Sài Gòn',
-    region: 'TP.HCM'
-  },
-  {
-    name: 'Phường Tân Bình',
-    subtext: 'Gồm: phường 13, 14, một phần phường 15 cũ',
-    keywords: ['tan binh', 'tân bình', 'phường 13', 'phuong 13', 'phường 14', 'phuong 14', 'phường 15', 'phuong 15'],
-    ward: 'Phường Tân Bình',
-    region: 'TP.HCM'
-  },
-  {
-    name: 'Phường Dĩ An',
-    subtext: 'Thành phố Dĩ An, Bình Dương',
-    keywords: ['di an', 'dĩ an', 'binh duong', 'bình dương'],
-    ward: 'Phường Dĩ An',
-    region: 'Bình Dương'
-  },
-  {
-    name: 'Phường Vũng Tàu',
-    subtext: 'Thành phố Vũng Tàu, Bà Rịa - Vũng Tàu',
-    keywords: ['vung tau', 'vũng tàu', 'ba ria', 'bà rịa'],
-    ward: 'Phường Vũng Tàu',
-    region: 'Bà Rịa - Vũng Tàu'
-  },
-  {
-    name: 'Phường Bến Nghé',
-    subtext: 'Gồm: Bến Nghé, một phần Đa Kao, Nguyễn Thái Bình',
-    keywords: ['ben nghe', 'bến nghé', 'quan 1', 'quận 1'],
-    ward: 'Phường Sài Gòn',
-    region: 'TP.HCM'
-  }
-];
-
 const Home = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const sharedPropertyId = searchParams.get('propertyId');
-  const { user, logout } = useAuth();
-  const [showDropdown, setShowDropdown] = useState(false);
-  const [showSidebar, setShowSidebar] = useState(false);
+  const { user } = useAuth();
   const [properties, setProperties] = useState([]);
   
   // Search parameters
@@ -140,235 +70,7 @@ const Home = () => {
   const [filteredProperties, setFilteredProperties] = useState([]);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState(null);
-  const [activeSliderIdx, setActiveSliderIdx] = useState(0);
-  const [similarProperties, setSimilarProperties] = useState([]);
-  const [isLoadingSimilar, setIsLoadingSimilar] = useState(false);
   const [dbFavorites, setDbFavorites] = useState([]);
-  
-  const [showRatingForm, setShowRatingForm] = useState(false);
-  const [ratingVal, setRatingVal] = useState(5);
-  const [reviewText, setReviewText] = useState('');
-  const [reviews, setReviews] = useState([]);
-  const [isLoadingReviews, setIsLoadingReviews] = useState(false);
-  const [selectedImages, setSelectedImages] = useState([]);
-  const [activeTab, setActiveTab] = useState('all'); // 'all' or 'mine'
-  const [sortOrder, setSortOrder] = useState('newest'); // 'newest', 'oldest', 'highest', 'lowest'
-  const [ratingFilter, setRatingFilter] = useState('all'); // 'all', '5', '4', '3', '2', '1'
-
-  useEffect(() => {
-    if (selectedProperty?.id) {
-      setIsLoadingReviews(true);
-      apiFetch(`${API_BASE_URL}/api/properties/${selectedProperty.id}/reviews`)
-        .then(res => res.json())
-        .then(data => {
-          setReviews(data.reviews || []);
-          setIsLoadingReviews(false);
-        })
-        .catch(err => {
-          console.error('Error fetching reviews:', err);
-          setIsLoadingReviews(false);
-        });
-
-      setIsLoadingSimilar(true);
-      apiFetch(`${API_BASE_URL}/api/properties/${selectedProperty.id}/similar`)
-        .then(res => res.json())
-        .then(data => {
-          setSimilarProperties(data.properties || []);
-          setIsLoadingSimilar(false);
-        })
-        .catch(err => {
-          console.error('Error fetching similar properties:', err);
-          setIsLoadingSimilar(false);
-        });
-    } else {
-      setReviews([]);
-      setSimilarProperties([]);
-    }
-  }, [selectedProperty?.id]);
-
-  const handleImageSelect = (e) => {
-    const files = Array.from(e.target.files);
-    if (selectedImages.length + files.length > 5) {
-      alert('Chỉ được chọn tối đa 5 ảnh!');
-      return;
-    }
-    files.forEach(file => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setSelectedImages(prev => [...prev, reader.result]);
-      };
-      reader.readAsDataURL(file);
-    });
-  };
-
-  const removeSelectedImage = (idx) => {
-    setSelectedImages(prev => prev.filter((_, i) => i !== idx));
-  };
-
-  const avgScore = useMemo(() => {
-    if (reviews.length === 0) return 0;
-    return reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
-  }, [reviews]);
-
-  const ratingLabel = useMemo(() => {
-    if (avgScore >= 4.5) return 'Tuyệt vời!';
-    if (avgScore >= 4.0) return 'Rất tốt!';
-    if (avgScore >= 3.0) return 'Khá tốt!';
-    if (avgScore > 0) return 'Trung bình';
-    return 'Chưa có đánh giá';
-  }, [avgScore]);
-
-  const filteredReviewsList = useMemo(() => {
-    let list = [...reviews];
-    
-    // Tab filter
-    if (activeTab === 'mine' && user?.id) {
-      list = list.filter(r => r.user_id === user.id);
-    }
-    
-    // Star / verified filter
-    if (ratingFilter !== 'all') {
-      if (ratingFilter === 'verified') {
-        list = list.filter(r => Boolean(r.is_verified_review));
-      } else {
-        const stars = parseInt(ratingFilter);
-        list = list.filter(r => r.rating === stars);
-      }
-    }
-    
-    // Sorting
-    list.sort((a, b) => {
-      if (sortOrder === 'newest') {
-        return new Date(b.created_at) - new Date(a.created_at);
-      } else if (sortOrder === 'oldest') {
-        return new Date(a.created_at) - new Date(b.created_at);
-      } else if (sortOrder === 'highest') {
-        return b.rating - a.rating;
-      } else if (sortOrder === 'lowest') {
-        return a.rating - b.rating;
-      }
-      return 0;
-    });
-    
-    return list;
-  }, [reviews, activeTab, sortOrder, ratingFilter, user?.id]);
-
-  const handleRatingSubmit = async (e) => {
-    e.preventDefault();
-    if (!selectedProperty) return;
-    if (!user) {
-      alert('Vui lòng đăng nhập để gửi đánh giá!');
-      return;
-    }
-    if (user.id === selectedProperty.owner_id) {
-      alert('Chủ sở hữu không thể tự đánh giá bất động sản của mình!');
-      return;
-    }
-
-    try {
-      const response = await apiFetch(`${API_BASE_URL}/api/properties/${selectedProperty.id}/reviews`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          rating: ratingVal,
-          comment: reviewText,
-          images: selectedImages
-        })
-      });
-
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        const errMsg = errData.error || 'Gửi đánh giá không thành công';
-        if (errMsg.includes('property_reviews_user_property_unique') || errMsg.includes('already exists')) {
-          throw new Error('Bạn đã đánh giá bất động sản này rồi! Mỗi tài khoản chỉ được đánh giá một lần.');
-        }
-        throw new Error(errMsg);
-      }
-
-      const data = await response.json();
-      if (data.success && data.review) {
-        const newReview = {
-          ...data.review,
-          user: { name: user.name, avatar: user.avatar, role: user.role },
-          images: selectedImages
-        };
-
-        const newReviewsList = [newReview, ...reviews];
-        setReviews(newReviewsList);
-
-        const newCount = newReviewsList.length;
-        const newRating = newReviewsList.reduce((sum, r) => sum + r.rating, 0) / newCount;
-
-        selectedProperty.review_count = newCount;
-        selectedProperty.average_rating = newRating;
-
-        setProperties(prev => prev.map(p => p.id === selectedProperty.id ? { ...p, review_count: newCount, average_rating: newRating } : p));
-        setFilteredProperties(prev => prev.map(p => p.id === selectedProperty.id ? { ...p, review_count: newCount, average_rating: newRating } : p));
-
-        alert(`Cảm ơn bạn đã đánh giá ${ratingVal} sao cho tin đăng này!`);
-        setReviewText('');
-        setSelectedImages([]);
-      }
-    } catch (err) {
-      console.error(err);
-      alert('Lỗi khi gửi đánh giá: ' + err.message);
-    }
-  };
-
-  const handleToggleHelpful = async (reviewId) => {
-    if (!user) {
-      alert('Vui lòng đăng nhập để bình chọn đánh giá này!');
-      return;
-    }
-
-    // Optimistic update
-    setReviews(prev => prev.map(r => {
-      if (r.id === reviewId) {
-        const currentlyVoted = Boolean(r.user_has_voted);
-        const currentCount = r.helpful_count || 0;
-        return {
-          ...r,
-          user_has_voted: !currentlyVoted,
-          helpful_count: currentlyVoted ? Math.max(0, currentCount - 1) : currentCount + 1
-        };
-      }
-      return r;
-    }));
-
-    try {
-      const res = await apiFetch(`${API_BASE_URL}/api/properties/reviews/${reviewId}/helpful`, {
-        method: 'POST'
-      });
-      if (res.ok) {
-        const result = await res.json();
-        setReviews(prev => prev.map(r => {
-          if (r.id === reviewId) {
-            return {
-              ...r,
-              user_has_voted: result.has_voted,
-              helpful_count: result.helpful_count
-            };
-          }
-          return r;
-        }));
-      } else {
-        const refetch = await apiFetch(`${API_BASE_URL}/api/properties/${selectedProperty.id}/reviews`);
-        if (refetch.ok) {
-          const freshData = await refetch.json();
-          setReviews(freshData.reviews || []);
-        }
-        const errData = await res.json().catch(() => ({}));
-        alert(errData.error || 'Không thể thực hiện bình chọn lúc này.');
-      }
-    } catch (err) {
-      console.error('Error toggling review helpful in Home:', err);
-      const refetch = await apiFetch(`${API_BASE_URL}/api/properties/${selectedProperty.id}/reviews`);
-      if (refetch.ok) {
-        const freshData = await refetch.json();
-        setReviews(freshData.reviews || []);
-      }
-    }
-  };
 
   const categories = useMemo(() => {
     const counts = {};
@@ -405,10 +107,6 @@ const Home = () => {
       fetchFavorites();
     }
   }, [user]);
-
-  useEffect(() => {
-    setActiveSliderIdx(0);
-  }, [selectedProperty?.id]);
 
   // Fetch properties from backend API
   useEffect(() => {
@@ -487,7 +185,14 @@ const Home = () => {
     properties.forEach(p => {
       if (p.property_features) {
         p.property_features.forEach(f => {
-          if (f.feature_name) featuresSet.add(f.feature_name);
+          const name = typeof f === 'string' ? f : f.feature_name;
+          if (name) featuresSet.add(name);
+        });
+      }
+      if (p.lifestyle_tags) {
+        p.lifestyle_tags.forEach(t => {
+          const name = typeof t === 'string' ? t : t.tag_name;
+          if (name) featuresSet.add(name);
         });
       }
     });
@@ -721,24 +426,17 @@ const Home = () => {
     ).slice(0, 8);
   }, [wardSearchQuery, selectedWards, selectedProvince]);
 
-  const handleLogout = async () => {
-    try {
-      await logout();
-      navigate('/login');
-    } catch (error) {
-      alert(error.message);
-    }
-  };
-
   const formatPrice = (price) => {
-    if (price < 1000000) {
-      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(price);
-    }
+    if (!price || price === 0) return 'Liên hệ';
     const billion = 1000000000;
+    const million = 1000000;
     if (price >= billion) {
       return `${(price / billion).toFixed(1).replace('.0', '')} Tỷ`;
     }
-    return `${(price / 1000000).toFixed(0)} Triệu`;
+    if (price >= million) {
+      return `${(price / million).toFixed(0)} Triệu`;
+    }
+    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
   };
 
   const toggleFavorite = async (property) => {
@@ -766,11 +464,10 @@ const Home = () => {
 
   return (
     <div className="home-container">
-      {/* Navbar */}
-      <Header
-        activeTab="home"
-        // showSearch
-        // showNotifications
+      {/* Header */}
+      <SwipeHeader 
+        activeView="home" 
+        onSearch={() => setShowAdvModal(true)} 
       />
 
       {/* Hero Section */}
@@ -883,8 +580,6 @@ const Home = () => {
                   <option value="Phòng Trọ">Phòng trọ</option>
                   <option value="Mặt Bằng">Mặt bằng</option>
                   <option value="Văn Phòng">Văn phòng</option>
-                  <option value="Biệt Thự">Biệt thự</option>
-                  <option value="Đất Nền">Đất nền</option>
                   {searchType === 'CUSTOM' && <option value="CUSTOM">Nhiều loại hình</option>}
                 </select>
               </div>
@@ -995,7 +690,14 @@ const Home = () => {
                 }}
               >
                 <div className="listing-image-wrap">
-                  <img src={property.thumbnail} alt={property.title} />
+                  <img 
+                    src={property.thumbnail || (property.images && property.images[0]) || 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=600&q=80'} 
+                    alt={property.title} 
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=600&q=80';
+                    }}
+                  />
                   {property.is_highlighted && <span className="listing-highlight-badge"><Sparkles size={11} /> Nổi bật</span>}
                   <button
                     className={`listing-favorite ${isFavorite ? 'active' : ''}`}
@@ -1082,575 +784,20 @@ const Home = () => {
         </div>
       </footer>
 
-      {/* Property Details Modal */}
-      {showDetailModal && selectedProperty && (() => {
-        const sliderImages = (selectedProperty.property_images && selectedProperty.property_images.length > 0)
-          ? selectedProperty.property_images.map(img => img.image_url)
-          : [selectedProperty.thumbnail];
-
-        const lifestyleChips = selectedProperty.lifestyle_tags && selectedProperty.lifestyle_tags.length > 0
-          ? selectedProperty.lifestyle_tags.map(t => t.tag_name)
-          : [];
-        const amenityChips = selectedProperty.property_features && selectedProperty.property_features.length > 0
-          ? selectedProperty.property_features.map(f => f.feature_name)
-          : [];
-        const ownerDetails = selectedProperty.owner;
-
-        const isFav = dbFavorites.some(fav => fav.id === selectedProperty.id);
-
-        return (
-          <div className="modal-backdrop" onClick={() => { setShowDetailModal(false); setSelectedProperty(null); }}>
-            <div className="detail-modal-content premium-detail-modal" onClick={(e) => e.stopPropagation()}>
-              <button className="modal-close-btn circular-close" onClick={() => { setShowDetailModal(false); setSelectedProperty(null); }}>
-                <X size={20} />
-              </button>
-              
-              <div className="modal-body premium-body">
-                {/* 1. Top Media Slider */}
-                <div className="detail-media-slider">
-                  <div className="main-image-container">
-                    <img src={sliderImages[activeSliderIdx]} alt={selectedProperty.title} className="slider-main-img" />
-                    
-                    {sliderImages.length > 1 && (
-                      <>
-                        <button 
-                          className="slider-nav-btn prev" 
-                          onClick={() => setActiveSliderIdx(prev => (prev - 1 + sliderImages.length) % sliderImages.length)}
-                        >
-                          <ChevronLeft size={24} />
-                        </button>
-                        <button 
-                          className="slider-nav-btn next" 
-                          onClick={() => setActiveSliderIdx(prev => (prev + 1) % sliderImages.length)}
-                        >
-                          <ChevronRight size={24} />
-                        </button>
-                      </>
-                    )}
-                  </div>
-                  
-                  {sliderImages.length > 1 && (
-                    <div className="slider-thumbnails">
-                      {sliderImages.map((img, idx) => (
-                        <div 
-                          key={idx} 
-                          className={`thumb-wrapper ${idx === activeSliderIdx ? 'active' : ''}`}
-                          onClick={() => setActiveSliderIdx(idx)}
-                        >
-                          <img src={img} alt={`thumbnail-${idx}`} />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="detail-content-wrapper">
-                  {/* 2. Rating & Match Score */}
-                  <div className="detail-meta-row">
-                    <span className="match-score-tag">
-                      <Sparkles size={12} /> {selectedProperty.matchScore || 95}% MATCH SCORE
-                    </span>
-                    
-                    <div className="detail-rating">
-                      <span className="rating-num">{selectedProperty.average_rating ? selectedProperty.average_rating.toFixed(1) : '0'}</span>
-                      <div className="rating-stars">
-                        {[1, 2, 3, 4, 5].map(star => (
-                          <span key={star} className={star <= Math.round(selectedProperty.average_rating || 0) ? 'star-filled' : 'star-empty'}>★</span>
-                        ))}
-                      </div>
-                      <span className="rating-count">({selectedProperty.review_count || 0} đánh giá)</span>
-                    </div>
-                  </div>
-
-                  {/* 3. Header Section */}
-                  <div className="detail-header-block">
-                    <div className="title-section">
-                      <h2>{selectedProperty.title}</h2>
-                      <div className="detail-address-row">
-                        <MapPin size={16} />
-                        <span>{selectedProperty.address}</span>
-                      </div>
-                    </div>
-                    
-                    <div className="detail-action-buttons">
-                      <button 
-                        className={`action-btn fav-btn ${isFav ? 'active' : ''}`}
-                        onClick={async () => {
-                          if (!user?.id) return;
-                          if (isFav) {
-                            setDbFavorites(prev => prev.filter(fav => fav.id !== selectedProperty.id));
-                            apiFetch(`${API_BASE_URL}/api/favorites/delete`, {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ propertyId: selectedProperty.id })
-                            }).catch(err => console.error(err));
-                          } else {
-                            setDbFavorites(prev => [...prev, selectedProperty]);
-                            apiFetch(`${API_BASE_URL}/api/favorites`, {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ propertyId: selectedProperty.id })
-                            }).catch(err => console.error(err));
-                          }
-                        }}
-                      >
-                        <Heart size={16} fill={isFav ? "white" : "none"} />
-                        <span>{isFav ? 'Đã lưu' : 'Lưu'}</span>
-                      </button>
-                      
-                      <button className="action-btn share-btn" onClick={() => {
-                        const shareUrl = `${window.location.origin}/?propertyId=${selectedProperty.id}`;
-                        navigator.clipboard.writeText(shareUrl);
-                        alert('Đã sao chép liên kết bài đăng!');
-                      }}>
-                        <Share2 size={16} />
-                        <span>Chia sẻ</span>
-                      </button>
-
-                      <button className="action-btn rate-btn" onClick={() => setShowRatingForm(true)}>
-                        <Star size={16} />
-                        <span>Đánh giá</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="detail-price-tag">
-                    {selectedProperty.price ? selectedProperty.price.toLocaleString('vi-VN') : 'Liên hệ'} VNĐ
-                  </div>
-
-                  {/* 4. Specs Grid */}
-                  <div className="detail-specs-grid">
-                    <div className="spec-card">
-                      <div className="spec-icon-box"><Maximize size={20} /></div>
-                      <div className="spec-info">
-                        <span>Diện tích</span>
-                        <p>{selectedProperty.area} m²</p>
-                      </div>
-                    </div>
-                    <div className="spec-card">
-                      <div className="spec-icon-box"><Bath size={20} /></div>
-                      <div className="spec-info">
-                        <span>Phòng tắm</span>
-                        <p>{selectedProperty.bathrooms || 0}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 5. Lifestyle & Amenities Columns */}
-                  <div className="detail-columns-row">
-                    <div className="detail-column">
-                      <h3>Lối sống phù hợp</h3>
-                      <div className="chips-list">
-                        {lifestyleChips.length > 0 ? (
-                          lifestyleChips.map((chip, idx) => (
-                            <span key={idx} className="feature-chip lifestyle-chip-style">{chip}</span>
-                          ))
-                        ) : (
-                          <span className="no-features-text">Đang cập nhật...</span>
-                        )}
-                      </div>
-                    </div>
-                    
-                    <div className="detail-column">
-                      <h3>Tiện ích</h3>
-                      <div className="chips-list">
-                        {amenityChips.length > 0 ? (
-                          amenityChips.map((chip, idx) => (
-                            <span key={idx} className="feature-chip amenity-chip-style">{chip}</span>
-                          ))
-                        ) : (
-                          <span className="no-features-text">Đang cập nhật...</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 6. Description & Images Grid */}
-                  <div className="detail-columns-row text-image-row">
-                    <div className="detail-column description-column">
-                      <h3>Mô tả chi tiết</h3>
-                      <p className="description-text">{selectedProperty.description}</p>
-                    </div>
-                    
-                    <div className="detail-column detail-images-column">
-                      <h3>Hình ảnh chi tiết</h3>
-                      <div className="detail-images-grid-box">
-                        {sliderImages.slice(0, 4).map((img, idx) => (
-                          <div key={idx} className="grid-image-wrapper" onClick={() => setActiveSliderIdx(idx)}>
-                            <img src={img} alt={`detail-${idx}`} />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 6.5. Similar Properties from other agents */}
-                  {!isLoadingSimilar && similarProperties.length > 0 && (
-                    <div className="detail-similar-properties-section" style={{ padding: '20px', marginTop: '20px', borderTop: '1px solid #e2e8f0' }}>
-                      <h3 style={{ fontSize: '16px', fontWeight: '700', color: '#0f172a', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Sparkles size={16} color="#2563eb" /> Các căn hộ tương tự từ các môi giới khác
-                      </h3>
-                      <div className="similar-properties-grid" style={{ display: 'flex', gap: '15px', overflowX: 'auto', paddingBottom: '10px' }}>
-                        {similarProperties.map(sim => (
-                          <div 
-                            key={sim.id} 
-                            className="similar-property-card-small" 
-                            onClick={() => setSelectedProperty(sim)}
-                            style={{ 
-                              minWidth: '220px', 
-                              border: '1px solid #e2e8f0', 
-                              borderRadius: '12px', 
-                              overflow: 'hidden', 
-                              cursor: 'pointer', 
-                              backgroundColor: '#f8fafc',
-                              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-                              transition: 'transform 0.2s, box-shadow 0.2s' 
-                            }}
-                          >
-                            <img src={sim.thumbnail} alt={sim.title} style={{ width: '100%', height: '120px', objectFit: 'cover' }} />
-                            <div style={{ padding: '12px' }}>
-                              <h4 style={{ fontSize: '13px', fontWeight: '600', color: '#1e293b', margin: '0 0 4px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sim.title}</h4>
-                              <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 8px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                <MapPin size={10} style={{ marginRight: '2px', verticalAlign: 'middle' }} /> {sim.district}, {sim.city}
-                              </p>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: '13px', fontWeight: '700', color: '#2563eb' }}>
-                                  {sim.price ? (sim.price / 1000000).toFixed(1).replace('.0', '') + ' Triệu/tháng' : 'Liên hệ'}
-                                </span>
-                                <span style={{ fontSize: '11px', color: '#64748b' }}>{sim.area} m²</span>
-                              </div>
-                              <div style={{ marginTop: '8px', borderTop: '1px solid #e2e8f0', paddingTop: '6px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <span style={{ fontSize: '11px', color: '#475569', fontWeight: '500' }}>Sale: {sim.owner?.name || 'Môi giới'}</span>
-                                <span style={{ fontSize: '10px', color: '#d97706', backgroundColor: '#fef3c7', padding: '2px 6px', borderRadius: '4px', fontWeight: '600' }}>★ {sim.owner?.trust_score ?? 50}</span>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 7. Poster info */}
-                  <div className="detail-poster-block">
-                    <h3>Thông tin người đăng</h3>
-                    {ownerDetails ? (
-                      <div className="poster-card">
-                        <div className="poster-left">
-                          <img src={ownerDetails.avatar || 'https://i.pravatar.cc/150?img=67'} alt={ownerDetails.name} className="poster-avatar" />
-                          <div className="poster-name-info">
-                            <div className="name-row">
-                              <h4>{ownerDetails.name}</h4>
-                              <span className="role-verified-badge">
-                                <ShieldCheck size={12} /> {ownerDetails.role === 'AGENT' ? 'Môi giới' : 'Chính chủ'}
-                              </span>
-                            </div>
-                            <p>Thành viên từ {new Date(ownerDetails.created_at || selectedProperty.created_at).toLocaleDateString('vi-VN')}</p>
-                          </div>
-                        </div>
-                        <div className="poster-right">
-                          {(() => {
-                            const score = Number(ownerDetails.trust_score ?? 50);
-                            let text = 'Rất uy tín';
-                            let color = '#d97706'; // gold
-                            if (score <= 39) {
-                              text = 'Rủi ro cao';
-                              color = '#dc2626'; // red
-                            } else if (score <= 59) {
-                              text = 'Bình thường';
-                              color = '#6b7280'; // grey
-                            } else if (score <= 79) {
-                              text = 'Đáng tin';
-                              color = '#10b981'; // green
-                            }
-                            return (
-                              <div className="trust-score-wrapper" style={{ borderColor: color }}>
-                                <span style={{ color: '#94a3b8' }}>Trust Score</span>
-                                <p style={{ color }}>{score}</p>
-                                <small style={{ color }}>{text}</small>
-                              </div>
-                            );
-                          })()}
-                          
-                          <div className="poster-contact-buttons">
-                            <button
-                              type="button"
-                              className="contact-btn message-btn"
-                              onClick={() => {
-                                if (selectedProperty.owner_id) {
-                                  navigate(`/chat?agentId=${selectedProperty.owner_id}&propertyId=${selectedProperty.id}`);
-                                } else {
-                                  alert('Bất động sản này không có thông tin chủ sở hữu.');
-                                }
-                              }}
-                            >
-                              <MessageSquare size={16} /> Nhắn tin
-                            </button>
-                            {selectedProperty.contact_phone ? (
-                              <a href={`tel:${selectedProperty.contact_phone}`} className="contact-btn call-btn">
-                                <Phone size={16} /> Gọi ngay
-                              </a>
-                            ) : (
-                              <button className="contact-btn call-btn" disabled style={{ opacity: 0.5, cursor: 'not-allowed' }}>
-                                <Phone size={16} /> Chưa có SĐT
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="poster-card" style={{ display: 'flex', justifyContent: 'center', padding: '20px', color: '#94a3b8' }}>
-                        Đang tải thông tin...
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 8. Footer Info */}
-                  <div className="detail-footer-bar">
-                    <div className="footer-item"><Calendar size={14} /> <span>Đăng tin: {new Date(selectedProperty.created_at).toLocaleDateString('vi-VN')}</span></div>
-                    <div className="footer-item"><Eye size={14} /> <span>Lượt xem: {selectedProperty.views || 0}</span></div>
-                    <div className="footer-item"><Shield size={14} /> <span>Mã tin: {selectedProperty.property_type === 'Mặt Bằng' ? 'MBKD' : 'CHCH'}-{124000 + selectedProperty.id}</span></div>
-                  </div>
-
-                </div>
-              </div>
-            </div>
-
-            {showRatingForm && (
-              <div className="rating-modal-backdrop" onClick={(e) => { e.stopPropagation(); setShowRatingForm(false); }}>
-                <div className="rating-modal-content premium-rating-modal" onClick={(e) => e.stopPropagation()}>
-                  <button className="rating-modal-close-btn" onClick={() => setShowRatingForm(false)}>
-                    <X size={20} />
-                  </button>
-                  
-                  <h3 className="rating-modal-title">Đánh giá bất động sản</h3>
-                  
-                  {/* Rating summary row */}
-                  <div className="rating-summary-container">
-                    {reviews.length === 0 ? (
-                      <div className="no-reviews-box-summary">
-                        <p>Chưa có đánh giá cho tin đăng này</p>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="summary-left">
-                          <span className="score-num">{avgScore.toFixed(1)}</span>
-                          <div className="rating-stars">
-                            {[1, 2, 3, 4, 5].map(star => (
-                              <span key={star} className={star <= Math.round(avgScore) ? 'star-filled' : 'star-empty'}>★</span>
-                            ))}
-                          </div>
-                          <span className="rating-desc">{ratingLabel}</span>
-                          <span className="total-ratings-count">Dựa trên {reviews.length} đánh giá</span>
-                        </div>
-                        
-                        <div className="summary-right">
-                          {[5, 4, 3, 2, 1].map((stars) => {
-                            const count = reviews.filter(r => r.rating === stars).length;
-                            const pct = reviews.length > 0 ? (count / reviews.length) * 100 : 0;
-                            return (
-                              <div key={stars} className="star-row">
-                                <span className="star-label">{stars} ★</span>
-                                <div className="bar-outer">
-                                  <div className="bar-inner" style={{ width: `${pct}%` }}></div>
-                                </div>
-                                <span className="star-count">{count}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                  
-                  {/* Tabs */}
-                  <div className="rating-tabs">
-                    <button 
-                      className={`rating-tab-btn ${activeTab === 'all' ? 'active' : ''}`}
-                      onClick={() => setActiveTab('all')}
-                    >
-                      Tất cả đánh giá ({reviews.length})
-                    </button>
-                    <button 
-                      className={`rating-tab-btn ${activeTab === 'mine' ? 'active' : ''}`}
-                      onClick={() => setActiveTab('mine')}
-                    >
-                      Đánh giá của tôi
-                    </button>
-                  </div>
-                  
-                  {/* Rating form box */}
-                  <div className="rating-form-card">
-                    <h4>Chia sẻ trải nghiệm của bạn</h4>
-                    <p className="form-subtext">Đánh giá của bạn giúp người khác dễ dàng quyết định hơn.</p>
-                    
-                    <form onSubmit={handleRatingSubmit} className="rating-main-form">
-                      <div className="stars-selector-row">
-                        <span>Chọn số sao</span>
-                        <div className="stars-selector">
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <button
-                              key={star}
-                              type="button"
-                              className={`star-select-btn ${star <= ratingVal ? 'active' : ''}`}
-                              onClick={() => setRatingVal(star)}
-                            >
-                              ★
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      
-                      <div className="rating-textarea-wrapper">
-                        <textarea
-                          placeholder="Viết bình luận của bạn..."
-                          value={reviewText}
-                          onChange={(e) => setReviewText(e.target.value.slice(0, 500))}
-                          maxLength={500}
-                          rows={4}
-                        />
-                        <span className="char-counter">{reviewText.length}/500</span>
-                      </div>
-                      
-                      {/* Image Upload Input */}
-                      <div className="image-upload-row">
-                        <label className="upload-btn">
-                          <input 
-                            type="file" 
-                            accept="image/*" 
-                            multiple 
-                            style={{ display: 'none' }} 
-                            onChange={handleImageSelect}
-                          />
-                          <div className="camera-icon-box">📷</div>
-                          <div className="upload-text-block">
-                            <span>Thêm ảnh (tùy chọn)</span>
-                            <small>Tối đa 5 ảnh</small>
-                          </div>
-                        </label>
-                        
-                        {selectedImages.length > 0 && (
-                          <div className="selected-images-preview">
-                            {selectedImages.map((img, idx) => (
-                              <div key={idx} className="preview-img-wrapper">
-                                <img src={img} alt={`uploaded-${idx}`} />
-                                <button type="button" className="remove-img-btn" onClick={() => removeSelectedImage(idx)}>×</button>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      
-                      <div className="form-actions">
-                        <button type="button" className="btn-cancel" onClick={() => setShowRatingForm(false)}>Hủy</button>
-                        <button type="submit" className="btn-submit">Gửi đánh giá</button>
-                      </div>
-                    </form>
-                  </div>
-                  
-                  {/* Reviews List filters */}
-                  <div className="reviews-filter-row">
-                    <div className="select-wrapper">
-                      <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)}>
-                        <option value="newest">Sắp xếp: Mới nhất</option>
-                        <option value="oldest">Sắp xếp: Cũ nhất</option>
-                        <option value="highest">Sắp xếp: Đánh giá cao nhất</option>
-                        <option value="lowest">Sắp xếp: Đánh giá thấp nhất</option>
-                      </select>
-                    </div>
-                    
-                    <div className="select-wrapper">
-                      <select value={ratingFilter} onChange={(e) => setRatingFilter(e.target.value)}>
-                        <option value="all">Tất cả sao</option>
-                        <option value="verified">✓ Đã xác thực giao dịch</option>
-                        <option value="5">5 sao</option>
-                        <option value="4">4 sao</option>
-                        <option value="3">3 sao</option>
-                        <option value="2">2 sao</option>
-                        <option value="1">1 sao</option>
-                      </select>
-                    </div>
-                  </div>
-                  
-                  {/* Reviews list */}
-                  <div className="reviews-list-box">
-                    {isLoadingReviews ? (
-                      <p className="loading-reviews-text">Đang tải đánh giá...</p>
-                    ) : filteredReviewsList.length === 0 ? (
-                      <p className="no-reviews-text">Chưa có đánh giá nào phù hợp với bộ lọc.</p>
-                    ) : (
-                      filteredReviewsList.map((rev) => {
-                        const avatarInitial = rev.user?.name ? rev.user.name.charAt(0).toUpperCase() : 'U';
-                        const reviewDate = new Date(rev.created_at).toLocaleDateString('vi-VN');
-                        const isVerified = Boolean(rev.is_verified_review);
-                        
-                        return (
-                          <div key={rev.id} className="review-item-card">
-                            <div className="review-header">
-                              <div className="reviewer-info">
-                                <div className="reviewer-avatar">
-                                  {rev.user?.avatar ? (
-                                    <img src={rev.user.avatar} alt={rev.user.name} />
-                                  ) : (
-                                    <span className="avatar-letter">{avatarInitial}</span>
-                                  )}
-                                </div>
-                                <div className="reviewer-name-date">
-                                  <div className="reviewer-name-row">
-                                    <span className="reviewer-name">{rev.user?.name || 'Người dùng'}</span>
-                                    {isVerified && (
-                                      <span className="purchased-badge" title="Đánh giá đã được xác thực qua giao dịch thực tế">
-                                        ✓ Đã giao dịch
-                                      </span>
-                                    )}
-                                  </div>
-                                  <span className="review-date">{reviewDate}</span>
-                                </div>
-                              </div>
-                              <button className="dots-menu-btn">•••</button>
-                            </div>
-                            
-                            <div className="review-rating-stars">
-                              {[1, 2, 3, 4, 5].map(star => (
-                                <span key={star} className={star <= rev.rating ? 'star-filled' : 'star-empty'}>★</span>
-                              ))}
-                            </div>
-                            
-                            <p className="review-comment-text">{rev.comment}</p>
-                            
-                            {rev.images && rev.images.length > 0 && (
-                              <div className="review-comment-images">
-                                {rev.images.map((img, idx) => {
-                                  const imgUrl = typeof img === 'string' ? img : img.image_url;
-                                  return (
-                                    <img key={idx} src={imgUrl} alt="review-comment" onClick={() => window.open(imgUrl)} />
-                                  );
-                                })}
-                              </div>
-                            )}
-                            
-                            <div className="review-actions-footer">
-                              <button
-                                className={`helpful-btn ${rev.user_has_voted ? 'voted' : ''}`}
-                                onClick={() => handleToggleHelpful(rev.id)}
-                                title={rev.user_has_voted ? "Bỏ bình chọn hữu ích" : "Bình chọn hữu ích"}
-                              >
-                                <span>👍 Hữu ích ({rev.helpful_count || 0})</span>
-                              </button>
-                              <button className="reply-btn">
-                                <span>💬 Trả lời</span>
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        );
-      })()}
+      {/* Property Details Modal (F18: Reusable Component) */}
+      {showDetailModal && selectedProperty && (
+        <PropertyDetailModal
+          property={selectedProperty}
+          onClose={() => {
+            setShowDetailModal(false);
+            setSelectedProperty(null);
+          }}
+          showFavoriteActions={true}
+          isFavorite={dbFavorites.some(fav => fav.id === selectedProperty.id)}
+          onToggleFavorite={() => toggleFavorite(selectedProperty)}
+          onSelectProperty={(prop) => setSelectedProperty(prop)}
+        />
+      )}
 
       {/* Advanced Filter Modal */}
       {showAdvModal && (
@@ -1676,9 +823,9 @@ const Home = () => {
                     }}
                   >
                     <option value="">Tất cả Tỉnh/TP</option>
-                    <option value="TP.HCM">TP.HCM</option>
-                    <option value="Bình Dương">Bình Dương</option>
-                    <option value="Bà Rịa - Vũng Tàu">Bà Rịa - Vũng Tàu</option>
+                    {Object.keys(WARDS_BY_REGION).map((region) => (
+                      <option key={region} value={region}>{region}</option>
+                    ))}
                   </select>
 
                   <div className="ward-search-wrapper">
