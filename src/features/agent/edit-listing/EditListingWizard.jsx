@@ -35,7 +35,7 @@ const EditListingWizard = ({ propertyId, setActiveTab, setData, currentUser }) =
     selectedProvinceCode, setSelectedProvinceCode,
     selectedDistrictCode, setSelectedDistrictCode,
     loadDistricts, loadWards,
-    handleAutoLocation, handleSearchAddressOnMap, geocodeAddress,
+    handleAutoLocation, handleSearchAddressOnMap,
     handleImageFileChange, handleDragOver, handleDrop,
     toggleSelectImage, setFeaturedImage, deleteSelectedImages,
     toggleAmenity, toggleLifestyleTag, toggleChannel,
@@ -214,31 +214,7 @@ const EditListingWizard = ({ propertyId, setActiveTab, setData, currentUser }) =
                 </div>
                 <div className="input-group">
                   <label>Phường / Xã</label>
-                  <select 
-                    value={listing.ward} 
-                    disabled={!selectedDistrictCode} 
-                    onChange={(e) => {
-                      const wardName = e.target.value;
-                      setListing(prev => ({ ...prev, ward: wardName }));
-                      if (wardName) {
-                        geocodeAddress({
-                          address_detail: listing.address_detail,
-                          ward: wardName,
-                          district: listing.district,
-                          city: listing.city
-                        }).then(res => {
-                          if (res) {
-                            setListing(prev => ({
-                              ...prev,
-                              latitude: res.lat,
-                              longitude: res.lon,
-                              address: res.display_name || prev.address
-                            }));
-                          }
-                        });
-                      }
-                    }}
-                  >
+                  <select value={listing.ward} disabled={!selectedDistrictCode} onChange={(e) => setListing(prev => ({ ...prev, ward: e.target.value }))}>
                     <option value="">Chọn Phường / Xã</option>
                     {wards.map(w => <option key={w.code} value={w.name}>{w.name}</option>)}
                   </select>

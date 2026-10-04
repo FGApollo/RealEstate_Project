@@ -2,13 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { 
   ChevronLeft, Send, MessageSquare, User, 
-  MapPin, Phone, MessageCircle, Home, Compass, Heart, Map, X, Plus, Search, Building2
+  MapPin, Phone, MessageCircle, Home, Compass, Heart, Map
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import { apiFetch } from '../auth/apiClient';
 import { useAuth } from '../auth/useAuth';
-import PropertyDetailModal from '../components/PropertyDetailModal';
-import SwipeHeader from '../features/swipe/SwipeHeader';
 import './Chat.css';
 
 const Chat = () => {
@@ -21,18 +19,10 @@ const Chat = () => {
   const [conversations, setConversations] = useState([]);
   const [activeConversation, setActiveConversation] = useState(null);
   const [messages, setMessages] = useState([]);
-  const [messagesLoading, setMessagesLoading] = useState(false);
   const [newMessage, setNewMessage] = useState('');
   const [sendError, setSendError] = useState('');
   const [activeProperty, setActiveProperty] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [viewingPropertyModal, setViewingPropertyModal] = useState(null);
-
-  // Agent property attachment modal states
-  const [showPropertyModal, setShowPropertyModal] = useState(false);
-  const [agentProperties, setAgentProperties] = useState([]);
-  const [isLoadingAgentProperties, setIsLoadingAgentProperties] = useState(false);
-  const [propertySearchQuery, setPropertySearchQuery] = useState('');
 
   const messagesEndRef = useRef(null);
 
@@ -42,10 +32,8 @@ const Chat = () => {
   };
 
   useEffect(() => {
-    if (!messagesLoading) {
-      scrollToBottom();
-    }
-  }, [messages, messagesLoading]);
+    scrollToBottom();
+  }, [messages]);
 
   // Fetch initial data
   useEffect(() => {
@@ -64,16 +52,6 @@ const Chat = () => {
           if (targetAgentId) {
             const agentIdNum = Number(targetAgentId);
             
-            // Check if user is attempting to chat with themselves
-            if (currentUser && Number(currentUser.id) === agentIdNum) {
-              setSendError('Bạn không thể tự nhắn tin cho chính mình.');
-              navigate('/chat', { replace: true });
-              if (convData.conversations.length > 0) {
-                setActiveConversation(convData.conversations[0]);
-              }
-              return;
-            }
-
             // Check if conversation already exists in lists
             const existing = convData.conversations.find(c => c.partner.id === agentIdNum);
             if (existing) {
@@ -119,51 +97,28 @@ const Chat = () => {
     fetchInitialData();
   }, [currentUser, targetAgentId, targetPropertyId]);
 
-  // Fetch messages when active conversation changes (clean reset on partner switch)
-  const activePartnerId = activeConversation?.partner?.id;
-
+  // Fetch messages when active conversation changes
   useEffect(() => {
-    if (!currentUser?.id || !activePartnerId) {
-      setMessages([]);
-      setMessagesLoading(false);
-      return;
-    }
+    if (!currentUser || !activeConversation) return;
 
-    let isCurrent = true;
-    // Clear previous partner's messages immediately to avoid flashing stale messages
-    setMessages([]);
-    setMessagesLoading(true);
-
-    const fetchMessages = async (isInitial = false) => {
+    const fetchMessages = async () => {
       try {
-        const res = await apiFetch(`${API_BASE_URL}/api/chat/messages?otherId=${activePartnerId}`);
-        if (res.ok && isCurrent) {
+        const res = await apiFetch(`${API_BASE_URL}/api/chat/messages?otherId=${activeConversation.partner.id}`);
+        if (res.ok) {
           const data = await res.json();
           setMessages(data.messages || []);
         }
       } catch (err) {
-        if (isCurrent) {
-          console.error('Error fetching messages:', err);
-        }
-      } finally {
-        if (isCurrent && isInitial) {
-          setMessagesLoading(false);
-        }
+        console.error('Error fetching messages:', err);
       }
     };
 
-    fetchMessages(true);
+    fetchMessages();
 
-    // Poll for new messages every 3 seconds for simulated realtime chat without re-triggering skeleton
-    const interval = setInterval(() => {
-      fetchMessages(false);
-    }, 3000);
-
-    return () => {
-      isCurrent = false;
-      clearInterval(interval);
-    };
-  }, [currentUser?.id, activePartnerId]);
+    // Poll for new messages every 3 seconds for simulated realtime chat
+    const interval = setInterval(fetchMessages, 3000);
+    return () => clearInterval(interval);
+  }, [currentUser, activeConversation]);
 
   // Send message handler
   const handleSendMessage = async (e) => {
@@ -194,7 +149,6 @@ const Chat = () => {
 
       setNewMessage('');
       setMessages(prev => [...prev, data.message]);
-      setActiveProperty(null); // Detach property after first send
 
       // Refresh conversations list to update last message preview
       const convRes = await apiFetch(`${API_BASE_URL}/api/chat/conversations`);
@@ -207,69 +161,6 @@ const Chat = () => {
       setSendError('Lỗi kết nối. Tin nhắn vẫn được giữ lại để bạn thử gửi lại.');
     }
   };
-
-  const fetchAgentProperties = async () => {
-    if (!currentUser) return;
-    setIsLoadingAgentProperties(true);
-    try {
-      const res = await apiFetch(`${API_BASE_URL}/api/properties`);
-      if (res.ok) {
-        const data = await res.json();
-        const myProps = (data.properties || []).filter(
-          p => Number(p.owner_id) === Number(currentUser.id)
-        );
-        setAgentProperties(myProps);
-      }
-    } catch (err) {
-      console.error('Error fetching agent properties:', err);
-    } finally {
-      setIsLoadingAgentProperties(false);
-    }
-  };
-
-  const handleSelectPropertyToAttach = (prop) => {
-    setActiveProperty(prop);
-    setShowPropertyModal(false);
-  };
-
-  const handleQuickSendProperty = async (prop) => {
-    if (!currentUser || !activeConversation) return;
-    try {
-      const res = await apiFetch(`${API_BASE_URL}/api/chat/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          receiverId: activeConversation.partner.id,
-          propertyId: prop.id,
-          message: `[Bất động sản] ${prop.title}`
-        })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setMessages(prev => [...prev, data.message]);
-        setShowPropertyModal(false);
-        setActiveProperty(null);
-
-        const convRes = await apiFetch(`${API_BASE_URL}/api/chat/conversations`);
-        if (convRes.ok) {
-          const convData = await convRes.json();
-          setConversations(convData.conversations || []);
-        }
-      }
-    } catch (err) {
-      console.error('Error quick sending property card:', err);
-    }
-  };
-
-  const filteredAgentProperties = agentProperties.filter(p => {
-    if (!propertySearchQuery.trim()) return true;
-    const q = propertySearchQuery.toLowerCase();
-    return (
-      (p.title && p.title.toLowerCase().includes(q)) ||
-      (p.district && p.district.toLowerCase().includes(q)) ||
-      (p.city && p.city.toLowerCase().includes(q))
-    );
-  });
 
   const formatPrice = (price) => {
     if (!price || price === 0) return 'Liên hệ';
@@ -288,13 +179,36 @@ const Chat = () => {
   return (
     <div className="chat-page-container">
       {/* Header */}
-      <SwipeHeader 
-        activeView="chat" 
-        onSearch={() => navigate('/swipe/Tất cả')} 
-      />
+      <header className="chat-header">
+        <div className="chat-header-left">
+          <Link to="/" className="back-home-btn">
+            <ChevronLeft size={20} />
+          </Link>
+          <span className="chat-logo" onClick={() => navigate('/')}>Swipe Nest Chat</span>
+        </div>
+        
+        <div className="chat-header-right">
+          <div className="header-nav-item" onClick={() => navigate('/swipe/Tất cả')}>
+            <Compass size={18} />
+            <span>KHÁM PHÁ</span>
+          </div>
+          <div className="header-nav-item" onClick={() => navigate('/swipe/Tất cả', { state: { activeView: 'saved' } })}>
+            <Heart size={18} />
+            <span>YÊU THÍCH</span>
+          </div>
+          <div className="header-nav-item">
+            <Map size={18} />
+            <span>MAP</span>
+          </div>
+          <div className="header-nav-item">
+            <User size={18} />
+            <span>PROFILE</span>
+          </div>
+        </div>
+      </header>
 
       {/* Main Container */}
-      <div className={`chat-main-layout ${activeConversation ? 'has-active-chat' : ''}`}>
+      <div className="chat-main-layout">
         {/* Left pane - conversations */}
         <aside className="chat-sidebar">
           <div className="sidebar-header">
@@ -302,17 +216,7 @@ const Chat = () => {
           </div>
           <div className="conversation-list">
             {loading && conversations.length === 0 ? (
-              <div className="sidebar-skeleton-list">
-                {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="sidebar-skeleton-item">
-                    <div className="skeleton-avatar" />
-                    <div className="sidebar-skeleton-lines">
-                      <div className="skeleton-line line-title" />
-                      <div className="skeleton-line line-sub" />
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <p className="chat-status-text">Đang tải cuộc trò chuyện...</p>
             ) : conversations.length === 0 ? (
               <div className="empty-conversations">
                 <MessageSquare size={36} color="#cbd5e1" />
@@ -348,7 +252,7 @@ const Chat = () => {
                         {conv.partner?.role === 'AGENT' && <span className="agent-badge">Môi giới</span>}
                       </div>
                       <p className="conv-last-msg">
-                        {conv.lastSenderId === currentUser?.id ? 'Bạn: ' : ''}
+                        {conv.lastSenderId === currentUser.id ? 'Bạn: ' : ''}
                         {conv.lastMessage || 'Bắt đầu trò chuyện...'}
                       </p>
                     </div>
@@ -365,14 +269,6 @@ const Chat = () => {
             <>
               {/* Active Conversation Header */}
               <div className="active-chat-header">
-                <button 
-                  type="button" 
-                  className="chat-mobile-back-btn" 
-                  aria-label="Quay lại danh sách hội thoại"
-                  onClick={() => setActiveConversation(null)}
-                >
-                  <ChevronLeft size={22} />
-                </button>
                 <div className="chat-partner-info">
                   <div className="conv-avatar">
                     {activeConversation.partner?.avatar ? (
@@ -397,36 +293,27 @@ const Chat = () => {
                 )}
               </div>
 
+              {/* Active Property Context Ribbon */}
+              {activeProperty && (
+                <div className="active-property-ribbon">
+                  <img src={activeProperty.thumbnail} alt={activeProperty.title} className="ribbon-thumb" />
+                  <div className="ribbon-info">
+                    <h5>{activeProperty.title}</h5>
+                    <p className="ribbon-price-address">
+                      <span className="price">{formatPrice(activeProperty.price)}/tháng</span>
+                      <span className="dot">•</span>
+                      <span className="address"><MapPin size={12} /> {activeProperty.district}, {activeProperty.city}</span>
+                    </p>
+                  </div>
+                  <button className="view-property-btn" onClick={() => navigate(`/swipe/Tất cả`, { state: { selectPropertyId: activeProperty.id } })}>
+                    Xem tin
+                  </button>
+                </div>
+              )}
+
               {/* Messages Area */}
               <div className="messages-container">
-                {messagesLoading ? (
-                  <div className="chat-messages-skeleton" aria-label="Đang tải tin nhắn...">
-                    <div className="skeleton-row partner">
-                      <div className="skeleton-avatar" />
-                      <div className="skeleton-bubble-wrap">
-                        <div className="skeleton-bubble skeleton-bubble-lg" />
-                        <div className="skeleton-bubble skeleton-bubble-sm" />
-                      </div>
-                    </div>
-                    <div className="skeleton-row own">
-                      <div className="skeleton-bubble-wrap">
-                        <div className="skeleton-bubble skeleton-bubble-md own-bubble" />
-                      </div>
-                    </div>
-                    <div className="skeleton-row partner">
-                      <div className="skeleton-avatar" />
-                      <div className="skeleton-bubble-wrap">
-                        <div className="skeleton-card" />
-                        <div className="skeleton-bubble skeleton-bubble-sm" />
-                      </div>
-                    </div>
-                    <div className="skeleton-row own">
-                      <div className="skeleton-bubble-wrap">
-                        <div className="skeleton-bubble skeleton-bubble-lg own-bubble" />
-                      </div>
-                    </div>
-                  </div>
-                ) : messages.length === 0 ? (
+                {messages.length === 0 ? (
                   <div className="empty-messages">
                     <MessageCircle size={48} color="#cbd5e1" />
                     <h3>Bắt đầu cuộc trò chuyện</h3>
@@ -452,10 +339,10 @@ const Chat = () => {
                           </div>
                         )}
                         <div className="message-bubble-content">
-                          {msg.property && (
+                          {msg.property ? (
                             <div 
                               className="chat-property-card" 
-                              onClick={() => setViewingPropertyModal(msg.property)}
+                              onClick={() => navigate(`/swipe/Tất cả`, { state: { selectPropertyId: msg.property.id } })}
                               style={{ 
                                 cursor: 'pointer', 
                                 border: '1px solid #e2e8f0', 
@@ -465,8 +352,7 @@ const Chat = () => {
                                 width: '260px',
                                 boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
                                 display: 'flex',
-                                flexDirection: 'column',
-                                marginBottom: msg.message && msg.message !== `[Bất động sản] ${msg.property?.title}` ? '8px' : '0'
+                                flexDirection: 'column'
                               }}
                             >
                               <img src={msg.property.thumbnail} alt={msg.property.title} style={{ width: '100%', height: '140px', objectFit: 'cover' }} />
@@ -478,8 +364,7 @@ const Chat = () => {
                                 </div>
                               </div>
                             </div>
-                          )}
-                          {msg.message && msg.message !== `[Bất động sản] ${msg.property?.title}` && (
+                          ) : (
                             <p className="message-text">{msg.message}</p>
                           )}
                           <span className="message-time">{formattedTime}</span>
@@ -491,66 +376,15 @@ const Chat = () => {
                 <div ref={messagesEndRef} />
               </div>
 
-              {/* Active Property Context Ribbon (Moved right above input form) */}
-              {activeProperty && (
-                <div className="active-property-ribbon">
-                  <img src={activeProperty.thumbnail} alt={activeProperty.title} className="ribbon-thumb" />
-                  <div className="ribbon-info">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span className="ribbon-badge">
-                        Đang đính kèm
-                      </span>
-                      <h5>{activeProperty.title}</h5>
-                    </div>
-                    <p className="ribbon-price-address">
-                      <span className="price">{formatPrice(activeProperty.price)}/tháng</span>
-                      <span className="dot">•</span>
-                      <span className="address"><MapPin size={12} /> {activeProperty.district}, {activeProperty.city}</span>
-                    </p>
-                  </div>
-                  <div className="ribbon-actions">
-                    <button className="view-property-btn" onClick={() => setViewingPropertyModal(activeProperty)}>
-                      Xem tin
-                    </button>
-                    <button 
-                      className="detach-property-btn" 
-                      onClick={() => setActiveProperty(null)}
-                      title="Gỡ đính kèm bất động sản"
-                      aria-label="Gỡ đính kèm"
-                    >
-                      <X size={15} />
-                      <span>Gỡ</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-
               {/* Message Input Box */}
               {sendError && <p role="alert" style={{ color: '#b91c1c', margin: '4px 12px' }}>{sendError}</p>}
               <form className="message-input-form" onSubmit={handleSendMessage}>
-                {(currentUser?.role === 'AGENT' || currentUser?.role === 'ADMIN') && (
-                  <button 
-                    type="button" 
-                    className="attach-btn" 
-                    onClick={() => {
-                      setShowPropertyModal(true);
-                      fetchAgentProperties();
-                    }}
-                    title="Đính kèm bất động sản của bạn (Shopee Style)"
-                    aria-label="Đính kèm BĐS"
-                  >
-                    <Plus size={20} />
-                  </button>
-                )}
                 <input 
                   type="text" 
-                  placeholder={activeProperty ? `Soạn tin nhắn kèm [${activeProperty.title}]...` : "Nhập tin nhắn..."} 
+                  placeholder="Nhập tin nhắn..." 
                   value={newMessage}
                   maxLength={2000}
-                  onChange={(e) => {
-                    setNewMessage(e.target.value);
-                    setSendError('');
-                  }}
+                  onChange={(e) => setNewMessage(e.target.value)}
                 />
                 <button type="submit" className="send-msg-btn">
                   <Send size={18} />
@@ -566,101 +400,6 @@ const Chat = () => {
           )}
         </main>
       </div>
-
-      {/* Shopee-style Property Selection Modal for Agent */}
-      {showPropertyModal && (
-        <div className="property-modal-overlay" onClick={() => setShowPropertyModal(false)}>
-          <div className="property-modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="property-modal-header">
-              <div>
-                <h3>Kho bất động sản của bạn</h3>
-                <p>Chọn BĐS để đính kèm vào tin nhắn hoặc gửi nhanh đến khách hàng</p>
-              </div>
-              <button 
-                className="property-modal-close-btn"
-                onClick={() => setShowPropertyModal(false)}
-                title="Đóng"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="property-modal-search">
-              <Search size={16} color="#94a3b8" />
-              <input 
-                type="text"
-                placeholder="Tìm nhanh theo tên BĐS, khu vực..."
-                value={propertySearchQuery}
-                onChange={(e) => setPropertySearchQuery(e.target.value)}
-              />
-              {propertySearchQuery && (
-                <button 
-                  onClick={() => setPropertySearchQuery('')}
-                  style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex' }}
-                >
-                  <X size={14} />
-                </button>
-              )}
-            </div>
-
-            <div className="property-modal-list">
-              {isLoadingAgentProperties ? (
-                <div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
-                  <p>Đang tải danh sách bất động sản...</p>
-                </div>
-              ) : agentProperties.length === 0 ? (
-                <div style={{ padding: '40px 20px', textAlign: 'center', color: '#64748b' }}>
-                  <Building2 size={40} color="#cbd5e1" style={{ margin: '0 auto 12px' }} />
-                  <p style={{ fontWeight: 600, color: '#334155' }}>Bạn chưa có bất động sản nào</p>
-                  <p style={{ fontSize: '13px', marginTop: '4px' }}>Hãy đăng tin bất động sản mới trong trang quản trị Môi giới.</p>
-                </div>
-              ) : filteredAgentProperties.length === 0 ? (
-                <div style={{ padding: '30px', textAlign: 'center', color: '#64748b' }}>
-                  <p>Không tìm thấy bất động sản nào khớp với từ khóa "{propertySearchQuery}".</p>
-                </div>
-              ) : (
-                filteredAgentProperties.map((p) => {
-                  const isCurrentlyAttached = activeProperty?.id === p.id;
-                  return (
-                    <div key={p.id} className="property-modal-item">
-                      <img src={p.thumbnail} alt={p.title} className="property-modal-thumb" />
-                      <div className="property-modal-info">
-                        <h4>{p.title}</h4>
-                        <p className="property-modal-price">{formatPrice(p.price)}/tháng • {p.area || 0} m²</p>
-                        <p className="property-modal-addr">
-                          <MapPin size={11} /> {p.district}, {p.city}
-                        </p>
-                      </div>
-                      <div className="property-modal-actions">
-                        <button 
-                          className="modal-attach-btn"
-                          onClick={() => handleSelectPropertyToAttach(p)}
-                        >
-                          {isCurrentlyAttached ? 'Đang chọn' : 'Đính kèm'}
-                        </button>
-                        <button 
-                          className="modal-quick-send-btn"
-                          onClick={() => handleQuickSendProperty(p)}
-                        >
-                          Gửi ngay
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Property Details Modal directly inside Chat */}
-      {viewingPropertyModal && (
-        <PropertyDetailModal
-          property={viewingPropertyModal}
-          onClose={() => setViewingPropertyModal(null)}
-        />
-      )}
     </div>
   );
 };
