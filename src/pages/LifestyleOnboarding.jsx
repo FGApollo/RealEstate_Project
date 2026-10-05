@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, Check, Heart, Loader2, Sparkles } from 'lucide-r
 import { API_BASE_URL } from '../config';
 import { apiFetch } from '../auth/apiClient';
 import { useAuth } from '../auth/useAuth';
+import { resumePendingAuthAction } from '../auth/pendingAuthFlow';
 import { roleDestination } from '../auth/roleDestination';
 import './LifestyleOnboarding.css';
 
@@ -67,7 +68,7 @@ export default function LifestyleOnboarding() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const { user } = useAuth();
+  const { user, markOnboardingCompleted } = useAuth();
   const editing = searchParams.get('edit') === '1';
   const [preferences, setPreferences] = useState(EMPTY_PREFERENCES);
   const [options, setOptions] = useState({ property_types: [], locations: [], features: [] });
@@ -97,7 +98,7 @@ export default function LifestyleOnboarding() {
           return;
         }
         if (preferenceData.preferences?.onboarding_completed && !editing) {
-          navigate(location.state?.from || '/swipe/T%E1%BA%A5t%20c%E1%BA%A3', { replace: true });
+          await resumePendingAuthAction(navigate, location.state?.returnTo || location.state?.from || '/swipe/T%E1%BA%A5t%20c%E1%BA%A3');
           return;
         }
         setPreferences(fromRecord(preferenceData.preferences));
@@ -148,7 +149,12 @@ export default function LifestyleOnboarding() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Lưu gu tìm nhà thất bại.');
-      navigate(editing ? (location.state?.from || '/profile') : '/swipe/T%E1%BA%A5t%20c%E1%BA%A3', { replace: true });
+      markOnboardingCompleted();
+      if (editing) {
+        navigate(location.state?.returnTo || location.state?.from || '/profile', { replace: true });
+      } else {
+        await resumePendingAuthAction(navigate, location.state?.returnTo || '/swipe/T%E1%BA%A5t%20c%E1%BA%A3');
+      }
     } catch (saveError) {
       setError(saveError.message || 'Lưu gu tìm nhà thất bại. Vui lòng thử lại.');
     } finally {
@@ -157,7 +163,7 @@ export default function LifestyleOnboarding() {
   };
 
   const leaveOnboarding = () => {
-    navigate(editing ? (location.state?.from || '/profile') : '/swipe/T%E1%BA%A5t%20c%E1%BA%A3', { replace: true });
+    navigate(editing ? (location.state?.returnTo || location.state?.from || '/profile') : '/', { replace: true });
   };
 
   if (loading) return <main className="lifestyle-onboarding loading-state"><Loader2 className="onboarding-spin" /><span>Nesty đang chuẩn bị vài câu hỏi cho bạn…</span></main>;

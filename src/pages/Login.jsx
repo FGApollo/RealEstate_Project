@@ -1,17 +1,16 @@
-import { useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { User, Lock, EyeOff, Eye } from 'lucide-react';
 import AuthLayout from '../components/AuthLayout';
 import GoogleAuthButton from '../components/GoogleAuthButton';
 import Input from '../components/ui/Input';
 import Button from '../components/ui/Button';
 import { API_BASE_URL } from '../config';
-import { useAuth } from '../auth/useAuth';
-import { roleDestination } from '../auth/roleDestination';
+import { useFinishAuthentication } from '../auth/useFinishAuthentication';
+import { savePendingRouteIfMissing } from '../auth/pendingAuthAction';
 
 const Login = () => {
-  const navigate = useNavigate();
-  const { completeLogin } = useAuth();
+  const finishAuthentication = useFinishAuthentication();
   const location = useLocation();
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({ email: '', password: '' });
@@ -19,6 +18,12 @@ const Login = () => {
   const [needsVerification, setNeedsVerification] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const successMessage = location.state?.message;
+
+  useEffect(() => {
+    if (location.state?.returnTo) {
+      savePendingRouteIfMissing(location.state.returnTo, location.state.routeState);
+    }
+  }, [location.state?.returnTo, location.state?.routeState]);
 
   const togglePasswordVisibility = () => {
     setShowPassword(!showPassword);
@@ -50,8 +55,7 @@ const Login = () => {
         throw new Error(data.error || 'Failed to login');
       }
 
-      completeLogin(data);
-      navigate(roleDestination(data.user.role));
+      await finishAuthentication(data);
     } catch (err) {
       setError(err.message);
     } finally {

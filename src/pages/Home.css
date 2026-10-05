@@ -3197,6 +3197,16 @@
   gap: 18px;
 }
 
+.home-action-notice {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 13px;
+}
+
 .listing-card {
   min-width: 0;
   overflow: hidden;

@@ -1,18 +1,23 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useMemo } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { 
   X, ChevronLeft, ChevronRight, Sparkles, MapPin, 
   Heart, Share2, Maximize, Bath, Calendar, Eye, Shield, 
-  ShieldCheck, MessageSquare, Phone, Bed, Star
+  ShieldCheck, MessageSquare, Bed, Star
 } from 'lucide-react';
 import './PropertyDetailModal.css';
 import { API_BASE_URL } from '../config';
-import { apiFetch } from '../auth/apiClient';
+import { apiFetch, publicApiFetch } from '../auth/apiClient';
 import { useAuth } from '../auth/useAuth';
+import { useRequireAuth } from '../auth/useRequireAuth';
+import { openPropertyChat } from '../auth/openPropertyChat';
 import PropertyLocationMap from './PropertyLocationMap';
 
 const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = false, isFavorite = false, onToggleFavorite, onSelectProperty }) => {
   const [activePropertyId, setActivePropertyId] = useState(prop?.id);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const requireAuth = useRequireAuth();
   const [fetchedProperty, setFetchedProperty] = useState(null);
   const property = fetchedProperty || prop;
 
@@ -31,6 +36,23 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
 
   const { user } = useAuth();
 
+  const propertyReturnTo = (propertyId) => location.pathname === '/'
+    ? `/?propertyId=${encodeURIComponent(propertyId)}`
+    : `${location.pathname}${location.search}`;
+
+  const propertyRouteState = (propertyId) => location.pathname.startsWith('/swipe/')
+    ? { selectPropertyId: Number(propertyId) }
+    : undefined;
+
+  const handleContactAgent = async () => {
+    if (!property?.id) return;
+    try {
+      await openPropertyChat({ propertyId: property.id, requireAuth, navigate });
+    } catch (error) {
+      alert(error.message || 'Không thể mở cuộc trò chuyện lúc này.');
+    }
+  };
+
   const [localRating, setLocalRating] = useState(property?.average_rating || 0);
   const [localReviewCount, setLocalReviewCount] = useState(property?.review_count || 0);
 
@@ -39,8 +61,6 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
   const [replyTextMap, setReplyTextMap] = useState({});
   const [submittingReplyMap, setSubmittingReplyMap] = useState({});
   const [togglingHelpfulMap, setTogglingHelpfulMap] = useState({});
-
-  const navigate = useNavigate();
 
   useEffect(() => {
     setActiveSliderIdx(0);
@@ -76,7 +96,7 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
     }
 
     // Always fetch full details to ensure all relations (features, tags, images, owner) are up to date
-    apiFetch(`${API_BASE_URL}/api/properties/${activePropertyId}`)
+    publicApiFetch(`${API_BASE_URL}/api/properties/${activePropertyId}`)
       .then(res => res.json())
       .then(data => {
         if (data.property) {
@@ -86,7 +106,7 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
       .catch(err => console.error('Error fetching full property details:', err));
 
     setIsLoadingReviews(true);
-    apiFetch(`${API_BASE_URL}/api/properties/${activePropertyId}/reviews`)
+    publicApiFetch(`${API_BASE_URL}/api/properties/${activePropertyId}/reviews`)
       .then(res => res.json())
       .then(data => {
         setReviews(data.reviews || []);
@@ -98,7 +118,7 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
       });
 
     setIsLoadingSimilar(true);
-    apiFetch(`${API_BASE_URL}/api/properties/${activePropertyId}/similar`)
+    publicApiFetch(`${API_BASE_URL}/api/properties/${activePropertyId}/similar`)
       .then(res => res.json())
       .then(data => {
         setSimilarProperties(data.properties || []);
@@ -180,11 +200,13 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
   const handleRatingSubmit = async (e) => {
     e.preventDefault();
     if (!property) return;
-    if (!user) {
-      alert('Vui lòng đăng nhập để gửi đánh giá!');
-      return;
-    }
-    if (user.id === property.owner_id) {
+    const authorizedUser = await requireAuth({
+      type: 'NAVIGATE',
+      returnTo: propertyReturnTo(property.id),
+      routeState: propertyRouteState(property.id)
+    });
+    if (!authorizedUser) return;
+    if (String(authorizedUser.id) === String(property.owner_id)) {
       alert('Chủ sở hữu không thể tự đánh giá bất động sản của mình!');
       return;
     }
@@ -247,10 +269,12 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
   };
 
   const handleSendReviewReply = async (reviewId) => {
-    if (!user) {
-      alert('Vui lòng đăng nhập để phản hồi đánh giá này!');
-      return;
-    }
+    const authorizedUser = await requireAuth({
+      type: 'NAVIGATE',
+      returnTo: propertyReturnTo(property.id),
+      routeState: propertyRouteState(property.id)
+    });
+    if (!authorizedUser) return;
 
     const text = (replyTextMap[reviewId] || '').trim();
     if (!text) return;
@@ -289,10 +313,12 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
   };
 
   const handleToggleHelpful = async (reviewId) => {
-    if (!user) {
-      alert('Vui lòng đăng nhập để bình chọn đánh giá này!');
-      return;
-    }
+    const authorizedUser = await requireAuth({
+      type: 'NAVIGATE',
+      returnTo: propertyReturnTo(property.id),
+      routeState: propertyRouteState(property.id)
+    });
+    if (!authorizedUser) return;
 
     if (togglingHelpfulMap[reviewId]) return;
 
@@ -328,7 +354,7 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
           return r;
         }));
       } else {
-        const refetch = await apiFetch(`${API_BASE_URL}/api/properties/${property?.id || prop?.id}/reviews`);
+        const refetch = await publicApiFetch(`${API_BASE_URL}/api/properties/${property?.id || prop?.id}/reviews`);
         if (refetch.ok) {
           const freshData = await refetch.json();
           setReviews(freshData.reviews || []);
@@ -338,7 +364,7 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
       }
     } catch (err) {
       console.error('Error toggling review helpful in modal:', err);
-      const refetch = await apiFetch(`${API_BASE_URL}/api/properties/${property?.id || prop?.id}/reviews`);
+      const refetch = await publicApiFetch(`${API_BASE_URL}/api/properties/${property?.id || prop?.id}/reviews`);
       if (refetch.ok) {
         const freshData = await refetch.json();
         setReviews(freshData.reviews || []);
@@ -616,7 +642,6 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
                         </div>
                         <div style={{ marginTop: '8px', borderTop: '1px solid #e2e8f0', paddingTop: '6px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                           <span style={{ fontSize: '11px', color: '#475569', fontWeight: '500' }}>Sale: {sim.owner?.name || 'Môi giới'}</span>
-                          <span style={{ fontSize: '10px', color: '#d97706', backgroundColor: '#fef3c7', padding: '2px 6px', borderRadius: '4px', fontWeight: '600' }}>★ {sim.owner?.trust_score ?? 50}</span>
                         </div>
                       </div>
                     </div>
@@ -639,34 +664,11 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
                           <ShieldCheck size={12} /> {ownerDetails.role === 'AGENT' ? 'Môi giới' : 'Chính chủ'}
                         </span>
                       </div>
-                      <p>Thành viên từ {new Date(ownerDetails.created_at || property.created_at || new Date()).toLocaleDateString('vi-VN')}</p>
+                      <p>Thông tin công khai về người đăng tin</p>
                     </div>
                   </div>
                   
                   <div className="poster-right">
-                    {(() => {
-                      const score = Number(ownerDetails.trust_score ?? 50);
-                      let text = 'Rất uy tín';
-                      let color = '#d97706'; // gold
-                      if (score <= 39) {
-                        text = 'Rủi ro cao';
-                        color = '#dc2626'; // red
-                      } else if (score <= 59) {
-                        text = 'Bình thường';
-                        color = '#6b7280'; // grey
-                      } else if (score <= 79) {
-                        text = 'Đáng tin';
-                        color = '#10b981'; // green
-                      }
-                      return (
-                        <div className="trust-score-wrapper" style={{ borderColor: color }}>
-                          <span style={{ color: '#94a3b8' }}>Trust Score</span>
-                          <p style={{ color }}>{score}</p>
-                          <small style={{ color }}>{text}</small>
-                        </div>
-                      );
-                    })()}
-                    
                     {user && Number(user.id) === Number(property.owner_id) ? (
                       <div className="own-property-indicator" style={{ 
                         display: 'flex', 
@@ -690,25 +692,10 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
                       <div className="poster-contact-buttons">
                         <button 
                           className="contact-btn message-btn"
-                          onClick={() => {
-                            if (property.owner_id) {
-                              navigate(`/chat?agentId=${property.owner_id}&propertyId=${property.id}`);
-                            } else {
-                              alert('Bất động sản này không có thông tin chủ sở hữu.');
-                            }
-                          }}
+                          onClick={handleContactAgent}
                         >
-                          <MessageSquare size={16} /> Nhắn tin
+                          <MessageSquare size={16} /> {user ? 'Nhắn tin' : 'Đăng nhập để liên hệ'}
                         </button>
-                        {property.contact_phone ? (
-                          <a href={`tel:${property.contact_phone}`} className="contact-btn call-btn">
-                            <Phone size={16} /> Gọi ngay
-                          </a>
-                        ) : (
-                          <button className="contact-btn call-btn" disabled style={{ opacity: 0.5, cursor: 'not-allowed' }}>
-                            <Phone size={16} /> Chưa có SĐT
-                          </button>
-                        )}
                       </div>
                     )}
                   </div>

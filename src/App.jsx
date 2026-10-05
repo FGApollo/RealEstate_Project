@@ -28,12 +28,14 @@ function App() {
       <Route path="/verify-email" element={<VerifyEmail />} />
       <Route path="/resend-verification" element={<ResendVerification />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
-      <Route element={<ProtectedRoute />}>
+      <Route path="/" element={<Home />} />
+      <Route element={<ProtectedRoute allowedRoles={['USER']} />}>
         <Route path="/onboarding" element={<LifestyleOnboarding />} />
-        <Route path="/" element={<Home />} />
         <Route path="/swipe/:categoryName" element={<Swipe />} />
-        <Route path="/chat" element={<Chat />} />
         <Route path="/profile" element={<UserProfile />} />
+      </Route>
+      <Route element={<ProtectedRoute />}>
+        <Route path="/chat" element={<Chat />} />
       </Route>
       <Route element={<ProtectedRoute allowedRoles={['AGENT']} />}>
         <Route path="/sale/overview" element={<AgentOverview />} />

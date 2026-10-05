@@ -1,6 +1,10 @@
 const propertyService = require('../services/propertyService');
 const reviewService = require('../services/reviewService');
 const geminiService = require('../services/geminiService');
+const { toPublicProperty } = require('../services/publicPropertyDto');
+
+const isAgentOwner = (property, user) => String(user?.role || '').toUpperCase() === 'AGENT'
+  && String(property?.owner_id) === String(user?.id);
 
 const MAX_PROPERTY_IMAGE_COUNT = 6;
 const MAX_PROPERTY_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -28,8 +32,16 @@ const validatePropertyImages = (body = {}) => {
 
 const getProperties = async (req, res) => {
   try {
-    const properties = await propertyService.getProperties();
-    res.status(200).json({ properties });
+    const isAgent = String(req.user?.role || '').toUpperCase() === 'AGENT';
+    const maxLimit = isAgent ? 100 : 24;
+    const requestedLimit = Number.parseInt(req.query.limit, 10);
+    const limit = Number.isInteger(requestedLimit)
+      ? Math.max(1, Math.min(maxLimit, requestedLimit))
+      : (isAgent ? maxLimit : 12);
+    const properties = await propertyService.getProperties(limit);
+    res.status(200).json({ properties: properties.map((property) => (
+      isAgentOwner(property, req.user) ? property : toPublicProperty(property)
+    )) });
   } catch (error) {
     console.error('Error fetching properties:', error);
     res.status(500).json({ error: error.message || 'Internal server error' });
@@ -52,13 +64,23 @@ const getPropertyById = async (req, res) => {
   try {
     const { id } = req.params;
     const property = await propertyService.getPropertyById(id);
-    if (!property) {
+    if (!property || (!isAgentOwner(property, req.user)
+      && (property.is_hidden === true || property.status !== 'AVAILABLE'))) {
       return res.status(404).json({ error: 'Property not found' });
     }
-    res.status(200).json({ property });
+    res.status(200).json({ property: isAgentOwner(property, req.user) ? property : toPublicProperty(property) });
   } catch (error) {
     console.error('Error fetching property by id:', error);
     res.status(500).json({ error: error.message || 'Internal server error' });
+  }
+};
+
+const getContactAgent = async (req, res) => {
+  try {
+    const agentId = await propertyService.getContactAgentId(req.params.id, req.user.id);
+    return res.status(200).json({ agentId });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({ error: error.message || 'Could not open this conversation.' });
   }
 };
 
@@ -151,7 +173,7 @@ const getSimilarProperties = async (req, res) => {
   try {
     const { id } = req.params;
     const similar = await propertyService.getSimilarProperties(id);
-    res.status(200).json({ success: true, properties: similar });
+    res.status(200).json({ success: true, properties: similar.map(toPublicProperty) });
   } catch (error) {
     console.error('Error in getSimilarProperties:', error);
     res.status(500).json({ error: error.message || 'Internal server error' });
@@ -194,6 +216,7 @@ module.exports = {
   getProperties,
   createProperty,
   getPropertyById,
+  getContactAgent,
   updateProperty,
   deleteProperty,
   getPropertyReviews,

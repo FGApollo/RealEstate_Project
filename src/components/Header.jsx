@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Menu, X, Search, Bell, ChevronDown, User, LogOut, 
   Home as HomeIcon, Compass, Heart, MessageCircle 
 } from 'lucide-react';
 import { useAuth } from '../auth/useAuth';
+import { useRequireAuth } from '../auth/useRequireAuth';
 import SwipeNestMark from './SwipeNestMark';
 import './Header.css';
 
@@ -15,7 +16,7 @@ export default function Header({
   onMenuClick,
   onTabChange,
   showSearch = false,
-  showNotifications = false,
+  showNotifications = true,
   onSearchClick,
   onSearch, // alias for onSearchClick
   user: userProp,
@@ -26,8 +27,10 @@ export default function Header({
   const auth = useAuth();
   const user = userProp !== undefined ? userProp : auth?.user;
   const logout = onLogoutProp || auth?.logout;
+  const requireAuth = useRequireAuth();
 
   const [showDropdown, setShowDropdown] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const dropdownRef = useRef(null);
 
@@ -73,9 +76,13 @@ export default function Header({
     return '';
   })();
 
-  const handleTabClick = (tab, path, state) => {
+  const handleTabClick = async (tab, path, state) => {
     setMobileDrawerOpen(false);
     setShowDropdown(false);
+    if (path !== '/') {
+      const authorizedUser = await requireAuth({ type: 'NAVIGATE', returnTo: path, routeState: state });
+      if (!authorizedUser) return;
+    }
     if (onTabChange) {
       const handled = onTabChange(tab);
       if (handled) return;
@@ -168,11 +175,24 @@ export default function Header({
             </button>
           )}
 
-          {showNotifications && (
-            <button type="button" className="app-header-notification-btn" aria-label="Thông báo">
-              <Bell size={20} />
-              <i className="app-header-badge-dot" />
-            </button>
+          {showNotifications && user && (
+            <div className="app-header-notification-wrap">
+              <button
+                type="button"
+                className="app-header-notification-btn"
+                aria-label="Thông báo"
+                aria-expanded={notificationsOpen}
+                onClick={() => setNotificationsOpen((open) => !open)}
+              >
+                <Bell size={20} />
+              </button>
+              {notificationsOpen && (
+                <div className="app-header-notification-panel" role="status">
+                  <strong>Thông báo</strong>
+                  <p>Chưa có thông báo mới.</p>
+                </div>
+              )}
+            </div>
           )}
 
           {/* Mobile Hamburger Button - ĐẶT Ở BÊN PHẢI CẠNH TOOLS VÀ PROFILE */}
@@ -223,7 +243,7 @@ export default function Header({
                     className={`app-header-dropdown-item ${currentTab === 'profile' ? 'active' : ''}`}
                     onClick={() => {
                       setShowDropdown(false);
-                      navigate('/profile');
+                      handleTabClick('profile', '/profile');
                     }}
                   >
                     <User size={15} />
@@ -241,13 +261,14 @@ export default function Header({
               )}
             </div>
           ) : (
-            <button 
-              type="button" 
-              className="app-header-login-btn"
-              onClick={() => navigate('/login')}
-            >
-              Đăng nhập
-            </button>
+            <div className="app-header-auth-links">
+              <button type="button" className="app-header-login-btn" onClick={() => navigate('/login')}>
+                Đăng nhập
+              </button>
+              <button type="button" className="app-header-register-btn" onClick={() => navigate('/register')}>
+                Đăng ký
+              </button>
+            </div>
           )}
         </div>
       </header>
@@ -335,6 +356,19 @@ export default function Header({
                   <span>Hồ sơ cá nhân</span>
                 </button>
               )}
+              {user && showNotifications && (
+                <button
+                  type="button"
+                  className="app-header-drawer-link"
+                  onClick={() => {
+                    setMobileDrawerOpen(false);
+                    setNotificationsOpen(true);
+                  }}
+                >
+                  <Bell size={18} />
+                  <span>Thông báo</span>
+                </button>
+              )}
             </nav>
 
             <div className="app-header-drawer-footer">
@@ -359,16 +393,14 @@ export default function Header({
                   </button>
                 </>
               ) : (
-                <button 
-                  type="button"
-                  className="app-header-drawer-login-btn" 
-                  onClick={() => {
-                    setMobileDrawerOpen(false);
-                    navigate('/login');
-                  }}
-                >
-                  Đăng nhập
-                </button>
+                <div className="app-header-drawer-auth-links">
+                  <button type="button" className="app-header-drawer-login-btn" onClick={() => { setMobileDrawerOpen(false); navigate('/login'); }}>
+                    Đăng nhập
+                  </button>
+                  <button type="button" className="app-header-drawer-register-btn" onClick={() => { setMobileDrawerOpen(false); navigate('/register'); }}>
+                    Đăng ký
+                  </button>
+                </div>
               )}
             </div>
           </div>

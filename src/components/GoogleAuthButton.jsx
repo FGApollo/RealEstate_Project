@@ -1,16 +1,13 @@
 import { useState } from 'react';
 import { GoogleLogin } from '@react-oauth/google';
-import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../config';
-import { useAuth } from '../auth/useAuth';
-import { roleDestination } from '../auth/roleDestination';
+import { useFinishAuthentication } from '../auth/useFinishAuthentication';
 
 const GoogleAuthButton = ({ intent, phone, onError }) => {
   const [busy, setBusy] = useState(false);
   const [pendingCredential, setPendingCredential] = useState(null);
   const [linkPassword, setLinkPassword] = useState('');
-  const { completeLogin } = useAuth();
-  const navigate = useNavigate();
+  const finishAuthentication = useFinishAuthentication();
 
   const submitCredential = async (credential, password = null) => {
     setBusy(true);
@@ -36,8 +33,7 @@ const GoogleAuthButton = ({ intent, phone, onError }) => {
 
       setPendingCredential(null);
       setLinkPassword('');
-      completeLogin(data);
-      navigate(roleDestination(data.user.role));
+      await finishAuthentication(data);
     } catch (error) {
       onError(error.message);
     } finally {
