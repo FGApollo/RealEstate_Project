@@ -38,7 +38,14 @@ const getProperties = async (req, res) => {
     const limit = Number.isInteger(requestedLimit)
       ? Math.max(1, Math.min(maxLimit, requestedLimit))
       : (isAgent ? maxLimit : 12);
-    const properties = await propertyService.getProperties(limit);
+    const requestedPropertyType = typeof req.query.property_type === 'string'
+      ? req.query.property_type.trim()
+      : '';
+    const propertyType = requestedPropertyType.length > 0 && requestedPropertyType.length <= 80
+      && !/[%_*]/.test(requestedPropertyType)
+      ? requestedPropertyType
+      : null;
+    const properties = await propertyService.getProperties(limit, propertyType);
     res.status(200).json({ properties: properties.map((property) => (
       isAgentOwner(property, req.user) ? property : toPublicProperty(property)
     )) });

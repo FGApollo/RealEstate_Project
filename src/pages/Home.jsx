@@ -34,6 +34,28 @@ const getCategoryIllustration = (name = '') => {
   return '/icons/categories/house.webp';
 };
 
+const PROPERTY_CATEGORY_CATALOG = [
+  'Nhà Ở',
+  'Văn Phòng',
+  'Căn Hộ',
+  'Chung Cư',
+  'Mặt Bằng',
+  'Đất Nền',
+  'Phòng Trọ'
+];
+
+const normalizePropertyType = (value = '') => String(value)
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .toLocaleLowerCase('vi')
+  .trim();
+
+const mergePropertiesById = (current, additions) => {
+  const merged = new Map(current.map((property) => [String(property.id), property]));
+  additions.forEach((property) => merged.set(String(property.id), property));
+  return [...merged.values()];
+};
+
 const Home = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -80,13 +102,20 @@ const Home = () => {
     const counts = {};
     properties.forEach(p => {
       const type = p.property_type || 'Khác';
-      counts[type] = (counts[type] || 0) + 1;
+      const key = normalizePropertyType(type);
+      counts[key] = { name: type, count: (counts[key]?.count || 0) + 1 };
     });
 
-    return Object.keys(counts).map(type => ({
-      name: type,
-      count: counts[type]
+    const catalogKeys = new Set(PROPERTY_CATEGORY_CATALOG.map(normalizePropertyType));
+    const knownCategories = PROPERTY_CATEGORY_CATALOG.map((name) => ({
+      name,
+      count: counts[normalizePropertyType(name)]?.count || 0
     }));
+    const additionalCategories = Object.entries(counts)
+      .filter(([key]) => !catalogKeys.has(key))
+      .map(([, category]) => category);
+
+    return [...knownCategories, ...additionalCategories];
   }, [properties]);
 
   const fetchFavorites = async () => {
@@ -145,6 +174,31 @@ const Home = () => {
 
     fetchProperties();
   }, [sharedPropertyId]);
+
+  const selectCategoryPreview = async (category) => {
+    setSelectedCategories([category.name]);
+    const categoryKey = normalizePropertyType(category.name);
+    const hasPreview = properties.some((property) => normalizePropertyType(property.property_type) === categoryKey);
+
+    if (!hasPreview) {
+      try {
+        const query = new URLSearchParams({ limit: '4', property_type: category.name });
+        const response = await publicApiFetch(`${API_BASE_URL}/api/properties?${query.toString()}`);
+        if (response.ok) {
+          const data = await response.json();
+          const categoryProperties = (data.properties || []).filter((property) => !property.is_hidden);
+          if (categoryProperties.length) {
+            setProperties((current) => mergePropertiesById(current, categoryProperties));
+            setFilteredProperties((current) => mergePropertiesById(current, categoryProperties));
+          }
+        }
+      } catch (error) {
+        console.error('Could not load public category preview:', error);
+      }
+    }
+
+    document.getElementById('featured-properties')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   const locationSuggestions = useMemo(() => {
     if (!searchLoc.trim()) return [];
@@ -482,7 +536,10 @@ const Home = () => {
     const categoriesToShow = selectedCategories.length > 0
       ? selectedCategories
       : (searchType !== 'ALL' && searchType !== 'CUSTOM' ? [searchType] : []);
-    if (categoriesToShow.length) candidates = candidates.filter((property) => categoriesToShow.includes(property.property_type));
+    if (categoriesToShow.length) {
+      const categoryKeys = new Set(categoriesToShow.map(normalizePropertyType));
+      candidates = candidates.filter((property) => categoryKeys.has(normalizePropertyType(property.property_type)));
+    }
     if (selectedWards.length) candidates = candidates.filter((property) => selectedWards.includes(property.ward));
     if (minPrice !== '') candidates = candidates.filter((property) => Number(property.price) >= Number(minPrice));
     if (maxPrice !== '') candidates = candidates.filter((property) => Number(property.price) <= Number(maxPrice));
@@ -621,6 +678,7 @@ const Home = () => {
                   <option value="Phòng Trọ">Phòng trọ</option>
                   <option value="Mặt Bằng">Mặt bằng</option>
                   <option value="Văn Phòng">Văn phòng</option>
+                  <option value="Đất Nền">Đất nền</option>
                   {searchType === 'CUSTOM' && <option value="CUSTOM">Nhiều loại hình</option>}
                 </select>
               </div>
@@ -684,21 +742,17 @@ const Home = () => {
           <button className="view-all-link" onClick={() => executeSearch()}>Xem tất cả <ArrowRight size={14} /></button>
         </div>
         <div className="categories-grid">
-          {categories.slice(0, 6).map((category) => (
+          {categories.map((category) => (
             <div 
               className="category-card" 
               key={category.name}
               role="button"
               tabIndex={0}
-              onClick={() => {
-                setSelectedCategories([category.name]);
-                document.getElementById('featured-properties')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-              }}
+              onClick={() => selectCategoryPreview(category)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter' || event.key === ' ') {
                   event.preventDefault();
-                  setSelectedCategories([category.name]);
-                  document.getElementById('featured-properties')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  selectCategoryPreview(category);
                 }
               }}
             >
@@ -710,7 +764,7 @@ const Home = () => {
               />
               <div className="category-info">
                 <h3>{category.name}</h3>
-                <p>{category.count}+ tin đăng</p>
+                <p>{category.count ? `${category.count}+ tin đăng` : 'Khám phá tin đăng'}</p>
               </div>
               <ChevronRight size={15} className="category-arrow" />
             </div>
@@ -785,7 +839,11 @@ const Home = () => {
           })}
 
           {featuredProperties.length === 0 && (
-            <div className="listings-empty-state">Chưa có bất động sản phù hợp. Hãy thử thay đổi bộ lọc tìm kiếm.</div>
+            <div className="listings-empty-state">
+              {selectedCategories.length
+                ? `Chưa có tin ${selectedCategories[0]} trong phần xem trước.`
+                : 'Chưa có bất động sản phù hợp. Hãy thử thay đổi bộ lọc tìm kiếm.'}
+            </div>
           )}
         </div>
       </section>
@@ -936,7 +994,7 @@ const Home = () => {
               <div className="filter-group">
                 <label className="filter-section-title">Loại bất động sản</label>
                 <div className="chips-grid">
-                  {['Căn Hộ', 'Chung Cư', 'Nhà Ở', 'Phòng Trọ', 'Mặt Bằng', 'Văn Phòng'].map(cat => {
+                  {['Căn Hộ', 'Chung Cư', 'Nhà Ở', 'Phòng Trọ', 'Mặt Bằng', 'Văn Phòng', 'Đất Nền'].map(cat => {
                     const isSelected = selectedCategories.includes(cat);
                     return (
                       <button

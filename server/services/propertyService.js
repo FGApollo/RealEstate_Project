@@ -120,8 +120,8 @@ const syncRelatedRows = async (table, idField, propertyId, rows) => {
   }
 };
 
-const getProperties = async (limit = 24) => {
-  const { data, error } = await supabase
+const getProperties = async (limit = 24, propertyType = null) => {
+  let query = supabase
     .from('properties')
     .select(`
       *,
@@ -133,6 +133,10 @@ const getProperties = async (limit = 24) => {
     .or('is_hidden.is.null,is_hidden.eq.false')
     .eq('status', 'AVAILABLE')
     .limit(limit);
+
+  if (propertyType) query = query.ilike('property_type', propertyType);
+
+  const { data, error } = await query;
 
   if (error) {
     throw new Error(error.message);
