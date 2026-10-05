@@ -16,6 +16,8 @@ const trustScoreRoutes = require('./routes/trustScoreRoutes');
 const userProfileRoutes = require('./routes/userProfileRoutes');
 const subscriptionRoutes = require('./routes/subscriptionRoutes');
 const appealRoutes = require('./routes/appealRoutes');
+const preferenceRoutes = require('./routes/preferenceRoutes');
+const recommendationRoutes = require('./routes/recommendationRoutes');
 const { getJwtConfig, getCookieOptions } = require('./services/authSessionService');
 const { corsOptions } = require('./middleware/trustedOrigin');
 const { rateLimiters } = require('./middleware/rateLimiters');
@@ -70,6 +72,8 @@ app.use('/api/trust-score', trustScoreRoutes);
 app.use('/api/users', userProfileRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/appeals', appealRoutes);
+app.use('/api/me', preferenceRoutes);
+app.use('/api/recommendations', recommendationRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);

@@ -255,6 +255,17 @@ export default function UserProfile() {
 
       {/* Main Container */}
       <main className="uprofile-main-container">
+        {String(authUser?.role || '').toUpperCase() === 'USER' && (
+          <section style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '20px', marginBottom: '22px', padding: '20px 24px', border: '1px solid #e5eaf4', borderRadius: '18px', background: '#fff' }}>
+            <div>
+              <h2 style={{ margin: '0 0 5px', color: '#1d2e55', fontSize: '17px' }}>Tùy chọn gợi ý</h2>
+              <p style={{ margin: 0, color: '#74809a', fontSize: '13px' }}>Thêm khu vực, ngân sách và kiểu nhà nếu bạn muốn cá nhân hóa gợi ý.</p>
+            </div>
+            <Link to="/onboarding?edit=1" state={{ from: '/profile' }} style={{ flexShrink: 0, padding: '11px 15px', borderRadius: '12px', color: '#fff', background: '#25499b', textDecoration: 'none', fontWeight: 700, fontSize: '13px' }}>
+              Thiết lập
+            </Link>
+          </section>
+        )}
         {/* Profile Hero Header Card */}
         <section className="uprofile-hero-card">
           <div className="uprofile-hero-banner" />

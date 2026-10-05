@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { 
   Heart, X, MapPin,
@@ -100,8 +100,12 @@ const Swipe = () => {
 
   const [dbProperties, setDbProperties] = useState([]);
   const [isLoadingProperties, setIsLoadingProperties] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [propertiesError, setPropertiesError] = useState(false);
   const [propertiesReloadKey, setPropertiesReloadKey] = useState(0);
+  const recommendationPagingRef = useRef({ offset: 0, hasMore: false, loading: false, feedToken: null });
+  const recommendationFeedIdRef = useRef(0);
+  const filterSignatureRef = useRef(null);
   const [currentProperties, setCurrentProperties] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [swipeHistory, setSwipeHistory] = useState(() => {
@@ -327,27 +331,82 @@ const Swipe = () => {
     }
   };
 
-  // Fetch properties from DB
+  // Personalized feed pages are ranked by the backend before they reach the swipe UI.
   useEffect(() => {
     let isCurrentRequest = true;
-    const fetchProperties = async () => {
+    recommendationFeedIdRef.current += 1;
+    const fetchRecommendations = async () => {
       setIsLoadingProperties(true);
+      setIsLoadingMore(false);
       setPropertiesError(false);
+      setDbProperties([]);
+      setCurrentProperties([]);
+      setCurrentIndex(0);
+      recommendationPagingRef.current = { offset: 0, hasMore: false, loading: false, feedToken: null };
       try {
-        const response = await apiFetch(`${API_BASE_URL}/api/properties`);
-        if (!response.ok) throw new Error(`Properties request failed (${response.status})`);
+        const query = new URLSearchParams({
+          category: activeCategoryKey === 'Tất cả' ? 'ALL' : activeCategoryKey,
+          limit: '24',
+          offset: '0'
+        });
+        const response = await apiFetch(`${API_BASE_URL}/api/recommendations?${query}`);
+        if (!response.ok) throw new Error(`Recommendations request failed (${response.status})`);
         const data = await response.json();
-        if (isCurrentRequest) setDbProperties((data.properties || []).filter(p => !p.is_hidden));
+        if (isCurrentRequest) {
+          setDbProperties((data.properties || []).filter(p => !p.is_hidden));
+          recommendationPagingRef.current = {
+            offset: data.pagination?.nextOffset || 0,
+            hasMore: Boolean(data.pagination?.hasMore),
+            loading: false,
+            feedToken: data.pagination?.feedToken || null
+          };
+        }
       } catch (err) {
-        console.warn('Could not load swipe properties:', err);
+        console.warn('Could not load recommendations:', err);
         if (isCurrentRequest) setPropertiesError(true);
       } finally {
         if (isCurrentRequest) setIsLoadingProperties(false);
       }
     };
-    fetchProperties();
+    fetchRecommendations();
     return () => { isCurrentRequest = false; };
-  }, [propertiesReloadKey]);
+  }, [propertiesReloadKey, activeCategoryKey, user?.id]);
+
+  const loadMoreRecommendations = useCallback(async () => {
+    const paging = recommendationPagingRef.current;
+    if (paging.loading || !paging.hasMore || !user?.id) return;
+    const feedId = recommendationFeedIdRef.current;
+    paging.loading = true;
+    setIsLoadingMore(true);
+    try {
+      const query = new URLSearchParams({
+        category: activeCategoryKey === 'Tất cả' ? 'ALL' : activeCategoryKey,
+        limit: '24',
+        offset: String(paging.offset)
+      });
+      if (paging.feedToken) query.set('feedToken', paging.feedToken);
+      const response = await apiFetch(`${API_BASE_URL}/api/recommendations?${query}`);
+      if (!response.ok) throw new Error(`Recommendations request failed (${response.status})`);
+      const data = await response.json();
+      if (feedId !== recommendationFeedIdRef.current) return;
+      setDbProperties((previous) => {
+        const currentIds = new Set(previous.map((property) => Number(property.id)));
+        return [...previous, ...(data.properties || []).filter((property) => !currentIds.has(Number(property.id)) && !property.is_hidden)];
+      });
+      paging.offset = data.pagination?.nextOffset || paging.offset;
+      paging.hasMore = Boolean(data.pagination?.hasMore);
+    } catch (error) {
+      if (feedId !== recommendationFeedIdRef.current) return;
+      console.warn('Could not load more recommendations:', error);
+      setPropertiesError(true);
+      paging.hasMore = false;
+    } finally {
+      if (feedId === recommendationFeedIdRef.current) {
+        paging.loading = false;
+        setIsLoadingMore(false);
+      }
+    }
+  }, [activeCategoryKey, user?.id]);
 
   // Filter properties based on current category and active applied filters
   useEffect(() => {
@@ -442,9 +501,21 @@ const Swipe = () => {
       }
     }
 
+    const signature = JSON.stringify([
+      activeCategoryKey, minPrice, maxPrice, selectedWards, selectedLifestyles,
+      minArea, maxArea, selectedBedrooms, selectedCategories
+    ]);
+    const shouldResetIndex = filterSignatureRef.current !== signature || Boolean(targetSelectId);
+    filterSignatureRef.current = signature;
     setCurrentProperties(combined);
-    setCurrentIndex(targetIndex);
+    setCurrentIndex((previousIndex) => shouldResetIndex
+      ? targetIndex
+      : Math.min(previousIndex, Math.max(0, combined.length - 1)));
   }, [activeCategoryKey, dbProperties, minPrice, maxPrice, selectedWards, selectedLifestyles, minArea, maxArea, selectedBedrooms, selectedCategories, location.state?.selectPropertyId]);
+
+  useEffect(() => {
+    if (!isLoadingProperties && currentIndex >= currentProperties.length - 4) loadMoreRecommendations();
+  }, [currentIndex, currentProperties.length, isLoadingProperties, loadMoreRecommendations]);
 
   // Preload next property image for buttery-smooth transition
   useEffect(() => {
@@ -459,6 +530,16 @@ const Swipe = () => {
 
   const currentProperty = currentProperties[currentIndex];
   const isAlreadyFavorite = currentProperty && dbFavorites.some(fav => fav.id === currentProperty.id);
+
+  const recordPropertyAction = useCallback((propertyId, action) => {
+    apiFetch(`${API_BASE_URL}/api/me/property-events`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ propertyId, action })
+    }).then((response) => {
+      if (!response.ok) console.warn(`Could not record ${action.toLowerCase()} event (${response.status}).`);
+    }).catch((error) => console.warn(`Could not record ${action.toLowerCase()} event:`, error));
+  }, []);
 
   const formatPrice = (price) => {
     if (!price || price === 0) return 'Liên hệ';
@@ -497,6 +578,7 @@ const Swipe = () => {
     });
 
     if (currentProperty) {
+      recordPropertyAction(currentProperty.id, direction === 'right' ? 'LIKE' : 'DISLIKE');
       setSwipeHistory(prev => {
         const filtered = prev.filter(item => item.id !== currentProperty.id);
         return [
@@ -532,8 +614,8 @@ const Swipe = () => {
   };
 
   const resetSwipes = () => {
-    setCurrentIndex(0);
     setSwipeHistory([]);
+    setPropertiesReloadKey((key) => key + 1);
   };
 
   const toggleFavorite = async (property = currentProperty) => {
@@ -646,6 +728,12 @@ const Swipe = () => {
 
   const activePropertyForModal = selectedSavedProperty || currentProperty;
 
+  useEffect(() => {
+    if (showDetailModal && activePropertyForModal?.id && user?.id) {
+      recordPropertyAction(activePropertyForModal.id, 'VIEW');
+    }
+  }, [showDetailModal, activePropertyForModal?.id, user?.id, recordPropertyAction]);
+
   return (
     <div className="swipe-page-container">
       <Header
@@ -688,7 +776,8 @@ const Swipe = () => {
             onToggleFavorite={toggleFavorite}
             onShowDetails={() => setShowDetailModal(true)}
             onRestart={() => propertiesError ? setPropertiesReloadKey((key) => key + 1) : resetSwipes()}
-            isLoading={isLoadingProperties}
+            onAdjustPreferences={() => navigate('/onboarding?edit=1', { state: { from: location.pathname } })}
+            isLoading={isLoadingProperties || isLoadingMore}
             hasError={propertiesError}
             cardMotion={{ x, rotate, opacity }}
             cardController={cardController}
@@ -841,6 +930,8 @@ const Swipe = () => {
 
                       <div className="saved-card-price-tag">
                         {formatPrice(property.price)}
+                        {property.listing_type === 'RENT' && ' /tháng'}
+                        {property.listing_type === 'SALE' && ' · mua bán'}
                       </div>
                     </div>
 

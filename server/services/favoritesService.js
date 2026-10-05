@@ -61,7 +61,17 @@ const addFavorite = async (userId, propertyId) => {
   if (error) {
     throw new Error(error.message);
   }
+  await recordFavoriteEvent(userId, propertyId, 'FAVORITE');
   return data[0];
+};
+
+const recordFavoriteEvent = async (userId, propertyId, action) => {
+  const { error } = await supabase.from('user_property_events').insert({
+    user_id: userId,
+    property_id: propertyId,
+    action
+  });
+  if (error) console.error('Could not persist favorite recommendation signal:', error.message);
 };
 
 const removeFavorite = async (userId, propertyId) => {
@@ -75,6 +85,7 @@ const removeFavorite = async (userId, propertyId) => {
   if (error) {
     throw new Error(error.message);
   }
+  if (data?.length) await recordFavoriteEvent(userId, propertyId, 'UNFAVORITE');
   return data;
 };
 

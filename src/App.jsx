@@ -15,6 +15,7 @@ import AgentOverview from './pages/AgentOverview'
 import Chat from './pages/Chat'
 import AdminPage from './pages/AdminPage'
 import UserProfile from './pages/UserProfile'
+import LifestyleOnboarding from './pages/LifestyleOnboarding'
 import './App.css'
 
 function App() {
@@ -28,6 +29,7 @@ function App() {
       <Route path="/resend-verification" element={<ResendVerification />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route element={<ProtectedRoute />}>
+        <Route path="/onboarding" element={<LifestyleOnboarding />} />
         <Route path="/" element={<Home />} />
         <Route path="/swipe/:categoryName" element={<Swipe />} />
         <Route path="/chat" element={<Chat />} />
