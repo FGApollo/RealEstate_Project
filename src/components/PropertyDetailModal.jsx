@@ -500,6 +500,7 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
 
             <div className="detail-price-tag">
               {property.price ? property.price.toLocaleString('vi-VN') : 'Liên hệ'} VNĐ
+              {property.listing_type === 'RENT' ? ' / tháng' : property.listing_type === 'SALE' ? ' · Giá bán' : ''}
             </div>
 
             {/* 4. Specs Grid */}
@@ -609,7 +610,7 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
                         </p>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span style={{ fontSize: '13px', fontWeight: '700', color: '#2563eb' }}>
-                            {sim.price ? (sim.price / 1000000).toFixed(1).replace('.0', '') + ' Triệu/tháng' : 'Liên hệ'}
+                            {sim.price ? (sim.price / 1000000).toFixed(1).replace('.0', '') + ' Triệu' : 'Liên hệ'}{sim.listing_type === 'RENT' ? '/tháng' : sim.listing_type === 'SALE' ? ' · mua bán' : ''}
                           </span>
                           <span style={{ fontSize: '11px', color: '#64748b' }}>{sim.area} m²</span>
                         </div>

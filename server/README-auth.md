@@ -19,3 +19,7 @@ Password registrations create accounts with `email_verified_at = NULL` and issue
 The public register/resend messages do not confirm whether an email exists. Gmail API delivery over HTTPS is started asynchronously so response content/timing does not wait on Google; delivery failures are logged only by error code, and the user can request a resend after the cooldown. This is not a durable outbox, so monitor backend logs and the sender mailbox's delivery/bounce signals.
 
 Password registration also uses `USER_SIGNUP` or `AGENT_SIGNUP` intent now. The backend rejects a raw `role` field on both registration and Google endpoints; older frontend builds that send `role: AGENT` to `/api/register` must be replaced with this frontend during rollout.
+
+## Lifestyle onboarding rollout
+
+Apply `db-migration/009-lifestyle-recommendations.sql` to the Supabase database before deploying the frontend and API changes. It adds the per-user preference and property-event tables, recommendation indexes, and nullable `properties.listing_type`. Classify new and edited listings as `RENT` or `SALE`; existing listings stay unclassified until an agent edits them and remain available as lower-ranked fallback candidates. Customers can open the optional onboarding from their profile, or use Swipe immediately for mixed rent and sale recommendations that improve from their interactions. Agents and admins do not use customer onboarding.

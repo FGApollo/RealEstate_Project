@@ -153,6 +153,7 @@ const createProperty = async (propertyData) => {
     bedrooms,
     bathrooms,
     property_type,
+    listing_type,
     status,
     city,
     district,
@@ -169,6 +170,12 @@ const createProperty = async (propertyData) => {
     images,
     lifestyle_tags
   } = propertyData;
+
+  if (!['RENT', 'SALE'].includes(listing_type)) {
+    const error = new Error('Chọn tin cho thuê hoặc mua bán.');
+    error.statusCode = 400;
+    throw error;
+  }
 
   console.log('createProperty service called. Title:', title);
   
@@ -210,6 +217,7 @@ const createProperty = async (propertyData) => {
       bedrooms: parseInt(bedrooms) || 0,
       bathrooms: parseInt(bathrooms) || 0,
       property_type,
+      listing_type,
       status: status || 'AVAILABLE',
       city,
       district,
@@ -307,7 +315,7 @@ const getPropertyById = async (id) => {
 const updateProperty = async (id, actorId, propertyData) => {
   const { features, images, lifestyle_tags } = propertyData;
   const editableFields = [
-    'title', 'description', 'price', 'area', 'bedrooms', 'bathrooms', 'property_type',
+    'title', 'description', 'price', 'area', 'bedrooms', 'bathrooms', 'property_type', 'listing_type',
     'status', 'city', 'district', 'ward', 'floor_range', 'address', 'address_detail',
     'thumbnail', 'virtual_tour_url', 'contact_phone', 'latitude', 'longitude'
   ];
@@ -315,6 +323,11 @@ const updateProperty = async (id, actorId, propertyData) => {
     editableFields.filter((field) => Object.hasOwn(propertyData, field))
       .map((field) => [field, propertyData[field]])
   );
+  if (Object.hasOwn(fields, 'listing_type') && !['RENT', 'SALE'].includes(fields.listing_type)) {
+    const error = new Error('Chọn tin cho thuê hoặc mua bán.');
+    error.statusCode = 400;
+    throw error;
+  }
   if (Object.hasOwn(fields, 'price')) fields.price = parseFloat(fields.price) || 0;
   if (Object.hasOwn(fields, 'area')) fields.area = parseFloat(fields.area) || 0;
   if (Object.hasOwn(fields, 'bedrooms')) fields.bedrooms = parseInt(fields.bedrooms, 10) || 0;

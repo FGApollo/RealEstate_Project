@@ -9,6 +9,7 @@ const DEFAULT_LISTING = (currentUser) => ({
   title: '',
   description: '',
   price: '',
+  listing_type: '',
   property_type: 'Căn Hộ',
   status: 'AVAILABLE',
   area: '',
@@ -182,6 +183,7 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
           title: prop.title || '',
           description: prop.description || '',
           price: prop.price || '',
+          listing_type: prop.listing_type || '',
           property_type: prop.property_type || 'Căn Hộ',
           status: prop.status || 'AVAILABLE',
           area: prop.area || '',
@@ -483,6 +485,7 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
         title: listing.title,
         description: listing.description,
         price: parseFloat(listing.price) || 0,
+        listing_type: listing.listing_type,
         area: parseFloat(listing.area) || 0,
         bedrooms: parseInt(listing.bedrooms) || 0,
         bathrooms: parseInt(listing.bathrooms) || 0,
@@ -543,6 +546,10 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
 
   // Submit handler (create or edit) - with validation checks
   const handleSubmitListing = async () => {
+    if (!['RENT', 'SALE'].includes(listing.listing_type)) {
+      alert('Vui lòng chọn tin cho thuê hoặc mua bán để Nesty gợi ý đúng nhu cầu.');
+      return;
+    }
     setIsCheckingSave(true);
     setWarnings([]);
     try {
@@ -550,6 +557,7 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
         title: listing.title,
         description: listing.description,
         price: parseFloat(listing.price) || 0,
+        listing_type: listing.listing_type,
         area: parseFloat(listing.area) || 0,
         bedrooms: parseInt(listing.bedrooms) || 0,
         bathrooms: parseInt(listing.bathrooms) || 0,

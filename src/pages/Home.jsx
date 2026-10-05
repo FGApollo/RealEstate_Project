@@ -108,6 +108,15 @@ const Home = () => {
     }
   }, [user]);
 
+  useEffect(() => {
+    if (!showDetailModal || !selectedProperty?.id || !user?.id) return;
+    apiFetch(`${API_BASE_URL}/api/me/property-events`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ propertyId: selectedProperty.id, action: 'VIEW' })
+    }).catch((error) => console.warn('Could not record property view:', error));
+  }, [showDetailModal, selectedProperty?.id, user?.id]);
+
   // Fetch properties from backend API
   useEffect(() => {
     const fetchProperties = async () => {
@@ -714,7 +723,11 @@ const Home = () => {
                   <h3>{property.title}</h3>
                   <p className="listing-address"><MapPin size={12} /> {property.address}</p>
                   <div className="listing-card-bottom">
-                    <p className="listing-price"><strong>{formatPrice(property.price).toLowerCase()}</strong><span>/tháng</span></p>
+                    <p className="listing-price">
+                      <strong>{formatPrice(property.price).toLowerCase()}</strong>
+                      {property.listing_type === 'RENT' && <span>/tháng</span>}
+                      {property.listing_type === 'SALE' && <span>mua bán</span>}
+                    </p>
                     <div className="listing-specs">
                       <span><Bed size={12} /> {property.bedrooms}</span>
                       <span><Bath size={12} /> {property.bathrooms}</span>

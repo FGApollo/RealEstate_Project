@@ -127,9 +127,17 @@ const EditListingWizard = ({ propertyId, setActiveTab, setData, currentUser }) =
                 <label>Mô tả chi tiết</label>
                 <textarea rows={5} placeholder="Mô tả đặc điểm nổi bật, hướng nhà, tình trạng nội thất..." value={listing.description} onChange={(e) => setListing(prev => ({ ...prev, description: e.target.value }))} />
               </div>
+              <div className="input-group">
+                <label>Tin đăng cho thuê hay mua bán?</label>
+                <select value={listing.listing_type} onChange={(e) => setListing(prev => ({ ...prev, listing_type: e.target.value }))}>
+                  <option value="">Chọn mục đích giao dịch</option>
+                  <option value="RENT">Cho thuê</option>
+                  <option value="SALE">Mua bán</option>
+                </select>
+              </div>
               <div className="form-row-2">
                 <div className="input-group">
-                  <label>Giá thuê / giá bán (VND)</label>
+                  <label>{listing.listing_type === 'RENT' ? 'Giá thuê (VND/tháng)' : listing.listing_type === 'SALE' ? 'Giá bán (VND)' : 'Giá (VND)'}</label>
                   <div className="input-with-suffix">
                     <input type="number" placeholder="Nhập giá tiền" value={listing.price} onChange={(e) => setListing(prev => ({ ...prev, price: e.target.value }))} />
                     <span className="suffix">VND</span>

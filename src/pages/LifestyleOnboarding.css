@@ -1,0 +1,61 @@
+.lifestyle-onboarding {
+  min-height: 100vh;
+  padding: 36px 20px 48px;
+  background: radial-gradient(circle at 10% 15%, #fff1cf 0, transparent 26%), radial-gradient(circle at 90% 80%, #dce9ff 0, transparent 28%), #f7f9ff;
+  color: #17264a;
+  font-family: inherit;
+}
+
+.onboarding-shell { width: min(100%, 720px); margin: 0 auto; }
+.onboarding-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 34px; color: #25499b; font-weight: 800; font-size: 18px; }
+.onboarding-brand-mark { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 12px; background: #25499b; color: #fff; box-shadow: 0 6px 14px #25499b2e; }
+.onboarding-progress-row { display: flex; justify-content: space-between; color: #7783a0; font-size: 11px; font-weight: 800; letter-spacing: .12em; }
+.onboarding-progress-track { height: 6px; margin: 10px 0 22px; overflow: hidden; border-radius: 8px; background: #e6eaf3; }
+.onboarding-progress-track span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #25499b, #7099f2); transition: width .25s ease; }
+.onboarding-card { position: relative; min-height: 520px; padding: 38px 44px 28px; overflow: hidden; border: 1px solid #e9edf5; border-radius: 26px; background: #fff; box-shadow: 0 24px 70px #1e376412; }
+.onboarding-card-top { display: flex; justify-content: space-between; align-items: flex-start; height: 50px; }
+.onboarding-step-icon { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 13px; color: #3157ab; background: #eef3ff; }
+.onboarding-mascot { width: 72px; height: 72px; object-fit: contain; margin: -21px -10px 0 0; }
+.onboarding-eyebrow { margin: 5px 0 9px; color: #6480bc; font-size: 11px; font-weight: 800; letter-spacing: .14em; }
+.onboarding-card h1 { max-width: 570px; margin: 0; color: #1d2e55; font-size: clamp(25px, 4vw, 34px); line-height: 1.18; letter-spacing: -.035em; }
+.onboarding-description { margin: 11px 0 26px; color: #78839a; font-size: 14px; line-height: 1.6; }
+.onboarding-choice-grid, .onboarding-chip-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 11px; }
+.onboarding-choice-grid.two-columns { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.onboarding-choice-card { position: relative; min-height: 130px; padding: 24px 17px 18px; text-align: left; border: 1px solid #e4e9f2; border-radius: 18px; background: #fff; color: #263756; cursor: pointer; transition: .18s ease; }
+.onboarding-choice-card strong, .onboarding-choice-card small { display: block; }
+.onboarding-choice-card strong { margin-bottom: 7px; font-size: 17px; }
+.onboarding-choice-card small { color: #8791a4; font-size: 12px; }
+.onboarding-choice-card:hover, .onboarding-chip:hover { border-color: #9bb1e3; transform: translateY(-1px); }
+.onboarding-choice-card.selected, .onboarding-chip.selected { border-color: #5076ca; background: #f2f6ff; color: #274a9b; box-shadow: 0 0 0 2px #5076ca19; }
+.choice-check { position: absolute; top: 12px; right: 12px; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 8px; color: transparent; background: #fff; border: 1px solid #e1e6ef; }
+.selected .choice-check { color: #fff; border-color: #3157ab; background: #3157ab; }
+.onboarding-chip-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); max-height: 235px; padding: 1px 3px 3px 1px; overflow-y: auto; }
+.onboarding-chip-grid.compact-chips { grid-template-columns: repeat(3, minmax(0, 1fr)); max-height: none; }
+.onboarding-chip { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 9px 12px; border: 1px solid #e4e9f2; border-radius: 14px; background: #fff; color: #4b5873; font: inherit; font-size: 13px; cursor: pointer; transition: .18s ease; }
+.onboarding-subheading { margin: 20px 0 9px; color: #384767; font-size: 13px; font-weight: 750; }
+.area-heading { margin-top: 18px; }
+.onboarding-muted { grid-column: 1 / -1; margin: 4px 0; padding: 15px; border-radius: 13px; color: #75819b; background: #f6f8fc; font-size: 13px; line-height: 1.5; }
+.onboarding-finish-note { display: flex; align-items: center; gap: 9px; margin-top: 19px; padding: 13px 15px; border-radius: 13px; color: #3157ab; background: #f3f6ff; font-size: 13px; font-weight: 650; }
+.onboarding-actions { display: flex; justify-content: space-between; align-items: center; gap: 14px; margin-top: 30px; }
+.onboarding-back, .onboarding-continue { display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-height: 48px; padding: 0 18px; border: 0; border-radius: 14px; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.onboarding-back { color: #697691; background: transparent; }
+.onboarding-continue { min-width: 150px; margin-left: auto; color: #fff; background: #25499b; box-shadow: 0 8px 18px #25499b2b; }
+.onboarding-continue:disabled { opacity: .65; cursor: wait; }
+.onboarding-inline-error, .onboarding-error { color: #b42318; font-size: 13px; }
+.onboarding-inline-error { margin: 18px 0 -12px; }
+.onboarding-error { display: grid; gap: 12px; width: min(100%, 560px); margin: 10vh auto; padding: 22px; border-radius: 16px; background: #fff; }
+.onboarding-error button { justify-self: start; border: 0; border-radius: 10px; padding: 10px 14px; color: #fff; background: #25499b; cursor: pointer; }
+.onboarding-footnote { margin: 17px 0 0; color: #8791a4; text-align: center; font-size: 12px; }
+.lifestyle-onboarding.loading-state { display: flex; align-items: center; justify-content: center; gap: 11px; color: #66738e; }
+.onboarding-spin { animation: onboarding-spin 1s linear infinite; }
+@keyframes onboarding-spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 640px) {
+  .lifestyle-onboarding { padding: 22px 13px 30px; }
+  .onboarding-brand { margin-bottom: 23px; }
+  .onboarding-card { min-height: 560px; padding: 26px 19px 22px; border-radius: 21px; }
+  .onboarding-choice-grid, .onboarding-chip-grid, .onboarding-chip-grid.compact-chips { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+  .onboarding-card h1 { font-size: 27px; }
+  .onboarding-chip { min-height: 43px; padding: 8px; font-size: 12px; }
+  .onboarding-choice-card { padding-left: 13px; padding-right: 10px; }
+}
