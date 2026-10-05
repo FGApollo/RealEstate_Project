@@ -12,6 +12,8 @@ import '../features/swipe/SwipeExperience.css';
 import { API_BASE_URL } from '../config';
 import { apiFetch } from '../auth/apiClient';
 import { useAuth } from '../auth/useAuth';
+import { useRequireAuth } from '../auth/useRequireAuth';
+import { openPropertyChat } from '../auth/openPropertyChat';
 import Header from '../components/Header';
 import SwipeHistoryPanel from '../features/swipe/SwipeHistoryPanel';
 import SwipeMainSection from '../features/swipe/SwipeMainSection';
@@ -86,6 +88,7 @@ const Swipe = () => {
   const { categoryName } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const requireAuth = useRequireAuth();
 
   const handleLogout = async () => {
     try {
@@ -967,11 +970,8 @@ const Swipe = () => {
                             className="saved-card-chat-btn"
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (property.owner_id) {
-                                navigate(`/chat?agentId=${property.owner_id}&propertyId=${property.id}`);
-                              } else {
-                                alert('Bất động sản này không có thông tin chủ sở hữu.');
-                              }
+                              openPropertyChat({ propertyId: property.id, requireAuth, navigate })
+                                .catch((error) => alert(error.message || 'Không thể mở cuộc trò chuyện lúc này.'));
                             }}
                             title="Nhắn tin với môi giới"
                           >

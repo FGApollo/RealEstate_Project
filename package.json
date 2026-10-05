@@ -8,6 +8,7 @@
     "server": "node server/index.js",
     "build": "vite build",
     "lint": "eslint .",
+    "test:auth-flow": "node --test src/auth/pendingAuthAction.test.js",
     "preview": "vite preview",
     "db:check-prod": "node .local/dump-prod-schema.cjs",
     "db:diff": "node .local/compare-schemas.cjs",

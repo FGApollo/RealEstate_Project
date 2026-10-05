@@ -1,4 +1,5 @@
 const recommendationService = require('../services/recommendationService');
+const { toPublicProperty } = require('../services/publicPropertyDto');
 
 const getRecommendations = async (req, res) => {
   try {
@@ -8,7 +9,7 @@ const getRecommendations = async (req, res) => {
       offset: req.query.offset,
       feedToken: req.query.feedToken
     });
-    return res.status(200).json({ properties, pagination });
+    return res.status(200).json({ properties: properties.map(toPublicProperty), pagination });
   } catch (error) {
     return res.status(error.statusCode || 500).json({
       error: error.statusCode ? error.message : 'Could not load recommendations.',

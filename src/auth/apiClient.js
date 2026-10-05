@@ -11,6 +11,14 @@ export const clearAccessToken = () => {
   accessToken = null;
 };
 
+// Public reads must not wait for session restoration. If a token is already in
+// memory, send it opportunistically so optional-auth responses can personalize.
+export const publicApiFetch = (url, options = {}) => {
+  const headers = new Headers(options.headers || {});
+  if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
+  return fetch(url, { ...options, headers, credentials: 'include' });
+};
+
 export const restoreSession = () => {
   if (!refreshPromise) {
     refreshPromise = fetch(`${API_BASE_URL}/api/auth/refresh`, {

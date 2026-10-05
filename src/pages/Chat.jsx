@@ -60,9 +60,22 @@ const Chat = () => {
           const convData = await convRes.json();
           setConversations(convData.conversations || []);
 
+          // A pending contact action carries only the property id. Resolve its
+          // owner through the authenticated contact endpoint after login.
+          let requestedAgentId = targetAgentId;
+          if (!requestedAgentId && targetPropertyId) {
+            const contactRes = await apiFetch(`${API_BASE_URL}/api/properties/${targetPropertyId}/contact-agent`);
+            const contactData = await contactRes.json().catch(() => ({}));
+            if (!contactRes.ok) {
+              setSendError(contactData.error || 'Không thể mở cuộc trò chuyện cho tin đăng này.');
+              return;
+            }
+            requestedAgentId = String(contactData.agentId);
+          }
+
           // 2. Determine who to chat with
-          if (targetAgentId) {
-            const agentIdNum = Number(targetAgentId);
+          if (requestedAgentId) {
+            const agentIdNum = Number(requestedAgentId);
             
             // Check if user is attempting to chat with themselves
             if (currentUser && Number(currentUser.id) === agentIdNum) {
@@ -75,7 +88,7 @@ const Chat = () => {
             }
 
             // Check if conversation already exists in lists
-            const existing = convData.conversations.find(c => c.partner.id === agentIdNum);
+            const existing = convData.conversations.find(c => Number(c.partner.id) === agentIdNum);
             if (existing) {
               setActiveConversation(existing);
             } else {

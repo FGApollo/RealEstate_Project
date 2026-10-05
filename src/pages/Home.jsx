@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Mascot } from 'page-mascot';
 import SwipeNestMark from '../components/SwipeNestMark';
 import SwipeHeader from '../features/swipe/SwipeHeader';
@@ -12,8 +12,9 @@ import {
 } from 'lucide-react';
 import './Home.css';
 import { API_BASE_URL } from '../config';
-import { apiFetch } from '../auth/apiClient';
+import { apiFetch, publicApiFetch } from '../auth/apiClient';
 import { useAuth } from '../auth/useAuth';
+import { useRequireAuth } from '../auth/useRequireAuth';
 import PropertyDetailModal from '../components/PropertyDetailModal';
 import { 
   WARDS_BY_REGION, 
@@ -35,10 +36,13 @@ const getCategoryIllustration = (name = '') => {
 
 const Home = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const sharedPropertyId = searchParams.get('propertyId');
   const { user } = useAuth();
+  const requireAuth = useRequireAuth();
   const [properties, setProperties] = useState([]);
+  const actionNotice = location.state?.authActionNotice || '';
   
   // Search parameters
   const [searchLoc, setSearchLoc] = useState('');
@@ -85,10 +89,6 @@ const Home = () => {
     }));
   }, [properties]);
 
-  useEffect(() => {
-    if (user?.role === 'AGENT') navigate('/sale/overview', { replace: true });
-  }, [navigate, user]);
-
   const fetchFavorites = async () => {
     if (!user) return;
     try {
@@ -121,7 +121,7 @@ const Home = () => {
   useEffect(() => {
     const fetchProperties = async () => {
       try {
-        const response = await apiFetch(`${API_BASE_URL}/api/properties`);
+        const response = await publicApiFetch(`${API_BASE_URL}/api/properties?limit=12`);
         if (!response.ok) throw new Error('Failed to fetch properties');
         const data = await response.json();
         
@@ -224,7 +224,7 @@ const Home = () => {
     return groups;
   }, [properties]);
 
-  const executeSearch = (e) => {
+  const executeSearch = async (e) => {
     if (e) e.preventDefault();
     
     let targetCategory = 'Tất cả';
@@ -243,9 +243,9 @@ const Home = () => {
       categories: selectedCategories
     };
 
-    navigate(`/swipe/${encodeURIComponent(targetCategory)}`, {
-      state: { filters }
-    });
+    const returnTo = `/swipe/${encodeURIComponent(targetCategory)}`;
+    const authorizedUser = await requireAuth({ type: 'NAVIGATE', returnTo, routeState: { filters } });
+    if (authorizedUser) navigate(returnTo, { state: { filters } });
   };
 
   // Handle price range quick select
@@ -449,7 +449,15 @@ const Home = () => {
   };
 
   const toggleFavorite = async (property) => {
-    if (!user?.id) return;
+    const propertyId = Number(property.id);
+    const returnTo = location.pathname === '/'
+      ? `/?propertyId=${encodeURIComponent(propertyId)}`
+      : `${location.pathname}${location.search}`;
+    const routeState = location.pathname.startsWith('/swipe/') ? { selectPropertyId: propertyId } : undefined;
+    const authorizedUser = await requireAuth({
+      type: 'FAVORITE_PROPERTY', propertyId, returnTo, routeState
+    });
+    if (!authorizedUser) return;
     const isFavorite = dbFavorites.some(fav => fav.id === property.id);
 
     if (isFavorite) {
@@ -469,7 +477,31 @@ const Home = () => {
     }
   };
 
-  const featuredProperties = filteredProperties.slice(0, 4);
+  const featuredProperties = useMemo(() => {
+    let candidates = filteredProperties;
+    const categoriesToShow = selectedCategories.length > 0
+      ? selectedCategories
+      : (searchType !== 'ALL' && searchType !== 'CUSTOM' ? [searchType] : []);
+    if (categoriesToShow.length) candidates = candidates.filter((property) => categoriesToShow.includes(property.property_type));
+    if (selectedWards.length) candidates = candidates.filter((property) => selectedWards.includes(property.ward));
+    if (minPrice !== '') candidates = candidates.filter((property) => Number(property.price) >= Number(minPrice));
+    if (maxPrice !== '') candidates = candidates.filter((property) => Number(property.price) <= Number(maxPrice));
+    if (minArea !== '') candidates = candidates.filter((property) => Number(property.area) >= Number(minArea));
+    if (maxArea !== '') candidates = candidates.filter((property) => Number(property.area) <= Number(maxArea));
+    if (selectedBedrooms.length) candidates = candidates.filter((property) => (
+      selectedBedrooms.some((bedroom) => Number(bedroom) === Number(property.bedrooms))
+    ));
+    if (selectedLifestyles.length) {
+      candidates = candidates.filter((property) => {
+        const available = [
+          ...(property.property_features || []).map((feature) => feature.feature_name),
+          ...(property.lifestyle_tags || []).map((tag) => tag.tag_name)
+        ];
+        return selectedLifestyles.every((selected) => available.includes(selected));
+      });
+    }
+    return candidates.slice(0, 4);
+  }, [filteredProperties, selectedCategories, searchType, selectedWards, minPrice, maxPrice, minArea, maxArea, selectedBedrooms, selectedLifestyles]);
 
   return (
     <div className="home-container">
@@ -649,14 +681,26 @@ const Home = () => {
             <h2>Danh Mục Phổ Biến <Zap size={16} fill="currentColor" /></h2>
             <p>Khám phá các loại bất động sản phù hợp với nhu cầu của bạn</p>
           </div>
-          <button className="view-all-link" onClick={() => navigate('/swipe/Tất cả')}>Xem tất cả <ArrowRight size={14} /></button>
+          <button className="view-all-link" onClick={() => executeSearch()}>Xem tất cả <ArrowRight size={14} /></button>
         </div>
         <div className="categories-grid">
           {categories.slice(0, 6).map((category) => (
             <div 
               className="category-card" 
               key={category.name}
-              onClick={() => navigate(`/swipe/${encodeURIComponent(category.name)}`)}
+              role="button"
+              tabIndex={0}
+              onClick={() => {
+                setSelectedCategories([category.name]);
+                document.getElementById('featured-properties')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  setSelectedCategories([category.name]);
+                  document.getElementById('featured-properties')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+              }}
             >
               <img
                 src={getCategoryIllustration(category.name)}
@@ -675,18 +719,19 @@ const Home = () => {
       </section>
 
       {/* Dành Cho Bạn (Recommended Properties) */}
-      <section className="recommended-section">
+      <section className="recommended-section" id="featured-properties">
         <div className="section-heading-row listings-heading">
           <div>
             <h2>Bất Động Sản Nổi Bật <Sparkles size={16} /></h2>
             <p>Những lựa chọn được yêu thích nhất từ cộng đồng Swipe Nest</p>
           </div>
-          <button className="view-all-link" onClick={() => navigate('/swipe/Tất cả')}>
+          <button className="view-all-link" onClick={() => executeSearch()}>
             Xem tất cả <ArrowRight size={14} />
           </button>
         </div>
 
         <div className="featured-properties-grid">
+          {actionNotice && <p className="home-action-notice" role="status">{actionNotice}</p>}
           {featuredProperties.map((property) => {
             const isFavorite = dbFavorites.some(fav => fav.id === property.id);
             return (

@@ -120,7 +120,7 @@ const syncRelatedRows = async (table, idField, propertyId, rows) => {
   }
 };
 
-const getProperties = async () => {
+const getProperties = async (limit = 24) => {
   const { data, error } = await supabase
     .from('properties')
     .select(`
@@ -128,9 +128,11 @@ const getProperties = async () => {
       property_features(feature_name),
       property_images(image_url),
       lifestyle_tags(tag_name),
-      owner:users!owner_id(name, role, avatar, trust_score, created_at, verification_status)
+      owner:users!owner_id(name, role, avatar, trust_score)
     `)
-    .or('is_hidden.is.null,is_hidden.eq.false');
+    .or('is_hidden.is.null,is_hidden.eq.false')
+    .eq('status', 'AVAILABLE')
+    .limit(limit);
 
   if (error) {
     throw new Error(error.message);
@@ -301,7 +303,7 @@ const getPropertyById = async (id) => {
       property_features(feature_name),
       property_images(image_url),
       lifestyle_tags(tag_name),
-      owner:users!owner_id(name, role, avatar, trust_score, created_at)
+      owner:users!owner_id(name, role, avatar, trust_score)
     `)
     .eq('id', id)
     .single();
@@ -310,6 +312,38 @@ const getPropertyById = async (id) => {
     throw new Error(error.message);
   }
   return data;
+};
+
+const getContactAgentId = async (id, requesterId) => {
+  const { data: property, error: propertyError } = await supabase
+    .from('properties')
+    .select('id, owner_id, status, is_hidden')
+    .eq('id', id)
+    .maybeSingle();
+  if (propertyError) throw new Error(propertyError.message);
+  if (!property || property.status !== 'AVAILABLE' || property.is_hidden === true) {
+    const error = new Error('Không tìm thấy tin đăng đang hoạt động.');
+    error.statusCode = 404;
+    throw error;
+  }
+  if (String(property.owner_id) === String(requesterId)) {
+    const error = new Error('Bạn không thể tự nhắn tin cho chính mình.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const { data: agent, error: agentError } = await supabase
+    .from('users')
+    .select('id, role')
+    .eq('id', property.owner_id)
+    .maybeSingle();
+  if (agentError) throw new Error(agentError.message);
+  if (!agent || String(agent.role).toUpperCase() !== 'AGENT') {
+    const error = new Error('Tin đăng không có môi giới để liên hệ.');
+    error.statusCode = 404;
+    throw error;
+  }
+  return agent.id;
 };
 
 const updateProperty = async (id, actorId, propertyData) => {
@@ -574,10 +608,12 @@ const getSimilarProperties = async (propertyId) => {
       property_features(feature_name),
       property_images(image_url),
       lifestyle_tags(tag_name),
-      owner:users!owner_id(name, role, avatar, trust_score, created_at)
+      owner:users!owner_id(name, role, avatar, trust_score)
     `)
     .in('id', similarIds)
-    .or('is_hidden.is.null,is_hidden.eq.false');
+    .or('is_hidden.is.null,is_hidden.eq.false')
+    .eq('status', 'AVAILABLE')
+    .limit(12);
 
   if (propsError) {
     console.error('Error fetching similar properties details:', propsError);
@@ -591,6 +627,7 @@ module.exports = {
   getProperties,
   createProperty,
   getPropertyById,
+  getContactAgentId,
   updateProperty,
   deleteProperty,
   checkSimilarity,

@@ -130,6 +130,23 @@
   color: #0870ff;
 }
 
+.app-header-notification-wrap { position: relative; }
+.app-header-notification-panel {
+  position: absolute;
+  z-index: 80;
+  top: calc(100% + 10px);
+  right: 0;
+  width: min(280px, calc(100vw - 32px));
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 14px 40px rgba(15, 23, 42, 0.14);
+  color: #1e293b;
+}
+.app-header-notification-panel strong { display: block; font-size: 14px; }
+.app-header-notification-panel p { margin: 8px 0 0; color: #64748b; font-size: 13px; }
+
 .app-header-badge-dot {
   position: absolute;
   top: 5px;
@@ -294,21 +311,28 @@
   color: #dc2626;
 }
 
-.app-header-login-btn {
+.app-header-auth-links {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.app-header-login-btn,
+.app-header-register-btn {
   padding: 8px 18px;
   border-radius: 999px;
-  background: #0866f5;
-  color: #ffffff;
-  border: none;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.18s ease;
+  transition: all 0.18s ease;
 }
 
+.app-header-login-btn { background: #0866f5; color: #ffffff; border: none; }
 .app-header-login-btn:hover {
   background: #0654cd;
 }
+.app-header-register-btn { background: #ffffff; color: #0866f5; border: 1px solid #cbd9f5; }
+.app-header-register-btn:hover { background: #f3f7ff; border-color: #0866f5; }
 
 /* Responsiveness */
 @media (max-width: 1080px) {
@@ -353,7 +377,6 @@
     display: grid !important; /* Hiển thị nút 3 gạch ở bên phải */
   }
 
-  .app-header-notification-btn,
   .app-header-profile-name,
   .app-header-chevron {
     display: none;
@@ -592,3 +615,18 @@
 .app-header-drawer-login-btn:hover {
   background: #0654cd;
 }
+
+.app-header-drawer-auth-links { display: grid; gap: 0.6rem; }
+.app-header-drawer-register-btn {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid #cbd9f5;
+  background: #ffffff;
+  color: #0866f5;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+.app-header-drawer-register-btn:hover { background: #f3f7ff; }
