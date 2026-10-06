@@ -547,7 +547,7 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
   // Submit handler (create or edit) - with validation checks
   const handleSubmitListing = async () => {
     if (!['RENT', 'SALE'].includes(listing.listing_type)) {
-      alert('Vui lòng chọn tin cho thuê hoặc mua bán để Nesty gợi ý đúng nhu cầu.');
+      alert('Vui lòng chọn tin cho thuê hoặc mua bán để Swipe Nest gợi ý đúng nhu cầu.');
       return;
     }
     setIsCheckingSave(true);

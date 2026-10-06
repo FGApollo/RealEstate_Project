@@ -27,7 +27,6 @@ const getCategoryIllustration = (name = '') => {
 
   if (/van phong|office/.test(normalized)) return '/icons/categories/office.webp';
   if (/mat bang|kinh doanh|shop|retail|store/.test(normalized)) return '/icons/categories/shop.webp';
-  if (/dat nen|land/.test(normalized)) return '/icons/categories/land.webp';
   if (/phong tro|studio|room/.test(normalized)) return '/icons/categories/room.webp';
   if (/chung cu|can ho|apartment|condo/.test(normalized)) return '/icons/categories/apartment.webp';
 
@@ -40,21 +39,18 @@ const PROPERTY_CATEGORY_CATALOG = [
   'Căn Hộ',
   'Chung Cư',
   'Mặt Bằng',
-  'Đất Nền',
   'Phòng Trọ'
 ];
 
 const normalizePropertyType = (value = '') => String(value)
   .normalize('NFD')
   .replace(/[\u0300-\u036f]/g, '')
+  .replace(/đ/g, 'd')
   .toLocaleLowerCase('vi')
+  .replace(/[^a-z0-9]+/g, ' ')
   .trim();
 
-const mergePropertiesById = (current, additions) => {
-  const merged = new Map(current.map((property) => [String(property.id), property]));
-  additions.forEach((property) => merged.set(String(property.id), property));
-  return [...merged.values()];
-};
+const EXCLUDED_PROPERTY_CATEGORY_KEYS = new Set(['dat nen', 'dat', 'land']);
 
 const Home = () => {
   const navigate = useNavigate();
@@ -103,6 +99,7 @@ const Home = () => {
     properties.forEach(p => {
       const type = p.property_type || 'Khác';
       const key = normalizePropertyType(type);
+      if (EXCLUDED_PROPERTY_CATEGORY_KEYS.has(key) || key.startsWith('land ')) return;
       counts[key] = { name: type, count: (counts[key]?.count || 0) + 1 };
     });
 
@@ -176,28 +173,10 @@ const Home = () => {
   }, [sharedPropertyId]);
 
   const selectCategoryPreview = async (category) => {
-    setSelectedCategories([category.name]);
-    const categoryKey = normalizePropertyType(category.name);
-    const hasPreview = properties.some((property) => normalizePropertyType(property.property_type) === categoryKey);
-
-    if (!hasPreview) {
-      try {
-        const query = new URLSearchParams({ limit: '4', property_type: category.name });
-        const response = await publicApiFetch(`${API_BASE_URL}/api/properties?${query.toString()}`);
-        if (response.ok) {
-          const data = await response.json();
-          const categoryProperties = (data.properties || []).filter((property) => !property.is_hidden);
-          if (categoryProperties.length) {
-            setProperties((current) => mergePropertiesById(current, categoryProperties));
-            setFilteredProperties((current) => mergePropertiesById(current, categoryProperties));
-          }
-        }
-      } catch (error) {
-        console.error('Could not load public category preview:', error);
-      }
-    }
-
-    document.getElementById('featured-properties')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const returnTo = `/swipe/${encodeURIComponent(category.name)}`;
+    const routeState = { filters: { categories: [category.name] } };
+    const authorizedUser = await requireAuth({ type: 'NAVIGATE', returnTo, routeState });
+    if (authorizedUser) navigate(returnTo, { state: routeState });
   };
 
   const locationSuggestions = useMemo(() => {
@@ -678,7 +657,6 @@ const Home = () => {
                   <option value="Phòng Trọ">Phòng trọ</option>
                   <option value="Mặt Bằng">Mặt bằng</option>
                   <option value="Văn Phòng">Văn phòng</option>
-                  <option value="Đất Nền">Đất nền</option>
                   {searchType === 'CUSTOM' && <option value="CUSTOM">Nhiều loại hình</option>}
                 </select>
               </div>
@@ -994,7 +972,7 @@ const Home = () => {
               <div className="filter-group">
                 <label className="filter-section-title">Loại bất động sản</label>
                 <div className="chips-grid">
-                  {['Căn Hộ', 'Chung Cư', 'Nhà Ở', 'Phòng Trọ', 'Mặt Bằng', 'Văn Phòng', 'Đất Nền'].map(cat => {
+                  {['Căn Hộ', 'Chung Cư', 'Nhà Ở', 'Phòng Trọ', 'Mặt Bằng', 'Văn Phòng'].map(cat => {
                     const isSelected = selectedCategories.includes(cat);
                     return (
                       <button

@@ -23,7 +23,7 @@ const SwipeMainSection = ({
             <span className="swipe-discovery-icon"><Compass size={23} /></span>
             <div>
               <h1>{discoveryTitle}</h1>
-              <p>Khám phá tin đăng và vuốt để Nesty dần hiểu lựa chọn của bạn</p>
+              <p>Khám phá tin đăng và vuốt để Swipe Nest dần hiểu lựa chọn của bạn</p>
             </div>
           </div>
           <button type="button" className={`swipe-filter-pill ${activeFiltersCount ? 'has-filters' : ''}`} onClick={onOpenFilters}>
@@ -82,7 +82,7 @@ const SwipeMainSection = ({
             <div className="swipe-card-empty">
               {isLoading ? <span className="swipe-loading-spinner" /> : hasError ? <Info size={42} /> : <RefreshCw size={42} />}
               <h2>{isLoading ? 'Đang tìm bất động sản' : hasError ? 'Chưa thể tải dữ liệu' : propertyCount === 0 ? 'Chưa có tin phù hợp' : 'Bạn đã xem hết lượt này'}</h2>
-              <p>{isLoading ? 'Swipe Nest đang tìm những lựa chọn phù hợp cho bạn.' : hasError ? 'Đã có lỗi khi kết nối. Hãy thử tải lại danh sách.' : propertyCount === 0 ? 'Thử đổi bộ lọc hoặc thêm tùy chọn gợi ý trong hồ sơ nhé.' : 'Nesty sẽ xếp hạng lại các lựa chọn mới nhất cho bạn.'}</p>
+              <p>{isLoading ? 'Swipe Nest đang tìm những lựa chọn phù hợp cho bạn.' : hasError ? 'Đã có lỗi khi kết nối. Hãy thử tải lại danh sách.' : propertyCount === 0 ? 'Thử đổi bộ lọc hoặc thêm tùy chọn gợi ý trong hồ sơ nhé.' : 'Swipe Nest sẽ xếp hạng lại các lựa chọn mới nhất cho bạn.'}</p>
               {!isLoading && <button type="button" className="swipe-restart-button" onClick={propertyCount === 0 && !hasError ? onAdjustPreferences : onRestart}>{hasError ? 'Thử lại' : propertyCount === 0 ? 'Tùy chỉnh gợi ý' : 'Tải gợi ý mới'}</button>}
             </div>
           )}
