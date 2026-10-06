@@ -17,7 +17,7 @@ const SCORING = Object.freeze({
 });
 const FEED_TOKEN_AUDIENCE = 'swipe-recommendation-feed';
 const DEFAULT_PREFERENCES = Object.freeze({
-  listing_type: null,
+  listing_type: 'RENT',
   preferred_property_types: [],
   preferred_location_keys: [],
   min_price: null,

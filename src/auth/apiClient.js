@@ -1,7 +1,10 @@
 import { API_BASE_URL } from '../config';
+import { getOnboardingSessionKey } from './onboardingSession.js';
 
 let accessToken = null;
 let refreshPromise = null;
+
+export const getAccessSessionKey = (userId) => getOnboardingSessionKey(userId, accessToken);
 
 export const setAccessToken = (token) => {
   accessToken = token || null;

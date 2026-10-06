@@ -20,26 +20,11 @@ import SwipeMainSection from '../features/swipe/SwipeMainSection';
 import SwipeSuggestionsPanel from '../features/swipe/SwipeSuggestionsPanel';
 import SwipeChatPrompt from '../features/swipe/SwipeChatPrompt';
 import { WARDS_BY_REGION, ALL_WARDS, normalizeWard } from '../services/administrativeService';
+import { getCategoryKey } from '../services/propertyCategory.js';
 
 // Mock Properties for categories
 const mockProperties = {};
 
-
-// Map original names to normalized standard keys
-const getCategoryKey = (name) => {
-  if (!name) return 'Căn Hộ';
-  const lower = name.toLowerCase();
-  if (lower === 'tất cả' || lower === 'all') return 'Tất cả';
-  if (lower.includes('văn phòng') || lower.includes('office')) return 'Văn Phòng';
-  if (lower.includes('mặt bằng') || lower.includes('mặt') || lower.includes('retail') || lower.includes('ground') || lower.includes('commercial')) return 'Mặt Bằng';
-  if (lower.includes('phòng trọ') || lower.includes('trọ') || lower.includes('room')) return 'Phòng Trọ';
-  if (lower.includes('chung') || lower.includes('condo')) return 'Chung Cư';
-  if (lower.includes('nhà') || lower.includes('house') || lower.includes('townhouse')) return 'Nhà Ở';
-  if (lower.includes('căn') || lower.includes('apartment') || lower.includes('studio')) return 'Căn Hộ';
-  if (lower.includes('đất') || lower.includes('land')) return 'Đất Nền';
-  if (lower.includes('biệt') || lower.includes('villa')) return 'Biệt Thự';
-  return 'Căn Hộ';
-};
 
 const categorySuggestionDetails = {
   'Căn Hộ': {
@@ -768,7 +753,7 @@ const Swipe = () => {
             onExplore={() => setCurrentIndex(0)}
           />
           <SwipeMainSection
-            discoveryTitle={activeCategoryKey === 'Tất cả' ? 'Khám phá tất cả' : `Khám phá ${categoryName}`}
+            discoveryTitle={activeCategoryKey === 'Tất cả' ? 'Khám phá tất cả' : 'Khám phá ' + activeCategoryKey}
             currentProperty={currentProperty}
             isAlreadyFavorite={isAlreadyFavorite}
             formatPrice={formatPrice}

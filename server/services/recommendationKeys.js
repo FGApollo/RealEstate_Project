@@ -22,7 +22,7 @@ const propertyTypeKey = (value) => {
   const key = normalizeKey(value);
   if (key.includes('chung_cu') || key.includes('condo')) return 'CHUNG_CU';
   if (key.includes('can_ho') || key.includes('apartment') || key.includes('studio')) return 'CAN_HO';
-  if (key.includes('phong_tro') || key.includes('room')) return 'PHONG_TRO';
+  if (key.includes('phong_tro') || key.includes('nha_tro') || key.includes('room')) return 'PHONG_TRO';
   if (key.includes('van_phong') || key.includes('office')) return 'VAN_PHONG';
   if (key.includes('mat_bang') || key.includes('retail') || key.includes('commercial')) return 'MAT_BANG';
   if (key.includes('dat_nen') || key === 'dat' || key.includes('land')) return 'DAT_NEN';

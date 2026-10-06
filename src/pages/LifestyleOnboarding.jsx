@@ -6,6 +6,7 @@ import { apiFetch } from '../auth/apiClient';
 import { useAuth } from '../auth/useAuth';
 import { resumePendingAuthAction } from '../auth/pendingAuthFlow';
 import { roleDestination } from '../auth/roleDestination';
+import { resolveOnboardingAction } from '../auth/onboardingFlow.js';
 import './LifestyleOnboarding.css';
 
 const STEP_COUNT = 5;
@@ -61,7 +62,7 @@ export default function LifestyleOnboarding() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const { user, markOnboardingCompleted } = useAuth();
+  const { user, markOnboardingCompleted, skipOnboardingForCurrentSession, waitForOnboardingStatus } = useAuth();
   const editing = searchParams.get('edit') === '1';
   const [preferences, setPreferences] = useState(EMPTY_PREFERENCES);
   const [options, setOptions] = useState({ property_types: [], locations: [], features: [] });
@@ -76,6 +77,12 @@ export default function LifestyleOnboarding() {
       setLoading(true);
       setError('');
       try {
+        const onboardingStatus = await waitForOnboardingStatus();
+        if (!active) return;
+        if (onboardingStatus === 'skipped' && !editing) {
+          await resumePendingAuthAction(navigate, location.state?.returnTo || location.state?.from || '/');
+          return;
+        }
         const [preferenceResponse, optionsResponse] = await Promise.all([
           apiFetch(`${API_BASE_URL}/api/me/preferences`),
           apiFetch(`${API_BASE_URL}/api/me/preference-options?listingType=RENT`)
@@ -91,7 +98,8 @@ export default function LifestyleOnboarding() {
           return;
         }
         if (preferenceData.preferences?.onboarding_completed && !editing) {
-          await resumePendingAuthAction(navigate, location.state?.returnTo || location.state?.from || '/swipe/T%E1%BA%A5t%20c%E1%BA%A3');
+          markOnboardingCompleted();
+          await resumePendingAuthAction(navigate, location.state?.returnTo || location.state?.from || '/swipe/T%E1%BA%A5t%20c%E1%BA%A3', preferenceData.preferences);
           return;
         }
         setPreferences(fromRecord(preferenceData.preferences));
@@ -108,7 +116,7 @@ export default function LifestyleOnboarding() {
     };
     load();
     return () => { active = false; };
-  }, [editing, location.state, navigate, user?.id, user?.role]);
+  }, [editing, location.state, markOnboardingCompleted, navigate, user?.id, user?.role, waitForOnboardingStatus]);
 
   const budgetOptions = RENT_BUDGETS;
   const selectedBudget = budgetOptions.find((option) =>
@@ -142,11 +150,13 @@ export default function LifestyleOnboarding() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Lưu gu tìm nhà thất bại.');
+      const savedPreferences = data.preferences || preferences;
       markOnboardingCompleted();
       if (editing) {
-        navigate(location.state?.returnTo || location.state?.from || '/profile', { replace: true });
+        const destination = resolveOnboardingAction(null, savedPreferences, location.state?.returnTo || location.state?.from || '/profile');
+        navigate(destination.returnTo, { replace: true, state: destination.routeState });
       } else {
-        await resumePendingAuthAction(navigate, location.state?.returnTo || '/swipe/T%E1%BA%A5t%20c%E1%BA%A3');
+        await resumePendingAuthAction(navigate, location.state?.returnTo || location.state?.from || '/swipe/T%E1%BA%A5t%20c%E1%BA%A3', savedPreferences);
       }
     } catch (saveError) {
       setError(saveError.message || 'Lưu gu tìm nhà thất bại. Vui lòng thử lại.');
@@ -155,8 +165,13 @@ export default function LifestyleOnboarding() {
     }
   };
 
-  const leaveOnboarding = () => {
-    navigate(editing ? (location.state?.returnTo || location.state?.from || '/profile') : '/', { replace: true });
+  const leaveOnboarding = async () => {
+    if (editing) {
+      navigate(location.state?.returnTo || location.state?.from || '/profile', { replace: true });
+      return;
+    }
+    skipOnboardingForCurrentSession();
+    await resumePendingAuthAction(navigate, location.state?.returnTo || location.state?.from || '/');
   };
 
   if (loading) return <main className="lifestyle-onboarding loading-state"><Loader2 className="onboarding-spin" /><span>Swipe Nest đang chuẩn bị vài câu hỏi cho bạn…</span></main>;
@@ -256,7 +271,7 @@ export default function LifestyleOnboarding() {
           <div className="onboarding-actions">
             {step > 1
               ? <button className="onboarding-back" type="button" onClick={() => setStep((current) => current - 1)}><ArrowLeft size={17} /> Quay lại</button>
-              : <button className="onboarding-back onboarding-skip" type="button" onClick={leaveOnboarding}>{editing ? 'Hủy' : 'Để sau'}</button>}
+              : <button className="onboarding-back onboarding-skip" type="button" onClick={leaveOnboarding}>{editing ? 'Hủy' : 'Bỏ qua'}</button>}
             {step < STEP_COUNT ? (
               <button className="onboarding-continue" type="button" onClick={continueStep}>Tiếp tục <ArrowRight size={17} /></button>
             ) : (
