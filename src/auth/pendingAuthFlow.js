@@ -2,9 +2,11 @@ import { API_BASE_URL } from '../config';
 import { apiFetch } from './apiClient';
 import { roleDestination } from './roleDestination';
 import { clearPendingAuthAction, readPendingAuthAction } from './pendingAuthAction';
+import { resolveOnboardingAction } from './onboardingFlow.js';
 
-export const resumePendingAuthAction = async (navigate, fallback = '/swipe/T%E1%BA%A5t%20c%E1%BA%A3') => {
-  const pending = readPendingAuthAction();
+export const resumePendingAuthAction = async (navigate, fallback = '/swipe/T%E1%BA%A5t%20c%E1%BA%A3', preferences) => {
+  const storedPending = readPendingAuthAction();
+  const pending = preferences ? resolveOnboardingAction(storedPending, preferences, fallback) : storedPending;
   if (!pending) {
     navigate(fallback, { replace: true });
     return;

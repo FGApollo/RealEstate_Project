@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { API_BASE_URL } from '../config';
-import { apiFetch, clearAccessToken, restoreSession, setAccessToken } from './apiClient';
+import { apiFetch, clearAccessToken, getAccessSessionKey, restoreSession, setAccessToken } from './apiClient';
 import { AuthContext } from './context';
+import { clearOnboardingSkip, effectiveOnboardingStatus, skipOnboardingForSession } from './onboardingSession.js';
 
 const initialAuthState = {
   user: null,
@@ -29,6 +30,7 @@ export const AuthProvider = ({ children }) => {
   const [authState, setAuthState] = useState(initialAuthState);
   const authStateRef = useRef(initialAuthState);
   const authGenerationRef = useRef(0);
+  const onboardingRevisionRef = useRef(0);
   const authWaitersRef = useRef(new Set());
   const onboardingWaitersRef = useRef(new Set());
   const onboardingCheckRef = useRef(null);
@@ -67,7 +69,10 @@ export const AuthProvider = ({ children }) => {
     }
 
     const generation = authGenerationRef.current;
-    if (onboardingCheckRef.current?.generation === generation) return onboardingCheckRef.current.promise;
+    const revision = onboardingRevisionRef.current;
+    if (onboardingCheckRef.current?.generation === generation && onboardingCheckRef.current.revision === revision) {
+      return onboardingCheckRef.current.promise;
+    }
 
     updateAuthState({ onboardingStatus: 'checking' });
     const promise = (async () => {
@@ -77,12 +82,15 @@ export const AuthProvider = ({ children }) => {
       } catch {
         status = 'unknown';
       }
-      if (generation === authGenerationRef.current) updateAuthState({ onboardingStatus: status });
-      return generation === authGenerationRef.current ? status : authStateRef.current.onboardingStatus;
+      if (generation === authGenerationRef.current && revision === onboardingRevisionRef.current) {
+        status = effectiveOnboardingStatus(status, getAccessSessionKey(targetUser.id));
+        updateAuthState({ onboardingStatus: status });
+      }
+      return authStateRef.current.onboardingStatus;
     })().finally(() => {
-      if (onboardingCheckRef.current?.generation === generation) onboardingCheckRef.current = null;
+      if (onboardingCheckRef.current?.promise === promise) onboardingCheckRef.current = null;
     });
-    onboardingCheckRef.current = { generation, promise };
+    onboardingCheckRef.current = { generation, revision, promise };
     return promise;
   }, [updateAuthState]);
 
@@ -102,11 +110,13 @@ export const AuthProvider = ({ children }) => {
           });
           if (isRegularUser) void refreshOnboardingStatus(restoredUser);
         } else {
+          clearOnboardingSkip();
           updateAuthState({ user: null, authStatus: 'unauthenticated', onboardingStatus: 'unknown' });
         }
       })
       .catch(() => {
         if (!active || generation !== authGenerationRef.current) return;
+        clearOnboardingSkip();
         persistUser(null);
         updateAuthState({ user: null, authStatus: 'unauthenticated', onboardingStatus: 'unknown' });
       });
@@ -114,6 +124,7 @@ export const AuthProvider = ({ children }) => {
     const handleExpiry = () => {
       authGenerationRef.current += 1;
       onboardingCheckRef.current = null;
+      clearOnboardingSkip();
       clearAccessToken();
       persistUser(null);
       updateAuthState({ user: null, authStatus: 'unauthenticated', onboardingStatus: 'unknown' });
@@ -128,6 +139,7 @@ export const AuthProvider = ({ children }) => {
   const completeLogin = useCallback(({ user: nextUser, accessToken }) => {
     authGenerationRef.current += 1;
     onboardingCheckRef.current = null;
+    clearOnboardingSkip();
     setAccessToken(accessToken);
     persistUser(nextUser);
     updateAuthState({
@@ -146,7 +158,18 @@ export const AuthProvider = ({ children }) => {
   }, [updateAuthState]);
 
   const markOnboardingCompleted = useCallback(() => {
+    onboardingRevisionRef.current += 1;
+    clearOnboardingSkip();
     updateAuthState({ onboardingStatus: 'complete' });
+  }, [updateAuthState]);
+
+  const skipOnboardingForCurrentSession = useCallback(() => {
+    const current = authStateRef.current;
+    if (current.authStatus !== 'authenticated' || String(current.user?.role).toUpperCase() !== 'USER'
+      || current.onboardingStatus === 'complete') return;
+    skipOnboardingForSession(getAccessSessionKey(current.user.id));
+    onboardingRevisionRef.current += 1;
+    updateAuthState({ onboardingStatus: 'skipped' });
   }, [updateAuthState]);
 
   const logout = useCallback(async () => {
@@ -158,6 +181,7 @@ export const AuthProvider = ({ children }) => {
 
     authGenerationRef.current += 1;
     onboardingCheckRef.current = null;
+    clearOnboardingSkip();
     clearAccessToken();
     persistUser(null);
     updateAuthState({ user: null, authStatus: 'unauthenticated', onboardingStatus: 'unknown' });
@@ -173,6 +197,7 @@ export const AuthProvider = ({ children }) => {
       waitForAuth,
       waitForOnboardingStatus,
       markOnboardingCompleted,
+      skipOnboardingForCurrentSession,
       logout
     }}>
       {children}

@@ -51,6 +51,8 @@ const matchingProperty = (id, extras = {}) => ({
 test('recommendation keys normalize property, location and feature labels', () => {
   assert.equal(propertyTypeKey('Căn Hộ'), 'CAN_HO');
   assert.equal(propertyTypeKey('Phòng Trọ'), 'PHONG_TRO');
+  assert.equal(propertyTypeKey('Nhà trọ'), 'PHONG_TRO');
+  assert.equal(propertyTypeKey('PHONG_TRO'), 'PHONG_TRO');
   assert.equal(normalizeKey('Ban công'), 'ban_cong');
   assert.equal(locationKey({ city: 'TP. Hồ Chí Minh', district: 'Quận 7' }), 'tp_ho_chi_minh|quan_7');
 });
@@ -193,4 +195,52 @@ test('preference endpoints apply authentication before handlers', () => {
   assert.equal(preferenceRoutes.stack[0].handle, authenticate);
   const preferenceGet = preferenceRoutes.stack.find((layer) => layer.route?.path === '/preferences');
   assert.equal(preferenceGet.route.stack.at(-1).handle, preferenceController.getPreferences);
+});
+
+test('room survey preferences rank rooms first and room discovery excludes houses and sales', async (t) => {
+  const preferenceOriginal = preferenceService.getPreferences;
+  const originalRepository = { ...propertyRepository };
+  t.after(() => {
+    preferenceService.getPreferences = preferenceOriginal;
+    Object.assign(propertyRepository, originalRepository);
+  });
+  preferenceService.getPreferences = async () => ({ ...preference, preferred_property_types: ['PHONG_TRO'] });
+  propertyRepository.fetchRecommendationCandidates = async () => [
+    matchingProperty(12, { property_type: 'Nhà Ở' }),
+    matchingProperty(11, { property_type: 'Phòng Trọ' }),
+    matchingProperty(13, { property_type: 'Phòng Trọ', listing_type: 'SALE' }),
+    matchingProperty(14, { property_type: 'Nhà trọ' })
+  ];
+  propertyRepository.fetchFavoriteIds = async () => [];
+  propertyRepository.fetchRecentEvents = async () => [];
+  propertyRepository.fetchEventProperties = async () => [];
+
+  const ranked = await recommendationService.getRecommendations(17);
+  assert.equal(propertyTypeKey(ranked.properties[0].property_type), 'PHONG_TRO');
+  const rooms = await recommendationService.getRecommendations(17, { category: 'Phòng Trọ' });
+  assert.deepEqual(rooms.properties.map((property) => property.id).sort(), [11, 14]);
+  assert.ok(rooms.properties.every((property) => propertyTypeKey(property.property_type) === 'PHONG_TRO'));
+});
+
+test('unfinished or skipped onboarding can browse a fallback feed of rentals', async (t) => {
+  const preferenceOriginal = preferenceService.getPreferences;
+  const originalRepository = { ...propertyRepository };
+  t.after(() => {
+    preferenceService.getPreferences = preferenceOriginal;
+    Object.assign(propertyRepository, originalRepository);
+  });
+  preferenceService.getPreferences = async () => null;
+  propertyRepository.fetchRecommendationCandidates = async (listingType) => {
+    assert.equal(listingType, 'RENT');
+    return [
+      matchingProperty(11, { property_type: 'Phòng Trọ' }),
+      matchingProperty(12, { property_type: 'Nhà Ở' }),
+      matchingProperty(13, { listing_type: 'SALE' })
+    ];
+  };
+  propertyRepository.fetchFavoriteIds = async () => [];
+  propertyRepository.fetchRecentEvents = async () => [];
+  propertyRepository.fetchEventProperties = async () => [];
+  const result = await recommendationService.getRecommendations(17);
+  assert.deepEqual(result.properties.map((property) => property.id).sort(), [11, 12]);
 });

@@ -45,8 +45,8 @@ const PROPERTY_CATEGORY_CATALOG = [
 const normalizePropertyType = (value = '') => String(value)
   .normalize('NFD')
   .replace(/[\u0300-\u036f]/g, '')
-  .replace(/đ/g, 'd')
   .toLocaleLowerCase('vi')
+  .replace(/đ/g, 'd')
   .replace(/[^a-z0-9]+/g, ' ')
   .trim();
 
