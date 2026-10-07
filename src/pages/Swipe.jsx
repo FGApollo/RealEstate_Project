@@ -69,20 +69,11 @@ const SwipeNestMark = () => (
 );
 
 const Swipe = () => {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { categoryName } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const requireAuth = useRequireAuth();
-
-  const handleLogout = async () => {
-    try {
-      await logout();
-      navigate('/login');
-    } catch (err) {
-      alert(err.message);
-    }
-  };
 
   const initialFilters = useMemo(() => location.state?.filters || {}, [location.state]);
 
@@ -740,7 +731,6 @@ const Swipe = () => {
         }}
         showSearch={true}
         onSearchClick={openFilters}
-        onLogout={handleLogout}
       />
 
       {/* Main Content Layout */}

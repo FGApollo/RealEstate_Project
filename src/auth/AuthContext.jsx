@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { startTransition, useCallback, useEffect, useRef, useState } from 'react';
 import { API_BASE_URL } from '../config';
 import { apiFetch, clearAccessToken, getAccessSessionKey, restoreSession, setAccessToken } from './apiClient';
 import { AuthContext } from './context';
 import { clearOnboardingSkip, effectiveOnboardingStatus, skipOnboardingForSession } from './onboardingSession.js';
+import { clearPendingAuthAction } from './pendingAuthAction';
 
 const initialAuthState = {
   user: null,
@@ -172,7 +173,7 @@ export const AuthProvider = ({ children }) => {
     updateAuthState({ onboardingStatus: 'skipped' });
   }, [updateAuthState]);
 
-  const logout = useCallback(async () => {
+  const logout = useCallback(async (onLoggedOut) => {
     const response = await fetch(`${API_BASE_URL}/api/auth/logout`, {
       method: 'POST',
       credentials: 'include'
@@ -182,9 +183,14 @@ export const AuthProvider = ({ children }) => {
     authGenerationRef.current += 1;
     onboardingCheckRef.current = null;
     clearOnboardingSkip();
+    clearPendingAuthAction();
     clearAccessToken();
     persistUser(null);
-    updateAuthState({ user: null, authStatus: 'unauthenticated', onboardingStatus: 'unknown' });
+    // Commit navigation and session reset together so private guards cannot save the old route.
+    startTransition(() => {
+      if (typeof onLoggedOut === 'function') onLoggedOut();
+      updateAuthState({ user: null, authStatus: 'unauthenticated', onboardingStatus: 'unknown' });
+    });
   }, [updateAuthState]);
 
   return (
