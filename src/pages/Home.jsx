@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Mascot } from 'page-mascot';
 import SwipeNestMark from '../components/SwipeNestMark';
 import SwipeHeader from '../features/swipe/SwipeHeader';
+import AuthLoading from '../components/AuthLoading';
 import { 
   Search, MapPin, Home as HomeIcon, 
   Bed, Bath,
@@ -57,9 +58,12 @@ const Home = () => {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const sharedPropertyId = searchParams.get('propertyId');
-  const { user } = useAuth();
+  const { user, authStatus } = useAuth();
   const requireAuth = useRequireAuth();
   const [properties, setProperties] = useState([]);
+  const [isLoadingProperties, setIsLoadingProperties] = useState(true);
+  const [propertiesError, setPropertiesError] = useState('');
+  const [propertiesReloadKey, setPropertiesReloadKey] = useState(0);
   const actionNotice = location.state?.authActionNotice || '';
   
   // Search parameters
@@ -145,11 +149,18 @@ const Home = () => {
 
   // Fetch properties from backend API
   useEffect(() => {
+    const controller = new AbortController();
+    let active = true;
     const fetchProperties = async () => {
       try {
-        const response = await publicApiFetch(`${API_BASE_URL}/api/properties?limit=12`);
+        const response = await publicApiFetch(`${API_BASE_URL}/api/properties?limit=12`, {
+          signal: controller.signal
+        });
         if (!response.ok) throw new Error('Failed to fetch properties');
         const data = await response.json();
+        if (!Array.isArray(data.properties)) throw new Error('Invalid properties response');
+        if (!active) return;
+        setPropertiesError('');
         
         if (data.properties) {
           const visibleProperties = data.properties.filter(p => !p.is_hidden);
@@ -165,12 +176,20 @@ const Home = () => {
           }
         }
       } catch (error) {
+        if (!active || error.name === 'AbortError') return;
         console.error('Error fetching properties from DB:', error);
+        setPropertiesError('Chưa thể tải tin đăng. Vui lòng thử lại sau giây lát.');
+      } finally {
+        if (active) setIsLoadingProperties(false);
       }
     };
 
     fetchProperties();
-  }, [sharedPropertyId]);
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [sharedPropertyId, propertiesReloadKey]);
 
   const selectCategoryPreview = async (category) => {
     const returnTo = `/swipe/${encodeURIComponent(category.name)}`;
@@ -539,6 +558,15 @@ const Home = () => {
     return candidates.slice(0, 4);
   }, [filteredProperties, selectedCategories, searchType, selectedWards, minPrice, maxPrice, minArea, maxArea, selectedBedrooms, selectedLifestyles]);
 
+  if (isLoadingProperties || authStatus === 'authenticating') {
+    return (
+      <AuthLoading
+        description="Vui lòng đợi trong giây lát, Swipe Nest đang chuẩn bị những không gian phù hợp cho bạn."
+        progressLabel="Đang chuẩn bị Trang chủ"
+      />
+    );
+  }
+
   return (
     <div className="home-container">
       {/* Header */}
@@ -816,7 +844,23 @@ const Home = () => {
             );
           })}
 
-          {featuredProperties.length === 0 && (
+          {propertiesError && (
+            <div className="listings-empty-state" role="alert">
+              <p>{propertiesError}</p>
+              <button
+                className="listings-retry-button"
+                onClick={() => {
+                  setPropertiesError('');
+                  setIsLoadingProperties(true);
+                  setPropertiesReloadKey((key) => key + 1);
+                }}
+              >
+                Thử lại
+              </button>
+            </div>
+          )}
+
+          {!propertiesError && featuredProperties.length === 0 && (
             <div className="listings-empty-state">
               {selectedCategories.length
                 ? `Chưa có tin ${selectedCategories[0]} trong phần xem trước.`

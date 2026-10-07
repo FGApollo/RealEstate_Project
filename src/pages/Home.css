@@ -3363,6 +3363,24 @@
   font-size: 0.84rem;
 }
 
+.listings-retry-button {
+  margin-top: 16px;
+  padding: 10px 20px;
+  border-radius: 10px;
+  color: #fff;
+  background: #0667ff;
+  font-weight: 600;
+}
+
+.listings-retry-button:hover {
+  background: #0054dc;
+}
+
+.listings-retry-button:focus-visible {
+  outline: 3px solid #9bc5ff;
+  outline-offset: 3px;
+}
+
 .home-container .footer {
   padding: 48px 4.5% 22px;
   background: #0b1728;
