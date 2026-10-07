@@ -62,11 +62,12 @@ const Register = () => {
 
   return (
     <AuthLayout 
+      variant="register"
       title="Tạo tài khoản mới" 
       subtitle="Gia nhập cộng đồng Swipe Nest ngay hôm nay."
     >
-      <form onSubmit={handleSubmit}>
-        {error && <div style={{ color: 'red', marginBottom: '1rem', fontSize: '0.875rem', textAlign: 'center' }}>{error}</div>}
+      <form className="auth-entry-form" onSubmit={handleSubmit} aria-busy={isLoading}>
+        {error && <div className="auth-message auth-message--error" role="alert">{error}</div>}
         
         <Input 
           label="HỌ VÀ TÊN"
@@ -98,6 +99,7 @@ const Register = () => {
           name="password"
           rightIcon={showPassword ? Eye : EyeOff}
           onRightIconClick={togglePasswordVisibility}
+          rightIconLabel={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
           placeholder="Tạo mật khẩu"
           type={showPassword ? "text" : "password"}
           minLength={10}
@@ -107,8 +109,8 @@ const Register = () => {
           required
         />
 
-        <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '0.35rem 0 1rem' }}>
-          Tối thiểu 10 ký tự; có thể dùng cụm từ và khoảng trắng. Không cần quy tắc ký tự hoa/số/ký hiệu.
+        <p className="auth-password-hint">
+          Tối thiểu 10 ký tự. Bạn có thể dùng một cụm từ dễ nhớ.
         </p>
 
         <Input
@@ -124,7 +126,7 @@ const Register = () => {
           required
         />
 
-        <div style={{ marginTop: '2rem' }}>
+        <div className="auth-submit-row">
           <Button type="submit" fullWidth variant="primary" disabled={isLoading}>
             {isLoading ? 'Đang xử lý...' : 'Đăng ký'}
           </Button>
@@ -133,11 +135,11 @@ const Register = () => {
 
       <div className="divider">HOẶC ĐĂNG KÝ VỚI</div>
 
-      <GoogleAuthButton intent="USER_SIGNUP" onError={setError} />
+      <GoogleAuthButton intent="USER_SIGNUP" onError={setError} fullWidth />
 
       <div className="auth-footer">
         <div>Đã có tài khoản? <Link to="/login">Đăng nhập</Link></div>
-        <div style={{ marginTop: '1rem', fontSize: '0.85rem' }}>
+        <div className="auth-agent-link">
           Bạn muốn đăng ký làm Môi giới? <Link to="/register/agent">Đăng ký tại đây</Link>
         </div>
       </div>

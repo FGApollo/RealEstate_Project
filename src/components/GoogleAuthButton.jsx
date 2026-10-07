@@ -1,13 +1,24 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { GoogleLogin } from '@react-oauth/google';
 import { API_BASE_URL } from '../config';
 import { useFinishAuthentication } from '../auth/useFinishAuthentication';
 
-const GoogleAuthButton = ({ intent, phone, onError }) => {
+const GoogleAuthButton = ({ intent, phone, onError, fullWidth = false }) => {
   const [busy, setBusy] = useState(false);
   const [pendingCredential, setPendingCredential] = useState(null);
   const [linkPassword, setLinkPassword] = useState('');
   const finishAuthentication = useFinishAuthentication();
+  const containerRef = useRef(null);
+  const [buttonWidth, setButtonWidth] = useState(undefined);
+
+  useEffect(() => {
+    if (!fullWidth || !containerRef.current) return;
+    const observer = new ResizeObserver(([entry]) => {
+      setButtonWidth(Math.min(400, Math.floor(entry.contentRect.width)));
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, [fullWidth]);
 
   const submitCredential = async (credential, password = null) => {
     setBusy(true);
@@ -59,7 +70,7 @@ const GoogleAuthButton = ({ intent, phone, onError }) => {
   }
 
   return (
-    <div aria-busy={busy} style={{ display: 'flex', justifyContent: 'center', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
+    <div ref={containerRef} className={fullWidth ? 'google-auth-control' : undefined} aria-busy={busy} style={{ display: 'flex', justifyContent: 'center', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
       {pendingCredential ? (
         <form onSubmit={confirmExistingAccount} style={{ display: 'grid', gap: '0.5rem' }}>
           <label htmlFor="google-link-password">Xác nhận mật khẩu tài khoản hiện có để liên kết Google</label>
@@ -79,6 +90,8 @@ const GoogleAuthButton = ({ intent, phone, onError }) => {
           onSuccess={handleSuccess}
           onError={() => onError('Không thể đăng nhập Google. Vui lòng thử lại.')}
           text={intent === 'LOGIN' ? 'continue_with' : 'signup_with'}
+          width={fullWidth ? buttonWidth : undefined}
+          locale={fullWidth ? 'vi' : undefined}
         />
       )}
     </div>
