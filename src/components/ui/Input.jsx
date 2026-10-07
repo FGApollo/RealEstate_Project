@@ -1,10 +1,12 @@
-import React from 'react';
+import { useId } from 'react';
 import './Input.css';
 
-const Input = ({ icon: Icon, rightIcon: RightIcon, label, onRightIconClick, ...props }) => {
+const Input = ({ icon: Icon, rightIcon: RightIcon, label, onRightIconClick, rightIconLabel = 'Hiện hoặc ẩn mật khẩu', ...props }) => {
+  const generatedId = useId();
+  const inputId = props.id || generatedId;
   return (
     <div className="input-wrapper">
-      {label && <label className="input-label">{label}</label>}
+      {label && <label className="input-label" htmlFor={inputId}>{label}</label>}
       <div className="input-container">
         {Icon && (
           <div className="input-icon-left">
@@ -14,9 +16,10 @@ const Input = ({ icon: Icon, rightIcon: RightIcon, label, onRightIconClick, ...p
         <input 
           className={`input-field ${Icon ? 'has-left-icon' : ''} ${RightIcon ? 'has-right-icon' : ''}`}
           {...props}
+          id={inputId}
         />
         {RightIcon && (
-          <button type="button" className="input-icon-right" onClick={onRightIconClick}>
+          <button type="button" className="input-icon-right" onClick={onRightIconClick} aria-label={rightIconLabel}>
             <RightIcon size={20} color="var(--text-secondary)" />
           </button>
         )}

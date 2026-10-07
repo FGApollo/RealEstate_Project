@@ -72,17 +72,18 @@ const Login = () => {
 
   return (
     <AuthLayout 
+      variant="login"
       title="Chào mừng trở lại" 
       subtitle="Đăng nhập để khám phá những không gian sống đẳng cấp."
     >
-      <form onSubmit={handleSubmit}>
-        {successMessage && <div style={{ color: 'green', marginBottom: '1rem', fontSize: '0.875rem', textAlign: 'center' }}>{successMessage}</div>}
+      <form className="auth-entry-form" onSubmit={handleSubmit} aria-busy={isLoading}>
+        {successMessage && <div className="auth-message auth-message--success" role="status">{successMessage}</div>}
         {successMessage && location.state?.email && (
           <p style={{ textAlign: 'center', fontSize: '0.85rem' }}>
             <Link to="/resend-verification" state={{ email: location.state.email }}>Chưa nhận được email? Gửi lại</Link>
           </p>
         )}
-        {error && <div style={{ color: 'red', marginBottom: '1rem', fontSize: '0.875rem', textAlign: 'center' }}>{error}</div>}
+        {error && <div className="auth-message auth-message--error" role="alert">{error}</div>}
         {needsVerification && (
           <p style={{ textAlign: 'center', fontSize: '0.85rem' }}>
             <Link to="/resend-verification" state={{ email: formData.email }}>Gửi lại email xác minh</Link>
@@ -97,6 +98,7 @@ const Login = () => {
           type="email"
           value={formData.email}
           onChange={handleChange}
+          autoComplete="email"
           required
         />
         
@@ -106,14 +108,16 @@ const Login = () => {
           name="password"
           rightIcon={showPassword ? Eye : EyeOff}
           onRightIconClick={togglePasswordVisibility}
+          rightIconLabel={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
           placeholder="••••••••"
           type={showPassword ? "text" : "password"}
           value={formData.password}
           onChange={handleChange}
+          autoComplete="current-password"
           required
         />
 
-        <div style={{ marginTop: '2rem' }}>
+        <div className="auth-submit-row">
           <Button type="submit" fullWidth variant="primary" disabled={isLoading}>
             {isLoading ? 'Đang xử lý...' : 'Đăng nhập'}
           </Button>
@@ -122,11 +126,11 @@ const Login = () => {
 
       <div className="divider">HOẶC TIẾP TỤC VỚI</div>
 
-      <GoogleAuthButton intent="LOGIN" onError={setError} />
+      <GoogleAuthButton intent="LOGIN" onError={setError} fullWidth />
 
       <div className="auth-footer">
         <div>Chưa có tài khoản? <Link to="/register">Đăng ký ngay</Link></div>
-        <div style={{ marginTop: '1rem', fontSize: '0.85rem' }}>
+        <div className="auth-agent-link">
           Bạn là Môi giới? <Link to="/login/agent">Đăng nhập cổng Môi giới</Link>
         </div>
       </div>

@@ -2,7 +2,10 @@ import { Building2, Heart, House, LockKeyhole, ShieldCheck, Zap } from 'lucide-r
 import { Mascot } from 'page-mascot';
 import './AuthLoading.css';
 
-const AuthLoading = () => (
+const AuthLoading = ({
+  description = 'Vui lòng đợi trong giây lát, chúng tôi đang kiểm tra thông tin tài khoản của bạn.',
+  progressLabel = 'Đang xác thực tài khoản'
+}) => (
   <main className="auth-loading" aria-busy="true">
     <div className="auth-loading__cloud auth-loading__cloud--left" aria-hidden="true" />
     <div className="auth-loading__cloud auth-loading__cloud--right" aria-hidden="true" />
@@ -48,10 +51,10 @@ const AuthLoading = () => (
       <p className="auth-loading__eyebrow">SWIPE NEST ĐANG CHUẨN BỊ</p>
       <h1 className="auth-loading__title" id="auth-loading-title">Đang xác thực...</h1>
       <p className="auth-loading__description" role="status" aria-live="polite">
-        Vui lòng đợi trong giây lát, chúng tôi đang kiểm tra thông tin tài khoản của bạn.
+        {description}
       </p>
 
-      <div className="auth-loading__progress" role="progressbar" aria-label="Đang xác thực tài khoản">
+      <div className="auth-loading__progress" role="progressbar" aria-label={progressLabel}>
         <span />
       </div>
 
