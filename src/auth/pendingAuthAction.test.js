@@ -63,3 +63,15 @@ test('expired pending actions are discarded', () => {
   assert.equal(readPendingAuthAction(), null);
   assert.equal(stored.size, 0);
 });
+
+test('clearing an old discovery intent allows a fresh protected action to be preserved', () => {
+  savePendingAuthAction({ type: 'NAVIGATE', returnTo: '/swipe/V%C4%83n%20Ph%C3%B2ng' });
+  clearPendingAuthAction();
+  assert.equal(readPendingAuthAction(), null);
+  assert.equal(stored.size, 0);
+  savePendingAuthAction({ type: 'FAVORITE_PROPERTY', propertyId: 123 });
+  assert.deepEqual(readPendingAuthAction(), {
+    type: 'FAVORITE_PROPERTY', propertyId: '123', returnTo: '/?propertyId=123'
+  });
+  clearPendingAuthAction();
+});

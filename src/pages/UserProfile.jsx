@@ -224,8 +224,8 @@ export default function UserProfile() {
 
   const handleLogout = async () => {
     try {
-      await logout();
-      navigate('/login');
+      await logout(() => navigate('/', { replace: true }));
+      navigate('/', { replace: true });
     } catch (err) {
       alert(err.message);
     }

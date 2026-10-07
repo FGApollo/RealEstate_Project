@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../auth/useAuth';
 import { useRequireAuth } from '../auth/useRequireAuth';
+import { clearPendingAuthAction } from '../auth/pendingAuthAction';
 import SwipeNestMark from './SwipeNestMark';
 import './Header.css';
 
@@ -99,12 +100,19 @@ export default function Header({
       setShowDropdown(false);
       setMobileDrawerOpen(false);
       if (logout) {
-        await logout();
+        await logout(() => navigate('/', { replace: true }));
       }
-      navigate('/login');
+      navigate('/', { replace: true });
     } catch (err) {
       alert(err.message || 'Đăng xuất thất bại');
     }
+  };
+
+  const handleAuthEntry = (path) => {
+    clearPendingAuthAction();
+    setShowDropdown(false);
+    setMobileDrawerOpen(false);
+    navigate(path);
   };
 
   const displayName = user?.name || user?.email?.split('@')[0] || 'Tài khoản';
@@ -262,10 +270,10 @@ export default function Header({
             </div>
           ) : (
             <div className="app-header-auth-links">
-              <button type="button" className="app-header-login-btn" onClick={() => navigate('/login')}>
+              <button type="button" className="app-header-login-btn" onClick={() => handleAuthEntry('/login')}>
                 Đăng nhập
               </button>
-              <button type="button" className="app-header-register-btn" onClick={() => navigate('/register')}>
+              <button type="button" className="app-header-register-btn" onClick={() => handleAuthEntry('/register')}>
                 Đăng ký
               </button>
             </div>
@@ -394,10 +402,10 @@ export default function Header({
                 </>
               ) : (
                 <div className="app-header-drawer-auth-links">
-                  <button type="button" className="app-header-drawer-login-btn" onClick={() => { setMobileDrawerOpen(false); navigate('/login'); }}>
+                  <button type="button" className="app-header-drawer-login-btn" onClick={() => handleAuthEntry('/login')}>
                     Đăng nhập
                   </button>
-                  <button type="button" className="app-header-drawer-register-btn" onClick={() => { setMobileDrawerOpen(false); navigate('/register'); }}>
+                  <button type="button" className="app-header-drawer-register-btn" onClick={() => handleAuthEntry('/register')}>
                     Đăng ký
                   </button>
                 </div>
