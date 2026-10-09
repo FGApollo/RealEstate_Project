@@ -309,7 +309,9 @@ const verifyOtp = async ({ userId, phone, otp }) => {
 
   return {
     success: true,
-    message: 'Phone verified successfully'
+    message: 'Phone verified successfully',
+    phone: normalizedPhone,
+    phone_verified: true
   };
 };
 

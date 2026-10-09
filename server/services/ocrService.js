@@ -158,6 +158,15 @@ const getImageQualityResult = async (imageBuffer, label) => {
     };
   }
 
+  // Chặn ngay các ảnh đen thui / bị che camera / không nhìn thấy thẻ
+  if (stats.darkPixelRatio > 0.75 || stats.contrast < 10) {
+    return {
+      hardError: `${label} qua toi hoac khong nhin thay the CCCD. Vui long chup lai noi du anh sang`,
+      warnings,
+      stats
+    };
+  }
+
   if (stats.brightPixelRatio > QUALITY_LIMITS.maxBrightPixelRatio && stats.darkPixelRatio < QUALITY_LIMITS.minDarkPixelRatio) {
     warnings.push(`${label} hoi bi loa sang nhung van se thu doc OCR`);
   }
@@ -270,7 +279,9 @@ const findLineIndex = (normalizedLines, predicates) => normalizedLines.findIndex
 ));
 
 const cleanFieldValue = (value = '') => value
-  .replace(/^(\/|\.)*\s*(FULL NAME|HO VA TEN|DATE OF BIRTH|NGAY SINH|SEX|GIOI TINH|NATIONALITY|QUOC TICH|PLACE OF ORIGIN|QUE QUAN|PLACE OF RESIDENCE|NOI THUONG TRU|DATE OF EXPIRY|NGAY HET HAN|SO|NO|ENCE)\s*[:/.-]*\s*/i, '')
+  .replace(/^(\/|\.)*\s*(FULL NAME|HO VA TEN|DATE OF BIRTH|NGAY SINH|SEX|GIOI TINH|NATIONALITY|QUOC TICH|PLACE OF ORIGIN|QUE QUAN|PLACE OF RESIDENCE|NOI THUONG TRU|DATE OF EXPIRY|NGAY HET HAN|SO|NO|ENCE|ORIGIN|RESIDENCE)\s*[:/.-]*\s*/i, '')
+  .replace(/\b(origin|residence|place of origin|place of residence|bosman|meine)\b/gi, '')
+  .replace(/^[^a-zA-Z0-9\u00C0-\u1EF9]+/u, '')
   .replace(/[|:;]+/g, ' ')
   .replace(/\s+/g, ' ')
   .trim();
@@ -608,6 +619,7 @@ const analyzeCitizenId = async (frontImageBuffer, backImageBuffer) => {
       const hardError = frontQuality.hardError || backQuality.hardError;
       return {
         isValid: false,
+        hardError: hardError,
         errorMessage: hardError,
         data: {},
         warnings,
