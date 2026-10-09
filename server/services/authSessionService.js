@@ -6,7 +6,7 @@ const ACCESS_TOKEN_TTL = '15m';
 const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const COOKIE_NAME = 'swipenest_refresh';
 const COOKIE_PATH = '/api/auth';
-const USER_COLUMNS = 'id, name, email, avatar, role, phone, email_verified_at, verification_status, trust_score';
+const USER_COLUMNS = 'id, name, email, avatar, role, phone, phone_verified, email_verified_at, verification_status, trust_score';
 
 const getJwtConfig = () => {
   const secret = process.env.JWT_SECRET;

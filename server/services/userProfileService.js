@@ -99,7 +99,7 @@ const uploadAvatar = async (userId, file) => {
 const getUserProfile = async (userId) => {
   const { data: user, error } = await supabase
     .from('users')
-    .select('id, name, email, phone, role, avatar, trust_score, verification_status, created_at, password')
+    .select('id, name, email, phone, phone_verified, role, avatar, trust_score, verification_status, created_at, password')
     .eq('id', userId)
     .single();
 
@@ -146,7 +146,7 @@ const updateUserProfile = async (userId, { name, phone }) => {
     .from('users')
     .update(updates)
     .eq('id', userId)
-    .select('id, name, email, phone, role, avatar, trust_score, verification_status, created_at')
+    .select('id, name, email, phone, phone_verified, role, avatar, trust_score, verification_status, created_at')
     .single();
 
   if (error) {

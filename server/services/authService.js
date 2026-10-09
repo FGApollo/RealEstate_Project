@@ -11,7 +11,7 @@ const {
 } = require('./registrationValidation');
 
 const PUBLIC_USER_FIELDS = [
-  'id', 'name', 'email', 'avatar', 'role', 'phone', 'email_verified_at',
+  'id', 'name', 'email', 'avatar', 'role', 'phone', 'phone_verified', 'email_verified_at',
   'verification_status', 'trust_score'
 ];
 const toPublicUser = (user) => Object.fromEntries(

@@ -1497,6 +1497,31 @@
    KYC 4-STEP WIZARD & VERIFIED UI STYLES
    ════════════════════════════════════════ */
 
+.spin-icon {
+  animation: kycSpin 1s linear infinite;
+}
+
+@keyframes kycSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.kyc-error-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background-color: #fef2f2;
+  border: 1.5px solid #f87171;
+  color: #b91c1c;
+  padding: 12px 18px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.12);
+}
+
 /* Standard Header for Unverified state */
 .kyc-header-standard {
   margin-bottom: 24px;
@@ -1784,16 +1809,20 @@
 .s2-upload-zone:has(.preview-img) {
   padding: 0;
   border-style: solid;
-  border-color: #cbd5e1;
-  background: #0f172a;
+  border-color: #3b82f6;
+  background: #f8fafc;
+  overflow: hidden;
 }
 
 .preview-img {
   width: 100%;
   height: 100%;
+  min-height: 176px;
   max-height: 176px;
-  object-fit: cover;
+  object-fit: contain;
+  background: #0f172a;
   border-radius: 14px;
+  display: block;
 }
 
 .browse-link {
@@ -1837,6 +1866,60 @@
   margin: -8px 0 24px 0;
 }
 
+.s2-item-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  width: 100%;
+}
+
+.btn-item-camera {
+  flex: 1.2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: #eff6ff;
+  border: 1.5px solid #bfdbfe;
+  color: #1d4ed8;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-item-camera:hover {
+  background: #dbeafe;
+  border-color: #93c5fd;
+  color: #1e40af;
+  transform: translateY(-1px);
+}
+
+.btn-item-upload {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: #f8fafc;
+  border: 1.5px solid #e2e8f0;
+  color: #475569;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-item-upload:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #1e293b;
+}
+
 .s3-camera-wrapper {
   display: flex;
   flex-direction: column;
@@ -1857,6 +1940,35 @@
   margin-bottom: 24px;
   overflow: hidden;
   box-shadow: inset 0 0 20px rgba(59, 130, 246, 0.1);
+  transition: all 0.2s ease;
+}
+
+.s3-oval-frame:hover {
+  border-color: #2563eb;
+  background: #f1f5f9;
+}
+
+.s3-oval-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #94a3b8;
+  padding: 20px;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.s3-oval-frame:hover .s3-oval-inner {
+  color: #2563eb;
+  transform: scale(1.05);
+}
+
+.oval-hint-text {
+  font-size: 13px;
+  font-weight: 700;
+  color: #64748b;
 }
 
 .s3-preview-img {
@@ -1876,6 +1988,107 @@
 }
 .oval-dot.top { top: -5px; }
 .oval-dot.bottom { bottom: -5px; }
+
+.s3-actions-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 320px;
+}
+
+.btn-start-camera {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: linear-gradient(135deg, #2563eb, #7c3aed);
+  color: #ffffff;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 30px;
+  font-size: 14.5px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.35);
+  transition: all 0.2s ease;
+}
+
+.btn-start-camera:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.45);
+}
+
+.btn-upload-file-alt {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.btn-upload-file-alt:hover {
+  color: #1e293b;
+  background: #f1f5f9;
+}
+
+.s3-retake-group {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+
+.btn-s3-retake {
+  flex: 1.2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: #eff6ff;
+  color: #2563eb;
+  border: 1.5px solid #bfdbfe;
+  padding: 10px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-s3-retake:hover {
+  background: #dbeafe;
+}
+
+.btn-s3-file {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: #f8fafc;
+  color: #475569;
+  border: 1.5px solid #e2e8f0;
+  padding: 10px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-s3-file:hover {
+  background: #f1f5f9;
+  color: #1e293b;
+}
 
 .btn-capture-photo {
   display: flex;
@@ -2343,3 +2556,34 @@
 .filter-actions .btn-primary:hover {
   background-color: #1d4ed8;
 }
+
+/* Privacy & Masked KYC Card Styles */
+.kyc-verified-pill {
+  margin-left: auto;
+  background: #ecfdf5;
+  color: #059669;
+  border: 1px solid #a7f3d0;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 11.5px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  letter-spacing: 0.5px;
+}
+
+.kyc-privacy-notice {
+  margin-top: 20px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 12.5px;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  line-height: 1.5;
+}
+
