@@ -71,11 +71,47 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
     checks.push('Loading skeletons; no false zero KPI');
     await page.locator('.analytics-scope').waitFor();
     assert.equal(await page.locator('.analytics-kpi-value').first().textContent(), '13');
-    assert.ok(await page.locator('.recharts-surface').count() >= 4);
-    assert.ok((await page.locator('.analytics-notice').textContent()).includes('Chưa có dữ liệu thanh toán xác thực'));
+    assert.equal(await page.getByRole('tab').count(), 5);
+    assert.equal(await page.getByRole('tab', { name: 'Tổng quan', exact: true }).getAttribute('aria-selected'), 'true');
+    assert.equal(await page.getByRole('heading', { name: 'Người dùng hệ thống', exact: true }).count(), 0);
+    assert.equal(await page.getByRole('heading', { name: 'Thống kê doanh thu', exact: true }).count(), 0);
+    assert.equal(await page.locator('.recharts-surface').count(), 2);
     checks.push('Admin shell → apiFetch → real JWT/session → service → PostgreSQL → 13-account KPI and charts');
     await page.screenshot({ path: path.join(out, 'desktop.png'), fullPage: true });
     await page.screenshot({ path: path.join(out, 'desktop-overview.png') });
+    const navigationRequests = requests.length;
+    await page.getByRole('button', { name: 'Xem chi tiết', exact: true }).first().click();
+    assert.equal(await page.getByRole('tab', { name: 'Người dùng', exact: true }).getAttribute('aria-selected'), 'true');
+    await page.getByRole('heading', { name: 'Người dùng hệ thống', exact: true }).waitFor();
+    await page.locator('.analytics-trend-chart .recharts-line-dot').nth(23).hover();
+    await page.locator('.analytics-trend-tooltip').waitFor({ state: 'visible' });
+    assert.equal(await page.locator('.analytics-trend-tooltip-row b').textContent(), '6');
+    assert.ok((await page.locator('.analytics-trend-tooltip').textContent()).includes('Tất cả tài khoản mới'));
+    await page.screenshot({ path: path.join(out, 'users-desktop.png'), fullPage: true });
+    await page.locator('.analytics-panel').filter({ has: page.getByRole('heading', { name: 'Đăng ký tài khoản mới', exact: true }) }).screenshot({ path: path.join(out, 'users-line-chart.png') });
+    checks.push('Reference-style line chart tooltip displays the real PostgreSQL registration count');
+    await page.getByLabel('Nhóm người dùng trên biểu đồ').selectOption('comparison');
+    await page.getByRole('group', { name: 'Khách hàng mới, Môi giới mới', exact: true }).waitFor();
+    await page.getByRole('tab', { name: 'Gói dịch vụ', exact: true }).click();
+    await page.getByRole('table').waitFor();
+    assert.equal(await page.getByRole('heading', { name: 'Người dùng hệ thống', exact: true }).count(), 0);
+    await page.screenshot({ path: path.join(out, 'subscriptions-desktop.png'), fullPage: true });
+    await page.getByRole('tab', { name: 'Doanh thu', exact: true }).click();
+    assert.ok((await page.locator('.analytics-notice').textContent()).includes('Chưa có dữ liệu thanh toán xác thực'));
+    assert.equal(await page.getByRole('table').count(), 0);
+    await page.screenshot({ path: path.join(out, 'revenue-desktop.png'), fullPage: true });
+    await page.getByRole('tab', { name: 'Giao dịch', exact: true }).click();
+    await page.getByRole('heading', { name: 'Giao dịch gần đây', exact: true }).waitFor();
+    assert.equal(await page.locator('.analytics-kpi').count(), 0);
+    await page.getByRole('tab', { name: 'Giao dịch', exact: true }).press('Home');
+    assert.equal(await page.getByRole('tab', { name: 'Tổng quan', exact: true }).getAttribute('aria-selected'), 'true');
+    await page.getByRole('tab', { name: 'Tổng quan', exact: true }).press('End');
+    assert.equal(await page.getByRole('tab', { name: 'Giao dịch', exact: true }).getAttribute('aria-selected'), 'true');
+    await page.getByRole('tab', { name: 'Người dùng', exact: true }).click();
+    assert.equal(await page.getByLabel('Nhóm người dùng trên biểu đồ').inputValue(), 'comparison');
+    assert.equal(requests.length, navigationRequests);
+    checks.push('Five separate sections, overview detail links and keyboard navigation; no refetch when switching sections');
+    await page.getByLabel('Nhóm người dùng trên biểu đồ').selectOption('total');
     delay = 0;
     const before = requests.length;
     await page.getByLabel('Khoảng thời gian').selectOption('7d');
@@ -85,15 +121,25 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
     await page.getByLabel('Khoảng thời gian').selectOption('30d');
     await page.locator('.analytics-scope').waitFor();
     assert.equal(await newAccountCard.locator('.analytics-kpi-value').textContent(), '10');
+    assert.equal(await page.getByRole('tab', { name: 'Người dùng', exact: true }).getAttribute('aria-selected'), 'true');
     assert.equal(requests.length - before, 2);
     checks.push('7d → 30d updates KPI/chart together; one request per committed filter');
     for (const bucket of ['week', 'month', 'year', 'day']) {
+      const response = page.waitForResponse((result) => result.url().includes('/api/admin/analytics/overview') && new URL(result.url()).searchParams.get('bucket') === bucket && result.status() === 200);
       await page.getByLabel('Nhóm biểu đồ').selectOption(bucket);
+      await response;
       await page.locator('.analytics-scope').waitFor();
+      if (bucket === 'month') {
+        await page.locator('.analytics-trend-chart').getByText(new RegExp(`^T${Number(today.slice(5, 7))}(/\\d{4})?$`)).first().waitFor();
+        const labels = await page.locator('.analytics-trend-chart .recharts-cartesian-axis-tick-value').allTextContents();
+        assert.ok(labels.some((label) => label.startsWith(`T${Number(today.slice(5, 7))}`)), `Month labels: ${JSON.stringify(labels)}`);
+      }
     }
+    await page.getByRole('tab', { name: 'Doanh thu', exact: true }).click();
     await page.getByLabel('Loại so sánh').selectOption('subscriptions');
-    assert.ok(await page.locator('.analytics-section').last().locator('.recharts-surface').count() > 0);
+    assert.ok(await page.getByRole('tabpanel').locator('.recharts-surface').count() > 0);
     checks.push('Day/week/month/year grouping and comparison mode switching');
+    await page.getByRole('tab', { name: 'Người dùng', exact: true }).click();
     await page.getByLabel('Khoảng thời gian').selectOption('custom');
     await page.getByLabel('Từ ngày', { exact: true }).fill(fixtureDate('2026-10-10'));
     await page.getByLabel('Đến ngày', { exact: true }).fill(fixtureDate('2026-10-15'));
@@ -108,6 +154,12 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
       assert.ok(dimensions.content <= dimensions.width, `Page overflow at ${viewport.width}: ${JSON.stringify(dimensions)}`);
       await page.screenshot({ path: path.join(out, `${viewport.width === 390 ? 'mobile' : 'tablet'}.png`), fullPage: true });
       if (viewport.width === 390) await page.screenshot({ path: path.join(out, 'mobile-overview.png') });
+      for (const label of ['Tổng quan', 'Gói dịch vụ', 'Doanh thu', 'Giao dịch', 'Người dùng']) {
+        await page.getByRole('tab', { name: label, exact: true }).click();
+        const size = await page.evaluate(() => ({ width: innerWidth, content: document.documentElement.scrollWidth }));
+        assert.ok(size.content <= size.width, `${label} overflow at ${viewport.width}`);
+        assert.equal(await page.getByRole('tabpanel').count(), 1);
+      }
     }
     checks.push('Tablet 768px / mobile 390px: no page overflow; charts and table contained');
     await page.setViewportSize({ width: 1440, height: 1000 });
@@ -120,6 +172,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
     await page.locator('.analytics-scope').waitFor();
     checks.push('API error state and successful retry');
     await db.exec('TRUNCATE seller_subscriptions');
+    await page.getByRole('tab', { name: 'Gói dịch vụ', exact: true }).click();
     await page.getByRole('button', { name: 'Làm mới' }).click();
     await page.locator('.analytics-scope').waitFor();
     const subscriptions = page.getByRole('region', { name: 'Gói dịch vụ môi giới' });
@@ -131,7 +184,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
     await page.locator('.analytics-scope').waitFor();
     checks.push('Navigate analytics → existing KYC tab → analytics');
     assert.deepEqual(errors, []);
-    const report = { checks, errors, screenshots: ['desktop.png', 'tablet.png', 'mobile.png'], database: 'isolated in-memory PostgreSQL; fixtures only' };
+    const report = { checks, errors, screenshots: ['desktop.png', 'users-desktop.png', 'users-line-chart.png', 'subscriptions-desktop.png', 'revenue-desktop.png', 'tablet.png', 'mobile.png'], database: 'isolated in-memory PostgreSQL; fixtures only' };
     fs.writeFileSync(path.join(out, 'browser-results.json'), JSON.stringify(report, null, 2));
     console.log(JSON.stringify(report, null, 2));
   } finally {
