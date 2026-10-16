@@ -153,7 +153,7 @@ Frontend build tách chunk analytics khoảng **426 KB / 121 KB gzip**, chỉ t�
 ## TEST RESULTS
 
 - `npm run test:analytics`: **15/15** — SQL PostgreSQL thật (PGlite), security HTTP, timezone, 7/30 ngày và mọi bucket, expired/null/future, tie-break, gói động, baseline 0, empty, validation và performance.
-- `npm test --prefix server`: **53/53** sau khi bổ sung analytics/performance.
+- `npm test --prefix server`: **50/50** trên bản commit sạch sau khi tích hợp KYC mới nhất từ main. Lần chạy 53/53 trước đó bao gồm ba kiểm thử email đang chỉnh sửa riêng trong workspace; các thay đổi email đó không thuộc commit Analytics.
 - `npm run test:auth-flow`: **16/16**.
 - ESLint cho toàn bộ frontend mới và browser fixture: đạt; Node syntax check cho backend mới: đạt. Không tuyên bố lint sạch cho toàn bộ legacy codebase.
 - `npm run build`: đạt.
