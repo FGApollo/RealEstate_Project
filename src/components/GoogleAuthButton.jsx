@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { GoogleLogin } from '@react-oauth/google';
 import { API_BASE_URL } from '../config';
+import { authSessionFetch } from '../auth/apiClient';
 import { useFinishAuthentication } from '../auth/useFinishAuthentication';
 
 const GoogleAuthButton = ({ intent, phone, onError, fullWidth = false }) => {
@@ -24,7 +25,7 @@ const GoogleAuthButton = ({ intent, phone, onError, fullWidth = false }) => {
     setBusy(true);
     onError('');
     try {
-      const response = await fetch(`${API_BASE_URL}/api/google-login`, {
+      const response = await authSessionFetch(`${API_BASE_URL}/api/google-login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

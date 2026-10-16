@@ -1,114 +1,7 @@
 const { supabase } = require('../config/supabase');
-const fs = require('fs');
-const path = require('path');
-const crypto = require('crypto');
-
-// Upload base64 image to Supabase Storage "property-images" bucket if configured,
-// or fallback to saving locally in public/uploads directory.
-const saveBase64Image = async (base64Str) => {
-  const isPlaceholder = !base64Str || base64Str === 'https://via.placeholder.com/400';
-  
-  if (isPlaceholder) {
-    return base64Str;
-  }
-
-  if (typeof base64Str === 'string' && (base64Str.startsWith('http://') || base64Str.startsWith('https://') || base64Str.startsWith('/uploads/'))) {
-    return base64Str;
-  }
-
-  if (typeof base64Str !== 'string' || !base64Str.startsWith('data:image/')) {
-    return base64Str;
-  }
-
-  try {
-    const matches = base64Str.match(/^data:image\/([A-Za-z-+\/]+);base64,(.+)$/);
-    if (!matches || matches.length !== 3) {
-      return base64Str;
-    }
-
-    const imageType = matches[1];
-    const base64Data = matches[2];
-    const buffer = Buffer.from(base64Data, 'base64');
-    const filename = `${crypto.randomUUID()}.${imageType}`;
-
-    // 1. Try uploading to Supabase Storage "property-images" bucket first
-    try {
-      const PROPERTIES_BUCKET = 'property-images';
-      const filePath = `listings/${filename}`;
-      const { data, error: uploadError } = await supabase.storage
-        .from(PROPERTIES_BUCKET)
-        .upload(filePath, buffer, {
-          contentType: `image/${imageType}`,
-          upsert: true
-        });
-
-      if (!uploadError) {
-        const { data: urlData } = supabase.storage
-          .from(PROPERTIES_BUCKET)
-          .getPublicUrl(filePath);
-        console.log('Successfully uploaded listing image to Supabase Storage:', urlData.publicUrl);
-        return urlData.publicUrl;
-      } else {
-        console.warn('Supabase storage upload failed, falling back to local file storage:', uploadError.message);
-      }
-    } catch (storageErr) {
-      console.warn('Supabase storage error, falling back to local file storage:', storageErr.message);
-    }
-
-    // 2. Local file fallback if Supabase bucket isn't configured/accessible
-    const uploadDir = path.join(__dirname, '../public/uploads');
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-
-    const filepath = path.join(uploadDir, filename);
-    fs.writeFileSync(filepath, buffer);
-
-    return `http://localhost:3000/uploads/${filename}`;
-  } catch (err) {
-    console.error('Error saving base64 image:', err);
-    return base64Str;
-  }
-};
-
-// ponytail: helper to delete image files (Supabase Storage or local fallback)
-const deleteImageFile = async (imageUrl) => {
-  if (!imageUrl || imageUrl.startsWith('https://images.unsplash.com') || imageUrl.startsWith('https://images.pexels.com') || imageUrl === 'https://via.placeholder.com/400') {
-    return; // Don't delete external stock images or placeholder
-  }
-
-  try {
-    const PROPERTIES_BUCKET = 'property-images';
-    // Check if it's Supabase Storage URL
-    const publicUrlPrefix = `/storage/v1/object/public/${PROPERTIES_BUCKET}/`;
-    const prefixIndex = imageUrl.indexOf(publicUrlPrefix);
-
-    if (prefixIndex !== -1) {
-      const filePath = imageUrl.substring(prefixIndex + publicUrlPrefix.length);
-      console.log(`Deleting storage file: ${filePath}`);
-      const { error } = await supabase.storage
-        .from(PROPERTIES_BUCKET)
-        .remove([filePath]);
-      if (error) {
-        console.warn(`Failed to delete file from Supabase storage (${filePath}):`, error.message);
-      }
-    } else {
-      // Local fallback file deletion
-      const match = imageUrl.match(/\/uploads\/([^/?#]+)/);
-      if (match) {
-        const filename = match[1];
-        const filepath = path.join(__dirname, '../public/uploads', filename);
-        if (fs.existsSync(filepath)) {
-          fs.unlinkSync(filepath);
-          console.log(`Deleted local file: ${filename}`);
-        }
-      }
-    }
-  } catch (err) {
-    console.error(`Error deleting image file (${imageUrl}):`, err);
-  }
-};
-
+const { positiveId, propertyInput } = require('./businessValidation');
+const { savePublicImage, deleteOwnedListingImage } = require('./publicImageStorage');
+const saveBase64Image = (image, userId) => savePublicImage(image, 'listings', userId);
 
 // Sync a child table: delete all rows for this property then re-insert.
 const syncRelatedRows = async (table, idField, propertyId, rows) => {
@@ -150,6 +43,8 @@ const getProperties = async (limit = 24, propertyType = null) => {
 };
 
 const createProperty = async (propertyData) => {
+  propertyInput(propertyData);
+  positiveId(propertyData.owner_id, 'owner_id');
   const {
     owner_id,
     title,
@@ -208,7 +103,7 @@ const createProperty = async (propertyData) => {
   console.log('thumbnail input length:', thumbnail ? thumbnail.length : 'empty');
   
   // Save thumbnail locally/storage if base64
-  const savedThumbnail = await saveBase64Image(thumbnail);
+  const savedThumbnail = await saveBase64Image(thumbnail, owner_id);
   console.log('savedThumbnail output length:', savedThumbnail ? savedThumbnail.length : 'empty');
 
   // Insert into properties table
@@ -265,7 +160,7 @@ const createProperty = async (propertyData) => {
   if (images && images.length > 0) {
     const imageRecords = await Promise.all(images.map(async (url) => ({
       property_id: propertyId,
-      image_url: await saveBase64Image(url)
+      image_url: await saveBase64Image(url, owner_id)
     })));
     const { error: imagesError } = await supabase
       .from('property_images')
@@ -300,6 +195,7 @@ const createProperty = async (propertyData) => {
 };
 
 const getPropertyById = async (id) => {
+  id = positiveId(id);
   const { data, error } = await supabase
     .from('properties')
     .select(`
@@ -312,6 +208,7 @@ const getPropertyById = async (id) => {
     .eq('id', id)
     .single();
 
+  if (error?.code === 'PGRST116') return null;
   if (error) {
     throw new Error(error.message);
   }
@@ -319,6 +216,7 @@ const getPropertyById = async (id) => {
 };
 
 const getContactAgentId = async (id, requesterId) => {
+  id = positiveId(id);
   const { data: property, error: propertyError } = await supabase
     .from('properties')
     .select('id, owner_id, status, is_hidden')
@@ -338,11 +236,12 @@ const getContactAgentId = async (id, requesterId) => {
 
   const { data: agent, error: agentError } = await supabase
     .from('users')
-    .select('id, role')
+    .select('id, role, is_active, trust_score')
     .eq('id', property.owner_id)
     .maybeSingle();
   if (agentError) throw new Error(agentError.message);
-  if (!agent || String(agent.role).toUpperCase() !== 'AGENT') {
+  if (!agent || String(agent.role).toUpperCase() !== 'AGENT' || agent.is_active !== true
+    || Number(agent.trust_score ?? 50) <= 30) {
     const error = new Error('Tin đăng không có môi giới để liên hệ.');
     error.statusCode = 404;
     throw error;
@@ -351,6 +250,8 @@ const getContactAgentId = async (id, requesterId) => {
 };
 
 const updateProperty = async (id, actorId, propertyData) => {
+  id = positiveId(id);
+  propertyInput(propertyData, { partial: true });
   const { features, images, lifestyle_tags } = propertyData;
   const editableFields = [
     'title', 'description', 'price', 'area', 'bedrooms', 'bathrooms', 'property_type', 'listing_type',
@@ -386,7 +287,7 @@ const updateProperty = async (id, actorId, propertyData) => {
     throw error;
   }
 
-  if (existingProp.owner_id !== Number(actorId)) {
+  if (String(existingProp.owner_id) !== String(actorId)) {
     const error = new Error('Bạn không có quyền chỉnh sửa tin đăng của người khác.');
     error.statusCode = 403;
     throw error;
@@ -404,7 +305,7 @@ const updateProperty = async (id, actorId, propertyData) => {
   }
 
   if (Object.hasOwn(fields, 'thumbnail')) {
-    fields.thumbnail = await saveBase64Image(fields.thumbnail);
+    fields.thumbnail = await saveBase64Image(fields.thumbnail, actorId);
   }
 
   const { data: property, error: propertyError } = await supabase
@@ -428,7 +329,7 @@ const updateProperty = async (id, actorId, propertyData) => {
   if (images !== undefined) {
     const savedImages = await Promise.all(images.map(async (url) => ({
       property_id: id,
-      image_url: await saveBase64Image(url)
+      image_url: await saveBase64Image(url, actorId)
     })));
     await syncRelatedRows('property_images', 'property_id', id, savedImages);
   }
@@ -456,6 +357,7 @@ const updateProperty = async (id, actorId, propertyData) => {
 };
 
 const deleteProperty = async (id, actorId) => {
+  id = positiveId(id);
   // 1. Verify ownership and get old images
   const { data: existingProp, error: getPropError } = await supabase
     .from('properties')
@@ -469,7 +371,7 @@ const deleteProperty = async (id, actorId) => {
     throw error;
   }
 
-  if (existingProp.owner_id !== Number(actorId)) {
+  if (String(existingProp.owner_id) !== String(actorId)) {
     const error = new Error('Bạn không có quyền xoá tin đăng của người khác.');
     error.statusCode = 403;
     throw error;
@@ -491,7 +393,7 @@ const deleteProperty = async (id, actorId) => {
 
   // ponytail: delete physical image files (Supabase Storage or local fallback)
   for (const url of urlsToDelete) {
-    await deleteImageFile(url);
+    await deleteOwnedListingImage(url, actorId);
   }
 };
 
@@ -589,7 +491,10 @@ const createSimilarityLinks = async (propertyId, similarProperties) => {
 };
 
 const getSimilarProperties = async (propertyId) => {
-  const propId = Number(propertyId);
+  const propId = positiveId(propertyId);
+  const source = await getPropertyById(propId);
+  if (!source || source.is_hidden === true || source.status !== 'AVAILABLE'
+    || Number(source.owner?.trust_score ?? 50) <= 30) return [];
 
   const { data: links, error } = await supabase
     .from('property_links')
@@ -624,7 +529,7 @@ const getSimilarProperties = async (propertyId) => {
     return [];
   }
 
-  return properties || [];
+  return (properties || []).filter((property) => Number(property.owner?.trust_score ?? 50) > 30);
 };
 
 module.exports = {

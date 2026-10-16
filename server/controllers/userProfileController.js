@@ -1,3 +1,4 @@
+const { safeErrorMessage } = require('../services/httpError');
 const userProfileService = require('../services/userProfileService');
 
 const uploadAvatar = async (req, res) => {
@@ -17,7 +18,7 @@ const uploadAvatar = async (req, res) => {
       profileBonus: result.profileBonus
     });
   } catch (error) {
-    res.status(400).json({ error: error.message || 'Failed to upload avatar' });
+    res.status(400).json({ error: safeErrorMessage(error, 'Failed to upload avatar') });
   }
 };
 
@@ -30,7 +31,7 @@ const handleAvatarUploadError = (err, req, res, next) => {
     return res.status(400).json({ error: 'Avatar image must be 5MB or smaller' });
   }
 
-  return res.status(400).json({ error: err.message || 'Invalid avatar upload request' });
+  return res.status(400).json({ error: safeErrorMessage(err, 'Invalid avatar upload request') });
 };
 
 const getProfile = async (req, res) => {
@@ -41,7 +42,7 @@ const getProfile = async (req, res) => {
       user: profile
     });
   } catch (error) {
-    res.status(400).json({ error: error.message || 'Không thể lấy thông tin người dùng' });
+    res.status(400).json({ error: safeErrorMessage(error, 'Không thể lấy thông tin người dùng') });
   }
 };
 
@@ -55,7 +56,7 @@ const updateProfile = async (req, res) => {
       user: updated
     });
   } catch (error) {
-    res.status(400).json({ error: error.message || 'Cập nhật thông tin thất bại' });
+    res.status(400).json({ error: safeErrorMessage(error, 'Cập nhật thông tin thất bại') });
   }
 };
 
@@ -65,7 +66,7 @@ const changePassword = async (req, res) => {
     const result = await userProfileService.changeUserPassword(req.user.id, { currentPassword, newPassword });
     res.status(200).json(result);
   } catch (error) {
-    res.status(400).json({ error: error.message || 'Đổi mật khẩu thất bại' });
+    res.status(400).json({ error: safeErrorMessage(error, 'Đổi mật khẩu thất bại') });
   }
 };
 

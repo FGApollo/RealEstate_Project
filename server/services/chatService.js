@@ -1,6 +1,11 @@
 const { supabase } = require('../config/supabase');
+const { positiveId, boundedInteger, text, badRequest } = require('./businessValidation');
 
-const getMessages = async (userId, otherId) => {
+const getMessages = async (userId, otherId, { limit, offset } = {}) => {
+  userId = positiveId(userId, 'userId');
+  otherId = positiveId(otherId, 'otherId');
+  const pageLimit = boundedInteger(limit, 200, 1, 200);
+  const pageOffset = boundedInteger(offset, 0, 0, 100000);
   // Fetch messages between userId and otherId
   const { data, error } = await supabase
     .from('messages')
@@ -9,15 +14,37 @@ const getMessages = async (userId, otherId) => {
       property:properties(id, title, price, thumbnail, area)
     `)
     .or(`and(sender_id.eq.${userId},receiver_id.eq.${otherId}),and(sender_id.eq.${otherId},receiver_id.eq.${userId})`)
-    .order('created_at', { ascending: true });
+    .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
+    .range(pageOffset, pageOffset + pageLimit - 1);
 
   if (error) {
     throw new Error(error.message);
   }
-  return data;
+  return (data || []).reverse();
 };
 
 const sendMessage = async (senderId, receiverId, propertyId, message) => {
+  senderId = positiveId(senderId, 'senderId');
+  receiverId = positiveId(receiverId, 'receiverId');
+  message = text(message, 'message', 2000, { required: true });
+  if (senderId === receiverId) throw badRequest('Bạn không thể tự gửi tin nhắn cho chính mình');
+  const { data: receiver, error: receiverError } = await supabase.from('users')
+    .select('id, is_active').eq('id', receiverId).maybeSingle();
+  if (receiverError) throw new Error(receiverError.message);
+  if (!receiver || receiver.is_active !== true) {
+    throw Object.assign(badRequest('Không tìm thấy người nhận đang hoạt động.'), { statusCode: 404 });
+  }
+  if (propertyId !== undefined && propertyId !== null) {
+    propertyId = positiveId(propertyId, 'propertyId');
+    const { data: property, error: propertyError } = await supabase.from('properties')
+      .select('id, owner_id, status, is_hidden').eq('id', propertyId).maybeSingle();
+    if (propertyError) throw new Error(propertyError.message);
+    if (!property || property.is_hidden === true || property.status !== 'AVAILABLE'
+      || ![senderId, receiverId].includes(Number(property.owner_id))) {
+      throw Object.assign(badRequest('Không thể đính kèm tin đăng này.'), { statusCode: 404 });
+    }
+  }
   const { data, error } = await supabase
     .from('messages')
     .insert([{
@@ -39,6 +66,7 @@ const sendMessage = async (senderId, receiverId, propertyId, message) => {
 };
 
 const getConversations = async (userId) => {
+  userId = positiveId(userId, 'userId');
   // 1. Fetch all messages involving the user
   const { data: messages, error: msgError } = await supabase
     .from('messages')
@@ -65,7 +93,7 @@ const getConversations = async (userId) => {
   // 3. Fetch details of all conversation partners
   const { data: partners, error: partnersError } = await supabase
     .from('users')
-    .select('id, name, email, avatar, role, phone')
+    .select('id, name, avatar, role')
     .in('id', partnerIds);
 
   if (partnersError) {
@@ -98,6 +126,8 @@ const getConversations = async (userId) => {
 };
 
 const updateFunnelStage = async (agentId, userId, stage) => {
+  agentId = positiveId(agentId, 'agentId');
+  userId = positiveId(userId, 'userId');
   if (!['AWARENESS', 'CONSIDERATION', 'INTENT', 'ACTION'].includes(stage)) {
     const error = new Error('Invalid funnel stage');
     error.statusCode = 400;

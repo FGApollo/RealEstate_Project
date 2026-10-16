@@ -120,9 +120,9 @@ const getAgentReviews = async (agentId, currentUserId = null) => {
   });
 
   return (reviews || []).map(r => {
-    const votes = r.helpful_votes || [];
+    const { helpful_votes: votes = [], ...safeReview } = r;
     return {
-      ...r,
+      ...safeReview,
       propertyTitle: propertyTitleMap[r.property_id] || '',
       helpful_count: votes.length,
       user_has_voted: currentUserId ? votes.some(v => Number(v.user_id) === Number(currentUserId)) : false

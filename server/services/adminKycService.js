@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { supabase } = require('../config/supabase');
+const { signVerificationImages } = require('./kycStorage');
 
 const ADMIN_ROLE = 'ADMIN';
 const VERIFIED_STATUS = 'VERIFIED';
@@ -163,7 +164,8 @@ const getRejectedVerifications = async (adminId) => {
     .filter((verification) => verification.status === REJECTED_STATUS)
     .sort(compareLatestVerification);
 
-  return attachUsers(rejectedLatestVerifications);
+  const rows = await attachUsers(rejectedLatestVerifications);
+  return rows.map(({ id_card_front_url, id_card_back_url, selfie_url, ...row }) => row);
 };
 
 const getVerificationDetail = async (adminId, verificationId) => {
@@ -172,7 +174,7 @@ const getVerificationDetail = async (adminId, verificationId) => {
   const verification = await fetchVerificationById(verificationId);
   const [verificationWithUser] = await attachUsers([verification]);
 
-  return verificationWithUser;
+  return signVerificationImages(verificationWithUser);
 };
 
 const applyTrustScoreWithExistingService = async (userId) => {

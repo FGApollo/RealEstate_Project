@@ -87,14 +87,7 @@ const Swipe = () => {
   const filterSignatureRef = useRef(null);
   const [currentProperties, setCurrentProperties] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [swipeHistory, setSwipeHistory] = useState(() => {
-    try {
-      const saved = localStorage.getItem('swipeHistory');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [swipeHistory, setSwipeHistory] = useState([]);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
   // Price filters
@@ -169,14 +162,6 @@ const Swipe = () => {
       fetchFavorites();
     }
   }, [user, activeView]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('swipeHistory', JSON.stringify(swipeHistory));
-    } catch (e) {
-      console.error('Error saving to localStorage:', e);
-    }
-  }, [swipeHistory]);
 
   const targetSelectIdRef = useRef(location.state?.selectPropertyId ? Number(location.state.selectPropertyId) : null);
 

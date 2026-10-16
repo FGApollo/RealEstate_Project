@@ -2,11 +2,12 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Menu, X, Search, Bell, ChevronDown, User, LogOut, 
-  Home as HomeIcon, Compass, Heart, MessageCircle 
+  Home as HomeIcon, Compass, Heart, MessageCircle, ShieldCheck, BriefcaseBusiness
 } from 'lucide-react';
 import { useAuth } from '../auth/useAuth';
 import { useRequireAuth } from '../auth/useRequireAuth';
 import { clearPendingAuthAction } from '../auth/pendingAuthAction';
+import { normalizeRole, roleDestination } from '../auth/roleDestination.js';
 import SwipeNestMark from './SwipeNestMark';
 import './Header.css';
 
@@ -27,6 +28,21 @@ export default function Header({
   const location = useLocation();
   const auth = useAuth();
   const user = userProp !== undefined ? userProp : auth?.user;
+  const role = normalizeRole(auth?.user?.role);
+  const homePath = role ? roleDestination(role) : '/';
+  const profilePath = role === 'ADMIN' || role === 'AGENT' ? homePath : '/profile';
+  const profileLabel = role === 'ADMIN' ? 'Trang quản trị' : role === 'AGENT' ? 'Không gian môi giới' : 'Hồ sơ cá nhân';
+  const navItems = role === 'ADMIN'
+    ? [{ key: 'admin', label: 'Quản trị', path: '/admin', Icon: ShieldCheck }]
+    : role === 'AGENT' ? [
+      { key: 'agent', label: 'Môi giới', path: '/sale/overview', Icon: BriefcaseBusiness },
+      { key: 'chat', label: 'Chat', path: '/chat', Icon: MessageCircle }
+    ] : [
+      { key: 'home', label: 'Trang chủ', path: '/', Icon: HomeIcon },
+      { key: 'swipe', label: 'Khám phá', path: '/swipe/Tất cả', Icon: Compass },
+      { key: 'saved', label: 'Yêu thích', path: '/swipe/Tất cả', state: { activeView: 'saved' }, Icon: Heart },
+      { key: 'chat', label: 'Chat', path: '/chat', Icon: MessageCircle }
+    ];
   const logout = onLogoutProp || auth?.logout;
   const requireAuth = useRequireAuth();
 
@@ -74,6 +90,8 @@ export default function Header({
     }
     if (path.startsWith('/chat')) return 'chat';
     if (path.startsWith('/profile')) return 'profile';
+    if (path === '/admin') return 'admin';
+    if (path === '/sale/overview') return 'agent';
     return '';
   })();
 
@@ -125,8 +143,8 @@ export default function Header({
           className="app-header-brand" 
           role="button" 
           tabIndex={0} 
-          onClick={() => handleTabClick('home', '/')}
-          onKeyDown={(e) => e.key === 'Enter' && handleTabClick('home', '/')}
+          onClick={() => handleTabClick('home', homePath)}
+          onKeyDown={(e) => e.key === 'Enter' && handleTabClick('home', homePath)}
           aria-label="Về trang chủ Swipe Nest"
         >
           <span className="app-header-brand-mark">
@@ -137,37 +155,12 @@ export default function Header({
 
         {/* Middle: Primary Navigation (Desktop) */}
         <nav className="app-header-nav" aria-label="Điều hướng chính">
-          <button 
-            type="button"
-            className={`app-header-nav-link ${currentTab === 'home' ? 'active' : ''}`}
-            onClick={() => handleTabClick('home', '/')}
-          >
-            <span>Trang chủ</span>
-          </button>
-          <button 
-            type="button"
-            className={`app-header-nav-link ${currentTab === 'swipe' ? 'active' : ''}`}
-            onClick={() => handleTabClick('swipe', '/swipe/Tất cả')}
-          >
-            <Compass size={17} />
-            <span>Khám phá</span>
-          </button>
-          <button 
-            type="button"
-            className={`app-header-nav-link ${currentTab === 'saved' ? 'active' : ''}`}
-            onClick={() => handleTabClick('saved', '/swipe/Tất cả', { activeView: 'saved' })}
-          >
-            <Heart size={17} />
-            <span>Yêu thích</span>
-          </button>
-          <button 
-            type="button"
-            className={`app-header-nav-link ${currentTab === 'chat' ? 'active' : ''}`}
-            onClick={() => handleTabClick('chat', '/chat')}
-          >
-            <MessageCircle size={17} />
-            <span>Chat</span>
-          </button>
+          {navItems.map(({ key, label, path, state, Icon }) => (
+            <button type="button" key={key} className={`app-header-nav-link ${currentTab === key ? 'active' : ''}`}
+              onClick={() => handleTabClick(key, path, state)}>
+              {key !== 'home' && <Icon size={17} />}<span>{label}</span>
+            </button>
+          ))}
         </nav>
 
         {/* Right: Tools & Profile & Mobile Hamburger Menu Button */}
@@ -251,11 +244,11 @@ export default function Header({
                     className={`app-header-dropdown-item ${currentTab === 'profile' ? 'active' : ''}`}
                     onClick={() => {
                       setShowDropdown(false);
-                      handleTabClick('profile', '/profile');
+                      handleTabClick('profile', profilePath);
                     }}
                   >
                     <User size={15} />
-                    <span>Hồ sơ cá nhân</span>
+                    <span>{profileLabel}</span>
                   </button>
                   <button 
                     type="button" 
@@ -290,7 +283,7 @@ export default function Header({
                 className="app-header-brand" 
                 onClick={() => { 
                   setMobileDrawerOpen(false); 
-                  handleTabClick('home', '/'); 
+                  handleTabClick('home', homePath);
                 }}
               >
                 <span className="app-header-brand-mark">
@@ -309,38 +302,12 @@ export default function Header({
             </div>
 
             <nav className="app-header-drawer-nav">
-              <button 
-                type="button"
-                className={`app-header-drawer-link ${currentTab === 'home' ? 'active' : ''}`}
-                onClick={() => handleTabClick('home', '/')}
-              >
-                <HomeIcon size={18} />
-                <span>Trang chủ</span>
-              </button>
-              <button 
-                type="button"
-                className={`app-header-drawer-link ${currentTab === 'swipe' ? 'active' : ''}`}
-                onClick={() => handleTabClick('swipe', '/swipe/Tất cả')}
-              >
-                <Compass size={18} />
-                <span>Khám phá</span>
-              </button>
-              <button 
-                type="button"
-                className={`app-header-drawer-link ${currentTab === 'saved' ? 'active' : ''}`}
-                onClick={() => handleTabClick('saved', '/swipe/Tất cả', { activeView: 'saved' })}
-              >
-                <Heart size={18} />
-                <span>Yêu thích</span>
-              </button>
-              <button 
-                type="button"
-                className={`app-header-drawer-link ${currentTab === 'chat' ? 'active' : ''}`}
-                onClick={() => handleTabClick('chat', '/chat')}
-              >
-                <MessageCircle size={18} />
-                <span>Chat</span>
-              </button>
+              {navItems.map(({ key, label, path, state, Icon }) => (
+                <button type="button" key={key} className={`app-header-drawer-link ${currentTab === key ? 'active' : ''}`}
+                  onClick={() => handleTabClick(key, path, state)}>
+                  <Icon size={18} /><span>{label}</span>
+                </button>
+              ))}
               {shouldShowSearch && (
                 <button 
                   type="button"
@@ -358,10 +325,10 @@ export default function Header({
                 <button 
                   type="button"
                   className={`app-header-drawer-link ${currentTab === 'profile' ? 'active' : ''}`}
-                  onClick={() => handleTabClick('profile', '/profile')}
+                  onClick={() => handleTabClick('profile', profilePath)}
                 >
                   <User size={18} />
-                  <span>Hồ sơ cá nhân</span>
+                  <span>{profileLabel}</span>
                 </button>
               )}
               {user && showNotifications && (

@@ -1,4 +1,5 @@
 const authSessionService = require('../services/authSessionService');
+const { assertAccountCanAuthenticate } = require('../services/authAccountPolicy');
 
 const authenticate = async (req, res, next) => {
   const authorization = req.get('authorization') || '';
@@ -13,6 +14,8 @@ const authenticate = async (req, res, next) => {
       return res.status(401).json({ error: 'Invalid or expired session' });
     }
 
+    assertAccountCanAuthenticate(user);
+
     if (!user.email_verified_at) {
       return res.status(403).json({
         error: 'Hãy xác minh email trước khi sử dụng tài khoản này',
@@ -23,9 +26,13 @@ const authenticate = async (req, res, next) => {
     req.user = user;
     return next();
   } catch (error) {
-    if (error.name === 'TokenExpiredError' || error.name === 'JsonWebTokenError'
+    if (error.name === 'TokenExpiredError' || error.name === 'JsonWebTokenError' || error.name === 'NotBeforeError'
       || error.message === 'Invalid access token claims') {
       return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+
+    if (error.statusCode === 403 && ['ACCOUNT_DISABLED', 'ACCOUNT_ROLE_INVALID'].includes(error.code)) {
+      return res.status(403).json({ error: error.message, code: error.code });
     }
 
     return next(error);
@@ -49,7 +56,8 @@ const optionalAuthenticate = async (req, res, next) => {
 
   try {
     const user = await authSessionService.getAuthenticatedUser(match[1]);
-    if (user) {
+    if (user && user.email_verified_at) {
+      assertAccountCanAuthenticate(user);
       req.user = user;
     }
   } catch (error) {

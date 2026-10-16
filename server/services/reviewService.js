@@ -1,78 +1,11 @@
 const { supabase } = require('../config/supabase');
 
-const fs = require('fs');
-const path = require('path');
-const crypto = require('crypto');
-
-const saveBase64Image = async (base64Str) => {
-  const isPlaceholder = !base64Str || base64Str === 'https://via.placeholder.com/400';
-  
-  if (isPlaceholder) {
-    return base64Str;
-  }
-
-  if (typeof base64Str === 'string' && (base64Str.startsWith('http://') || base64Str.startsWith('https://') || base64Str.startsWith('/uploads/'))) {
-    return base64Str;
-  }
-
-  if (typeof base64Str !== 'string' || !base64Str.startsWith('data:image/')) {
-    return base64Str;
-  }
-
-  try {
-    const matches = base64Str.match(/^data:image\/([A-Za-z-+\/]+);base64,(.+)$/);
-    if (!matches || matches.length !== 3) {
-      return base64Str;
-    }
-
-    const imageType = matches[1];
-    const base64Data = matches[2];
-    const buffer = Buffer.from(base64Data, 'base64');
-    const filename = `${crypto.randomUUID()}.${imageType}`;
-
-    // 1. Try Supabase Storage 'property-images' bucket under 'reviews/' folder
-    try {
-      const BUCKET = 'property-images';
-      const filePath = `reviews/${filename}`;
-      const { error: uploadError } = await supabase.storage
-        .from(BUCKET)
-        .upload(filePath, buffer, {
-          contentType: `image/${imageType}`,
-          upsert: true
-        });
-
-      if (!uploadError) {
-        const { data: urlData } = supabase.storage
-          .from(BUCKET)
-          .getPublicUrl(filePath);
-        if (urlData?.publicUrl) {
-          console.log('Successfully uploaded review image to Supabase Storage:', urlData.publicUrl);
-          return urlData.publicUrl;
-        }
-      } else {
-        console.warn('Supabase review image upload failed, falling back to local file storage:', uploadError.message);
-      }
-    } catch (storageErr) {
-      console.warn('Supabase review storage error:', storageErr.message);
-    }
-
-    // 2. Local fallback
-    const uploadDir = path.join(__dirname, '../public/uploads');
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-
-    const filepath = path.join(uploadDir, filename);
-    fs.writeFileSync(filepath, buffer);
-
-    return `http://localhost:3000/uploads/${filename}`;
-  } catch (err) {
-    console.error('Error saving base64 image:', err);
-    return base64Str;
-  }
-};
+const { positiveId, text, badRequest } = require('./businessValidation');
+const { savePublicImage } = require('./publicImageStorage');
+const saveBase64Image = (image, userId) => savePublicImage(image, 'reviews', userId);
 
 const getPropertyReviews = async (propertyId, currentUserId = null) => {
+  propertyId = positiveId(propertyId, 'propertyId');
   const { data, error } = await supabase
     .from('property_reviews')
     .select(`
@@ -101,9 +34,9 @@ const getPropertyReviews = async (propertyId, currentUserId = null) => {
   }
 
   return (data || []).map(r => {
-    const votes = r.helpful_votes || [];
+    const { helpful_votes: votes = [], ...safeReview } = r;
     return {
-      ...r,
+      ...safeReview,
       helpful_count: votes.length,
       user_has_voted: currentUserId ? votes.some(v => Number(v.user_id) === Number(currentUserId)) : false
     };
@@ -152,24 +85,29 @@ const checkUserVerifiedTransaction = async (userId, propertyId) => {
   }
 };
 
-const createPropertyReview = async (propertyId, userId, rating, comment, images = [], customIsVerified = null) => {
-  const pId = parseInt(propertyId);
-  const uId = parseInt(userId);
+const createPropertyReview = async (propertyId, userId, rating, comment, images = []) => {
+  const pId = positiveId(propertyId, 'propertyId');
+  const uId = positiveId(userId, 'userId');
+  if (!['number', 'string'].includes(typeof rating) || !Number.isInteger(Number(rating))
+    || Number(rating) < 1 || Number(rating) > 5) throw badRequest('Rating must be an integer from 1 to 5.');
+  comment = text(comment, 'comment', 5000);
+  if (!Array.isArray(images) || images.length > 5) throw badRequest('A review can contain at most 5 images.');
 
   // 1. Validate property exists and reviewer is not the owner
   const { data: property, error: propError } = await supabase
     .from('properties')
-    .select('id, owner_id')
+    .select('id, owner_id, status, is_hidden, owner:users!owner_id(trust_score)')
     .eq('id', pId)
     .single();
 
-  if (propError || !property) {
+  if (propError || !property || property.is_hidden === true || property.status !== 'AVAILABLE'
+    || Number(property.owner?.trust_score ?? 50) <= 30) {
     const error = new Error('Bất động sản không tồn tại');
     error.statusCode = 404;
     throw error;
   }
 
-  if (property.owner_id === uId) {
+  if (Number(property.owner_id) === uId) {
     const error = new Error('Chủ sở hữu không thể tự đánh giá bất động sản của mình');
     error.statusCode = 403;
     throw error;
@@ -190,9 +128,10 @@ const createPropertyReview = async (propertyId, userId, rating, comment, images 
   }
 
   // 3. Determine verified status from actual transaction in database
-  const isVerifiedReview = customIsVerified !== null 
-    ? Boolean(customIsVerified) 
-    : await checkUserVerifiedTransaction(uId, pId);
+  const isVerifiedReview = await checkUserVerifiedTransaction(uId, pId);
+  // Validate/decode all images before any review rows are persisted.
+  const savedUrls = [];
+  for (const image of images) savedUrls.push(await saveBase64Image(image, uId));
 
   // 4. Insert review
   const { data: review, error: insError } = await supabase
@@ -215,7 +154,6 @@ const createPropertyReview = async (propertyId, userId, rating, comment, images 
 
   // 5. Insert review images if provided
   if (images && images.length > 0) {
-    const savedUrls = await Promise.all(images.map((img) => saveBase64Image(img)));
     const imageRecords = savedUrls.map((url, index) => ({
       review_id: review.id,
       image_url: url,
@@ -279,8 +217,9 @@ const createPropertyReview = async (propertyId, userId, rating, comment, images 
 };
 
 const createReviewReply = async (reviewId, userId, replyText) => {
-  const rId = parseInt(reviewId);
-  const uId = parseInt(userId);
+  const rId = positiveId(reviewId, 'reviewId');
+  const uId = positiveId(userId, 'userId');
+  replyText = text(replyText, 'reply_text', 5000, { required: true });
 
   if (isNaN(rId)) {
     const error = new Error('Mã đánh giá không hợp lệ');
@@ -300,12 +239,14 @@ const createReviewReply = async (reviewId, userId, replyText) => {
     .select(`
       id,
       property_id,
-      property:properties!property_id(id, owner_id)
+      status,
+      property:properties!property_id(id, owner_id, status, is_hidden)
     `)
     .eq('id', rId)
     .single();
 
-  if (revError || !review) {
+  if (revError || !review || review.status !== 'APPROVED'
+    || !review.property || review.property.is_hidden === true || review.property.status !== 'AVAILABLE') {
     const error = new Error('Đánh giá không tồn tại');
     error.statusCode = 404;
     throw error;
@@ -343,8 +284,8 @@ const createReviewReply = async (reviewId, userId, replyText) => {
 };
 
 const toggleReviewHelpful = async (reviewId, userId) => {
-  const rId = parseInt(reviewId, 10);
-  const uId = parseInt(userId, 10);
+  const rId = positiveId(reviewId, 'reviewId');
+  const uId = positiveId(userId, 'userId');
 
   if (!rId || isNaN(rId)) {
     const error = new Error('Mã đánh giá không hợp lệ');
@@ -355,11 +296,12 @@ const toggleReviewHelpful = async (reviewId, userId) => {
   // 1. Verify review exists
   const { data: review, error: revError } = await supabase
     .from('property_reviews')
-    .select('id')
+    .select('id, status, property:properties!property_id(status, is_hidden)')
     .eq('id', rId)
     .single();
 
-  if (revError || !review) {
+  if (revError || !review || review.status !== 'APPROVED' || !review.property
+    || review.property.is_hidden === true || review.property.status !== 'AVAILABLE') {
     const error = new Error('Đánh giá không tồn tại');
     error.statusCode = 404;
     throw error;

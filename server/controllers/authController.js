@@ -1,7 +1,12 @@
 const authService = require('../services/authService');
 const authSessionService = require('../services/authSessionService');
 const emailVerificationService = require('../services/emailVerificationService');
-const { createValidationError } = require('../services/registrationValidation');
+const { createValidationError, validateEmail } = require('../services/registrationValidation');
+
+const preventSessionCaching = (res) => {
+  res.set('Cache-Control', 'no-store');
+  res.set('Pragma', 'no-cache');
+};
 
 const sendError = (res, error, fallback = 'Request failed') => res
   .status(error.statusCode || 500)
@@ -12,9 +17,10 @@ const sendError = (res, error, fallback = 'Request failed') => res
   });
 
 const respondWithSession = async (res, user, message) => {
-  const { accessToken, refreshToken } = await authSessionService.createSession(user);
+  const { accessToken, refreshToken, user: currentUser } = await authSessionService.createSession(user);
+  preventSessionCaching(res);
   authSessionService.setRefreshCookie(res, refreshToken);
-  return res.status(200).json({ message, user, accessToken });
+  return res.status(200).json({ message, user: currentUser, accessToken });
 };
 
 const register = async (req, res) => {
@@ -45,8 +51,14 @@ const register = async (req, res) => {
 
 const login = async (req, res) => {
   try {
-    const { email, password } = req.body || {};
-    if (!email || !password) {
+    const submitted = req.body || {};
+    if (typeof submitted !== 'object' || Array.isArray(submitted)
+      || Object.keys(submitted).some((key) => !['email', 'password'].includes(key))) {
+      return res.status(400).json({ error: 'Invalid login request' });
+    }
+    const { email, password } = submitted;
+    if (!validateEmail(email) || typeof password !== 'string' || !password
+      || Buffer.byteLength(password, 'utf8') > 72) {
       return res.status(400).json({ error: 'Please provide email and password' });
     }
 
@@ -92,11 +104,14 @@ const verifyEmail = async (req, res) => {
 const googleLogin = async (req, res) => {
   try {
     const submitted = req.body || {};
-    if (Object.keys(submitted).some((key) => !['credential', 'intent', 'phone', 'linkPassword'].includes(key))) {
+    if (typeof submitted !== 'object' || Array.isArray(submitted)
+      || Object.keys(submitted).some((key) => !['credential', 'intent', 'phone', 'linkPassword'].includes(key))) {
       return res.status(400).json({ error: 'Unsupported Google authentication field' });
     }
     const { credential, intent = 'LOGIN', phone, linkPassword } = submitted;
-    if (!credential) {
+    if (typeof credential !== 'string' || !credential || credential.length > 16384
+      || (linkPassword !== undefined && (typeof linkPassword !== 'string'
+        || Buffer.byteLength(linkPassword, 'utf8') > 72))) {
       return res.status(400).json({ error: 'Google credential missing' });
     }
 
@@ -115,19 +130,24 @@ const googleLogin = async (req, res) => {
 const getUserById = async (req, res) => {
   try {
     const { id } = req.params;
+    if (!/^[1-9]\d*$/.test(id) || !Number.isSafeInteger(Number(id))) {
+      return res.status(400).json({ error: 'Invalid user id' });
+    }
     const user = await authService.getUserById(Number(id));
     res.status(200).json({ user });
   } catch (error) {
-    res.status(404).json({ error: error.message });
+    res.status(404).json({ error: 'User not found' });
   }
 };
 
 const refresh = async (req, res) => {
+  preventSessionCaching(res);
   try {
     const oldToken = authSessionService.getRefreshTokenFromRequest(req);
     const result = await authSessionService.refreshSession(oldToken);
     if (!result) {
-      authSessionService.clearRefreshCookie(res);
+      // Another tab may already have rotated this shared cookie. A stale 401
+      // must not delete the newer cookie returned by the successful refresh.
       return res.status(401).json({ error: 'Invalid or expired session' });
     }
 
@@ -140,8 +160,10 @@ const refresh = async (req, res) => {
 };
 
 const logout = async (req, res) => {
+  preventSessionCaching(res);
   try {
-    await authSessionService.revokeSession(authSessionService.getRefreshTokenFromRequest(req));
+    const accessToken = /^Bearer\s+([^\s]+)$/i.exec(req.get('authorization') || '')?.[1];
+    await authSessionService.revokeSession(authSessionService.getRefreshTokenFromRequest(req), accessToken);
     authSessionService.clearRefreshCookie(res);
     return res.status(204).end();
   } catch (error) {
@@ -150,7 +172,10 @@ const logout = async (req, res) => {
   }
 };
 
-const me = (req, res) => res.status(200).json({ user: req.user });
+const me = (req, res) => {
+  preventSessionCaching(res);
+  return res.status(200).json({ user: req.user });
+};
 
 module.exports = {
   register,

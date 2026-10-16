@@ -8,22 +8,23 @@
     "server": "node server/index.js",
     "build": "vite build",
     "lint": "eslint .",
-    "test:auth-flow": "node --test src/auth/pendingAuthAction.test.js src/auth/onboardingSession.test.js src/auth/onboardingFlow.test.js",
+    "test:auth-flow": "node --test src/auth/*.test.js",
     "test:analytics": "node --test server/tests/analytics.test.js",
     "preview": "vite preview",
     "db:check-prod": "node .local/dump-prod-schema.cjs",
     "db:diff": "node .local/compare-schemas.cjs",
-    "db:migration:new": "node .local/create-migration.cjs"
+    "db:migration:new": "node .local/create-migration.cjs",
+    "test:security": "npm run test:auth-flow && npm --prefix server test"
   },
   "dependencies": {
     "@react-oauth/google": "^0.13.5",
-    "axios": "^1.16.1",
+    "axios": "^1.20.0",
     "framer-motion": "^12.38.0",
     "lucide-react": "^1.16.0",
     "page-mascot": "^0.1.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
-    "react-router-dom": "^7.15.1",
+    "react-router-dom": "^7.18.4",
     "recharts": "^3.10.1"
   },
   "devDependencies": {

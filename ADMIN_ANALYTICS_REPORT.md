@@ -102,6 +102,7 @@ Migration `server/db-migration/010-admin-analytics.sql` tạo RPC `admin_analyti
 AdminPage (sidebar/tab hiện tại)
 └─ lazy + Suspense → AdminAnalyticsPage
    ├─ Header / bộ lọc / refresh / thời điểm cập nhật
+   ├─ Thanh mục riêng: Tổng quan / Người dùng / Gói dịch vụ / Doanh thu / Giao dịch
    ├─ useAnalytics → analyticsApi → apiFetch
    ├─ Kpi / Panel
    ├─ TrendChart (USER/AGENT/tổng đăng ký mới)
@@ -113,6 +114,10 @@ AdminPage (sidebar/tab hiện tại)
 ```
 
 Một thư viện chart mới: **Recharts**. Data fetching, định dạng và chart presentation tách file. Một lần đổi bộ lọc đã áp dụng gọi một overview; mọi KPI/chart dùng cùng response. Abort request cũ khi đổi filter/unmount, không hiển thị response cũ cho khoảng mới. Refresh không gọi lại dữ liệu các tab khác.
+
+Cập nhật theo ảnh tham chiếu ngày 16/10/2026: mỗi mục chỉ render nội dung tương ứng; Tổng quan giữ bốn KPI chính và hai biểu đồ tóm tắt, có nút mở chi tiết. Chuyển giữa năm mục giữ nguyên bộ lọc/chế độ xem biểu đồ, không phát sinh request. Thanh mục hỗ trợ bàn phím và cuộn ngang trên điện thoại.
+
+Biểu đồ đường dùng đường xanh mảnh, điểm tròn viền trắng, lưới ngang nét đứt và tooltip nền xám bo góc có đường dóng dọc. Mặc định biểu đồ người dùng vẽ một đường tổng đăng ký mới; có thể chọn khách hàng, môi giới hoặc so sánh hai nhóm. Trục thời gian hiển thị theo ngày/tuần, T1–T12 theo tháng (kèm năm khi cần), hoặc năm; trục tiền dùng đơn vị nghìn/triệu/tỷ đồng, tooltip giữ số tiền đầy đủ. Không tạo điểm doanh thu giả khi chưa có dữ liệu thanh toán.
 
 Có skeleton không dùng số 0 giả; empty state, lỗi có retry, giá trị chưa khả dụng. Desktop bốn KPI mỗi hàng, tablet hai, mobile một; chart co theo container, bảng cuộn ngang. CSS cho shell mobile giới hạn trong tab analytics để không thay layout các tab cũ.
 
@@ -148,7 +153,7 @@ Fixture kiểm thử: **30.012 tài khoản + 60.005 bản ghi gói**. Query das
 
 EXPLAIN ANALYZE xác nhận growth query dùng `users_analytics_created_role_idx`; query chọn gói hiệu lực dùng `subscriptions_analytics_current_idx`. Chart tối đa khoảng 400 bucket; payload chỉ aggregate. Một lần đổi filter gửi một request đã áp dụng, kiểm tra bằng browser. Tổng toàn lịch sử vẫn có scan cần thiết để tính số liệu chính xác.
 
-Frontend build tách chunk analytics khoảng **426 KB / 121 KB gzip**, chỉ tải khi mở tab. Cảnh báo bundle chính >500 KB của ứng dụng vẫn còn; không phải lỗi build.
+Frontend build tách chunk analytics khoảng **432 KB / 123 KB gzip**, chỉ tải khi mở tab. Cảnh báo bundle chính >500 KB của ứng dụng vẫn còn; không phải lỗi build.
 
 ## TEST RESULTS
 
@@ -157,11 +162,11 @@ Frontend build tách chunk analytics khoảng **426 KB / 121 KB gzip**, chỉ t�
 - `npm run test:auth-flow`: **16/16**.
 - ESLint cho toàn bộ frontend mới và browser fixture: đạt; Node syntax check cho backend mới: đạt. Không tuyên bố lint sạch cho toàn bộ legacy codebase.
 - `npm run build`: đạt.
-- Chrome headless: 9 nhóm kiểm tra đạt, không có page error. Bao gồm Admin shell → API/SQL → KPI/charts; skeleton; 7/30 ngày; ngày/tuần/tháng/năm; custom dates; so sánh số đăng ký; responsive 768/390 px; error/retry; subscription rỗng; điều hướng về KYC rồi analytics.
+- Chrome headless: **11 nhóm kiểm tra đạt**, không có page error. Bao gồm Admin shell → API/SQL → KPI/charts; skeleton; năm mục độc lập và điều hướng bàn phím; không refetch khi chuyển mục; tooltip đường hiển thị đúng số đăng ký từ PostgreSQL; 7/30 ngày; ngày/tuần/tháng/năm; custom dates; so sánh số đăng ký; cả năm mục responsive 768/390 px; error/retry; subscription rỗng; điều hướng về KYC rồi analytics.
 
 Browser runner là tùy chọn, cần Playwright có sẵn. Chạy `node server/tests/analytics.browser.cjs`; nếu dùng runtime bundle, đặt `PLAYWRIGHT_MODULE_PATH` tới package Playwright và `PLAYWRIGHT_EXECUTABLE_PATH` tới Chrome/Chromium cài sẵn. Runner tự tạo test server/DB, không dùng session hoặc dữ liệu production.
 
-Ảnh và kết quả browser nằm trong `.local/analytics-verification/`: `desktop.png`, `desktop-overview.png`, `tablet.png`, `mobile.png`, `mobile-overview.png`, `browser-results.json`. Ảnh có nhãn **TEST DATABASE — fixture data only**.
+Ảnh và kết quả browser nằm trong `.local/analytics-verification/`: `desktop.png`, `desktop-overview.png`, `users-desktop.png`, `users-line-chart.png`, `subscriptions-desktop.png`, `revenue-desktop.png`, `tablet.png`, `mobile.png`, `mobile-overview.png`, `browser-results.json`. Ảnh toàn trang có nhãn **TEST DATABASE — fixture data only**; ảnh cắt biểu đồ cũng dùng cùng test database.
 
 Test doanh thu PAID 100.000 + PAID 200.000 − bỏ FAILED 500.000 chưa thể chạy trên model thật vì model đó chưa tồn tại, đúng phạm vi đã xác nhận. Thay vào đó đã kiểm thử rằng bản ghi `PAID` với giá tùy ý **không thể** tạo doanh thu; mọi số tiền trả null. Refund, payment idempotency và transaction pagination thực tế cần test khi có ledger.
 

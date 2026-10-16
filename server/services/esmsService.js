@@ -47,6 +47,9 @@ const maskPhone = (phone) => {
  * @returns {Promise<{ success: boolean, smsId?: string, isMock?: boolean, message: string }>}
  */
 const sendOtpSms = async ({ phone, otp, customContent }) => {
+  if (process.env.NODE_ENV === 'production' && !isLiveSmsEnabled()) {
+    throw Object.assign(new Error('Dịch vụ SMS xác thực chưa sẵn sàng.'), { statusCode: 503 });
+  }
   const apiKey = process.env.ESMS_API_KEY;
   const secretKey = process.env.ESMS_SECRET_KEY;
   const brandname = process.env.ESMS_BRANDNAME || 'SwipeNest';

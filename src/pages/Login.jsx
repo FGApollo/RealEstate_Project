@@ -8,6 +8,7 @@ import Button from '../components/ui/Button';
 import { API_BASE_URL } from '../config';
 import { useFinishAuthentication } from '../auth/useFinishAuthentication';
 import { savePendingRouteIfMissing } from '../auth/pendingAuthAction';
+import { authSessionFetch } from '../auth/apiClient';
 
 const Login = () => {
   const finishAuthentication = useFinishAuthentication();
@@ -41,7 +42,7 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/login`, {
+      const response = await authSessionFetch(`${API_BASE_URL}/api/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

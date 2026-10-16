@@ -1,58 +1,20 @@
 const { supabase } = require('../config/supabase');
 const trustScoreService = require('./trustScoreService');
-const fs = require('fs');
-const path = require('path');
 const crypto = require('crypto');
+const { normalizeImageFile } = require('./imageValidation');
+const { EVIDENCE_BUCKET } = require('./evidenceStorage');
 
-const saveEvidenceImage = async (file) => {
-  if (!file || !file.buffer) {
-    throw new Error('Không tìm thấy dữ liệu file hình ảnh');
+const saveEvidenceImage = async (file, agentId) => {
+  if (!Number.isSafeInteger(Number(agentId)) || Number(agentId) <= 0) {
+    throw Object.assign(new Error('Invalid evidence owner'), { statusCode: 400 });
   }
-
-  const mimeToExt = {
-    'image/jpeg': 'jpg',
-    'image/jpg': 'jpg',
-    'image/png': 'png',
-    'image/webp': 'webp'
-  };
-  const ext = mimeToExt[file.mimetype] || 'jpg';
-  const filename = `evidence-${crypto.randomUUID()}.${ext}`;
-
-  // 1. Try Supabase Storage first
-  try {
-    const BUCKET = 'evidence-documents';
-    const { error: uploadErr } = await supabase.storage
-      .from(BUCKET)
-      .upload(filename, file.buffer, {
-        contentType: file.mimetype,
-        upsert: true
-      });
-
-    if (uploadErr) {
-      console.warn('Supabase storage upload error:', uploadErr.message);
-    } else {
-      const { data: urlData } = supabase.storage
-        .from(BUCKET)
-        .getPublicUrl(filename);
-      if (urlData?.publicUrl) {
-        console.log('Saved evidence image to Supabase Storage:', urlData.publicUrl);
-        return urlData.publicUrl;
-      }
-    }
-  } catch (storageErr) {
-    console.warn('Supabase storage exception:', storageErr.message);
-  }
-
-  // 2. Local storage fallback in public/uploads
-  const uploadDir = path.join(__dirname, '../public/uploads');
-  if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true });
-  }
-
-  const filePath = path.join(uploadDir, filename);
-  fs.writeFileSync(filePath, file.buffer);
-
-  return `http://localhost:3000/uploads/${filename}`;
+  await normalizeImageFile(file);
+  const objectPath = `evidence/${agentId}/${crypto.randomUUID()}.${file.extension}`;
+  const { error } = await supabase.storage.from(EVIDENCE_BUCKET).upload(objectPath, file.buffer, {
+    contentType: file.mimetype, upsert: false
+  });
+  if (error) throw new Error('Could not store appeal evidence');
+  return objectPath;
 };
 
 const parseEvidenceUrls = (evidenceUrl) => {
@@ -75,6 +37,11 @@ const parseEvidenceUrls = (evidenceUrl) => {
 };
 
 const submitAppeal = async ({ reportId, agentId, reason, evidenceUrl, evidenceUrls }) => {
+  const { validateEvidenceReferences, signEvidenceUrls } = require('./evidenceStorage');
+  const { positiveId, text, badRequest } = require('./businessValidation');
+  reportId = positiveId(reportId, 'reportId');
+  reason = text(reason, 'reason', 5000, { required: true });
+  validateEvidenceReferences(parseEvidenceUrls(evidenceUrls || evidenceUrl), agentId);
   if (!reportId || !agentId || !reason?.trim()) {
     const error = new Error('Vui lòng cung cấp đầy đủ mã báo cáo và lý do giải trình.');
     error.statusCode = 400;
@@ -154,7 +121,8 @@ const submitAppeal = async ({ reportId, agentId, reason, evidenceUrl, evidenceUr
     message: 'Gửi đơn khiếu nại thành công! Vui lòng chờ Quản trị viên xem xét.',
     appeal: {
       ...newAppeal,
-      evidence_urls: parseEvidenceUrls(newAppeal.evidence_url)
+      evidence_url: null,
+      evidence_urls: await signEvidenceUrls(parseEvidenceUrls(newAppeal.evidence_url))
     }
   };
 };
@@ -175,7 +143,7 @@ const getAgentViolations = async (agentId) => {
   // 2. Get reports on these properties
   const { data: reports, error: reportErr } = await supabase
     .from('property_reports')
-    .select('*, reporter:users!reporter_id(id, name, email)')
+    .select('*')
     .in('property_id', propIds)
     .order('created_at', { ascending: false });
 
@@ -194,23 +162,30 @@ const getAgentViolations = async (agentId) => {
 
   const appealMap = new Map((appeals || []).map(a => [a.report_id, a]));
 
-  const violations = reports.map(rep => {
+  const { signEvidenceUrls } = require('./evidenceStorage');
+  const violations = await Promise.all(reports.map(async (rep) => {
+    // Reporting identity is visible only to moderators, never the accused agent.
+    const { reporter_id, reporter, ...safeReport } = rep;
     const rawAppeal = appealMap.get(rep.id) || null;
     const appeal = rawAppeal ? {
       ...rawAppeal,
-      evidence_urls: parseEvidenceUrls(rawAppeal.evidence_url)
+      evidence_url: null,
+      evidence_urls: await signEvidenceUrls(parseEvidenceUrls(rawAppeal.evidence_url))
     } : null;
     return {
-      ...rep,
+      ...safeReport,
       property: propMap.get(rep.property_id) || null,
       appeal
     };
-  });
+  }));
 
   return { violations };
 };
 
 const getAdminAppeals = async (status) => {
+  const { badRequest } = require('./businessValidation');
+  if (status !== undefined && (typeof status !== 'string'
+    || !['PENDING', 'APPROVED', 'REJECTED', 'ALL'].includes(status))) throw badRequest('Invalid appeal status.');
   let query = supabase
     .from('property_report_appeals')
     .select(`
@@ -235,15 +210,22 @@ const getAdminAppeals = async (status) => {
     throw new Error(error.message);
   }
 
-  const formattedAppeals = (appeals || []).map(a => ({
+  const { signEvidenceUrls } = require('./evidenceStorage');
+  const formattedAppeals = await Promise.all((appeals || []).map(async (a) => ({
     ...a,
-    evidence_urls: parseEvidenceUrls(a.evidence_url)
-  }));
+    evidence_url: null,
+    evidence_urls: await signEvidenceUrls(parseEvidenceUrls(a.evidence_url))
+  })));
 
   return { appeals: formattedAppeals };
 };
 
 const approveAppeal = async (appealId, adminId, adminNote = '', customRefundPoints = null) => {
+  const { positiveId, text, badRequest } = require('./businessValidation');
+  appealId = positiveId(appealId, 'appealId');
+  adminNote = text(adminNote, 'adminNote', 5000);
+  if (customRefundPoints !== null && (!Number.isInteger(Number(customRefundPoints))
+    || Number(customRefundPoints) < 0 || Number(customRefundPoints) > 100)) throw badRequest('Invalid refund points.');
   if (!appealId || !adminId) {
     const error = new Error('Thiếu thông tin appealId hoặc adminId.');
     error.statusCode = 400;
@@ -298,12 +280,15 @@ const approveAppeal = async (appealId, adminId, adminNote = '', customRefundPoin
   return {
     success: true,
     message: refundResult.message,
-    appeal: updatedAppeal,
+    appeal: { ...updatedAppeal, evidence_url: null },
     refundResult
   };
 };
 
 const rejectAppeal = async (appealId, adminId, adminNote = '') => {
+  const { positiveId, text } = require('./businessValidation');
+  appealId = positiveId(appealId, 'appealId');
+  adminNote = text(adminNote, 'adminNote', 5000);
   if (!appealId || !adminId) {
     const error = new Error('Thiếu thông tin appealId hoặc adminId.');
     error.statusCode = 400;
@@ -350,7 +335,7 @@ const rejectAppeal = async (appealId, adminId, adminNote = '') => {
   return {
     success: true,
     message: 'Đã bác bỏ khiếu nại. Giữ nguyên mức phạt và trạng thái ẩn tin.',
-    appeal: updatedAppeal
+    appeal: { ...updatedAppeal, evidence_url: null }
   };
 };
 

@@ -2,6 +2,9 @@ const bcrypt = require('bcrypt');
 const { supabase } = require('../config/supabase');
 const trustScoreService = require('./trustScoreService');
 const { validatePassword, normalizeVietnamPhone } = require('./registrationValidation');
+const { normalizeImageFile } = require('./imageValidation');
+const { revokeAllUserSessions } = require('./authSessionService');
+const { badRequest } = require('./businessValidation');
 
 const AVATAR_BUCKET = 'avatars';
 
@@ -68,6 +71,7 @@ const updateUserAvatar = async (userId, publicUrl) => {
 };
 
 const uploadAvatar = async (userId, file) => {
+  await normalizeImageFile(file);
   await ensureUserExists(userId);
 
   const filePath = buildAvatarPath(userId, file.mimetype);
@@ -122,34 +126,49 @@ const updateUserProfile = async (userId, { name, phone }) => {
   };
 
   if (name !== undefined) {
-    const trimmedName = String(name || '').trim();
+    if (typeof name !== 'string' || /[\u0000-\u001f\u007f]/.test(name)) throw badRequest('Họ và tên không hợp lệ');
+    const trimmedName = name.trim();
     if (!trimmedName || trimmedName.length > 120) {
-      throw new Error('Họ và tên phải từ 1 đến 120 ký tự');
+      throw badRequest('Họ và tên phải từ 1 đến 120 ký tự');
     }
     updates.name = trimmedName;
   }
 
   if (phone !== undefined) {
-    const trimmedPhone = String(phone || '').trim();
+    if (phone !== null && typeof phone !== 'string') throw badRequest('Số điện thoại không hợp lệ');
+    const trimmedPhone = (phone || '').trim();
     if (trimmedPhone === '') {
       updates.phone = null;
     } else {
       const normalized = normalizeVietnamPhone(trimmedPhone);
       if (!normalized) {
-        throw new Error('Số điện thoại không hợp lệ (định dạng 10 số Việt Nam)');
+        throw badRequest('Số điện thoại không hợp lệ (định dạng 10 số Việt Nam)');
       }
       updates.phone = normalized;
     }
+    if (updates.phone !== (user.phone || null)) {
+      updates.phone_verified = false;
+      updates.phone_verified_at = null;
+    }
   }
 
-  const { data: updated, error } = await supabase
+  let updateQuery = supabase
     .from('users')
     .update(updates)
-    .eq('id', userId)
+    .eq('id', userId);
+  if (phone !== undefined) {
+    // An OTP verification may change the phone after our validation read.
+    // Do not overwrite that newer phone using an older verification decision.
+    updateQuery = user.phone == null ? updateQuery.is('phone', null) : updateQuery.eq('phone', user.phone);
+  }
+  const { data: updated, error } = await updateQuery
     .select('id, name, email, phone, phone_verified, role, avatar, trust_score, verification_status, created_at')
     .single();
 
   if (error) {
+    if (error.code === 'PGRST116' && phone !== undefined) {
+      throw Object.assign(badRequest('Thông tin tài khoản vừa thay đổi. Vui lòng tải lại rồi thử lại.'), { statusCode: 409 });
+    }
     throw new Error(error.message);
   }
 
@@ -169,22 +188,26 @@ const changeUserPassword = async (userId, { currentPassword, newPassword }) => {
 
   // If user already has a password, verify current password
   if (user.password) {
-    if (!currentPassword) {
-      throw new Error('Vui lòng nhập mật khẩu hiện tại');
+    if (typeof currentPassword !== 'string' || !currentPassword || Buffer.byteLength(currentPassword, 'utf8') > 72) {
+      throw badRequest('Vui lòng nhập mật khẩu hiện tại');
     }
     const isMatch = await bcrypt.compare(currentPassword, user.password);
     if (!isMatch) {
-      throw new Error('Mật khẩu hiện tại không chính xác');
+      throw badRequest('Mật khẩu hiện tại không chính xác');
     }
   }
 
   // Validate new password strength
   const validationError = validatePassword(newPassword);
   if (validationError) {
-    throw new Error(validationError);
+    throw badRequest(validationError);
   }
 
   const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+  // Revoke first so a revocation failure cannot leave a changed credential with
+  // previously stolen sessions still active. This includes the current session.
+  await revokeAllUserSessions(userId);
 
   const { error: updateError } = await supabase
     .from('users')
@@ -198,7 +221,9 @@ const changeUserPassword = async (userId, { currentPassword, newPassword }) => {
     throw new Error(updateError.message);
   }
 
-  return { success: true, message: 'Đổi mật khẩu thành công' };
+  await revokeAllUserSessions(userId);
+
+  return { success: true, requiresLogin: true, message: 'Đổi mật khẩu thành công. Vui lòng đăng nhập lại.' };
 };
 
 module.exports = {
