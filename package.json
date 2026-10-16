@@ -9,6 +9,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "test:auth-flow": "node --test src/auth/pendingAuthAction.test.js src/auth/onboardingSession.test.js src/auth/onboardingFlow.test.js",
+    "test:analytics": "node --test server/tests/analytics.test.js",
     "preview": "vite preview",
     "db:check-prod": "node .local/dump-prod-schema.cjs",
     "db:diff": "node .local/compare-schemas.cjs",
@@ -22,9 +23,11 @@
     "page-mascot": "^0.1.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
-    "react-router-dom": "^7.15.1"
+    "react-router-dom": "^7.15.1",
+    "recharts": "^3.10.1"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.10",
     "@eslint/js": "^10.0.1",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",

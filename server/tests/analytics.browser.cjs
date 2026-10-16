@@ -1,0 +1,144 @@
+// Optional browser verification. Install Playwright, or point PLAYWRIGHT_MODULE_PATH
+// at a bundled Playwright package. This process uses only an in-memory test DB.
+process.env.SUPABASE_URL = 'https://analytics-browser.example.test';
+process.env.SUPABASE_SERVICE_ROLE_KEY = 'isolated-browser-test-key';
+process.env.JWT_SECRET = 'isolated-browser-test-secret-over-32-characters';
+
+const fs = require('node:fs');
+const path = require('node:path');
+const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
+const express = require('express');
+const jwt = require('jsonwebtoken');
+const { createAnalyticsDatabase, seedAnalyticsDatabase, connectTestDatabase } = require('./helpers/analyticsDatabase');
+const { supabase } = require('../config/supabase');
+const { getJwtConfig } = require('../services/authSessionService');
+const { authenticate, requireRole } = require('../middleware/authenticate');
+const adminRoutes = require('../routes/adminRoutes');
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright');
+
+(async () => {
+  const db = await createAnalyticsDatabase();
+  await seedAnalyticsDatabase(db);
+  const today = new Date(Date.now() + 7 * 3600000).toISOString().slice(0, 10);
+  const fixtureOffset = (Date.parse(today) - Date.parse('2026-10-16')) / 86400000;
+  const fixtureDate = (value) => new Date(Date.parse(value) + fixtureOffset * 86400000).toISOString().slice(0, 10);
+  await db.query('UPDATE users SET created_at=created_at + $1::interval', [`${fixtureOffset} days`]);
+  await db.query('UPDATE seller_subscriptions SET created_at=created_at + $1::interval,start_date=start_date + $1::interval,end_date=end_date + $1::interval', [`${fixtureOffset} days`]);
+  await db.exec("INSERT INTO users (id,name,role,created_at) VALUES (99,'Analytics Test Admin','ADMIN','2026-01-01')");
+  const restore = connectTestDatabase(supabase, db);
+  let server;
+  let browser;
+  let vite;
+  const checks = [];
+  const errors = [];
+  const requests = [];
+  const out = path.resolve(__dirname, '../../.local/analytics-verification');
+  fs.mkdirSync(out, { recursive: true });
+  try {
+    const app = express();
+    let delay = 250;
+    let failure = false;
+    app.use('/api/admin/analytics/overview', async (_req, res, next) => {
+      if (delay) await new Promise((resolve) => setTimeout(resolve, delay));
+      if (failure) return res.status(503).json({ error: 'Lỗi thử nghiệm, hãy thử lại.' });
+      next();
+    });
+    app.get('/api/admin/kyc/rejected', authenticate, requireRole('ADMIN'), (_req, res) => res.json([]));
+    app.use('/api/admin', adminRoutes);
+    server = app.listen(0, '127.0.0.1');
+    await new Promise((resolve) => server.once('listening', resolve));
+    const base = `http://127.0.0.1:${server.address().port}`;
+    process.env.VITE_API_URL = base;
+    const sid = crypto.randomUUID();
+    await db.query('INSERT INTO auth_sessions (id,user_id,expires_at) VALUES ($1,99,$2)', [sid, new Date(Date.now() + 3600000).toISOString()]);
+    const { secret, issuer, audience } = getJwtConfig();
+    const token = jwt.sign({ token_use: 'access', sid }, secret, { algorithm: 'HS256', subject: '99', issuer, audience, expiresIn: '1h' });
+    const fixtureUser = { id: 99, name: 'Analytics Test Admin', role: 'ADMIN', is_active: true };
+    app.get('/__analytics_session', (_req, res) => res.json({ token, user: fixtureUser }));
+    const { createServer } = await import('vite');
+    vite = await createServer({ root: path.resolve(__dirname, '../..'), server: { middlewareMode: true }, appType: 'custom' });
+    app.get('/__analytics_test', async (_req, res) => res.type('html').send(await vite.transformIndexHtml('/__analytics_test', '<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><title>Analytics — isolated test database</title></head><body style="margin:0"><div style="background:#142842;color:#fff;padding:6px;text-align:center;font:11px sans-serif">TEST DATABASE — fixture data only</div><div id="root"></div><script type="module" src="/server/tests/fixtures/analyticsPreview.jsx"></script></body></html>')));
+    app.use(vite.middlewares);
+    browser = await chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH } : {}) });
+    const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+    page.on('pageerror', (error) => errors.push(error.message));
+    page.on('request', (request) => { if (request.url().includes('/api/admin/analytics/overview')) requests.push(request.url()); });
+    await page.goto(`${base}/__analytics_test`);
+    await page.getByRole('button', { name: 'Thống kê & Báo cáo', exact: true }).first().click();
+    await page.locator('.analytics-loading').waitFor();
+    assert.equal(await page.locator('.analytics-skeleton-kpi').count(), 4);
+    checks.push('Loading skeletons; no false zero KPI');
+    await page.locator('.analytics-scope').waitFor();
+    assert.equal(await page.locator('.analytics-kpi-value').first().textContent(), '13');
+    assert.ok(await page.locator('.recharts-surface').count() >= 4);
+    assert.ok((await page.locator('.analytics-notice').textContent()).includes('Chưa có dữ liệu thanh toán xác thực'));
+    checks.push('Admin shell → apiFetch → real JWT/session → service → PostgreSQL → 13-account KPI and charts');
+    await page.screenshot({ path: path.join(out, 'desktop.png'), fullPage: true });
+    await page.screenshot({ path: path.join(out, 'desktop-overview.png') });
+    delay = 0;
+    const before = requests.length;
+    await page.getByLabel('Khoảng thời gian').selectOption('7d');
+    await page.locator('.analytics-scope').waitFor();
+    const newAccountCard = page.locator('.analytics-kpi').filter({ has: page.getByText('Tài khoản mới trong kỳ', { exact: true }) });
+    assert.equal(await newAccountCard.locator('.analytics-kpi-value').textContent(), '6');
+    await page.getByLabel('Khoảng thời gian').selectOption('30d');
+    await page.locator('.analytics-scope').waitFor();
+    assert.equal(await newAccountCard.locator('.analytics-kpi-value').textContent(), '10');
+    assert.equal(requests.length - before, 2);
+    checks.push('7d → 30d updates KPI/chart together; one request per committed filter');
+    for (const bucket of ['week', 'month', 'year', 'day']) {
+      await page.getByLabel('Nhóm biểu đồ').selectOption(bucket);
+      await page.locator('.analytics-scope').waitFor();
+    }
+    await page.getByLabel('Loại so sánh').selectOption('subscriptions');
+    assert.ok(await page.locator('.analytics-section').last().locator('.recharts-surface').count() > 0);
+    checks.push('Day/week/month/year grouping and comparison mode switching');
+    await page.getByLabel('Khoảng thời gian').selectOption('custom');
+    await page.getByLabel('Từ ngày', { exact: true }).fill(fixtureDate('2026-10-10'));
+    await page.getByLabel('Đến ngày', { exact: true }).fill(fixtureDate('2026-10-15'));
+    await page.getByRole('button', { name: 'Áp dụng' }).click();
+    await page.locator('.analytics-scope').waitFor();
+    assert.ok((await page.locator('.analytics-scope').textContent()).includes(`${fixtureDate('2026-10-10')} → ${fixtureDate('2026-10-15')}`));
+    checks.push('Custom dates apply atomically');
+    for (const viewport of [{ width: 768, height: 1024 }, { width: 390, height: 844 }]) {
+      await page.setViewportSize(viewport);
+      await page.locator('.analytics-header').scrollIntoViewIfNeeded();
+      const dimensions = await page.evaluate(() => ({ width: innerWidth, content: document.documentElement.scrollWidth }));
+      assert.ok(dimensions.content <= dimensions.width, `Page overflow at ${viewport.width}: ${JSON.stringify(dimensions)}`);
+      await page.screenshot({ path: path.join(out, `${viewport.width === 390 ? 'mobile' : 'tablet'}.png`), fullPage: true });
+      if (viewport.width === 390) await page.screenshot({ path: path.join(out, 'mobile-overview.png') });
+    }
+    checks.push('Tablet 768px / mobile 390px: no page overflow; charts and table contained');
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    failure = true;
+    await page.getByRole('button', { name: 'Làm mới' }).click();
+    await page.getByRole('alert').waitFor();
+    assert.ok((await page.getByRole('alert').textContent()).includes('Lỗi thử nghiệm'));
+    failure = false;
+    await page.getByRole('button', { name: 'Thử lại' }).click();
+    await page.locator('.analytics-scope').waitFor();
+    checks.push('API error state and successful retry');
+    await db.exec('TRUNCATE seller_subscriptions');
+    await page.getByRole('button', { name: 'Làm mới' }).click();
+    await page.locator('.analytics-scope').waitFor();
+    const subscriptions = page.getByRole('region', { name: 'Gói dịch vụ môi giới' });
+    assert.ok(await subscriptions.getByText('Chưa có dữ liệu trong khoảng thời gian này.', { exact: true }).count() >= 2);
+    checks.push('Empty subscription charts/table remain stable');
+    await page.getByRole('button', { name: 'Kiểm duyệt tài khoản', exact: true }).first().click();
+    await page.getByText('Không có hồ sơ KYC nào bị từ chối', { exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Thống kê & Báo cáo', exact: true }).first().click();
+    await page.locator('.analytics-scope').waitFor();
+    checks.push('Navigate analytics → existing KYC tab → analytics');
+    assert.deepEqual(errors, []);
+    const report = { checks, errors, screenshots: ['desktop.png', 'tablet.png', 'mobile.png'], database: 'isolated in-memory PostgreSQL; fixtures only' };
+    fs.writeFileSync(path.join(out, 'browser-results.json'), JSON.stringify(report, null, 2));
+    console.log(JSON.stringify(report, null, 2));
+  } finally {
+    await browser?.close();
+    await vite?.close();
+    if (server) await new Promise((resolve) => server.close(resolve));
+    restore();
+    await db.close();
+  }
+})().catch((error) => { console.error(error); process.exitCode = 1; });
