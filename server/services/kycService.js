@@ -169,18 +169,23 @@ const getKycStatus = async (userId) => {
     }
   }
 
-  // If user is verified but no kycDetails was found/parsed, fallback to user's real info
-  if (!kycDetails && user.verification_status === VERIFIED_STATUS) {
-    kycDetails = {
-      fullName: latestVerification?.full_name || user.name || 'Người dùng đã xác minh',
-      idNumber: latestVerification?.id_number || '---',
-      dob: '---',
-      sex: '---',
-      placeOfOrigin: '---',
-      placeOfResidence: '---',
-      issueDate: '---',
-      issuePlace: '---'
-    };
+  // If user is verified, ensure key fields have reasonable fallbacks
+  if (user.verification_status === VERIFIED_STATUS) {
+    if (!kycDetails) {
+      kycDetails = {
+        fullName: latestVerification?.full_name || user.name || 'Người dùng đã xác minh',
+        idNumber: latestVerification?.id_number || '---',
+        dob: '---',
+        sex: '---',
+        placeOfOrigin: '---',
+        placeOfResidence: '---',
+        issueDate: '---',
+        issuePlace: '---'
+      };
+    } else {
+      if (!kycDetails.fullName) kycDetails.fullName = latestVerification?.full_name || user.name;
+      if (!kycDetails.idNumber) kycDetails.idNumber = latestVerification?.id_number || '---';
+    }
   }
 
   const hasCardUploaded = Boolean(
@@ -343,15 +348,14 @@ const uploadCard = async ({ userId, fullName, phone, frontImage, backImage }) =>
   if (!ocrResult.isValid) {
     return {
       success: false,
-      error: ocrResult.errorMessage || 'ID card OCR validation failed',
+      error: ocrResult.errorMessage || ocrResult.hardError || 'Không đọc được đủ thông tin trên thẻ CCCD. Vui lòng chụp rõ nét cả mặt trước và mặt sau.',
       data: ocrResult.data || {},
-      warnings: ocrResult.warnings || [],
-      debug: ocrResult.debug || null
+      warnings: ocrResult.warnings || []
     };
   }
 
-  const ocrData = ocrResult.data || null;
-  const idNumber = ocrResult.data?.idNumber || null;
+  const ocrData = ocrResult.data || {};
+  let idNumber = ocrResult.data?.idNumber || null;
 
   // Chống gian lận: Kiểm tra số CCCD này đã được tài khoản khác xác minh thành công chưa
   if (idNumber) {
@@ -378,13 +382,20 @@ const uploadCard = async ({ userId, fullName, phone, frontImage, backImage }) =>
   const uploadedFront = await uploadKycFile(frontImage.buffer, frontPath, frontImage.mimetype);
   const uploadedBack = await uploadKycFile(backImage.buffer, backPath, backImage.mimetype);
 
+  const mergedOcrData = {
+    ...ocrData,
+    fullName: ocrData.fullName || fullName || null,
+    phone: phone || null,
+    ocrPassed: Boolean(ocrResult.isValid)
+  };
+
   const verification = await createOrUpdatePendingVerification({
     userId,
     fullName: fullName || ocrResult.data?.fullName,
     phone,
     frontImageUrl: uploadedFront.url,
     backImageUrl: uploadedBack.url,
-    ocrData,
+    ocrData: mergedOcrData,
     idNumber
   });
 
@@ -393,7 +404,7 @@ const uploadCard = async ({ userId, fullName, phone, frontImage, backImage }) =>
   return {
     success: true,
     nextStep: 'SELFIE',
-    data: ocrResult.data || {},
+    data: mergedOcrData,
     warnings: ocrResult.warnings || [],
     verification
   };

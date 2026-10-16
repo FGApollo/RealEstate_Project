@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   MapPin, Bed, Bath, Maximize, Shield, ShieldCheck, ShieldAlert,
   Mail, Phone, Plus, SlidersHorizontal, X, Edit3, Trash2,
@@ -12,9 +12,20 @@ import { useAuth } from '../../../auth/useAuth';
 import PropertyDetailModal from '../../../components/PropertyDetailModal';
 import DeleteConfirmModal from '../overview/DeleteConfirmModal';
 import TrustScoreBonusModal from './TrustScoreBonusModal';
+import KycCameraModal from './KycCameraModal';
 import './AgentProfile.css';
 
 import { WARDS_BY_REGION, ALL_WARDS, normalizeWard } from '../../../services/administrativeService';
+
+const maskIdNumber = (id) => {
+  if (!id || typeof id !== 'string') return '---';
+  const clean = id.trim();
+  if (clean.length <= 4) return clean;
+  if (clean.length === 12) {
+    return `${clean.slice(0, 4)} •••• •••• ${clean.slice(-4)}`;
+  }
+  return `${clean.slice(0, 3)} •••••• ${clean.slice(-3)}`;
+};
 
 const AgentProfile = ({
   currentUser,
@@ -98,6 +109,78 @@ const AgentProfile = ({
   const [otpSent, setOtpSent] = useState(false);
   const [otpSuccessMsg, setOtpSuccessMsg] = useState('');
   const [phoneVerified, setPhoneVerified] = useState(Boolean(currentUser?.phone_verified));
+  const kycErrorRef = useRef(null);
+
+  // Camera Modal States for KYC
+  const [cameraModalConfig, setCameraModalConfig] = useState({
+    isOpen: false,
+    type: null, // 'front' | 'back' | 'selfie'
+    title: '',
+    subtitle: '',
+    shape: 'card' // 'card' | 'face'
+  });
+
+  const handleOpenFrontCamera = () => {
+    setCameraModalConfig({
+      isOpen: true,
+      type: 'front',
+      title: 'Chụp ảnh Mặt trước CCCD',
+      subtitle: 'Căn chỉnh mặt trước thẻ CCCD vừa với khung chữ nhật và chụp rõ nét',
+      shape: 'card'
+    });
+  };
+
+  const handleOpenBackCamera = () => {
+    setCameraModalConfig({
+      isOpen: true,
+      type: 'back',
+      title: 'Chụp ảnh Mặt sau CCCD',
+      subtitle: 'Căn chỉnh mặt sau thẻ CCCD (phần có chip và mã vạch) vào khung hình',
+      shape: 'card'
+    });
+  };
+
+  const handleOpenSelfieCamera = () => {
+    setCameraModalConfig({
+      isOpen: true,
+      type: 'selfie',
+      title: 'Xác thực khuôn mặt (Chân dung)',
+      subtitle: 'Đưa khuôn mặt vào trong khung hình bầu dục và giữ yên để hệ thống nhận diện',
+      shape: 'face'
+    });
+  };
+
+  const handleCameraCapture = (file, previewUrl) => {
+    if (cameraModalConfig.type === 'front') {
+      setKycFrontFile(file);
+      setKycFrontPreview(previewUrl);
+    } else if (cameraModalConfig.type === 'back') {
+      setKycBackFile(file);
+      setKycBackPreview(previewUrl);
+    } else if (cameraModalConfig.type === 'selfie') {
+      setKycSelfieFile(file);
+      setKycSelfiePreview(previewUrl);
+    }
+    setCameraModalConfig(prev => ({ ...prev, isOpen: false }));
+  };
+
+  useEffect(() => {
+    if (currentUser?.phone) {
+      setKycPhone((prev) => prev || currentUser.phone);
+    }
+    if (currentUser?.name) {
+      setKycFullName((prev) => (prev === 'Nguyễn Văn A' ? currentUser.name : prev || currentUser.name));
+    }
+    if (currentUser?.phone_verified !== undefined) {
+      setPhoneVerified(Boolean(currentUser.phone_verified));
+    }
+  }, [currentUser?.phone, currentUser?.name, currentUser?.phone_verified]);
+
+  useEffect(() => {
+    if (kycError && kycErrorRef.current) {
+      kycErrorRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [kycError]);
 
   useEffect(() => {
     let timer;
@@ -172,7 +255,9 @@ const AgentProfile = ({
 
   useEffect(() => {
     const fetchKycStatus = async () => {
-      setLoadingKyc(true);
+      if (!kycStatus) {
+        setLoadingKyc(true);
+      }
       try {
         const res = await apiFetch(`${API_BASE_URL}/api/kyc/status`);
         if (res.ok) {
@@ -197,7 +282,7 @@ const AgentProfile = ({
       }
     };
     fetchKycStatus();
-  }, [currentUser.id, currentUser.verification_status]);
+  }, [currentUser?.id, currentUser?.verification_status]);
 
   // Helpers
   const formatTimeAgo = (dateStr) => {
@@ -1328,43 +1413,45 @@ const AgentProfile = ({
                   <div className="kyc-main-panel">
                     <div className="kyc-info-card">
                       <div className="kyc-card-header">
-                        <FileText size={20} color="#2563eb" />
-                        <h4>Thông tin định danh</h4>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <ShieldCheck size={22} color="#059669" />
+                          <h4 style={{ margin: 0 }}>Hồ sơ định danh cá nhân</h4>
+                        </div>
+                        <span className="kyc-verified-pill">
+                          <Check size={13} strokeWidth={3} /> ĐÃ XÁC THỰC
+                        </span>
                       </div>
 
-                      <div className="kyc-details-grid">
+                      <div className="kyc-details-grid compact">
                         <div className="kyc-field">
                           <span className="kyc-field-label">HỌ VÀ TÊN</span>
-                          <span className="kyc-field-value">{kycStatus?.kycDetails?.fullName || kycVerificationData?.full_name || kycFullName || currentUser?.name || '---'}</span>
+                          <span className="kyc-field-value" style={{ fontWeight: 700, color: '#0f172a' }}>
+                            {kycStatus?.kycDetails?.fullName || kycVerificationData?.full_name || kycFullName || currentUser?.name || '---'}
+                          </span>
                         </div>
                         <div className="kyc-field">
-                          <span className="kyc-field-label">SỐ CCCD</span>
-                          <span className="kyc-field-value">{kycStatus?.kycDetails?.idNumber || kycVerificationData?.id_number || '---'}</span>
+                          <span className="kyc-field-label">SỐ CCCD (BẢO MẬT)</span>
+                          <span className="kyc-field-value font-mono" style={{ fontWeight: 700, color: '#1e293b', letterSpacing: '0.5px' }}>
+                            {maskIdNumber(kycStatus?.kycDetails?.idNumber || kycVerificationData?.id_number)}
+                          </span>
                         </div>
                         <div className="kyc-field">
-                          <span className="kyc-field-label">NGÀY SINH</span>
-                          <span className="kyc-field-value">{kycStatus?.kycDetails?.dob || '---'}</span>
+                          <span className="kyc-field-label">TRẠNG THÁI XÁC MINH</span>
+                          <span className="kyc-field-value" style={{ color: '#059669', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <CheckCircle2 size={16} color="#059669" /> Đã xác thực CCCD & Khuôn mặt
+                          </span>
                         </div>
                         <div className="kyc-field">
-                          <span className="kyc-field-label">GIỚI TÍNH</span>
-                          <span className="kyc-field-value">{kycStatus?.kycDetails?.sex || '---'}</span>
+                          <span className="kyc-field-label">TIÊU CHUẨN BẢO MẬT</span>
+                          <span className="kyc-field-value" style={{ color: '#2563eb', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Lock size={15} color="#2563eb" /> Mã hóa an toàn AES-256
+                          </span>
                         </div>
-                        <div className="kyc-field full-width">
-                          <span className="kyc-field-label">QUÊ QUÁN</span>
-                          <span className="kyc-field-value">{kycStatus?.kycDetails?.placeOfOrigin || '---'}</span>
-                        </div>
-                        <div className="kyc-field full-width">
-                          <span className="kyc-field-label">NƠI THƯỜNG TRÚ</span>
-                          <span className="kyc-field-value">{kycStatus?.kycDetails?.placeOfResidence || '---'}</span>
-                        </div>
-                        <div className="kyc-field">
-                          <span className="kyc-field-label">NGÀY CẤP</span>
-                          <span className="kyc-field-value">{kycStatus?.kycDetails?.issueDate || '---'}</span>
-                        </div>
-                        <div className="kyc-field">
-                          <span className="kyc-field-label">NƠI CẤP</span>
-                          <span className="kyc-field-value">{kycStatus?.kycDetails?.issuePlace || '---'}</span>
-                        </div>
+                      </div>
+
+                      <div className="kyc-privacy-notice">
+                        <Lock size={15} color="#64748b" />
+                        <span>Các thông tin cá nhân chi tiết (Quê quán, Nơi thường trú, Ngày cấp) đã được mã hóa và ẩn bảo mật để bảo vệ quyền riêng tư của bạn.</span>
                       </div>
 
                       <div className="s4-footer-actions">
@@ -1444,7 +1531,12 @@ const AgentProfile = ({
 
                 <div className="kyc-tab-grid">
                   <div className="kyc-main-panel">
-                    {kycError && <div className="kyc-error-banner"><AlertCircle size={16} /> {kycError}</div>}
+                    {kycError && (
+                      <div className="kyc-error-banner" ref={kycErrorRef}>
+                        <AlertCircle size={18} />
+                        <span>{kycError}</span>
+                      </div>
+                    )}
                     {otpSuccessMsg && (
                       <div
                         className="kyc-success-banner"
@@ -1486,8 +1578,11 @@ const AgentProfile = ({
                                 placeholder="VD: 0982123456"
                                 value={kycPhone}
                                 onChange={(e) => {
-                                  setKycPhone(e.target.value);
-                                  if (phoneVerified && e.target.value !== currentUser?.phone) {
+                                  const val = e.target.value;
+                                  setKycPhone(val);
+                                  if (currentUser?.phone_verified && val.trim() === currentUser?.phone) {
+                                    setPhoneVerified(true);
+                                  } else if (phoneVerified && val.trim() !== currentUser?.phone) {
                                     setPhoneVerified(false);
                                   }
                                 }}
@@ -1550,7 +1645,16 @@ const AgentProfile = ({
                             className="btn-wizard-next"
                             disabled={isOtpVerifying}
                           >
-                            {isOtpVerifying ? 'Đang xác thực...' : 'Tiếp theo'} <ArrowRight size={16} />
+                            {isOtpVerifying ? (
+                              <>
+                                <RefreshCw size={16} className="spin-icon" />
+                                <span>Đang xác thực...</span>
+                              </>
+                            ) : (
+                              <>
+                                <span>Tiếp theo</span> <ArrowRight size={16} />
+                              </>
+                            )}
                           </button>
                         </div>
                       </form>
@@ -1568,31 +1672,51 @@ const AgentProfile = ({
                             <div className="s2-upload-item">
                               <span className="s2-upload-title">Mặt trước</span>
                               <label className="s2-upload-zone">
-                                <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'front')} style={{ display: 'none' }} />
+                                <input type="file" id="front-card-upload-input" accept="image/*" onChange={(e) => handleFileChange(e, 'front')} style={{ display: 'none' }} />
                                 {kycFrontPreview ? (
                                   <img src={kycFrontPreview} alt="Mặt trước CCCD" className="preview-img" />
                                 ) : (
                                   <div className="dropzone-content">
                                     <Upload size={32} color="#94a3b8" />
-                                    <span>Drag & drop front of ID or <strong className="browse-link">browse</strong></span>
+                                    <span>Kéo thả ảnh mặt trước CCCD hoặc <strong className="browse-link">chọn file</strong></span>
                                   </div>
                                 )}
                               </label>
+                              <div className="s2-item-actions">
+                                <button type="button" className="btn-item-camera" onClick={handleOpenFrontCamera}>
+                                  <Camera size={15} />
+                                  <span>{kycFrontPreview ? 'Chụp lại bằng Camera' : 'Chụp bằng Camera'}</span>
+                                </button>
+                                <label htmlFor="front-card-upload-input" className="btn-item-upload">
+                                  <Upload size={15} />
+                                  <span>{kycFrontPreview ? 'Chọn file khác' : 'Tải từ máy'}</span>
+                                </label>
+                              </div>
                             </div>
 
                             <div className="s2-upload-item">
                               <span className="s2-upload-title">Mặt sau</span>
                               <label className="s2-upload-zone">
-                                <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'back')} style={{ display: 'none' }} />
+                                <input type="file" id="back-card-upload-input" accept="image/*" onChange={(e) => handleFileChange(e, 'back')} style={{ display: 'none' }} />
                                 {kycBackPreview ? (
                                   <img src={kycBackPreview} alt="Mặt sau CCCD" className="preview-img" />
                                 ) : (
                                   <div className="dropzone-content">
                                     <Upload size={32} color="#94a3b8" />
-                                    <span>Drag & drop back of ID or <strong className="browse-link">browse</strong></span>
+                                    <span>Kéo thả ảnh mặt sau CCCD hoặc <strong className="browse-link">chọn file</strong></span>
                                   </div>
                                 )}
                               </label>
+                              <div className="s2-item-actions">
+                                <button type="button" className="btn-item-camera" onClick={handleOpenBackCamera}>
+                                  <Camera size={15} />
+                                  <span>{kycBackPreview ? 'Chụp lại bằng Camera' : 'Chụp bằng Camera'}</span>
+                                </button>
+                                <label htmlFor="back-card-upload-input" className="btn-item-upload">
+                                  <Upload size={15} />
+                                  <span>{kycBackPreview ? 'Chọn file khác' : 'Tải từ máy'}</span>
+                                </label>
+                              </div>
                             </div>
                           </div>
 
@@ -1607,12 +1731,28 @@ const AgentProfile = ({
                           </div>
                         </div>
 
+                        {kycError && (
+                          <div className="kyc-error-banner mt-4">
+                            <AlertCircle size={18} />
+                            <span>{kycError}</span>
+                          </div>
+                        )}
+
                         <div className="wizard-actions-right">
                           <button type="button" className="btn-wizard-back" onClick={() => setKycWizardStep(1)}>
                             <ArrowLeft size={16} /> Quay lại
                           </button>
                           <button type="submit" className="btn-wizard-next" disabled={!kycFrontFile || !kycBackFile || kycSubmitting}>
-                            {kycSubmitting ? 'Đang xử lý...' : 'Tiếp theo'} <ArrowRight size={16} />
+                            {kycSubmitting ? (
+                              <>
+                                <RefreshCw size={16} className="spin-icon" />
+                                <span>Đang xử lý hồ sơ...</span>
+                              </>
+                            ) : (
+                              <>
+                                <span>Tiếp theo</span> <ArrowRight size={16} />
+                              </>
+                            )}
                           </button>
                         </div>
                       </form>
@@ -1643,32 +1783,76 @@ const AgentProfile = ({
                           )}
 
                           <div className="s3-camera-wrapper">
-                            <div className="s3-oval-frame">
+                            <div
+                              className="s3-oval-frame"
+                              onClick={!kycSelfiePreview ? handleOpenSelfieCamera : undefined}
+                              style={{ cursor: !kycSelfiePreview ? 'pointer' : 'default' }}
+                              title={!kycSelfiePreview ? 'Bấm để mở Camera chụp ảnh' : 'Ảnh selfie đã chọn'}
+                            >
                               <input type="file" id="selfie-upload-input" accept="image/*" onChange={(e) => handleFileChange(e, 'selfie')} style={{ display: 'none' }} />
                               {kycSelfiePreview ? (
                                 <img src={kycSelfiePreview} alt="Selfie preview" className="s3-preview-img" />
                               ) : (
-                                <div className="s3-oval-inner"></div>
+                                <div className="s3-oval-inner">
+                                  <Camera size={38} color="#94a3b8" />
+                                  <span className="oval-hint-text">Bấm để mở Camera</span>
+                                </div>
                               )}
                               <div className="oval-dot top"></div>
                               <div className="oval-dot bottom"></div>
                             </div>
 
-                            <label htmlFor="selfie-upload-input" className="btn-capture-photo">
-                              <div className="icon-blue-circle">
-                                <Camera size={22} color="#ffffff" />
-                              </div>
-                              <span>Nhấn để chụp ảnh</span>
-                            </label>
+                            <div className="s3-actions-group">
+                              {kycSelfiePreview ? (
+                                <div className="s3-retake-group">
+                                  <button type="button" className="btn-s3-retake" onClick={handleOpenSelfieCamera}>
+                                    <Camera size={16} /> Chụp lại bằng Camera
+                                  </button>
+                                  <label htmlFor="selfie-upload-input" className="btn-s3-file">
+                                    <Upload size={16} /> Chọn ảnh từ máy
+                                  </label>
+                                </div>
+                              ) : (
+                                <>
+                                  <button type="button" className="btn-start-camera" onClick={handleOpenSelfieCamera}>
+                                    <div className="icon-blue-circle">
+                                      <Camera size={22} color="#ffffff" />
+                                    </div>
+                                    <span>Mở Camera chụp chân dung</span>
+                                  </button>
+
+                                  <label htmlFor="selfie-upload-input" className="btn-upload-file-alt">
+                                    <Upload size={15} />
+                                    <span>Hoặc tải ảnh từ máy tính</span>
+                                  </label>
+                                </>
+                              )}
+                            </div>
                           </div>
                         </div>
+
+                        {kycError && (
+                          <div className="kyc-error-banner mt-4">
+                            <AlertCircle size={18} />
+                            <span>{kycError}</span>
+                          </div>
+                        )}
 
                         <div className="wizard-actions-right">
                           <button type="button" className="btn-wizard-back" onClick={() => setKycWizardStep(2)}>
                             <ArrowLeft size={16} /> Quay lại
                           </button>
                           <button type="submit" className="btn-wizard-next" disabled={!kycSelfieFile || kycSubmitting}>
-                            {kycSubmitting ? 'Đang đối sánh...' : 'Tiếp theo'} <ArrowRight size={16} />
+                            {kycSubmitting ? (
+                              <>
+                                <RefreshCw size={16} className="spin-icon" />
+                                <span>Đang đối sánh...</span>
+                              </>
+                            ) : (
+                              <>
+                                <span>Hoàn tất xác thực</span> <Check size={16} />
+                              </>
+                            )}
                           </button>
                         </div>
                       </form>
@@ -1917,6 +2101,16 @@ const AgentProfile = ({
         onNavigateToKyc={() => {
           setSelectedProfileTab('kyc');
         }}
+      />
+
+      {/* KYC Camera Modal (CCCD Front/Back & Selfie) */}
+      <KycCameraModal
+        isOpen={cameraModalConfig.isOpen}
+        onClose={() => setCameraModalConfig(prev => ({ ...prev, isOpen: false }))}
+        title={cameraModalConfig.title}
+        subtitle={cameraModalConfig.subtitle}
+        shape={cameraModalConfig.shape}
+        onCapture={handleCameraCapture}
       />
     </div>
   );

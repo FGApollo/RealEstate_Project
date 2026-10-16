@@ -7,7 +7,7 @@ async function createAnalyticsDatabase() {
   await db.exec(`
     CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role;
     CREATE TABLE users (
-      id integer PRIMARY KEY, name text, email text, avatar text, role varchar(20) DEFAULT 'USER', phone text,
+      id integer PRIMARY KEY, name text, email text, avatar text, role varchar(20) DEFAULT 'USER', phone text, phone_verified boolean DEFAULT false,
       email_verified_at timestamptz DEFAULT now(), verification_status text DEFAULT 'UNVERIFIED',
       trust_score integer DEFAULT 50, is_active boolean DEFAULT true,
       created_at timestamp DEFAULT CURRENT_TIMESTAMP

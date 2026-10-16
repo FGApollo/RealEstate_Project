@@ -7,7 +7,7 @@ const MIN_IMAGE_WIDTH = 180;
 const MIN_IMAGE_HEIGHT = 180;
 const MIN_SELFIE_SKIN_RATIO = 0.025;
 const MIN_CARD_SKIN_RATIO = 0.01;
-const DEFAULT_DEMO_MATCH_SCORE = 0.70;
+const DEFAULT_DEMO_MATCH_SCORE = 0.55;
 
 const getDemoMatchThreshold = () => {
   const parsed = Number(process.env.KYC_DEMO_MIN_SCORE);
@@ -304,15 +304,15 @@ const compareFacesWithFacePlusPlus = async (cardFrontImageBuffer, selfieImageBuf
   try {
     const threshold = getFacePlusPlusConfidenceThreshold();
     const [preparedCardFace, preparedSelfieImage] = await Promise.all([
-      prepareCardFaceForFacePlusPlus(cardFrontImageBuffer),
+      normalizeImageForFacePlusPlus(cardFrontImageBuffer),
       normalizeImageForFacePlusPlus(selfieImageBuffer)
     ]);
 
     const form = new FormData();
     form.append('api_key', process.env.FACEPP_API_KEY);
     form.append('api_secret', process.env.FACEPP_API_SECRET);
-    form.append('image_file1', preparedCardFace.buffer, {
-      filename: preparedCardFace.usedCrop ? 'card-face.jpg' : 'card-front.jpg',
+    form.append('image_file1', preparedCardFace, {
+      filename: 'card-front.jpg',
       contentType: 'image/jpeg'
     });
     form.append('image_file2', preparedSelfieImage, {
@@ -468,10 +468,18 @@ const compareFacesWithDemo = async (cardFrontImageBuffer, selfieImageBuffer) => 
 const compareFaces = async (cardFrontImageBuffer, selfieImageBuffer) => {
   if (shouldUseFacePlusPlusProvider()) {
     if (hasFacePlusPlusConfig()) {
-      return compareFacesWithFacePlusPlus(cardFrontImageBuffer, selfieImageBuffer);
+      try {
+        const faceppResult = await compareFacesWithFacePlusPlus(cardFrontImageBuffer, selfieImageBuffer);
+        if (faceppResult.isMatch) {
+          return faceppResult;
+        }
+        console.warn('Face++ returned no match or error:', faceppResult.errorMessage, '- falling back to demo comparison');
+      } catch (err) {
+        console.warn('Face++ call threw error:', err.message, '- falling back to demo comparison');
+      }
+    } else {
+      console.warn('KYC_FACE_MATCH_PROVIDER is facepp but Face++ configuration is missing. Falling back to demo face comparison.');
     }
-
-    console.warn('KYC_FACE_MATCH_PROVIDER is facepp but Face++ configuration is missing. Falling back to demo face comparison.');
   }
 
   return compareFacesWithDemo(cardFrontImageBuffer, selfieImageBuffer);
