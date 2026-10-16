@@ -1,6 +1,8 @@
 const { supabase } = require('../config/supabase');
 
 const DEFAULT_TRUST_SCORE = 50;
+const { positiveId, boundedInteger, text, badRequest } = require('./businessValidation');
+const { normalizeEmail, validateEmail } = require('./registrationValidation');
 const MIN_TRUST_SCORE = 0;
 const MAX_TRUST_SCORE = 100;
 const LOW_TRUST_SCORE_THRESHOLD = 30;
@@ -127,47 +129,24 @@ const enforceTrustScoreThresholds = async (userId, oldScore, newScore) => {
   }
 };
 
-const updateTrustScore = async (userId, action, pointChange, reason, options = {}) => {
+const mutateTrustScore = async (userId, action, pointChange, reason, options = {}) => {
   const scoreDelta = Number(pointChange);
-  if (!Number.isFinite(scoreDelta)) {
+  if (!Number.isInteger(scoreDelta) || Math.abs(scoreDelta) > 100) {
     throw new Error('Invalid trust score value');
   }
 
-  const user = await getUserForTrustScore(userId);
-  const oldScore = Number(user.trust_score ?? DEFAULT_TRUST_SCORE);
-  const newScore = clampTrustScore(oldScore + scoreDelta);
-
-  const { error: updateError } = await supabase
-    .from('users')
-    .update({ trust_score: newScore })
-    .eq('id', userId);
-
-  if (updateError) {
-    throw new Error(updateError.message);
-  }
-
-  const { error: logError } = await supabase
-    .from('trust_score_logs')
-    .insert({
-      user_id: userId,
-      action,
-      point_change: scoreDelta,
-      old_score: oldScore,
-      new_score: newScore,
-      reason,
-      related_property_id: options.related_property_id || null,
-      related_report_id: options.related_report_id || null
-    });
-
-  if (logError) {
-    throw new Error(logError.message);
-  }
+  const { data, error } = await supabase.rpc('security_apply_trust_score', {
+    p_user_id: positiveId(userId, 'userId'), p_action: action, p_delta: scoreDelta, p_reason: reason,
+    p_property_id: options.related_property_id || null, p_report_id: options.related_report_id || null
+  });
+  if (error || !data) throw Object.assign(new Error('Không thể cập nhật điểm uy tín. Vui lòng thử lại sau.'), { statusCode: 503 });
 
   // Trigger low trust score threshold enforcement
-  await enforceTrustScoreThresholds(userId, oldScore, newScore);
-
-  return newScore;
+  if (data.applied) await enforceTrustScoreThresholds(userId, data.oldScore, data.newScore);
+  return data;
 };
+
+const updateTrustScore = async (...args) => (await mutateTrustScore(...args)).newScore;
 
 const hasActionLog = async (userId, action) => {
   const { data, error } = await supabase
@@ -210,12 +189,12 @@ const applyOneTimeBonus = async (userId, action, pointChange, reason) => {
     };
   }
 
-  const trustScore = await updateTrustScore(userId, action, pointChange, reason);
+  const mutation = await mutateTrustScore(userId, action, pointChange, reason);
   return {
     success: true,
-    applied: true,
+    applied: mutation.applied,
     message: 'Trust score bonus applied',
-    trustScore
+    trustScore: mutation.newScore
   };
 };
 
@@ -557,6 +536,12 @@ const getPropertyById = async (propertyId) => {
 
 const applyReportPenalty = async (reportId, adminId) => {
   const report = await getReportById(reportId);
+  const markResolved = async () => {
+    const { error } = await supabase.from('property_reports').update({
+      status: 'RESOLVED', handled_by: adminId, handled_at: new Date().toISOString()
+    }).eq('id', report.id);
+    if (error) throw new Error(error.message);
+  };
 
   if (report.status === 'RESOLVED') {
     return {
@@ -567,6 +552,8 @@ const applyReportPenalty = async (reportId, adminId) => {
   }
 
   if (await hasReportPenaltyLog(reportId)) {
+    // Recover a prior successful score mutation whose later status write failed.
+    await markResolved();
     return {
       success: true,
       applied: false,
@@ -576,22 +563,9 @@ const applyReportPenalty = async (reportId, adminId) => {
 
   const property = await getPropertyById(report.property_id);
   const pointChange = REPORT_PENALTIES[report.reason] ?? 0;
-  const handledAt = new Date().toISOString();
-
-  const { error: reportUpdateError } = await supabase
-    .from('property_reports')
-    .update({
-      status: 'RESOLVED',
-      handled_by: adminId,
-      handled_at: handledAt
-    })
-    .eq('id', report.id);
-
-  if (reportUpdateError) {
-    throw new Error(reportUpdateError.message);
-  }
 
   if (pointChange === 0) {
+    await markResolved();
     return {
       success: true,
       applied: false,
@@ -613,6 +587,7 @@ const applyReportPenalty = async (reportId, adminId) => {
       related_report_id: report.id
     }
   );
+  await markResolved();
 
   return {
     success: true,
@@ -786,13 +761,14 @@ const adjustTrustScoreManually = async ({
     throw new Error('Thiếu ID Admin thực hiện thao tác.');
   }
 
-  let targetUserId = userId ? Number(userId) : null;
+  let targetUserId = userId ? positiveId(userId, 'userId') : null;
   if (!targetUserId && email) {
-    const trimmedEmail = String(email).trim().toLowerCase();
+    if (!validateEmail(email)) throw badRequest('Invalid email.');
+    const trimmedEmail = normalizeEmail(email);
     const { data: userByEmail, error: emailErr } = await supabase
       .from('users')
       .select('id, name, email')
-      .ilike('email', trimmedEmail)
+      .eq('email', trimmedEmail)
       .maybeSingle();
 
     if (emailErr) {
@@ -813,45 +789,17 @@ const adjustTrustScoreManually = async ({
     throw new Error('Biên độ điều chỉnh điểm không được vượt quá 100 điểm.');
   }
 
-  const trimmedReason = (reason || '').trim();
+  const trimmedReason = text(reason, 'reason', 5000, { required: true });
   if (!trimmedReason || trimmedReason.length < 5) {
     throw new Error('Vui lòng cung cấp lý do điều chỉnh cụ thể (tối thiểu 5 ký tự) để phục vụ kiểm toán.');
   }
 
   const user = await getUserForTrustScore(targetUserId, 'id, name, email, role, trust_score');
-  const oldScore = Number(user.trust_score ?? DEFAULT_TRUST_SCORE);
-  const newScore = clampTrustScore(oldScore + delta);
-
-  // Update user score
-  const { error: updateError } = await supabase
-    .from('users')
-    .update({ trust_score: newScore })
-    .eq('id', targetUserId);
-
-  if (updateError) {
-    throw new Error(updateError.message);
-  }
-
-  // Log in trust_score_logs
-  const { error: logError } = await supabase
-    .from('trust_score_logs')
-    .insert({
-      user_id: targetUserId,
-      action: 'ADMIN_MANUAL_ADJUSTMENT',
-      point_change: delta,
-      old_score: oldScore,
-      new_score: newScore,
-      reason: `[Admin can thiệp] ${trimmedReason}`,
-      related_property_id: relatedPropertyId || null,
-      related_report_id: relatedReportId || null
+  const { oldScore, newScore } = await mutateTrustScore(targetUserId,
+    'ADMIN_MANUAL_ADJUSTMENT', delta, `[Admin #${adminId} can thiệp] ${trimmedReason}`, {
+      related_property_id: relatedPropertyId ? positiveId(relatedPropertyId, 'relatedPropertyId') : null,
+      related_report_id: relatedReportId ? positiveId(relatedReportId, 'relatedReportId') : null
     });
-
-  if (logError) {
-    throw new Error(logError.message);
-  }
-
-  // Trigger low trust score threshold enforcement
-  await enforceTrustScoreThresholds(targetUserId, oldScore, newScore);
 
   return {
     success: true,
@@ -871,8 +819,8 @@ const adjustTrustScoreManually = async ({
 };
 
 const getUserTrustScoreLogs = async (userId, { limit = 50, offset = 0 } = {}) => {
-  const safeLimit = Math.max(1, Math.min(100, Number(limit) || 50));
-  const safeOffset = Math.max(0, Number(offset) || 0);
+  const safeLimit = boundedInteger(limit, 50, 1, 100);
+  const safeOffset = boundedInteger(offset, 0, 0, 100000);
 
   const { data: logs, count, error } = await supabase
     .from('trust_score_logs')
@@ -952,8 +900,8 @@ const getAdminTrustScoreLogs = async ({
   action = 'ALL',
   type = 'ALL'
 } = {}) => {
-  const safePage = Math.max(1, Number(page) || 1);
-  const safeLimit = Math.max(1, Math.min(100, Number(limit) || 20));
+  const safePage = boundedInteger(page, 1, 1, 10000);
+  const safeLimit = boundedInteger(limit, 20, 1, 100);
   const offset = (safePage - 1) * safeLimit;
 
   let query = supabase
@@ -975,7 +923,8 @@ const getAdminTrustScoreLogs = async ({
   }
 
   // Search filter
-  const trimmedSearch = (search || '').trim();
+  const trimmedSearch = text(search, 'search', 120);
+  if (/[,()"\\%_*]/.test(trimmedSearch)) throw badRequest('Invalid search characters.');
   if (trimmedSearch) {
     // Check if search matches user name/email first
     const { data: matchedUsers } = await supabase

@@ -46,6 +46,12 @@ const requireTrustedOrigin = (req, res, next) => {
   if (origin && !allowedOrigins.includes(origin)) {
     return res.status(403).json({ error: 'Origin not allowed' });
   }
+  // Cookie-backed endpoints must have positive evidence of a trusted browser
+  // origin, even when SameSite=None is needed for separate frontend/API hosts.
+  // Anonymous non-browser clients can still register/sign in without cookies.
+  if (!origin && (req.get('cookie') || ['cross-site', 'same-site'].includes(req.get('sec-fetch-site')))) {
+    return res.status(403).json({ error: 'Trusted origin required' });
+  }
   return next();
 };
 

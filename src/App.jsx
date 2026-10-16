@@ -1,6 +1,7 @@
 import { Routes, Route } from 'react-router-dom'
 import AdminRoute from './components/AdminRoute'
 import ProtectedRoute from './components/ProtectedRoute'
+import SessionRoute from './components/SessionRoute'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import LoginAgent from './pages/LoginAgent'
@@ -21,20 +22,24 @@ import './App.css'
 function App() {
   return (
     <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
-      <Route path="/login/agent" element={<LoginAgent />} />
-      <Route path="/register/agent" element={<RegisterAgent />} />
+      <Route element={<SessionRoute guestOnly />}>
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/login/agent" element={<LoginAgent />} />
+        <Route path="/register/agent" element={<RegisterAgent />} />
+      </Route>
       <Route path="/verify-email" element={<VerifyEmail />} />
       <Route path="/resend-verification" element={<ResendVerification />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
-      <Route path="/" element={<Home />} />
+      <Route element={<SessionRoute />}>
+        <Route path="/" element={<Home />} />
+      </Route>
       <Route element={<ProtectedRoute allowedRoles={['USER']} />}>
         <Route path="/onboarding" element={<LifestyleOnboarding />} />
         <Route path="/swipe/:categoryName" element={<Swipe />} />
         <Route path="/profile" element={<UserProfile />} />
       </Route>
-      <Route element={<ProtectedRoute />}>
+      <Route element={<ProtectedRoute allowedRoles={['USER', 'AGENT']} />}>
         <Route path="/chat" element={<Chat />} />
       </Route>
       <Route element={<ProtectedRoute allowedRoles={['AGENT']} />}>

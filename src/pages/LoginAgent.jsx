@@ -6,6 +6,7 @@ import GoogleAuthButton from '../components/GoogleAuthButton';
 import Input from '../components/ui/Input';
 import Button from '../components/ui/Button';
 import { API_BASE_URL } from '../config';
+import { authSessionFetch } from '../auth/apiClient';
 import { useFinishAuthentication } from '../auth/useFinishAuthentication';
 import { savePendingRouteIfMissing } from '../auth/pendingAuthAction';
 
@@ -40,7 +41,7 @@ const LoginAgent = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/login`, {
+      const response = await authSessionFetch(`${API_BASE_URL}/api/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

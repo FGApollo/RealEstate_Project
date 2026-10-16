@@ -1,6 +1,7 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 import AuthLoading from './AuthLoading';
+import { normalizeRole, roleDestination } from '../auth/roleDestination.js';
 
 const ProtectedRoute = ({ allowedRoles }) => {
   const { user, authStatus, onboardingStatus } = useAuth();
@@ -10,15 +11,14 @@ const ProtectedRoute = ({ allowedRoles }) => {
 
   if (authStatus === 'authenticating') return <AuthLoading />;
 
-  if (!user) {
+  const role = normalizeRole(user?.role);
+  if (!user || !role || authStatus !== 'authenticated') {
     const loginPath = allowedRoles?.includes('AGENT') ? '/login/agent' : '/login';
     return <Navigate to={loginPath} replace state={{ returnTo }} />;
   }
 
-  if (allowedRoles && !allowedRoles.includes(String(user.role).toUpperCase())) {
-    const fallback = String(user.role).toUpperCase() === 'AGENT' ? '/sale/overview'
-      : String(user.role).toUpperCase() === 'ADMIN' ? '/admin' : '/';
-    return <Navigate to={fallback} replace />;
+  if (allowedRoles && !allowedRoles.includes(role)) {
+    return <Navigate to={roleDestination(role)} replace />;
   }
 
   if (isOnboarding && String(user.role).toUpperCase() !== 'USER') {

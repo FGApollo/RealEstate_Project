@@ -21,8 +21,11 @@ const recommendationRoutes = require('./routes/recommendationRoutes');
 const { getJwtConfig, getCookieOptions } = require('./services/authSessionService');
 const { corsOptions } = require('./middleware/trustedOrigin');
 const { rateLimiters } = require('./middleware/rateLimiters');
+const { securityHeaders, apiErrorHandler, denyPrivateUploads } = require('./middleware/securityHeaders');
 
 const app = express();
+app.disable('x-powered-by');
+app.use(securityHeaders);
 const PORT = process.env.PORT || 3000;
 
 const configuredTrustProxyHops = process.env.TRUST_PROXY_HOPS;
@@ -51,11 +54,19 @@ const authUrlencodedParser = express.urlencoded({ limit: '24kb', extended: true 
   app.use(routePath, authJsonParser);
   app.use(routePath, authUrlencodedParser);
 });
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+// Listing/review photos currently use bounded base64 JSON uploads. Keep their
+// existing aggregate cap while keeping ordinary API DTOs small.
+app.use('/api/properties', express.json({ limit: '50mb' }));
+app.use(express.json({ limit: '256kb' }));
+app.use(express.urlencoded({ limit: '32kb', extended: false, parameterLimit: 100 }));
 
 // Serve uploaded images statically
-app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
+app.use('/uploads', denyPrivateUploads);
+app.use('/uploads', express.static(path.join(__dirname, 'public/uploads'), {
+  dotfiles: 'deny',
+  index: false,
+  setHeaders(res) { res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox"); }
+}));
 
 // Routes
 app.use('/api', authRoutes);
@@ -74,6 +85,7 @@ app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/appeals', appealRoutes);
 app.use('/api/me', preferenceRoutes);
 app.use('/api/recommendations', recommendationRoutes);
+app.use(apiErrorHandler);
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);

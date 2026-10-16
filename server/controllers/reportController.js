@@ -1,3 +1,4 @@
+const { safeErrorMessage } = require('../services/httpError');
 const reportService = require('../services/reportService');
 
 const createReport = async (req, res) => {
@@ -12,7 +13,7 @@ const createReport = async (req, res) => {
 
     res.status(201).json(result);
   } catch (error) {
-    res.status(error.statusCode || 500).json({ error: error.message || 'Failed to create report' });
+    res.status(error.statusCode || 500).json({ error: safeErrorMessage(error, 'Failed to create report') });
   }
 };
 
@@ -22,7 +23,7 @@ const getAdminReports = async (req, res) => {
     const result = await reportService.getAdminReports(status);
     res.status(200).json(result);
   } catch (error) {
-    res.status(error.statusCode || 500).json({ error: error.message || 'Failed to fetch reports' });
+    res.status(error.statusCode || 500).json({ error: safeErrorMessage(error, 'Failed to fetch reports') });
   }
 };
 
@@ -32,7 +33,7 @@ const resolveReport = async (req, res) => {
     const result = await reportService.resolveReport(reportId, req.user.id);
     res.status(200).json(result);
   } catch (error) {
-    res.status(error.statusCode || 500).json({ error: error.message || 'Failed to resolve report' });
+    res.status(error.statusCode || 500).json({ error: safeErrorMessage(error, 'Failed to resolve report') });
   }
 };
 
@@ -42,7 +43,7 @@ const rejectReport = async (req, res) => {
     const result = await reportService.rejectReport(reportId, req.user.id);
     res.status(200).json(result);
   } catch (error) {
-    res.status(error.statusCode || 500).json({ error: error.message || 'Failed to reject report' });
+    res.status(error.statusCode || 500).json({ error: safeErrorMessage(error, 'Failed to reject report') });
   }
 };
 

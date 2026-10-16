@@ -1,3 +1,4 @@
+const { safeErrorMessage } = require('../services/httpError');
 const agentService = require('../services/agentService');
 const reviewService = require('../services/reviewService');
 const { supabase } = require('../config/supabase');
@@ -10,7 +11,7 @@ const getOverview = async (req, res) => {
     res.status(200).json(overview);
   } catch (error) {
     console.error('Error fetching agent overview:', error);
-    res.status(500).json({ error: error.message || 'Internal server error' });
+    res.status(500).json({ error: safeErrorMessage(error, 'Internal server error') });
   }
  };
 
@@ -22,7 +23,7 @@ const getAgentReviews = async (req, res) => {
     res.status(200).json(reviews);
   } catch (error) {
     console.error('Error fetching agent reviews:', error);
-    res.status(500).json({ error: error.message || 'Internal server error' });
+    res.status(500).json({ error: safeErrorMessage(error, 'Internal server error') });
   }
 };
 
@@ -40,7 +41,7 @@ const replyToReview = async (req, res) => {
     res.status(201).json(reply);
   } catch (error) {
     console.error('Error replying to review:', error);
-    res.status(error.statusCode || 500).json({ error: error.message || 'Internal server error' });
+    res.status(error.statusCode || 500).json({ error: safeErrorMessage(error, 'Internal server error') });
   }
 };
 
@@ -53,7 +54,7 @@ const toggleReviewHelpful = async (req, res) => {
     res.status(200).json(result);
   } catch (error) {
     console.error('Error toggling review helpful in agentController:', error);
-    res.status(error.statusCode || 500).json({ error: error.message || 'Internal server error' });
+    res.status(error.statusCode || 500).json({ error: safeErrorMessage(error, 'Internal server error') });
   }
 };
 
