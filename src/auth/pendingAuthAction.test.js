@@ -64,6 +64,12 @@ test('expired pending actions are discarded', () => {
   assert.equal(stored.size, 0);
 });
 
+test('payment return keeps only the UUID path and discards provider query claims', () => {
+  const path = '/sale/payment/12345678-abcd-1234-abcd-123456789abc';
+  assert.deepEqual(normalizePendingAuthAction({ type: 'NAVIGATE', returnTo: `${path}?status=PAID&code=00&returnTo=https://evil.example` }), { type: 'NAVIGATE', returnTo: path });
+  assert.equal(normalizePendingAuthAction({ type: 'NAVIGATE', returnTo: '/sale/payment/not-an-order' }), null);
+});
+
 test('clearing an old discovery intent allows a fresh protected action to be preserved', () => {
   savePendingAuthAction({ type: 'NAVIGATE', returnTo: '/swipe/V%C4%83n%20Ph%C3%B2ng' });
   clearPendingAuthAction();

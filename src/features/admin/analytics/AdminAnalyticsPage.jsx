@@ -7,6 +7,7 @@ import { useAnalytics } from './useAnalytics';
 import { TrendChart, ComparisonChart, DistributionChart, Empty } from './AnalyticsCharts';
 import { number, money, percent } from './analyticsFormat';
 import './AdminAnalyticsPage.css';
+import PaymentTransactions from './PaymentTransactions';
 
 const dateTime = (value) => new Date(value).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
 const today = () => new Date(Date.now() + 7 * 3600000).toISOString().slice(0, 10);
@@ -110,7 +111,7 @@ function SubscriptionAnalytics({ subscriptions, packages }) {
 function RevenueAnalytics({ revenue, packages, bucket, comparison, onComparisonChange }) {
   return <section className="analytics-section" aria-labelledby="analytics-revenue-title">
     <h2 id="analytics-revenue-title"><Wallet size={20} /> Thống kê doanh thu</h2>
-    {!revenue.available && <div className="analytics-notice"><Info size={20} /><div><strong>{revenue.reason}</strong><p>Hệ thống chưa có sổ giao dịch thanh toán và hoàn tiền được xác thực. Giá gói và trạng thái đăng ký không được dùng để tính doanh thu.</p></div></div>}
+    <div className="analytics-notice"><Info size={20} /><div><strong>{revenue.available ? 'Doanh thu đã xác minh qua payOS' : revenue.reason}</strong><p>{revenue.available ? `${revenue.coverage} Chưa tích hợp đối soát hoàn tiền; số tiền hoàn và doanh thu sau hoàn được để trống.` : 'Hệ thống chưa có sổ giao dịch thanh toán và hoàn tiền được xác thực. Giá gói và trạng thái đăng ký không được dùng để tính doanh thu.'}</p></div></div>
     <div className="analytics-kpis">
       <Kpi icon={Wallet} label="Tổng đã thanh toán" value={revenue.totalGross} moneyValue detail="Doanh thu gộp, toàn bộ lịch sử" />
       <Kpi icon={CalendarDays} label="Doanh thu tháng hiện tại" value={revenue.currentMonthGross} moneyValue detail="Theo ngày thanh toán, giờ Việt Nam" />
@@ -122,7 +123,7 @@ function RevenueAnalytics({ revenue, packages, bucket, comparison, onComparisonC
     </div>
     <div className="analytics-grid">
       <Panel title="Xu hướng doanh thu" subtitle="VND · theo ngày thanh toán · cùng khoảng thời gian đã chọn" wide>
-        {revenue.available ? <TrendChart data={revenue.trend} series={[{ key: 'gross', name: 'Doanh thu gộp' }, { key: 'net', name: 'Sau hoàn tiền' }]} bucket={bucket} currency /> : <Empty>{revenue.reason}</Empty>}
+        {revenue.available ? <TrendChart data={revenue.trend} series={revenue.refundsAvailable ? [{ key: 'gross', name: 'Doanh thu gộp' }, { key: 'net', name: 'Sau hoàn tiền' }] : [{ key: 'gross', name: 'Doanh thu gộp' }]} bucket={bucket} currency /> : <Empty>{revenue.reason}</Empty>}
       </Panel>
       <Panel title="So sánh doanh thu" subtitle={comparison === 'subscriptions' ? 'Số lượt đăng ký trong kỳ' : 'VND · doanh thu gộp trong kỳ'} action={<select aria-label="Loại so sánh" value={comparison} onChange={(event) => onComparisonChange(event.target.value)}><option value="package">Theo gói dịch vụ</option><option value="month">Theo tháng</option><option value="subscriptions">Số lượt đăng ký theo gói</option></select>}>
         {comparison === 'subscriptions' ? <ComparisonChart data={packages} dataKey="newSubscriptions" label="Lượt đăng ký" /> : revenue.available ? <ComparisonChart data={comparison === 'month' ? revenue.monthly : revenue.byPackage} dataKey="gross" label="Doanh thu (VND)" currency /> : <Empty>{revenue.reason}</Empty>}
@@ -138,20 +139,20 @@ function AnalyticsDefinitions({ users, subscriptions }) {
   return <details className="analytics-definitions"><summary>Quy tắc tính và giới hạn dữ liệu</summary>
     <p>Tổng tài khoản gồm mọi role và cả tài khoản is_active=false. USER và AGENT là role hiện tại của tài khoản; tỷ lệ chỉ tính trên hai nhóm này. is_active=false là vô hiệu hóa, không suy ra nguyên nhân khóa. Tăng trưởng tổng tài khoản so với đầu kỳ; đăng ký mới so với kỳ liền trước có cùng số ngày. Kỳ trước bằng 0 hiển thị không có tỷ lệ.</p>
     <p>Gói hiệu lực phải có status=ACTIVE, ngày bắt đầu trước mốc chốt và ngày kết thúc sau mốc chốt. Mỗi Agent được chọn bản ghi hiệu lực có ngày bắt đầu mới nhất, sau đó ngày tạo và ID mới nhất. Bao gồm Agent bị vô hiệu hóa vì hiệu lực gói và quyền truy cập tài khoản là hai chỉ số riêng.</p>
-    <p>Không có bảng danh mục gói nên chỉ thống kê các tên gói đã xuất hiện trong DB. Giá gói không phải chứng từ thanh toán. Chưa có sổ thanh toán/hoàn tiền, nguồn thu hoặc lịch sử đổi trạng thái; không thể tái dựng chính xác trạng thái tài khoản/gói trong quá khứ. Bộ lọc quá khứ dùng ngày tạo/hạn dùng và role/status hiện tại.</p>
+    <p>Thống kê gói dựa trên bản ghi đăng ký đã xuất hiện trong DB. Gia hạn cập nhật hạn dùng của gói hiện tại; các lần thanh toán được lưu riêng trong sổ payOS. Giá gói không phải chứng từ thanh toán. Bộ lọc quá khứ dùng ngày tạo/hạn dùng và role/status hiện tại, không tái dựng toàn bộ lịch sử đổi trạng thái.</p>
     <p>Ngày kết thúc được tính trọn ngày Việt Nam, kỳ hiện tại chốt tại thời điểm cập nhật. Timestamp cũ được đọc là UTC. Bản ghi thiếu ngày vẫn có thể nằm trong tổng nhưng không nằm trong biểu đồ đăng ký; gói thiếu ngày bắt đầu/kết thúc không được tính hiệu lực. Thiếu ngày: {number(users.unknownDates)} tài khoản, {number(subscriptions.unknownDates)} đăng ký.</p>
-    <p>Doanh thu tích hợp sau sẽ dùng ngày thanh toán xác thực và số tiền giao dịch gốc bằng VND; PENDING/FAILED/CANCELLED không tính. Hoàn tiền tính riêng theo ngày hoàn, doanh thu sau hoàn = gộp − hoàn trong cùng kỳ; callback phải được khử trùng trước khi ghi sổ.</p>
+    <p>Doanh thu dùng ngày thanh toán xác thực và số tiền gốc bằng VND trong sổ payOS; PENDING/FAILED/CANCELLED không tính. Webhook lặp không ghi nhận trùng. Không suy ra thanh toán từ gói cũ. Chưa đối soát hoàn tiền nên chỉ công bố doanh thu gộp; tiền hoàn và doanh thu sau hoàn chưa có dữ liệu.</p>
   </details>;
 }
 
-function DashboardContent({ data, section, onNavigate, userMetric, onUserMetricChange, comparison, onComparisonChange }) {
+function DashboardContent({ data, section, onNavigate, userMetric, onUserMetricChange, comparison, onComparisonChange, revision }) {
   return <>
     <p className="analytics-scope">Mốc chốt: {dateTime(data.snapshotAt)} · Trong kỳ: {data.filters.start} → {data.filters.end} · Giờ Việt Nam (UTC+7). Tài khoản và gói được phân loại theo vai trò, trạng thái hiện tại.</p>
     {section === 'overview' && <OverviewAnalytics data={data} onNavigate={onNavigate} />}
     {section === 'users' && <UserAnalytics data={data} metric={userMetric} onMetricChange={onUserMetricChange} />}
     {section === 'subscriptions' && <SubscriptionAnalytics subscriptions={data.subscriptions} packages={data.packages} />}
     {section === 'revenue' && <RevenueAnalytics revenue={data.revenue} packages={data.packages} bucket={data.filters.bucket} comparison={comparison} onComparisonChange={onComparisonChange} />}
-    {section === 'transactions' && <Panel title="Giao dịch gần đây" subtitle="Ngày · môi giới · gói · số tiền · trạng thái" wide><Empty>{data.revenue.reason}</Empty></Panel>}
+    {section === 'transactions' && <Panel title="Giao dịch gần đây" subtitle="Ngày · môi giới · gói · số tiền · trạng thái" wide><PaymentTransactions filters={data.filters.preset === 'custom' ? { preset: 'custom', start: data.filters.start, end: data.filters.end, bucket: data.filters.bucket } : { preset: data.filters.preset, bucket: data.filters.bucket }} revision={revision} /></Panel>}
     <AnalyticsDefinitions users={data.users} subscriptions={data.subscriptions} />
   </>;
 }
@@ -200,7 +201,7 @@ export default function AdminAnalyticsPage() {
     <div role="tabpanel" id={`analytics-panel-${activeSection}`} aria-labelledby={`analytics-tab-${activeSection}`} tabIndex={0} aria-live="polite" aria-busy={loading}>
       {loading ? <div className="analytics-loading" role="status"><span className="analytics-sr-only">Đang tải dữ liệu thống kê</span><div className="analytics-kpis">{[0, 1, 2, 3].map((id) => <div className="analytics-skeleton analytics-skeleton-kpi" key={id} />)}</div><div className="analytics-grid"><div className="analytics-skeleton analytics-skeleton-chart" /><div className="analytics-skeleton analytics-skeleton-chart" /></div></div>
         : error ? <div className="analytics-error" role="alert"><Info size={24} /><h2>Không thể tải thống kê</h2><p>{error}</p><button type="button" onClick={() => setRevision((value) => value + 1)}>Thử lại</button></div>
-          : <DashboardContent data={data} section={activeSection} onNavigate={setActiveSection} userMetric={userMetric} onUserMetricChange={setUserMetric} comparison={comparison} onComparisonChange={setComparison} />}
+          : <DashboardContent data={data} section={activeSection} onNavigate={setActiveSection} userMetric={userMetric} onUserMetricChange={setUserMetric} comparison={comparison} onComparisonChange={setComparison} revision={revision} />}
     </div>
   </div>;
 }

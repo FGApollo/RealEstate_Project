@@ -16,13 +16,18 @@ const unavailableRevenue = () => ({
 
 async function getDashboard(query, now = new Date()) {
   const filters = parseAnalyticsQuery(query, now);
-  const result = await repository.getDashboard(filters, now);
-  return { ...result, filters, revenue: unavailableRevenue() };
+  const [result, revenue] = await Promise.all([repository.getDashboard(filters, now), repository.getRevenue(filters, now)]);
+  const packages = result.packages.map((plan) => ({ ...plan, revenue: revenue ? revenue.byPackage
+    .filter((item) => item.code === plan.name).reduce((sum, item) => sum + Number(item.gross), 0) : null }));
+  return { ...result, packages, filters, revenue: revenue || unavailableRevenue() };
 }
 
-function getTransactions(query) {
-  const pagination = parsePagination(query);
-  return { available: false, reason: 'Chưa có dữ liệu thanh toán xác thực', items: [], total: null, ...pagination };
+async function getTransactions(query, now = new Date()) {
+  const { page, limit, ...dates } = query;
+  const pagination = parsePagination({ ...(page !== undefined ? { page } : {}), ...(limit !== undefined ? { limit } : {}) });
+  const filters = parseAnalyticsQuery(dates, now);
+  return await repository.getTransactions(filters, pagination, now)
+    || { available: false, reason: 'Chưa có dữ liệu thanh toán xác thực', items: [], total: null, ...pagination };
 }
 
 module.exports = { getDashboard, getTransactions };

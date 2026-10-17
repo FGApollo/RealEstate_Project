@@ -122,7 +122,7 @@ test('no payment ledger: money and transaction count are unknown, never inferred
   for (const key of ['totalGross', 'periodGross', 'periodNet', 'periodRefunds', 'successfulTransactions', 'averageTransaction']) assert.equal(result.revenue[key], null);
   assert.deepEqual(result.revenue.trend, []);
   assert.ok(result.packages.every((row) => row.revenue === null));
-  assert.deepEqual(service.getTransactions({ page: '2', limit: '10' }), {
+  assert.deepEqual(await service.getTransactions({ page: '2', limit: '10' }), {
     available: false, reason: 'Chưa có dữ liệu thanh toán xác thực', items: [], total: null, page: 2, limit: 10
   });
 });

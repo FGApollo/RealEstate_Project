@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useOutletContext } from 'react-router-dom';
+import { useNavigate, useOutletContext, useSearchParams } from 'react-router-dom';
 import {
   Home, Search, LayoutDashboard, Settings, LogOut, BarChart2, HelpCircle, MessageSquare, Shield,
   User, Star, CreditCard, Scale, ShieldAlert
@@ -47,7 +47,8 @@ const AgentOverview = () => {
   const [loading, setLoading] = useState(true);
 
   // Navigation tabs: 'overview', 'listings', 'create-listing', 'profile'
-  const [activeTab, setActiveTab] = useState('overview');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') === 'pricing' ? 'pricing' : 'overview');
 
   // Filter query state (passed down to sync topbar with the listing panel)
   const [searchQuery, setSearchQuery] = useState('');
@@ -75,6 +76,7 @@ const AgentOverview = () => {
 
   const handleTabChange = (tabName) => {
     setActiveTab(tabName);
+    setSearchParams(tabName === 'pricing' ? { tab: 'pricing' } : {}, { replace: true });
     setEditingPropertyId(null);
     if (tabName === 'analytics') {
       fetchFunnelStats();
@@ -132,7 +134,7 @@ const AgentOverview = () => {
   }, [currentUser.id]);
 
   return (
-    <div className="agent-dashboard">
+    <div className={`agent-dashboard ${activeTab === 'pricing' ? 'agent-billing-view' : ''}`}>
       <aside className="sidebar">
         {/* Logo */}
         <div 

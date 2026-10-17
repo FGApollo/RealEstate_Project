@@ -21,6 +21,7 @@ export const canResumeAuthAction = (role, action) => {
   if (action.type !== 'NAVIGATE') return false;
   const path = String(action.returnTo || '').split('?')[0];
   if (normalizedRole === 'ADMIN') return path === '/admin';
-  if (normalizedRole === 'AGENT') return path === '/sale/overview' || path === '/chat';
+  if (normalizedRole === 'AGENT') return path === '/sale/overview' || path === '/chat'
+    || /^\/sale\/payment\/[0-9a-f-]{36}$/i.test(path);
   return ['/', '/onboarding', '/profile', '/chat'].includes(path) || /^\/swipe\/[^/]+$/.test(path);
 };

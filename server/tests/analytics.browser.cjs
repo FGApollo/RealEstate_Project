@@ -37,7 +37,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
   fs.mkdirSync(out, { recursive: true });
   try {
     const app = express();
-    let delay = 250;
+    let delay = 1000;
     let failure = false;
     app.use('/api/admin/analytics/overview', async (_req, res, next) => {
       if (delay) await new Promise((resolve) => setTimeout(resolve, delay));
