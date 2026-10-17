@@ -13,6 +13,7 @@ import NotFound from './pages/NotFound'
 import Home from './pages/Home'
 import Swipe from './pages/Swipe'
 import AgentOverview from './pages/AgentOverview'
+import AgentPayment from './pages/AgentPayment'
 import Chat from './pages/Chat'
 import AdminPage from './pages/AdminPage'
 import UserProfile from './pages/UserProfile'
@@ -44,6 +45,7 @@ function App() {
       </Route>
       <Route element={<ProtectedRoute allowedRoles={['AGENT']} />}>
         <Route path="/sale/overview" element={<AgentOverview />} />
+        <Route path="/sale/payment/:orderId" element={<AgentPayment />} />
       </Route>
       <Route element={<AdminRoute />}>
         <Route path="/admin" element={<AdminPage />} />

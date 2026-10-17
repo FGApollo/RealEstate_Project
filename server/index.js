@@ -57,6 +57,7 @@ const authUrlencodedParser = express.urlencoded({ limit: '24kb', extended: true 
 // Listing/review photos currently use bounded base64 JSON uploads. Keep their
 // existing aggregate cap while keeping ordinary API DTOs small.
 app.use('/api/properties', express.json({ limit: '50mb' }));
+app.use('/api/payments', express.json({ limit: '32kb' }));
 app.use(express.json({ limit: '256kb' }));
 app.use(express.urlencoded({ limit: '32kb', extended: false, parameterLimit: 100 }));
 
@@ -82,6 +83,7 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/trust-score', trustScoreRoutes);
 app.use('/api/users', userProfileRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
+app.use('/api/payments', require('./routes/paymentRoutes'));
 app.use('/api/appeals', appealRoutes);
 app.use('/api/me', preferenceRoutes);
 app.use('/api/recommendations', recommendationRoutes);

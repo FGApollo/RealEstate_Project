@@ -80,3 +80,4 @@
 @media (max-width: 700px) { .analytics-header { flex-direction: column; gap: 16px; }.analytics-refresh { align-items: flex-start; }.analytics-filter-note { width: 100%; margin-left: 0; }.analytics-filters { padding: 14px; gap: 12px; }.analytics-filters label { flex: 1; min-width: 120px; }.analytics-panel { padding: 16px; }.analytics-kpis { gap: 12px; }.analytics-chart { height: 260px; }.analytics-trend-chart { height: 300px; }.admin-analytics .analytics-tabs button { padding: 10px 13px; font-size: 12px; }.analytics-status-strip { gap: 12px; flex-direction: column; } }
 @media (max-width: 480px) { .analytics-kpis { grid-template-columns: minmax(0, 1fr); }.analytics-kpi-value { font-size: 28px; }.analytics-header h1 { font-size: 26px; } }
 @media (prefers-reduced-motion: reduce) { .analytics-skeleton, .analytics-spin { animation: none; } }
+.analytics-transaction-pagination { display:flex; justify-content:flex-end; align-items:center; gap:16px; margin-top:18px; }

@@ -60,6 +60,7 @@ async function queryDashboard(db, start = '2026-10-10', end = '2026-10-16', buck
 function connectTestDatabase(supabase, db) {
   const original = { from: supabase.from, rpc: supabase.rpc };
   supabase.rpc = async (name, args) => {
+    if (['admin_payment_revenue','admin_payment_transactions'].includes(name)) return { data: null, error: { code: 'PGRST202' } };
     if (name !== 'admin_analytics_dashboard') throw new Error(`Unexpected test RPC ${name}`);
     try { return { data: await queryDashboard(db, args.p_start, args.p_end, args.p_bucket, args.p_as_of), error: null }; }
     catch (error) { return { data: null, error }; }

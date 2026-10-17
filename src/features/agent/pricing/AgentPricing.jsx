@@ -1,261 +1,75 @@
-import { useState, useEffect } from 'react';
-import { CheckCircle2, Mail, CreditCard, Sparkles, AlertCircle, Clock } from 'lucide-react';
-import { API_BASE_URL } from '../../../config';
-import { apiFetch } from '../../../auth/apiClient';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { CheckCircle2, AlertCircle, Clock } from 'lucide-react';
+import { billingRequest, billingDate, billingMoney, paymentStatus, openCheckout } from './billingApi';
 import './AgentPricing.css';
 
-const AgentPricing = ({ currentUser }) => {
-  const [subscription, setSubscription] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState(false);
+export default function AgentPricing({ currentUser }) {
+  const [data, setData] = useState(null);
+  const [error, setError] = useState('');
   const [message, setMessage] = useState('');
-
-  const fetchSubscription = async () => {
-    setLoading(true);
-    try {
-      const res = await apiFetch(`${API_BASE_URL}/api/subscriptions`);
-      if (res.ok) {
-        const data = await res.json();
-        setSubscription(data);
-      }
-    } catch (err) {
-      console.error('Error fetching subscription:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  const [busy, setBusy] = useState(false);
+  const [page, setPage] = useState(1);
+  const requestId = useRef(null);
+  const fetchBilling = useCallback(async (signal) => {
+    const [subscription, catalog, history] = await Promise.all([
+      billingRequest('/api/subscriptions', { signal }),
+      billingRequest('/api/payments/catalog', { signal }),
+      billingRequest(`/api/payments?page=${page}&limit=10`, { signal })
+    ]);
+    return { subscription, catalog, history };
+  }, [page]);
+  const load = async () => { setData(await fetchBilling()); setError(''); };
   useEffect(() => {
-    fetchSubscription();
-  }, [currentUser.id]);
-
-  const handleSubscribe = async (planName) => {
-    setActionLoading(true);
-    setMessage('');
-    try {
-      const res = await apiFetch(`${API_BASE_URL}/api/subscriptions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ planName })
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setSubscription(data);
-        setMessage('Kích hoạt dùng thử 1 tháng thành công!');
-      } else {
-        const error = await res.json();
-        setMessage(error.error || 'Có lỗi xảy ra, vui lòng thử lại.');
-      }
-    } catch (err) {
-      console.error('Error subscribing:', err);
-      setMessage('Lỗi kết nối máy chủ.');
-    } finally {
-      setActionLoading(false);
-    }
+    const controller = new AbortController();
+    fetchBilling(controller.signal).then((result) => { if (!controller.signal.aborted) { setData(result); setError(''); } },
+      (err) => { if (!controller.signal.aborted) setError(err.message); });
+    return () => controller.abort();
+  }, [currentUser.id, fetchBilling]);
+  const act = async (fn) => {
+    setBusy(true); setMessage('');
+    try { await fn(); } catch (err) { setMessage(err.message); } finally { setBusy(false); }
   };
-
-  const formatDate = (dateStr) => {
-    if (!dateStr) return '';
-    return new Date(dateStr).toLocaleDateString('vi-VN', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  };
-
-  const formatPrice = (price) => {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
-  };
-
-  return (
-    <div className="pricing-panel-container">
-      <div className="pricing-header">
-        <h1>Gói Dịch Vụ & Bảng Giá</h1>
-        <p className="subtitle">Nâng cấp tài khoản của bạn để mở khóa các công cụ và gia tăng khả năng tiếp cận khách hàng.</p>
-      </div>
-
-      {message && (
-        <div className="pricing-message-banner">
-          <AlertCircle size={18} />
-          <span>{message}</span>
+  const subscribe = () => act(async () => {
+    requestId.current ||= crypto.randomUUID();
+    const order = await billingRequest('/api/payments', { method: 'POST', body: { planCode: 'PAID', requestId: requestId.current } });
+    if (order.status === 'PENDING' && order.checkoutUrl) openCheckout(order.checkoutUrl);
+    else { requestId.current = null; await load(); setMessage(`Đơn #${order.orderCode}: ${paymentStatus(order.status)}.`); }
+  });
+  const trial = () => act(async () => {
+    await billingRequest('/api/subscriptions', { method: 'POST', body: { planName: 'FREE_TRIAL' } });
+    await load(); setMessage('Đã kích hoạt một tháng dùng thử.');
+  });
+  const plan = data?.catalog.plans.find((item) => item.code === 'PAID');
+  const subscription = data?.subscription;
+  const active = subscription?.effective_status === 'ACTIVE';
+  return <div className="pricing-panel-container">
+    <div className="pricing-header"><h1>Gói dịch vụ & thanh toán</h1><p className="subtitle">Chọn gói phù hợp, thanh toán an toàn qua payOS và theo dõi lịch sử của bạn.</p></div>
+    {message && <div className="pricing-message-banner" role="status"><AlertCircle size={18} />{message}</div>}
+    {error ? <div className="pricing-message-banner" role="alert">{error}<button disabled={busy} onClick={() => act(load)}>Thử lại</button></div>
+      : !data || data.history.page !== page ? <p role="status">Đang tải gói dịch vụ và giao dịch…</p> : <>
+        <div className="current-subscription-card">
+          <div className="status-header"><Clock size={20} /><h3>Gói hiện tại</h3></div>
+          {subscription ? <div className="subscription-details"><p><strong>{subscription.plan_name === 'FREE_TRIAL' ? 'Dùng thử miễn phí' : subscription.plan_name === plan?.code ? plan.name : subscription.plan_name}</strong></p>
+            <p>Hạn dùng: <strong>{billingDate(subscription.end_date)}</strong></p><span className={active ? 'badge-active' : 'badge-inactive'}>{active ? 'ĐANG HOẠT ĐỘNG' : 'ĐÃ HẾT HẠN / NGỪNG'}</span></div>
+            : <p>Bạn chưa đăng ký gói dịch vụ.</p>}
         </div>
-      )}
-
-      {/* Current Subscription Status */}
-      <div className="current-subscription-card">
-        <div className="status-header">
-          <Clock size={20} color="#3b82f6" />
-          <h3>Trạng thái tài khoản của bạn</h3>
+        {!data.catalog.checkout.available && <div className="pricing-message-banner" role="status"><AlertCircle size={18} />{data.catalog.checkout.reason}</div>}
+        <div className="pricing-grid">
+          <article className="pricing-card"><div className="plan-header"><h3>Miễn phí dùng thử</h3><div className="price-row"><span className="amount">0đ</span><span className="period">/ một tháng</span></div><p className="plan-desc">Một lần cho mỗi tài khoản. Không tự động chuyển sang gói trả phí.</p></div>
+            <ul className="plan-features"><li><CheckCircle2 size={18} /><span>Trải nghiệm công cụ môi giới</span></li><li><CheckCircle2 size={18} /><span>Không cần thông tin thanh toán</span></li></ul>
+            <button className={subscription ? 'btn-plan-disabled' : 'btn-plan-action'} disabled={busy || Boolean(subscription)} onClick={trial}>{subscription ? 'Tài khoản đã đăng ký gói' : 'Kích hoạt dùng thử'}</button>
+          </article>
+          <article className="pricing-card popular-plan"><div className="popular-badge">THANH TOÁN QUA PAYOS</div><div className="plan-header"><h3>{plan?.name || 'Gói trả phí'}</h3><div className="price-row"><span className="amount">{plan ? billingMoney(plan.amount_vnd) : 'Chưa có giá'}</span><span className="period">/ {plan?.duration_months || '—'} tháng</span></div><p className="plan-desc">Gia hạn chủ động. Thời hạn được cộng vào phần còn lại của gói đang hoạt động.</p></div>
+            <ul className="plan-features"><li><CheckCircle2 size={18} /><span>Kích hoạt khi thanh toán được xác minh</span></li><li><CheckCircle2 size={18} /><span>Không tự động trừ tiền</span></li><li><CheckCircle2 size={18} /><span>Lưu lịch sử và hạn dùng sau mỗi lần thanh toán</span></li></ul>
+            <button className="btn-plan-action" disabled={busy || !plan || !data.catalog.checkout.available} onClick={subscribe}>{busy ? 'Đang xử lý…' : active && subscription.plan_name === 'PAID' ? 'Gia hạn bằng payOS' : 'Thanh toán bằng payOS'}</button>
+          </article>
+          <article className="pricing-card"><div className="plan-header"><h3>Giải pháp doanh nghiệp</h3><div className="price-row"><span className="amount-contact">Liên hệ</span></div><p className="plan-desc">Trao đổi nhu cầu và phạm vi dịch vụ trước khi đăng ký.</p></div><div className="plan-action"><a className="btn-plan-contact" href="mailto:contact@swipenest.com?subject=Tu%20van%20goi%20doanh%20nghiep">Liên hệ tư vấn</a></div></article>
         </div>
-        
-        {loading ? (
-          <p className="loading-text">Đang kiểm tra thông tin tài khoản...</p>
-        ) : subscription ? (
-          <div className="subscription-details">
-            <p>
-              Gói hiện tại: <strong>{subscription.plan_name === 'FREE_TRIAL' ? 'Dùng thử miễn phí (Free Trial)' : 'Thành viên trả phí (Paid Premium)'}</strong>
-            </p>
-            <p>
-              Chi phí: <strong>{formatPrice(subscription.price_vnd)} / tháng</strong>
-            </p>
-            <p>
-              Ngày hết hạn: <strong>{formatDate(subscription.end_date)}</strong>
-            </p>
-            <span className="badge-active">ĐANG HOẠT ĐỘNG</span>
-          </div>
-        ) : (
-          <div className="subscription-details">
-            <p>Gói hiện tại: <strong>Chưa đăng ký gói (Standard)</strong></p>
-            <p>Bạn đang sử dụng các tính năng cơ bản của tài khoản môi giới.</p>
-            <span className="badge-inactive">CHƯA KÍCH HOẠT</span>
-          </div>
-        )}
-      </div>
-
-      {/* Plans Grid */}
-      <div className="pricing-grid">
-        {/* Plan 1: Free Trial / Standard Paid */}
-        <div className={`pricing-card ${subscription?.plan_name === 'FREE_TRIAL' ? 'active-plan' : ''}`}>
-          <div className="plan-header">
-            <h3>Miễn Phí Dùng Thử</h3>
-            <div className="price-row">
-              <span className="amount">0đ</span>
-              <span className="period">/ 1 tháng đầu</span>
-            </div>
-            <p className="plan-desc">Dùng thử 1 tháng. Không tự động gia hạn hoặc thu phí; gói trả phí sẽ được mở sau khi có quy trình thanh toán xác thực.</p>
-          </div>
-
-          <ul className="plan-features">
-            <li>
-              <CheckCircle2 size={18} color="#10b981" />
-              <span>Đăng tin bất động sản cơ bản</span>
-            </li>
-            <li>
-              <CheckCircle2 size={18} color="#10b981" />
-              <span>Quản lý tin đăng và bộ lọc</span>
-            </li>
-            <li>
-              <CheckCircle2 size={18} color="#10b981" />
-              <span>Tiếp cận khách hàng tìm kiếm tự nhiên</span>
-            </li>
-            <li>
-              <CheckCircle2 size={18} color="#10b981" />
-              <span>Hỗ trợ email chuẩn</span>
-            </li>
-          </ul>
-
-          <div className="plan-action">
-            {subscription?.plan_name === 'FREE_TRIAL' ? (
-              <button className="btn-plan-disabled" disabled>
-                Đang sử dụng gói dùng thử
-              </button>
-            ) : subscription?.plan_name === 'PAID' ? (
-              <button className="btn-plan-disabled" disabled>
-                Bạn đang sử dụng gói Premium cao hơn
-              </button>
-            ) : (
-              <button 
-                className="btn-plan-action" 
-                onClick={() => handleSubscribe('FREE_TRIAL')}
-                disabled={actionLoading}
-              >
-                Kích hoạt dùng thử ngay
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Paid activation is intentionally unavailable until a verified payment flow exists. */}
-        <div className={`pricing-card popular-plan ${subscription?.plan_name === 'PAID' ? 'active-plan' : ''}`}>
-          <div className="popular-badge">KHUYÊN DÙNG</div>
-          <div className="plan-header">
-            <h3>Gói Premium</h3>
-            <div className="price-row">
-              <span className="amount">1.000.000đ</span>
-              <span className="period">/ tháng</span>
-            </div>
-            <p className="plan-desc">Gói tiêu chuẩn dành cho môi giới chuyên nghiệp cần duy trì hoạt động lâu dài.</p>
-          </div>
-
-          <ul className="plan-features">
-            <li>
-              <CheckCircle2 size={18} color="#10b981" />
-              <span>Duy trì đăng tin không giới hạn</span>
-            </li>
-            <li>
-              <CheckCircle2 size={18} color="#10b981" />
-              <span>Quản lý tin đăng và bộ lọc nâng cao</span>
-            </li>
-            <li>
-              <CheckCircle2 size={18} color="#10b981" />
-              <span>Tiếp cận khách hàng ổn định</span>
-            </li>
-            <li>
-              <CheckCircle2 size={18} color="#10b981" />
-              <span>Hỗ trợ kỹ thuật 24/7</span>
-            </li>
-          </ul>
-
-          <div className="plan-action">
-            {subscription?.plan_name === 'PAID' ? (
-              <button className="btn-plan-disabled" disabled>
-                Gói Premium đang hoạt động
-              </button>
-            ) : (
-              <button className="btn-plan-disabled" disabled>
-                Tạm chưa hỗ trợ thanh toán
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Plan 2: Plus Plan */}
-        <div className="pricing-card premium-plan">
-          <div className="plan-header">
-            <div className="premium-icon-row">
-              <Sparkles size={20} color="#f59e0b" />
-              <span>Gói Nâng Cao (Plus Plan)</span>
-            </div>
-            <div className="price-row">
-              <span className="amount-contact">Liên hệ</span>
-            </div>
-            <p className="plan-desc">Giải pháp tối ưu hóa tối đa doanh số dành cho các nhà môi giới xuất sắc hoặc doanh nghiệp.</p>
-          </div>
-
-          <ul className="plan-features">
-            <li>
-              <CheckCircle2 size={18} color="#f59e0b" />
-              <span style={{ fontWeight: 700 }}>Đẩy tin đăng lên đầu (Promote posts)</span>
-            </li>
-            <li>
-              <CheckCircle2 size={18} color="#f59e0b" />
-              <span style={{ fontWeight: 700 }}>Tăng khả năng tiếp cận khách hàng tiềm năng (Increase reachout)</span>
-            </li>
-            <li>
-              <CheckCircle2 size={18} color="#f59e0b" />
-              <span style={{ fontWeight: 700 }}>Công cụ quản lý bán hàng nâng cao (Higher sales tools)</span>
-            </li>
-            <li>
-              <CheckCircle2 size={18} color="#f59e0b" />
-              <span>Chăm sóc khách hàng VIP & hỗ trợ hotline riêng</span>
-            </li>
-          </ul>
-
-          <div className="plan-action">
-            <a 
-              href="mailto:contact@swipenest.com?subject=Đăng ký gói Plus Plan Swipe Nest" 
-              className="btn-plan-contact"
-            >
-              Liên hệ chúng tôi
-            </a>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default AgentPricing;
+        <section className="billing-history current-subscription-card" aria-labelledby="billing-history-title"><div className="billing-heading"><h2 id="billing-history-title">Lịch sử thanh toán</h2><button disabled={busy} onClick={() => act(load)}>Làm mới</button></div>
+          {!data.history.items.length ? <p>Chưa có đơn thanh toán.</p> : <div className="billing-table-wrap"><table><thead><tr><th>Mã đơn / ngày tạo</th><th>Gói</th><th>Số tiền</th><th>Trạng thái</th><th>Chi tiết</th></tr></thead><tbody>{data.history.items.map((order) => <tr key={order.id}><td>#{order.orderCode}<small>{billingDate(order.createdAt)}</small></td><td>{order.planName}</td><td>{billingMoney(order.amount)}</td><td>{paymentStatus(order.status)}</td><td><Link to={`/sale/payment/${order.id}`}>{['CREATING', 'PENDING'].includes(order.status) ? 'Tiếp tục / kiểm tra' : 'Xem giao dịch'}</Link></td></tr>)}</tbody></table></div>}
+          <div className="billing-pagination"><button disabled={page === 1 || busy} onClick={() => setPage(page - 1)}>Trước</button><span>Trang {page} · {data.history.total} đơn</span><button disabled={page * 10 >= data.history.total || busy} onClick={() => setPage(page + 1)}>Sau</button></div>
+        </section>
+      </>}
+  </div>;
+}
