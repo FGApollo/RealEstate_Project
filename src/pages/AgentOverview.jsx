@@ -94,15 +94,43 @@ const AgentOverview = () => {
       if (response.ok) {
         setData(prev => ({
           ...prev,
-          totalProperties: Math.max(0, prev.totalProperties - 1),
-          activeListings: (prev.activeListings || []).filter(listing => listing.id !== id)
+          activeListings: (prev.activeListings || []).map(listing => 
+            listing.id === id ? { ...listing, status: 'DELETED' } : listing
+          )
         }));
       } else {
-        alert('Xoá tin đăng thất bại.');
+        alert('Gỡ tin đăng thất bại.');
       }
     } catch (err) {
       console.error(err);
       alert('Lỗi kết nối server.');
+    }
+  };
+
+  const handleUpdateStatus = async (id, newStatus) => {
+    try {
+      const response = await apiFetch(`${API_BASE_URL}/api/properties/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      });
+      if (response.ok) {
+        setData(prev => ({
+          ...prev,
+          activeListings: (prev.activeListings || []).map(listing => 
+            listing.id === id ? { ...listing, status: newStatus } : listing
+          )
+        }));
+        return true;
+      } else {
+        const errData = await response.json().catch(() => ({}));
+        alert(errData.error || 'Cập nhật trạng thái thất bại.');
+        return false;
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Lỗi kết nối server.');
+      return false;
     }
   };
 
@@ -286,6 +314,7 @@ const AgentOverview = () => {
               currentUser={currentUser}
               onEditProperty={handleEditProperty}
               onDeleteProperty={handleDeleteProperty}
+              onUpdateStatus={handleUpdateStatus}
             />
           )}
 

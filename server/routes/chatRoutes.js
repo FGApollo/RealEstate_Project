@@ -8,6 +8,7 @@ router.use(authenticate);
 
 router.get('/messages', rateLimiters.read, chatController.getMessages);
 router.post('/messages', rateLimiters.message, chatController.sendMessage);
+router.post('/read', rateLimiters.write, chatController.markMessagesAsRead);
 router.get('/conversations', rateLimiters.read, chatController.getConversations);
 router.post('/funnel', requireRole('AGENT'), rateLimiters.write, chatController.updateFunnelStage);
 router.get('/funnel/stats', requireRole('AGENT'), rateLimiters.read, chatController.getFunnelStats);

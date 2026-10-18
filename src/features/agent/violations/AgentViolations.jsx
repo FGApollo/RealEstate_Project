@@ -159,6 +159,7 @@ const AgentViolations = ({ currentUser }) => {
 
   const handleSubmitAppeal = async (e) => {
     e.preventDefault();
+    if (submitting) return;
     if (!selectedReport || !appealReason.trim()) {
       alert('Vui lòng nhập lý do giải trình chi tiết.');
       return;

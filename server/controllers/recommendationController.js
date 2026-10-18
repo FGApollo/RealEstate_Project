@@ -11,9 +11,11 @@ const getRecommendations = async (req, res) => {
     });
     return res.status(200).json({ properties: properties.map(toPublicProperty), pagination });
   } catch (error) {
+    console.error('getRecommendations error:', error);
     return res.status(error.statusCode || 500).json({
       error: error.statusCode ? error.message : 'Could not load recommendations.',
-      ...(error.code ? { code: error.code } : {})
+      ...(error.code ? { code: error.code } : {}),
+      details: process.env.NODE_ENV === 'production' ? undefined : error.message
     });
   }
 };

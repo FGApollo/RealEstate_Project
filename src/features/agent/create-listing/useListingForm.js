@@ -26,7 +26,7 @@ const DEFAULT_LISTING = (currentUser) => ({
   features: [],
   images: [],
   lifestyle_tags: [],
-  contact_phone: currentUser?.phone || '0987654321',
+  contact_phone: currentUser?.phone || '',
   is_public: true,
   channels: ['Homepage', 'Social'],
   thumbnail: ''
@@ -40,6 +40,7 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
   const [warnings, setWarnings] = useState([]);
   const [showWarningsModal, setShowWarningsModal] = useState(false);
   const [isCheckingSave, setIsCheckingSave] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Location dropdowns
   const [provinces, setProvinces] = useState([]);
@@ -88,12 +89,12 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
     const cleanCity = (city || '').trim();
 
     const queries = [];
-    
+
     // 1. Full detailed address
     if (cleanDetail && cleanWard && cleanDistrict && cleanCity) {
       queries.push(`${cleanDetail}, ${cleanWard}, ${cleanDistrict}, ${cleanCity}`);
     }
-    
+
     // 2. Road/number only without complex compound/building prefix
     if (cleanDetail.includes(',')) {
       const afterComma = cleanDetail.split(',').pop().trim();
@@ -200,7 +201,7 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
           features,
           images,
           lifestyle_tags,
-          contact_phone: prop.contact_phone || currentUser?.phone || '0987654321',
+          contact_phone: prop.contact_phone || currentUser?.phone || '',
           is_public: prop.is_public !== undefined ? prop.is_public : true,
           channels: prop.channels || ['Homepage', 'Social'],
           thumbnail: prop.thumbnail || ''
@@ -479,6 +480,8 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
 
   // Execute direct database save
   const executeSaveListing = async () => {
+    if (isSaving) return;
+    setIsSaving(true);
     setShowWarningsModal(false);
     try {
       const payload = {
@@ -541,11 +544,26 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
     } catch (err) {
       console.error(err);
       alert('Lỗi kết nối server.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
   // Submit handler (create or edit) - with validation checks
   const handleSubmitListing = async () => {
+    if (isCheckingSave || isSaving) return;
+
+    if (mode === 'create' && currentUser?.verification_status !== 'VERIFIED') {
+      alert('Tài khoản chưa hoàn tất xác thực KYC. Vui lòng xác thực danh tính trước khi đăng tin.');
+      return;
+    }
+
+    const cleanPhone = (listing.contact_phone || currentUser?.phone || '').trim().replace(/[\s().-]/g, '').replace(/^\+84/, '0');
+    if (!/^0[35789]\d{8}$/.test(cleanPhone)) {
+      alert('Vui lòng cung cấp số điện thoại liên hệ hợp lệ (số di động Việt Nam 10 chữ số).');
+      return;
+    }
+
     if (!['RENT', 'SALE'].includes(listing.listing_type)) {
       alert('Vui lòng chọn tin cho thuê hoặc mua bán để Swipe Nest gợi ý đúng nhu cầu.');
       return;
@@ -593,16 +611,20 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
         const checkData = await checkRes.json();
         const activeWarnings = [];
 
+        // F31: Multiple agents can list the same property - no blocking or warning needed for similarOther.
+        // If agent re-lists their own property, prompt confirmation (isBlocking: false) while backend silently penalizes display score.
         if (checkData.similarOwn) {
           activeWarnings.push({
             type: 'OWN_SPAM',
-            text: 'Trông giống như bạn đã đăng căn này rồi. App tự tối ưu phân phối nên bạn không lo trôi bài. Bạn có chắc muốn đăng tiếp?'
+            isBlocking: false,
+            text: 'Bạn đã có một bất động sản tương tự trong hệ thống của mình. Bạn có chắc chắn muốn tiếp tục đăng tin này không?'
           });
         }
         if (checkData.isMultiListing) {
           activeWarnings.push({
             type: 'MULTI_LISTING',
-            text: 'Nền tảng khuyến khích bạn chỉ đăng thông tin của một căn duy nhất để tăng hiệu quả tiếp cận khách hàng. (Phát hiện giỏ hàng: ' + (checkData.geminiReason || 'Nhiều căn hộ') + ')'
+            isBlocking: true,
+            text: 'Mô tả chứa dấu hiệu giỏ hàng rác / nhiều căn hộ (' + (checkData.geminiReason || 'Nhiều căn hộ') + '). Quy định sàn yêu cầu mỗi bài đăng chỉ đại diện cho một căn duy nhất.'
           });
         }
 
@@ -648,6 +670,7 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
     showWarningsModal,
     setShowWarningsModal,
     isCheckingSave,
+    isSaving,
     executeSaveListing
   };
 };

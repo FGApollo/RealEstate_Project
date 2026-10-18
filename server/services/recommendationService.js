@@ -115,6 +115,10 @@ const scoreProperty = (property, preference, behaviorProfile) => {
     score -= SCORING.legacyListingPenalty;
     reasons.push('legacy listing type not classified');
   }
+  const priorityBoost = Number(property.priority_score) || 0;
+  if (priorityBoost !== 0) {
+    score += priorityBoost;
+  }
   return { score: Math.round(score + behaviorDelta), baseScore: Math.round(score), behaviorDelta, reasons };
 };
 
