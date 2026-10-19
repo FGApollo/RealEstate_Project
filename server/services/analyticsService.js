@@ -1,5 +1,5 @@
 const repository = require('../repositories/analyticsRepository');
-const { parseAnalyticsQuery, parsePagination } = require('./analyticsQuery');
+const { parseAnalyticsQuery, parsePagination, parseActiveAgentsQuery } = require('./analyticsQuery');
 
 // An absent ledger is unknown revenue, not zero revenue. No subscription price
 // or status is accepted as evidence of a settled payment.
@@ -30,4 +30,7 @@ async function getTransactions(query, now = new Date()) {
     || { available: false, reason: 'Chưa có dữ liệu thanh toán xác thực', items: [], total: null, ...pagination };
 }
 
-module.exports = { getDashboard, getTransactions };
+async function getActiveAgents(query, now = new Date()) {
+  return repository.getActiveAgents(parseActiveAgentsQuery(query, now));
+}
+module.exports = { getDashboard, getTransactions, getActiveAgents };

@@ -49,4 +49,24 @@ function parsePagination(query = {}) {
   return { page: integer(query.page, 1, 10000), limit: integer(query.limit, 10, 50) };
 }
 
-module.exports = { parseAnalyticsQuery, parsePagination, TIME_ZONE };
+function parseActiveAgentsQuery(query = {}, now = new Date()) {
+  const { at, page, limit, ...unknown } = query;
+  if (Object.keys(unknown).length) throw fail('Tham số danh sách Agent không hợp lệ.');
+  const pagination = parsePagination({ ...(page !== undefined ? { page } : {}), ...(limit !== undefined ? { limit } : {}) });
+  if (at !== undefined && (typeof at !== 'string'
+    || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:\d{2})$/.test(at))) {
+    throw fail('Mốc chốt danh sách Agent không hợp lệ.');
+  }
+  if (at !== undefined) {
+    dateNumber(at.slice(0, 10));
+    if (Number(at.slice(11, 13)) > 23 || Number(at.slice(14, 16)) > 59 || Number(at.slice(17, 19)) > 59) {
+      throw fail('Mốc chốt danh sách Agent không hợp lệ.');
+    }
+  }
+  const snapshot = at === undefined ? now : new Date(at);
+  if (!Number.isFinite(snapshot.getTime()) || snapshot < new Date('2000-01-01T00:00:00Z')
+    || snapshot.getTime() > now.getTime() + 1000) throw fail('Mốc chốt danh sách Agent không hợp lệ.');
+  return { ...pagination, snapshotAt: at === undefined ? snapshot.toISOString() : at };
+}
+
+module.exports = { parseAnalyticsQuery, parsePagination, parseActiveAgentsQuery, TIME_ZONE };

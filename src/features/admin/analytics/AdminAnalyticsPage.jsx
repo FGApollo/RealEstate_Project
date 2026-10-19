@@ -8,6 +8,7 @@ import { TrendChart, ComparisonChart, DistributionChart, Empty } from './Analyti
 import { number, money, percent } from './analyticsFormat';
 import './AdminAnalyticsPage.css';
 import PaymentTransactions from './PaymentTransactions';
+import ActiveSubscriptionAgents from './ActiveSubscriptionAgents';
 
 const dateTime = (value) => new Date(value).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
 const today = () => new Date(Date.now() + 7 * 3600000).toISOString().slice(0, 10);
@@ -84,7 +85,7 @@ function UserAnalytics({ data, metric, onMetricChange }) {
   </section>;
 }
 
-function SubscriptionAnalytics({ subscriptions, packages }) {
+function SubscriptionAnalytics({ subscriptions, packages, snapshotAt, onRefresh }) {
   return <section className="analytics-section" aria-labelledby="analytics-subscriptions-title">
     <h2 id="analytics-subscriptions-title"><BriefcaseBusiness size={20} /> Gói dịch vụ môi giới</h2>
     <div className="analytics-kpis">
@@ -95,6 +96,9 @@ function SubscriptionAnalytics({ subscriptions, packages }) {
     </div>
     <div className="analytics-status-strip"><span>Tổng môi giới <strong>{number(subscriptions.totalAgents)}</strong></span><span><i /> Đang sử dụng gói dịch vụ <strong>{number(subscriptions.activeAgents)}</strong></span><span>Hiện không sử dụng gói <strong>{number(subscriptions.withoutActive)}</strong></span></div>
     <div className="analytics-grid">
+      <Panel title="Agent đang sử dụng gói dịch vụ" subtitle="Agent có gói đang hoạt động, đã bắt đầu và còn hạn tại cùng mốc chốt với thống kê" wide>
+        <ActiveSubscriptionAgents snapshotAt={snapshotAt} expectedTotal={subscriptions.activeAgents} onRefresh={onRefresh} />
+      </Panel>
       <Panel title="Tỷ trọng gói đang dùng" subtitle="Mỗi môi giới một gói · tỷ lệ trên tổng môi giới đang sử dụng gói dịch vụ">
         <DistributionChart data={packages} dataKey="activeAgents" />
       </Panel>
@@ -146,12 +150,12 @@ function AnalyticsDefinitions({ users, subscriptions }) {
   </details>;
 }
 
-function DashboardContent({ data, section, onNavigate, userMetric, onUserMetricChange, comparison, onComparisonChange, revision }) {
+function DashboardContent({ data, section, onNavigate, userMetric, onUserMetricChange, comparison, onComparisonChange, revision, onRefresh }) {
   return <>
     <p className="analytics-scope">Mốc chốt: {dateTime(data.snapshotAt)} · Trong kỳ: {data.filters.start} → {data.filters.end} · Giờ Việt Nam (UTC+7). Tài khoản và gói được phân loại theo vai trò, trạng thái hiện tại.</p>
     {section === 'overview' && <OverviewAnalytics data={data} onNavigate={onNavigate} />}
     {section === 'users' && <UserAnalytics data={data} metric={userMetric} onMetricChange={onUserMetricChange} />}
-    {section === 'subscriptions' && <SubscriptionAnalytics subscriptions={data.subscriptions} packages={data.packages} />}
+    {section === 'subscriptions' && <SubscriptionAnalytics subscriptions={data.subscriptions} packages={data.packages} snapshotAt={data.snapshotAt} onRefresh={onRefresh} />}
     {section === 'revenue' && <RevenueAnalytics revenue={data.revenue} packages={data.packages} bucket={data.filters.bucket} comparison={comparison} onComparisonChange={onComparisonChange} />}
     {section === 'transactions' && <Panel title="Giao dịch gần đây" subtitle="Ngày · môi giới · gói · số tiền · trạng thái" wide><PaymentTransactions filters={data.filters.preset === 'custom' ? { preset: 'custom', start: data.filters.start, end: data.filters.end, bucket: data.filters.bucket } : { preset: data.filters.preset, bucket: data.filters.bucket }} revision={revision} /></Panel>}
     <AnalyticsDefinitions users={data.users} subscriptions={data.subscriptions} />
@@ -202,7 +206,7 @@ export default function AdminAnalyticsPage() {
     <div role="tabpanel" id={`analytics-panel-${activeSection}`} aria-labelledby={`analytics-tab-${activeSection}`} tabIndex={0} aria-live="polite" aria-busy={loading}>
       {loading ? <div className="analytics-loading" role="status"><span className="analytics-sr-only">Đang tải dữ liệu thống kê</span><div className="analytics-kpis">{[0, 1, 2, 3].map((id) => <div className="analytics-skeleton analytics-skeleton-kpi" key={id} />)}</div><div className="analytics-grid"><div className="analytics-skeleton analytics-skeleton-chart" /><div className="analytics-skeleton analytics-skeleton-chart" /></div></div>
         : error ? <div className="analytics-error" role="alert"><Info size={24} /><h2>Không thể tải thống kê</h2><p>{error}</p><button type="button" onClick={() => setRevision((value) => value + 1)}>Thử lại</button></div>
-          : <DashboardContent data={data} section={activeSection} onNavigate={setActiveSection} userMetric={userMetric} onUserMetricChange={setUserMetric} comparison={comparison} onComparisonChange={setComparison} revision={revision} />}
+          : <DashboardContent data={data} section={activeSection} onNavigate={setActiveSection} userMetric={userMetric} onUserMetricChange={setUserMetric} comparison={comparison} onComparisonChange={setComparison} revision={revision} onRefresh={() => setRevision((value) => value + 1)} />}
     </div>
   </div>;
 }

@@ -39,9 +39,14 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
     const app = express();
     let delay = 1000;
     let failure = false;
+    let agentFailure = false;
     app.use('/api/admin/analytics/overview', async (_req, res, next) => {
       if (delay) await new Promise((resolve) => setTimeout(resolve, delay));
       if (failure) return res.status(503).json({ error: 'Lỗi thử nghiệm, hãy thử lại.' });
+      next();
+    });
+    app.use('/api/admin/analytics/subscriptions/agents', (_req, res, next) => {
+      if (agentFailure) return res.status(503).json({ error: 'Không thể tải danh sách Agent trong kiểm thử.' });
       next();
     });
     app.get('/api/admin/kyc/rejected', authenticate, requireRole('ADMIN'), (_req, res) => res.json([]));
@@ -82,7 +87,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
     checks.push('Admin shell → apiFetch → real JWT/session → service → PostgreSQL → 13-account KPI and charts');
     await page.screenshot({ path: path.join(out, 'desktop.png'), fullPage: true });
     await page.screenshot({ path: path.join(out, 'desktop-overview.png') });
-    const navigationRequests = requests.length;
+    let navigationRequests = requests.length;
     await page.getByRole('button', { name: 'Xem chi tiết', exact: true }).first().click();
     assert.equal(await page.getByRole('tab', { name: 'Người dùng', exact: true }).getAttribute('aria-selected'), 'true');
     await page.getByRole('heading', { name: 'Người dùng hệ thống', exact: true }).waitFor();
@@ -96,7 +101,13 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
     await page.getByLabel('Nhóm người dùng trên biểu đồ').selectOption('comparison');
     await page.getByRole('group', { name: 'Khách hàng mới, Môi giới mới', exact: true }).waitFor();
     await page.getByRole('tab', { name: 'Gói dịch vụ', exact: true }).click();
-    await page.getByRole('table').waitFor();
+    await page.locator('.analytics-agents-table').waitFor();
+    assert.equal(await page.locator('.analytics-agents-table tbody tr').count(), 2);
+    const activeRows = await page.locator('.analytics-agents-table tbody tr').allTextContents();
+    assert.ok(activeRows[0].includes('Fixture 10') && activeRows[0].includes('Vô hiệu hóa'));
+    assert.ok(activeRows[1].includes('Fixture 9') && activeRows[1].includes('DB_PLAN_B'));
+    assert.ok((await page.locator('.analytics-agent-summary').textContent()).startsWith('Tổng 2 Agent'));
+    assert.equal(requests.length, navigationRequests);
     const subscriptionCards = page.getByRole('region', { name: 'Gói dịch vụ môi giới' }).locator('.analytics-kpi');
     assert.equal(await subscriptionCards.filter({ has: page.getByText('Đang sử dụng gói dịch vụ', { exact: true }) }).locator('.analytics-kpi-value').textContent(), '2');
     const neverRegistered = subscriptionCards.filter({ has: page.getByText('Chưa đăng ký gói dịch vụ', { exact: true }) });
@@ -108,6 +119,32 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
     checks.push('Subscription labels reconcile with SQL: 2 current users vs 3 historical subscribers; 1 never-registered vs 2 without an active plan; expired + cancelled = 2 records');
     assert.equal(await page.getByRole('heading', { name: 'Người dùng hệ thống', exact: true }).count(), 0);
     await page.screenshot({ path: path.join(out, 'subscriptions-desktop.png'), fullPage: true });
+    checks.push('Active Agent table uses authenticated SQL data, matches KPI=2, lists each Agent once with current plan, dates and account status');
+    await db.exec(`INSERT INTO users(id,name,email,role,created_at)
+      SELECT n,'Paged Agent '||n,'agent'||n||'@example.test','AGENT','2020-01-01' FROM generate_series(100,111) n;
+      INSERT INTO seller_subscriptions(id,user_id,plan_name,status,start_date,end_date,created_at)
+      SELECT n,n,'PAGED_PLAN','ACTIVE','2020-01-01','2099-01-01','2020-01-01' FROM generate_series(100,111) n;`);
+    await page.getByRole('button', { name: 'Làm mới', exact: true }).click();
+    await page.getByText('Trang 1 / 2', { exact: true }).waitFor();
+    assert.equal(await page.locator('.analytics-agents-table tbody tr').count(), 10);
+    await page.getByRole('button', { name: 'Trang Agent tiếp', exact: true }).click();
+    await page.getByText('Trang 2 / 2', { exact: true }).waitFor();
+    assert.equal(await page.locator('.analytics-agents-table tbody tr').count(), 4);
+    await page.getByRole('button', { name: 'Trang Agent trước', exact: true }).click();
+    await page.getByText('Trang 1 / 2', { exact: true }).waitFor();
+    agentFailure = true;
+    await page.getByRole('button', { name: 'Làm mới', exact: true }).click();
+    await page.getByRole('button', { name: 'Thử lại danh sách', exact: true }).waitFor();
+    assert.equal(await page.getByRole('heading', { name: 'Chi tiết từng gói', exact: true }).count(), 1);
+    agentFailure = false;
+    await page.getByRole('button', { name: 'Thử lại danh sách', exact: true }).click();
+    await page.getByText('Trang 1 / 2', { exact: true }).waitFor();
+    await db.exec('DELETE FROM users WHERE id BETWEEN 100 AND 111');
+    await page.getByRole('button', { name: 'Làm mới', exact: true }).click();
+    await page.getByText('Trang 1 / 1', { exact: true }).waitFor();
+    assert.equal(await page.locator('.analytics-agents-table tbody tr').count(), 2);
+    navigationRequests = requests.length;
+    checks.push('Active Agent table paginates 14 agents as 10+4, refresh resets pagination, API failure retries without blocking charts');
     await page.getByRole('tab', { name: 'Doanh thu', exact: true }).click();
     assert.ok((await page.locator('.analytics-notice').textContent()).includes('Chưa có dữ liệu thanh toán xác thực'));
     assert.equal(await page.getByRole('table').count(), 0);
@@ -168,6 +205,11 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
       if (viewport.width === 390) await page.screenshot({ path: path.join(out, 'mobile-overview.png') });
       for (const label of ['Tổng quan', 'Gói dịch vụ', 'Doanh thu', 'Giao dịch', 'Người dùng']) {
         await page.getByRole('tab', { name: label, exact: true }).click();
+        if (label === 'Gói dịch vụ') {
+          await page.locator('.analytics-agents-table').waitFor();
+          await page.locator('.analytics-panel').filter({ has: page.getByRole('heading', { name: 'Agent đang sử dụng gói dịch vụ', exact: true }) })
+            .screenshot({ path: path.join(out, `active-agents-${viewport.width === 390 ? 'mobile' : 'tablet'}.png`) });
+        }
         const size = await page.evaluate(() => ({ width: innerWidth, content: document.documentElement.scrollWidth }));
         assert.ok(size.content <= size.width, `${label} overflow at ${viewport.width}`);
         assert.equal(await page.getByRole('tabpanel').count(), 1);
@@ -189,6 +231,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
     await page.locator('.analytics-scope').waitFor();
     const subscriptions = page.getByRole('region', { name: 'Gói dịch vụ môi giới' });
     assert.ok(await subscriptions.getByText('Chưa có dữ liệu trong khoảng thời gian này.', { exact: true }).count() >= 2);
+    await page.getByText('Chưa có Agent đang sử dụng gói dịch vụ tại mốc chốt.', { exact: true }).waitFor();
     checks.push('Empty subscription charts/table remain stable');
     await page.getByRole('button', { name: 'Kiểm duyệt tài khoản', exact: true }).first().click();
     await page.getByText('Không có hồ sơ KYC nào bị từ chối', { exact: true }).waitFor();
