@@ -27,6 +27,7 @@ async function createAnalyticsDatabase() {
     GRANT SELECT ON users, seller_subscriptions TO service_role;
   `);
   await db.exec(fs.readFileSync(path.join(__dirname, '../../db-migration/010-admin-analytics.sql'), 'utf8'));
+  await db.exec(fs.readFileSync(path.join(__dirname, '../../db-migration/016-admin-active-subscription-agents.sql'), 'utf8'));
   return db;
 }
 
@@ -61,6 +62,13 @@ function connectTestDatabase(supabase, db) {
   const original = { from: supabase.from, rpc: supabase.rpc };
   supabase.rpc = async (name, args) => {
     if (['admin_payment_revenue','admin_payment_transactions'].includes(name)) return { data: null, error: { code: 'PGRST202' } };
+    if (name === 'admin_analytics_active_agents') {
+      try {
+        const result = await db.query('SELECT public.admin_analytics_active_agents($1::timestamptz,$2::integer,$3::integer) AS data',
+          [args.p_snapshot_at,args.p_page,args.p_limit]);
+        return { data: result.rows[0].data, error: null };
+      } catch (error) { return { data: null, error }; }
+    }
     if (name !== 'admin_analytics_dashboard') throw new Error(`Unexpected test RPC ${name}`);
     try { return { data: await queryDashboard(db, args.p_start, args.p_end, args.p_bucket, args.p_as_of), error: null }; }
     catch (error) { return { data: null, error }; }

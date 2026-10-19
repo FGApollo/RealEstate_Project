@@ -17,6 +17,7 @@ router.use('/analytics', (req, res, next) => {
 
 router.get('/analytics/overview', rateLimiters.read, analyticsController.getDashboard);
 router.get('/analytics/transactions', rateLimiters.read, analyticsController.getTransactions);
+router.get('/analytics/subscriptions/agents', rateLimiters.read, analyticsController.getActiveAgents);
 
 // KYC is handled by adminKycRoutes, mounted at /api/admin/kyc.
 

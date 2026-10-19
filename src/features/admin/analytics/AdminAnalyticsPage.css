@@ -81,3 +81,7 @@
 @media (max-width: 480px) { .analytics-kpis { grid-template-columns: minmax(0, 1fr); }.analytics-kpi-value { font-size: 28px; }.analytics-header h1 { font-size: 26px; } }
 @media (prefers-reduced-motion: reduce) { .analytics-skeleton, .analytics-spin { animation: none; } }
 .analytics-transaction-pagination { display:flex; justify-content:flex-end; align-items:center; gap:16px; margin-top:18px; }
+.analytics-agent-summary { color:#64748b; font-size:13px; line-height:1.6; margin:0 0 16px; }
+.analytics-agents-table td:first-child { min-width:180px; max-width:280px; overflow-wrap:anywhere; }
+.analytics-agents-table td small { display:block; color:#64748b; font-size:12px; margin-top:5px; }
+.analytics-agents-table td { vertical-align:top; }

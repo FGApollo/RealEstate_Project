@@ -8,7 +8,7 @@ const crypto = require('node:crypto');
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const { createAnalyticsDatabase, seedAnalyticsDatabase, queryDashboard, connectTestDatabase } = require('./helpers/analyticsDatabase');
-const { parseAnalyticsQuery, parsePagination } = require('../services/analyticsQuery');
+const { parseAnalyticsQuery, parsePagination, parseActiveAgentsQuery } = require('../services/analyticsQuery');
 const service = require('../services/analyticsService');
 const { supabase } = require('../config/supabase');
 const { getJwtConfig } = require('../services/authSessionService');
@@ -92,6 +92,56 @@ test('subscription KPIs distinguish current users, previous signups and never-re
   assert.equal(started.subscriptions.activeAgents, 3);
   assert.equal(started.packages.find((item) => item.name === 'FREE_TRIAL').activeAgents, 1);
   assert.equal(started.subscriptions.neverSubscribed, 0);
+});
+
+test('active Agent detail matches the KPI, selects one current plan and paginates before returning rows', async () => {
+  const now = new Date('2026-10-16T12:00:00Z');
+  const dashboard = await service.getDashboard({ start: '2026-10-10', end: '2026-10-16' }, now);
+  const first = await service.getActiveAgents({ at: dashboard.snapshotAt, page: '1', limit: '1' }, now);
+  const second = await service.getActiveAgents({ at: dashboard.snapshotAt, page: '2', limit: '1' }, now);
+  assert.equal(first.total, dashboard.subscriptions.activeAgents);
+  assert.equal(second.total, first.total);
+  assert.equal(first.items.length, 1);
+  assert.equal(second.items.length, 1);
+  assert.deepEqual([first.items[0].agentId, second.items[0].agentId], [10, 9]);
+  assert.equal(first.items[0].accountActive, false);
+  assert.equal(second.items[0].planName, 'DB_PLAN_B');
+  assert.equal(first.items[0].name, 'Fixture 10');
+  assert.equal(first.items[0].email, 'fixture10@example.test');
+  assert.equal(new Date(first.items[0].endDate).toISOString(), '2026-11-10T00:00:00.000Z');
+  assert.deepEqual(Object.keys(first.items[0]).sort(), ['accountActive', 'agentId', 'email', 'endDate', 'name', 'planName', 'startDate']);
+  const pastEnd = await service.getActiveAgents({ at: dashboard.snapshotAt, page: '3', limit: '1' }, now);
+  assert.equal(pastEnd.total, 2);
+  assert.deepEqual(pastEnd.items, []);
+});
+
+test('active Agent detail excludes expired/cancelled/future/missing dates and other roles exactly like the KPI', async () => {
+  await db.exec(`UPDATE seller_subscriptions SET end_date='2026-10-16 12:00:00' WHERE id=4;
+    INSERT INTO seller_subscriptions(id,user_id,plan_name,status,start_date,end_date,created_at) VALUES
+      (6,12,'FUTURE','ACTIVE','2026-10-17','2026-11-17','2026-10-11'),
+      (7,12,'NO_EXPIRY','ACTIVE','2026-10-11',NULL,'2026-10-11'),
+      (8,1,'CUSTOMER','ACTIVE','2026-10-11','2026-11-11','2026-10-11');`);
+  const now = new Date('2026-10-16T12:00:00Z');
+  const dashboard = await service.getDashboard({ start: '2026-10-10', end: '2026-10-16' }, now);
+  const detail = await service.getActiveAgents({ at: dashboard.snapshotAt }, now);
+  assert.equal(detail.total, dashboard.subscriptions.activeAgents);
+  assert.deepEqual(detail.items.map((item) => item.agentId), [9]);
+  await db.exec('TRUNCATE seller_subscriptions');
+  const empty = await service.getActiveAgents({ at: dashboard.snapshotAt }, now);
+  assert.equal(empty.total, 0);
+  assert.deepEqual(empty.items, []);
+});
+
+test('active Agent query validates snapshot, pagination, duplicate values and spoofed identity', () => {
+  const now = new Date('2026-10-16T12:00:00Z');
+  assert.deepEqual(parseActiveAgentsQuery({}, now), { page: 1, limit: 10, snapshotAt: now.toISOString() });
+  const precise = '2026-10-16T11:59:59.123456+00:00';
+  assert.equal(parseActiveAgentsQuery({ at: precise }, now).snapshotAt, precise);
+  for (const query of [
+    { at: ['2026-10-16T12:00:00Z'] }, { at: '2026-10-16' }, { at: '2026-02-30T00:00:00Z' },
+    { at: '2026-10-16T24:00:00Z' }, { at: '1999-01-01T00:00:00Z' }, { at: '2026-10-17T00:00:00Z' },
+    { page: '0' }, { page: '10001' }, { limit: '51' }, { limit: ['10'] }, { userId: '9' }, { role: 'ADMIN' }
+  ]) assert.throws(() => parseActiveAgentsQuery(query, now), (error) => error.statusCode === 400);
 });
 
 test('7/30-day filters reconcile KPI totals and growth chart across every bucket', async () => {
@@ -191,7 +241,7 @@ async function tokenFor(id, role = 'ADMIN', active = true) {
 }
 
 test('HTTP authentication: guest 401, USER/AGENT 403, active ADMIN 200 with real JWT/session/SQL', async () => {
-  for (const path of ['/analytics/overview', '/analytics/transactions']) {
+  for (const path of ['/analytics/overview', '/analytics/transactions', '/analytics/subscriptions/agents']) {
     assert.equal((await fetch(`${base}${path}`)).status, 401);
     for (const id of [1, 9]) {
       const token = await tokenFor(id, id === 1 ? 'USER' : 'AGENT');
@@ -206,6 +256,9 @@ test('HTTP authentication: guest 401, USER/AGENT 403, active ADMIN 200 with real
       assert.equal(body.users.total, 13);
       assert.equal(body.revenue.available, false);
       for (const forbidden of ['email', 'password', 'phone', 'accessToken', 'refresh_token_hash']) assert.ok(!Object.hasOwn(body, forbidden));
+    } else if (path.endsWith('/agents')) {
+      assert.equal(body.total, 2);
+      assert.equal(body.items.length, 2);
     } else assert.equal(body.total, null);
   }
 });
@@ -233,6 +286,13 @@ test('database RPC rejects anon/authenticated execute and enforces bounds on dir
     has_function_privilege('authenticated','admin_analytics_dashboard(date,date,text,timestamptz)','EXECUTE') AS authenticated,
     has_function_privilege('service_role','admin_analytics_dashboard(date,date,text,timestamptz)','EXECUTE') AS service`);
   assert.deepEqual(rows[0], { anon: false, authenticated: false, service: true });
+  const activePrivileges = await db.query(`SELECT
+    has_function_privilege('anon','admin_analytics_active_agents(timestamptz,integer,integer)','EXECUTE') AS anon,
+    has_function_privilege('authenticated','admin_analytics_active_agents(timestamptz,integer,integer)','EXECUTE') AS authenticated,
+    has_function_privilege('service_role','admin_analytics_active_agents(timestamptz,integer,integer)','EXECUTE') AS service`);
+  assert.deepEqual(activePrivileges.rows[0], { anon: false, authenticated: false, service: true });
+  await assert.rejects(db.query("SELECT admin_analytics_active_agents('2026-10-16T12:00:00Z',1,51)"), /Invalid active Agent/);
+  await assert.rejects(db.query("SELECT admin_analytics_active_agents('2099-01-01',1,10)"), /Invalid active Agent/);
   await assert.rejects(queryDashboard(db, '2026-02-01', '2026-01-01'), /Invalid analytics/);
   await assert.rejects(queryDashboard(db, '2020-01-01', '2026-10-01', 'day'), /Invalid analytics/);
 });
@@ -242,8 +302,10 @@ test('missing migration and query failures return actionable safe errors, withou
   try {
     supabase.rpc = async () => ({ error: { code: 'PGRST202', message: 'internal schema detail' } });
     await assert.rejects(service.getDashboard({}), (error) => error.statusCode === 503 && error.code === 'ANALYTICS_NOT_CONFIGURED');
+    await assert.rejects(service.getActiveAgents({}), (error) => error.statusCode === 503 && error.code === 'ACTIVE_AGENTS_NOT_CONFIGURED');
     supabase.rpc = async () => ({ error: { code: 'XX000', message: 'secret database details' } });
     await assert.rejects(service.getDashboard({}), (error) => error.statusCode === 500 && !error.message.includes('secret'));
+    await assert.rejects(service.getActiveAgents({}), (error) => error.statusCode === 503 && !error.message.includes('secret'));
   } finally { supabase.rpc = original; }
 });
 
@@ -291,5 +353,9 @@ test('large fixture uses indexed date/active lookups and keeps aggregated respon
   assert.equal(result.userGrowth.length, 7);
   assert.ok(JSON.stringify(result).length < 12000);
   assert.ok(elapsed < 8000);
+  const detail = await service.getActiveAgents({ at: result.snapshotAt, limit: '50' }, new Date('2026-10-16T12:00:00Z'));
+  assert.equal(detail.total, result.subscriptions.activeAgents);
+  assert.equal(detail.items.length, 50);
+  assert.ok(JSON.stringify(detail).length < 30000);
   t.diagnostic(`30,012 accounts + 60,005 subscriptions: ${elapsed.toFixed(1)} ms, ${JSON.stringify(result).length} JSON characters; indexed growth and active-plan lookups verified. All-time totals intentionally scan applicable facts.`);
 });
