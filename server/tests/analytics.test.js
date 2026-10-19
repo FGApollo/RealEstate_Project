@@ -65,6 +65,35 @@ test('renewals/overlaps count unique agents and select the newest active plan', 
   assert.equal(result.packages.reduce((sum, row) => sum + row.newSubscriptions, 0), result.subscriptions.newRecords);
 });
 
+test('subscription KPIs distinguish current users, previous signups and never-registered agents', async () => {
+  const now = new Date('2026-10-16T12:00:00Z');
+  const result = await service.getDashboard({ start: '2026-10-10', end: '2026-10-16' }, now);
+  assert.equal(result.subscriptions.activeAgents, 2);
+  assert.equal(result.subscriptions.everSubscribed, 3);
+  assert.equal(result.subscriptions.neverSubscribed, 1);
+  assert.equal(result.subscriptions.withoutActive, 2);
+  assert.equal(result.subscriptions.activeAgents + result.subscriptions.withoutActive, result.subscriptions.totalAgents);
+  assert.equal(result.subscriptions.expiredRecords + result.subscriptions.cancelledRecords, 2);
+
+  // A future or incomplete registration is still a registration, but is not
+  // current usage. Multiple records and a disabled account do not add agents.
+  await db.exec(`INSERT INTO seller_subscriptions(id,user_id,plan_name,status,start_date,end_date,created_at) VALUES
+    (6,12,'FREE_TRIAL','ACTIVE','2026-10-17','2026-11-17','2026-10-11'),
+    (7,12,'INCOMPLETE','ACTIVE','2026-10-11',NULL,'2026-10-11');`);
+  const future = await service.getDashboard({ start: '2026-10-10', end: '2026-10-16' }, now);
+  assert.equal(future.subscriptions.activeAgents, 2);
+  assert.equal(future.subscriptions.everSubscribed, 4);
+  assert.equal(future.subscriptions.neverSubscribed, 0);
+  assert.equal(future.subscriptions.withoutActive, 2);
+  assert.equal(future.packages.reduce((sum, item) => sum + item.activeAgents, 0), future.subscriptions.activeAgents);
+
+  await db.exec("UPDATE seller_subscriptions SET start_date='2026-10-15' WHERE id=6");
+  const started = await service.getDashboard({ start: '2026-10-10', end: '2026-10-16' }, now);
+  assert.equal(started.subscriptions.activeAgents, 3);
+  assert.equal(started.packages.find((item) => item.name === 'FREE_TRIAL').activeAgents, 1);
+  assert.equal(started.subscriptions.neverSubscribed, 0);
+});
+
 test('7/30-day filters reconcile KPI totals and growth chart across every bucket', async () => {
   for (const bucket of ['day', 'week', 'month', 'year']) {
     const seven = await queryDashboard(db, '2026-10-10', '2026-10-16', bucket);

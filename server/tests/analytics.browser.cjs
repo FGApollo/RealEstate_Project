@@ -71,6 +71,9 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
     checks.push('Loading skeletons; no false zero KPI');
     await page.locator('.analytics-scope').waitFor();
     assert.equal(await page.locator('.analytics-kpi-value').first().textContent(), '13');
+    const overviewUsage = page.locator('.analytics-kpi').filter({ has: page.getByText('Agent sử dụng gói dịch vụ', { exact: true }) });
+    assert.equal(await overviewUsage.locator('.analytics-kpi-value').textContent(), '2');
+    assert.ok((await overviewUsage.locator('small').textContent()).includes('mốc chốt'));
     assert.equal(await page.getByRole('tab').count(), 5);
     assert.equal(await page.getByRole('tab', { name: 'Tổng quan', exact: true }).getAttribute('aria-selected'), 'true');
     assert.equal(await page.getByRole('heading', { name: 'Người dùng hệ thống', exact: true }).count(), 0);
@@ -94,6 +97,15 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
     await page.getByRole('group', { name: 'Khách hàng mới, Môi giới mới', exact: true }).waitFor();
     await page.getByRole('tab', { name: 'Gói dịch vụ', exact: true }).click();
     await page.getByRole('table').waitFor();
+    const subscriptionCards = page.getByRole('region', { name: 'Gói dịch vụ môi giới' }).locator('.analytics-kpi');
+    assert.equal(await subscriptionCards.filter({ has: page.getByText('Đang sử dụng gói dịch vụ', { exact: true }) }).locator('.analytics-kpi-value').textContent(), '2');
+    const neverRegistered = subscriptionCards.filter({ has: page.getByText('Chưa đăng ký gói dịch vụ', { exact: true }) });
+    assert.equal(await neverRegistered.locator('.analytics-kpi-value').textContent(), '1');
+    assert.ok((await neverRegistered.locator('small').textContent()).includes('chưa từng đăng ký'));
+    assert.equal(await subscriptionCards.filter({ has: page.getByText('Hết hạn / hủy', { exact: true }) }).locator('.analytics-kpi-value').textContent(), '2');
+    assert.equal(await page.getByText('Đã từng đăng ký', { exact: true }).count(), 0);
+    assert.equal(await page.getByText('Chưa từng có gói', { exact: true }).count(), 0);
+    checks.push('Subscription labels reconcile with SQL: 2 current users vs 3 historical subscribers; 1 never-registered vs 2 without an active plan; expired + cancelled = 2 records');
     assert.equal(await page.getByRole('heading', { name: 'Người dùng hệ thống', exact: true }).count(), 0);
     await page.screenshot({ path: path.join(out, 'subscriptions-desktop.png'), fullPage: true });
     await page.getByRole('tab', { name: 'Doanh thu', exact: true }).click();

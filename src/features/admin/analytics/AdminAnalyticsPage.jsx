@@ -48,14 +48,14 @@ function OverviewAnalytics({ data, onNavigate }) {
     <div className="analytics-kpis">
       <Kpi icon={Users} label="Tổng tài khoản" value={users.total} growth={users.totalGrowthPercent} detail="Gồm khách hàng, môi giới và Admin · so với đầu kỳ" />
       <Kpi icon={BriefcaseBusiness} label="Tổng môi giới" value={users.agents} growth={users.agentGrowthPercent} detail="So với đầu kỳ · gồm tài khoản vô hiệu hóa" />
-      <Kpi icon={BadgeCheck} label="Agent có gói hiệu lực" value={subscriptions.activeAgents} detail="Mỗi môi giới được tính một lần · gói đang còn hạn" />
+      <Kpi icon={BadgeCheck} label="Agent sử dụng gói dịch vụ" value={subscriptions.activeAgents} detail="Gói đang hoạt động và còn hạn tại mốc chốt · mỗi môi giới được tính một lần" />
       <Kpi icon={Wallet} label="Tổng doanh thu đã thu" value={revenue.totalGross} moneyValue detail={revenue.available ? 'Doanh thu gộp từ giao dịch xác thực' : revenue.reason} />
     </div>
     <div className="analytics-grid">
       <Panel title="Đăng ký tài khoản mới" subtitle="Số đăng ký mới trong từng kỳ" action={detailLink('users')}>
         <TrendChart data={data.userGrowth} series={USER_SERIES.total} bucket={data.filters.bucket} />
       </Panel>
-      <Panel title="Gói dịch vụ đang dùng" subtitle="Tỷ trọng môi giới có gói hiệu lực" action={detailLink('subscriptions')}>
+      <Panel title="Gói dịch vụ đang dùng" subtitle="Tỷ trọng môi giới đang sử dụng gói dịch vụ tại mốc chốt" action={detailLink('subscriptions')}>
         <DistributionChart data={packages} dataKey="activeAgents" />
       </Panel>
     </div>
@@ -88,14 +88,14 @@ function SubscriptionAnalytics({ subscriptions, packages }) {
   return <section className="analytics-section" aria-labelledby="analytics-subscriptions-title">
     <h2 id="analytics-subscriptions-title"><BriefcaseBusiness size={20} /> Gói dịch vụ môi giới</h2>
     <div className="analytics-kpis">
-      <Kpi icon={Users} label="Đã từng đăng ký" value={subscriptions.everSubscribed} detail="Mỗi môi giới được tính một lần, gồm cả gói đã hết hạn" />
-      <Kpi icon={UserRound} label="Chưa từng có gói" value={subscriptions.neverSubscribed} detail={`${number(subscriptions.withoutActive)} môi giới hiện không có gói hiệu lực`} />
+      <Kpi icon={Users} label="Đang sử dụng gói dịch vụ" value={subscriptions.activeAgents} detail="Gói đang hoạt động và còn hạn tại mốc chốt · mỗi môi giới được tính một lần" />
+      <Kpi icon={UserRound} label="Chưa đăng ký gói dịch vụ" value={subscriptions.neverSubscribed} detail="Môi giới chưa từng đăng ký bất kỳ gói nào tính đến mốc chốt" />
       <Kpi icon={BadgeCheck} label="Đăng ký mới trong kỳ" value={subscriptions.newRecords} growth={subscriptions.newGrowthPercent} detail="Số lượt đăng ký, có thể gồm nhiều lượt của một môi giới" />
-      <Kpi icon={CalendarDays} label="Hết hạn / hủy" value={subscriptions.expiredRecords} detail={`${number(subscriptions.cancelledRecords)} lượt đã hủy · ${number(subscriptions.endedInPeriod)} hết hạn trong kỳ`} />
+      <Kpi icon={CalendarDays} label="Hết hạn / hủy" value={subscriptions.expiredRecords + subscriptions.cancelledRecords} detail={`${number(subscriptions.expiredRecords)} lượt hết hạn · ${number(subscriptions.cancelledRecords)} lượt đã hủy tại mốc chốt · ${number(subscriptions.endedInPeriod)} lượt hết hạn trong kỳ`} />
     </div>
-    <div className="analytics-status-strip"><span>Tổng môi giới <strong>{number(subscriptions.totalAgents)}</strong></span><span><i /> Đang có gói hiệu lực <strong>{number(subscriptions.activeAgents)}</strong></span></div>
+    <div className="analytics-status-strip"><span>Tổng môi giới <strong>{number(subscriptions.totalAgents)}</strong></span><span><i /> Đang sử dụng gói dịch vụ <strong>{number(subscriptions.activeAgents)}</strong></span><span>Hiện không sử dụng gói <strong>{number(subscriptions.withoutActive)}</strong></span></div>
     <div className="analytics-grid">
-      <Panel title="Tỷ trọng gói đang dùng" subtitle="Mỗi môi giới một gói · tỷ lệ trên tổng môi giới có gói hiệu lực">
+      <Panel title="Tỷ trọng gói đang dùng" subtitle="Mỗi môi giới một gói · tỷ lệ trên tổng môi giới đang sử dụng gói dịch vụ">
         <DistributionChart data={packages} dataKey="activeAgents" />
       </Panel>
       <Panel title="Đăng ký theo gói" subtitle="Số lượt đăng ký mới trong khoảng đã chọn">
@@ -138,7 +138,8 @@ function RevenueAnalytics({ revenue, packages, bucket, comparison, onComparisonC
 function AnalyticsDefinitions({ users, subscriptions }) {
   return <details className="analytics-definitions"><summary>Quy tắc tính và giới hạn dữ liệu</summary>
     <p>Tổng tài khoản gồm mọi role và cả tài khoản is_active=false. USER và AGENT là role hiện tại của tài khoản; tỷ lệ chỉ tính trên hai nhóm này. is_active=false là vô hiệu hóa, không suy ra nguyên nhân khóa. Tăng trưởng tổng tài khoản so với đầu kỳ; đăng ký mới so với kỳ liền trước có cùng số ngày. Kỳ trước bằng 0 hiển thị không có tỷ lệ.</p>
-    <p>Gói hiệu lực phải có status=ACTIVE, ngày bắt đầu trước mốc chốt và ngày kết thúc sau mốc chốt. Mỗi Agent được chọn bản ghi hiệu lực có ngày bắt đầu mới nhất, sau đó ngày tạo và ID mới nhất. Bao gồm Agent bị vô hiệu hóa vì hiệu lực gói và quyền truy cập tài khoản là hai chỉ số riêng.</p>
+    <p>“Đang sử dụng gói dịch vụ” đếm Agent có gói đang hoạt động, đã bắt đầu và còn hạn tại mốc chốt; bao gồm gói dùng thử và gói trả phí. Mỗi Agent được tính một lần, chọn gói có ngày bắt đầu mới nhất, sau đó ngày tạo và ID mới nhất. Bao gồm Agent bị vô hiệu hóa vì hiệu lực gói và quyền truy cập tài khoản là hai chỉ số riêng.</p>
+    <p>“Chưa đăng ký gói dịch vụ” đếm Agent chưa từng có bản ghi đăng ký tính đến mốc chốt. “Hiện không sử dụng gói” gồm cả nhóm này và Agent đã đăng ký nhưng hiện chưa có gói đang hoạt động, đã bắt đầu và còn hạn. “Hết hạn / hủy” là tổng số lượt đăng ký đã hết hạn hoặc đã hủy tại mốc chốt; một Agent có thể có nhiều lượt.</p>
     <p>Thống kê gói dựa trên bản ghi đăng ký đã xuất hiện trong DB. Gia hạn cập nhật hạn dùng của gói hiện tại; các lần thanh toán được lưu riêng trong sổ payOS. Giá gói không phải chứng từ thanh toán. Bộ lọc quá khứ dùng ngày tạo/hạn dùng và role/status hiện tại, không tái dựng toàn bộ lịch sử đổi trạng thái.</p>
     <p>Ngày kết thúc được tính trọn ngày Việt Nam, kỳ hiện tại chốt tại thời điểm cập nhật. Timestamp cũ được đọc là UTC. Bản ghi thiếu ngày vẫn có thể nằm trong tổng nhưng không nằm trong biểu đồ đăng ký; gói thiếu ngày bắt đầu/kết thúc không được tính hiệu lực. Thiếu ngày: {number(users.unknownDates)} tài khoản, {number(subscriptions.unknownDates)} đăng ký.</p>
     <p>Doanh thu dùng ngày thanh toán xác thực và số tiền gốc bằng VND trong sổ payOS; PENDING/FAILED/CANCELLED không tính. Webhook lặp không ghi nhận trùng. Không suy ra thanh toán từ gói cũ. Chưa đối soát hoàn tiền nên chỉ công bố doanh thu gộp; tiền hoàn và doanh thu sau hoàn chưa có dữ liệu.</p>
