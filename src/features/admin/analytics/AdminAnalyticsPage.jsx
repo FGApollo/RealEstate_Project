@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   Users, UserRound, BriefcaseBusiness, BadgeCheck, Wallet, RefreshCw, TrendingUp,
-  BarChart3, Info, CalendarDays, LayoutDashboard, ReceiptText, ArrowUpRight
+  BarChart3, Info, CalendarDays, LayoutDashboard, ReceiptText, ArrowUpRight, Globe2, Search, UserPlus, TrendingDown
 } from 'lucide-react';
 import { useAnalytics } from './useAnalytics';
 import { TrendChart, ComparisonChart, DistributionChart, Empty } from './AnalyticsCharts';
@@ -44,23 +44,33 @@ function Panel({ title, subtitle, children, wide = false, action }) {
 
 function OverviewAnalytics({ data, onNavigate }) {
   const { users, subscriptions, packages, revenue } = data;
+  const activePackageCount = packages.reduce((sum, item) => sum + Number(item.activeAgents || 0), 0);
+  const activationRate = users.agents > 0 ? activePackageCount * 100 / users.agents : null;
+  const GrowthIcon = users.totalGrowthPercent < 0 ? TrendingDown : TrendingUp;
   const detailLink = (section) => <button type="button" className="analytics-panel-link" onClick={() => onNavigate(section)}>Xem chi tiết <ArrowUpRight size={15} /></button>;
-  return <>
-    <div className="analytics-kpis">
+  return <section className="analytics-section analytics-overview">
+    <div className="analytics-kpis analytics-overview-kpis">
       <Kpi icon={Users} label="Tổng tài khoản" value={users.total} growth={users.totalGrowthPercent} detail="Gồm khách hàng, môi giới và Admin · so với đầu kỳ" />
       <Kpi icon={BriefcaseBusiness} label="Tổng môi giới" value={users.agents} growth={users.agentGrowthPercent} detail="So với đầu kỳ · gồm tài khoản vô hiệu hóa" />
       <Kpi icon={BadgeCheck} label="Agent sử dụng gói dịch vụ" value={subscriptions.activeAgents} detail="Gói đang hoạt động và còn hạn tại mốc chốt · mỗi môi giới được tính một lần" />
       <Kpi icon={Wallet} label="Tổng doanh thu đã thu" value={revenue.totalGross} moneyValue detail={revenue.available ? 'Doanh thu gộp từ giao dịch xác thực' : revenue.reason} />
     </div>
+
+    <div className="analytics-overview-metrics" aria-label="Chỉ số phân tích">
+      <article><span className={`analytics-overview-metric-icon growth${users.totalGrowthPercent < 0 ? ' negative' : ''}`}><GrowthIcon size={19} /></span><div><small>Tăng trưởng tài khoản</small><strong className={users.totalGrowthPercent < 0 ? 'negative' : ''}>{users.totalGrowthPercent == null ? 'Chưa đủ dữ liệu' : `${users.totalGrowthPercent > 0 ? '+' : ''}${percent(users.totalGrowthPercent)}`}</strong><span>So với đầu kỳ được chọn</span></div></article>
+      <article><span className="analytics-overview-metric-icon accounts"><UserPlus size={19} /></span><div><small>Đăng ký mới trong kỳ</small><strong>{number(users.newAccounts)}</strong><span>Khách hàng và môi giới mới</span></div></article>
+      <article><span className="analytics-overview-metric-icon activation"><BadgeCheck size={19} /></span><div><small>Tỷ lệ Agent dùng gói</small><strong>{activationRate == null ? 'Chưa có Agent' : percent(activationRate)}</strong><span>{number(activePackageCount)} / {number(users.agents)} Agent tại mốc chốt</span></div></article>
+    </div>
+
     <div className="analytics-grid">
-      <Panel title="Đăng ký tài khoản mới" subtitle="Số đăng ký mới trong từng kỳ" action={detailLink('users')}>
-        <TrendChart data={data.userGrowth} series={USER_SERIES.total} bucket={data.filters.bucket} />
+      <Panel title="Tăng trưởng người dùng" subtitle="Số đăng ký mới theo kỳ · phân biệt khách hàng và môi giới" action={detailLink('users')}>
+        <TrendChart data={data.userGrowth} series={USER_SERIES.comparison} bucket={data.filters.bucket} />
       </Panel>
-      <Panel title="Gói dịch vụ đang dùng" subtitle="Tỷ trọng môi giới đang sử dụng gói dịch vụ tại mốc chốt" action={detailLink('subscriptions')}>
-        <DistributionChart data={packages} dataKey="activeAgents" />
+      <Panel title="Gói dịch vụ đang dùng" subtitle={`Tỷ trọng Agent theo gói còn hiệu lực tại ${dateTime(data.snapshotAt)}`} action={detailLink('subscriptions')}>
+        {activePackageCount > 0 ? <DistributionChart data={packages} dataKey="activeAgents" /> : <div className="analytics-overview-empty"><span><BriefcaseBusiness size={28} /><Search size={18} /></span><strong>Chưa có Agent đang sử dụng gói</strong><p>Không có gói đang hoạt động và còn hạn tại mốc chốt này.</p><button type="button" onClick={() => onNavigate('subscriptions')}>Xem thống kê gói <ArrowUpRight size={14} /></button></div>}
       </Panel>
     </div>
-  </>;
+  </section>;
 }
 
 function UserAnalytics({ data, metric, onMetricChange }) {
@@ -190,7 +200,7 @@ export default function AdminAnalyticsPage() {
     setActiveSection(id);
     event.currentTarget.querySelector(`#analytics-tab-${id}`).focus();
   };
-  return <div className="admin-analytics">
+  return <div className={`admin-analytics${activeSection === 'overview' ? ' admin-analytics--overview' : ''}`}>
     <header className="analytics-header"><div><span className="analytics-eyebrow"><BarChart3 size={15} /> THỐNG KÊ & BÁO CÁO</span><h1>{section.title}</h1><p>{section.description}</p></div>
       <div className="analytics-refresh"><button type="button" onClick={() => setRevision((value) => value + 1)} disabled={loading}><RefreshCw size={16} className={loading ? 'analytics-spin' : ''} /> Làm mới</button><small>{data ? `Cập nhật: ${dateTime(data.generatedAt)}` : loading ? 'Đang cập nhật…' : 'Chưa tải được dữ liệu'}</small></div>
     </header>
@@ -199,9 +209,10 @@ export default function AdminAnalyticsPage() {
     </div>
     <form className="analytics-filters" onSubmit={applyDates}>
       <label>Khoảng thời gian<select value={filters.preset} onChange={(event) => selectPreset(event.target.value)}><option value="7d">7 ngày</option><option value="30d">30 ngày</option><option value="90d">90 ngày</option><option value="12m">12 tháng</option><option value="custom">Tùy chỉnh</option></select></label>
+      {activeSection === 'overview' && <div className="analytics-range-shortcuts" role="group" aria-label="Chọn nhanh khoảng thời gian">{[{ value: '7d', label: '7 ngày' }, { value: '30d', label: '30 ngày' }, { value: '90d', label: '90 ngày' }, { value: '12m', label: '1 năm' }].map(({ value, label }) => <button type="button" aria-pressed={filters.preset === value} key={value} onClick={() => selectPreset(value)}>{label}</button>)}</div>}
       {filters.preset === 'custom' && <><label>Từ ngày<input aria-label="Từ ngày" type="date" required min="2000-01-01" max={draft.end} value={draft.start} onChange={(event) => setDraft({ ...draft, start: event.target.value })} /></label><label>Đến ngày<input aria-label="Đến ngày" type="date" required min={draft.start} max={today()} value={draft.end} onChange={(event) => setDraft({ ...draft, end: event.target.value })} /></label><button type="submit">Áp dụng</button></>}
       <label>Nhóm biểu đồ<select value={filters.bucket} onChange={(event) => setFilters({ ...filters, bucket: event.target.value })}><option value="day" disabled={rangeDays > 366}>Ngày</option><option value="week" disabled={rangeDays > 2793}>Tuần</option><option value="month">Tháng</option><option value="year">Năm</option></select></label>
-      <span className="analytics-filter-note">Múi giờ Việt Nam · tối đa 10 năm</span>
+      <span className="analytics-filter-note">{activeSection === 'overview' ? <><Globe2 size={16} /><span><strong>Múi giờ Việt Nam (UTC+7)</strong><small>Dữ liệu được nhóm theo ngày giờ Việt Nam</small></span></> : 'Múi giờ Việt Nam · tối đa 10 năm'}</span>
     </form>
     <div role="tabpanel" id={`analytics-panel-${activeSection}`} aria-labelledby={`analytics-tab-${activeSection}`} tabIndex={0} aria-live="polite" aria-busy={loading}>
       {loading ? <div className="analytics-loading" role="status"><span className="analytics-sr-only">Đang tải dữ liệu thống kê</span><div className="analytics-kpis">{[0, 1, 2, 3].map((id) => <div className="analytics-skeleton analytics-skeleton-kpi" key={id} />)}</div><div className="analytics-grid"><div className="analytics-skeleton analytics-skeleton-chart" /><div className="analytics-skeleton analytics-skeleton-chart" /></div></div>
