@@ -34,20 +34,23 @@ function TrendTooltip({ active, payload, label, bucket, multipleYears, currency 
 
 export const Empty = ({ children = 'Chưa có dữ liệu trong khoảng thời gian này.' }) => <div className="analytics-empty">{children}</div>;
 
-export function TrendChart({ data, series, currency = false, bucket = 'day' }) {
+export function TrendChart({ data, series, currency = false, bucket = 'day', curve = 'linear', hideZeroDots = false, axisColor = '#7b8190', gridColor = '#e9edf3' }) {
   if (!data?.length || !data.some((row) => series.some((item) => Number(row[item.key]) !== 0 && Number.isFinite(Number(row[item.key]))))) return <Empty />;
   const multipleYears = new Set(data.map((row) => row.date.slice(0, 4))).size > 1;
   return <div className="analytics-chart analytics-trend-chart" role="group" aria-label={series.map((item) => item.name).join(', ')}>
     <ResponsiveContainer width="100%" height="100%" minWidth={0}>
       <LineChart data={data} margin={{ top: 20, right: 24, left: 0, bottom: 12 }} accessibilityLayer>
-        <CartesianGrid strokeDasharray="4 5" vertical={false} stroke="#e9edf3" />
-        <XAxis dataKey="date" tickFormatter={(value) => trendDate(value, bucket, multipleYears)} axisLine={false} tickLine={false} tickMargin={14} minTickGap={34} padding={{ left: 10, right: 10 }} tick={{ fontSize: 12, fill: '#7b8190' }} />
-        <YAxis allowDecimals={currency} tickFormatter={currency ? trendMoney : number} axisLine={false} tickLine={false} tickMargin={12} tickCount={5} width={currency ? 88 : 48} domain={currency ? ['auto', 'auto'] : [0, 'auto']} tick={{ fontSize: 12, fill: '#7b8190' }} />
+        <CartesianGrid strokeDasharray="4 5" vertical={false} stroke={gridColor} />
+        <XAxis dataKey="date" tickFormatter={(value) => trendDate(value, bucket, multipleYears)} axisLine={false} tickLine={false} tickMargin={14} minTickGap={34} padding={{ left: 10, right: 10 }} tick={{ fontSize: 12, fill: axisColor }} />
+        <YAxis allowDecimals={currency} tickFormatter={currency ? trendMoney : number} axisLine={false} tickLine={false} tickMargin={12} tickCount={5} width={currency ? 88 : 48} domain={currency ? ['auto', 'auto'] : [0, 'auto']} tick={{ fontSize: 12, fill: axisColor }} />
         <Tooltip cursor={{ stroke: '#dfe3e9', strokeWidth: 1 }} content={<TrendTooltip bucket={bucket} multipleYears={multipleYears} currency={currency} />} />
         {series.length > 1 && <Legend iconType="circle" iconSize={8} wrapperStyle={{ paddingTop: 16, fontSize: 12 }} />}
         {series.map((item, i) => {
           const color = item.color || TREND_COLORS[i % TREND_COLORS.length];
-          return <Line key={item.key} type="linear" dataKey={item.key} name={item.name} stroke={color} strokeWidth={2.4} dot={data.length <= 45 ? { r: 4.5, fill: color, stroke: '#fff', strokeWidth: 2 } : false} activeDot={{ r: 6, fill: color, stroke: '#fff', strokeWidth: 3 }} isAnimationActive={false} />;
+          const dot = data.length > 45 ? false : hideZeroDots
+            ? (props) => Number(props.value) > 0 ? <circle cx={props.cx} cy={props.cy} r="4" fill={color} stroke="#fff" strokeWidth="2" /> : null
+            : { r: 4.5, fill: color, stroke: '#fff', strokeWidth: 2 };
+          return <Line key={item.key} type={curve} dataKey={item.key} name={item.name} stroke={color} strokeWidth={curve === 'linear' ? 2.4 : 2.9} dot={dot} activeDot={{ r: 6, fill: color, stroke: '#fff', strokeWidth: 3 }} isAnimationActive={false} />;
         })}
       </LineChart>
     </ResponsiveContainer>
