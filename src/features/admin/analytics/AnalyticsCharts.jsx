@@ -48,9 +48,14 @@ export function TrendChart({ data, series, currency = false, bucket = 'day', cur
         {series.map((item, i) => {
           const color = item.color || TREND_COLORS[i % TREND_COLORS.length];
           const dot = data.length > 45 ? false : hideZeroDots
-            ? (props) => Number(props.value) > 0 ? <circle cx={props.cx} cy={props.cy} r="4" fill={color} stroke="#fff" strokeWidth="2" /> : null
+            ? (props) => {
+              if (Number(props.value) <= 0) return null;
+              if (item.marker === 'square') return <rect x={props.cx - 4} y={props.cy - 4} width="8" height="8" rx="1.5" fill={color} stroke="#fff" strokeWidth="2" />;
+              if (item.marker === 'triangle') return <path d={`M ${props.cx} ${props.cy - 5} L ${props.cx + 4.5} ${props.cy + 3.5} L ${props.cx - 4.5} ${props.cy + 3.5} Z`} fill={color} stroke="#fff" strokeWidth="1.5" />;
+              return <circle cx={props.cx} cy={props.cy} r="4" fill={color} stroke="#fff" strokeWidth="2" />;
+            }
             : { r: 4.5, fill: color, stroke: '#fff', strokeWidth: 2 };
-          return <Line key={item.key} type={curve} dataKey={item.key} name={item.name} stroke={color} strokeWidth={curve === 'linear' ? 2.4 : 2.9} dot={dot} activeDot={{ r: 6, fill: color, stroke: '#fff', strokeWidth: 3 }} isAnimationActive={false} />;
+          return <Line key={item.key} type={curve} dataKey={item.key} name={item.name} stroke={color} strokeDasharray={item.dashArray} strokeWidth={curve === 'linear' ? 2.4 : 2.9} dot={dot} activeDot={{ r: 6, fill: color, stroke: '#fff', strokeWidth: 3 }} isAnimationActive={false} />;
         })}
       </LineChart>
     </ResponsiveContainer>
