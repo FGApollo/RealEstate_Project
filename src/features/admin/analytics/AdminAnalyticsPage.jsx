@@ -29,8 +29,8 @@ const USER_SERIES = {
   customers: [{ key: 'customers', name: 'Khách hàng mới', color: '#9333ea', dashArray: '8 4', marker: 'square' }],
   agents: [{ key: 'agents', name: 'Môi giới mới', color: '#ea580c', dashArray: '2 4', marker: 'triangle' }],
   comparison: [
-    { key: 'customers', name: 'Khách hàng mới', color: '#9333ea', dashArray: '8 4', marker: 'square' },
-    { key: 'agents', name: 'Môi giới mới', color: '#ea580c', dashArray: '2 4', marker: 'triangle' }
+    { key: 'customers', name: 'Khách hàng mới', color: '#9333ea', marker: 'square' },
+    { key: 'agents', name: 'Môi giới mới', color: '#ea580c', marker: 'triangle' }
   ]
 };
 const USER_ROLE_COLORS = ['#2563eb', '#0aa89f', '#8b5cf6', '#f59e0b'];
@@ -110,7 +110,7 @@ function OverviewAnalytics({ data, onNavigate }) {
 
     <div className="analytics-grid">
       <Panel title="Tăng trưởng người dùng" subtitle="Số đăng ký mới theo kỳ · phân biệt khách hàng và môi giới" action={detailLink('users')}>
-        <TrendChart data={data.userGrowth} series={USER_SERIES.comparison} bucket={data.filters.bucket} />
+        <TrendChart data={data.userGrowth} series={USER_SERIES.comparison} bucket={data.filters.bucket} curve="monotone" hideZeroDots />
       </Panel>
       <Panel title="Gói dịch vụ đang dùng" subtitle={`Tỷ trọng Agent theo gói còn hiệu lực tại ${dateTime(data.snapshotAt)}`} action={detailLink('subscriptions')}>
         {activePackageCount > 0 ? <DistributionChart data={packages} dataKey="activeAgents" /> : <div className="analytics-overview-empty"><span><BriefcaseBusiness size={28} /><Search size={18} /></span><strong>Chưa có Agent đang sử dụng gói</strong><p>Không có gói đang hoạt động và còn hạn tại mốc chốt này.</p><button type="button" onClick={() => onNavigate('subscriptions')}>Xem thống kê gói <ArrowUpRight size={14} /></button></div>}
