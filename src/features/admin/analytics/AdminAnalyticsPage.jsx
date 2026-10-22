@@ -21,14 +21,17 @@ const SECTIONS = [
 ];
 const USER_SERIES = {
   all: [
-    { key: 'total', name: 'Tổng tài khoản mới', color: '#1d4ed8' },
-    { key: 'customers', name: 'Khách hàng mới', color: '#0284c7' },
-    { key: 'agents', name: 'Môi giới mới', color: '#0f9f8f' }
+    { key: 'total', name: 'Tổng tài khoản mới', color: '#2563eb', marker: 'circle' },
+    { key: 'customers', name: 'Khách hàng mới', color: '#9333ea', dashArray: '8 4', marker: 'square' },
+    { key: 'agents', name: 'Môi giới mới', color: '#ea580c', dashArray: '2 4', marker: 'triangle' }
   ],
-  total: [{ key: 'total', name: 'Tổng tài khoản mới', color: '#1d4ed8' }],
-  customers: [{ key: 'customers', name: 'Khách hàng mới', color: '#0284c7' }],
-  agents: [{ key: 'agents', name: 'Môi giới mới', color: '#0f9f8f' }],
-  comparison: [{ key: 'customers', name: 'Khách hàng mới', color: '#0284c7' }, { key: 'agents', name: 'Môi giới mới', color: '#0f9f8f' }]
+  total: [{ key: 'total', name: 'Tổng tài khoản mới', color: '#2563eb', marker: 'circle' }],
+  customers: [{ key: 'customers', name: 'Khách hàng mới', color: '#9333ea', dashArray: '8 4', marker: 'square' }],
+  agents: [{ key: 'agents', name: 'Môi giới mới', color: '#ea580c', dashArray: '2 4', marker: 'triangle' }],
+  comparison: [
+    { key: 'customers', name: 'Khách hàng mới', color: '#9333ea', dashArray: '8 4', marker: 'square' },
+    { key: 'agents', name: 'Môi giới mới', color: '#ea580c', dashArray: '2 4', marker: 'triangle' }
+  ]
 };
 const USER_ROLE_COLORS = ['#2563eb', '#0aa89f', '#8b5cf6', '#f59e0b'];
 
