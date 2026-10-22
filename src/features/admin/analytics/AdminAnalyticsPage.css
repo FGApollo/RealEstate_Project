@@ -86,6 +86,73 @@
 .analytics-agents-table td small { display:block; color:#64748b; font-size:12px; margin-top:5px; }
 .analytics-agents-table td { vertical-align:top; }
 
+/* User analytics keeps the reference layout while showing role and activity
+   counts from the same verified dashboard response. */
+.analytics-users-view { --analytics-user-blue:#2674f5; --analytics-user-sky:#1493e6; --analytics-user-teal:#0aa89f; --analytics-user-violet:#8b5cf6; }
+.analytics-users-view .analytics-users-kpis { grid-template-columns:repeat(4,minmax(0,1fr)); gap:13px; margin-bottom:13px; }
+.analytics-user-kpi { position:relative; min-height:148px; padding:16px 17px 14px; border-color:#e5edf7; border-radius:13px; box-shadow:0 5px 16px #213f6408; }
+.analytics-user-kpi .analytics-kpi-label { justify-content:flex-start; min-height:34px; padding-left:47px; color:#586b86; font-size:11px; }
+.analytics-user-kpi .analytics-kpi-icon { position:absolute; inset:15px auto auto 15px; display:flex; width:37px; height:37px; align-items:center; justify-content:center; padding:0; border-radius:10px; background:color-mix(in srgb,var(--analytics-user-blue) 11%,white); color:var(--analytics-user-blue); }
+.analytics-user-kpi--sky .analytics-kpi-icon { background:#e8f4ff; color:var(--analytics-user-sky); }
+.analytics-user-kpi--teal .analytics-kpi-icon { background:#e5f8f5; color:var(--analytics-user-teal); }
+.analytics-user-kpi--violet .analytics-kpi-icon { background:#f1edff; color:var(--analytics-user-violet); }
+.analytics-user-kpi-main { display:flex; align-items:center; justify-content:space-between; gap:8px; min-width:0; }
+.analytics-user-kpi-main > div { min-width:0; }
+.analytics-user-kpi .analytics-kpi-value { margin:2px 0 4px 47px; font-size:clamp(23px,2vw,29px); }
+.analytics-user-kpi .analytics-change { margin:0 0 0 47px; min-height:16px; font-size:10px; }
+.analytics-user-kpi .analytics-change:not(.negative) { color:#059669; }
+.analytics-user-kpi .analytics-change.negative { color:#dc2626; }
+.analytics-user-kpi > small { display:block; margin:4px 0 0 47px; color:#73859c; font-size:10px; line-height:1.45; }
+.analytics-user-sparkline { flex:none; width:clamp(64px,8vw,112px); height:42px; overflow:visible; }
+.analytics-user-sparkline-empty { flex:none; width:clamp(64px,8vw,112px); height:1px; border-top:1px dashed #dbe5f1; }
+.analytics-users-charts { grid-template-columns:minmax(0,1.65fr) minmax(300px,.9fr); gap:13px; margin-bottom:13px; }
+.analytics-users-tables { grid-template-columns:minmax(0,1.35fr) minmax(300px,.95fr); gap:13px; }
+.analytics-users-view .analytics-panel { padding:17px 18px 14px; border-color:#e5edf7; border-radius:13px; box-shadow:0 5px 16px #213f6407; }
+.analytics-users-view .analytics-panel-heading { align-items:center; margin-bottom:9px; }
+.analytics-users-view .analytics-panel h3 { font-size:13px; }
+.analytics-users-view .analytics-panel-heading p { font-size:10px; }
+.analytics-users-view .analytics-panel select { min-height:34px; font-size:10px; }
+.analytics-users-charts .analytics-trend-chart { height:220px; }
+.analytics-users-charts .analytics-distribution { min-height:242px; flex-wrap:nowrap; gap:0; }
+.analytics-users-charts .analytics-donut { width:min(52%,190px); height:220px; }
+.analytics-users-view .analytics-panel-title { display:flex; align-items:center; gap:8px; color:#18314f; }
+.analytics-users-view .analytics-panel-title svg { flex:none; color:#2674f5; }
+.analytics-user-chart-totals { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:2px 0 0; }
+.analytics-user-chart-totals span { display:inline-flex; align-items:center; gap:6px; min-height:28px; padding:4px 9px; border:1px solid #e7edf5; border-radius:8px; background:#f9fbfe; color:#61738a; font-size:10px; white-space:nowrap; }
+.analytics-user-chart-totals i { width:7px; height:7px; flex:none; border-radius:50%; background:var(--analytics-category-color); }
+.analytics-user-chart-totals strong { margin-left:2px; color:#18314f; font-size:11px; }
+.analytics-donut-with-center { position:relative; }
+.analytics-donut-center { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; pointer-events:none; text-align:center; }
+.analytics-donut-center span { color:#8292a8; font-size:10px; font-weight:600; }
+.analytics-donut-center strong { color:#18314f; font-size:23px; line-height:1.2; }
+.analytics-donut-center small { color:#70839b; font-size:9px; }
+.analytics-users-charts .analytics-legend { min-width:0; max-height:230px; }
+.analytics-users-charts .analytics-legend li { gap:7px; padding:9px 0; font-size:10px; }
+.analytics-users-charts .analytics-legend strong { white-space:nowrap; }
+.analytics-users-tables .analytics-panel { padding-bottom:12px; }
+.analytics-users-table { white-space:normal !important; font-size:11px !important; }
+.analytics-users-table th,.analytics-users-table td { padding:9px 10px !important; }
+.analytics-users-table th:first-child,.analytics-users-table td:first-child { width:58%; }
+.analytics-table-category { display:inline-flex; align-items:center; gap:8px; }
+.analytics-table-category i { flex:none; width:8px; height:8px; border-radius:50%; background:var(--analytics-category-color); }
+.analytics-users-table tbody tr:last-child td { border-bottom:0; }
+@media (max-width:1100px) {
+  .analytics-users-view .analytics-users-kpis { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .analytics-users-charts { grid-template-columns:minmax(0,1fr); }
+  .analytics-users-charts .analytics-distribution { justify-content:flex-start; }
+}
+@media (max-width:700px) {
+  .analytics-users-charts,.analytics-users-tables { grid-template-columns:minmax(0,1fr); }
+  .analytics-users-charts .analytics-trend-chart { height:250px; }
+  .analytics-users-charts .analytics-distribution { flex-wrap:wrap; justify-content:center; }
+  .analytics-users-charts .analytics-donut { width:210px; }
+}
+@media (max-width:480px) {
+  .analytics-users-view .analytics-users-kpis { grid-template-columns:minmax(0,1fr); }
+  .analytics-user-kpi { min-height:138px; }
+  .analytics-users-view .analytics-panel { padding:15px 13px 12px; }
+}
+
 /* Overview dashboard follows the light, compact reference while keeping every
    displayed number and chart bound to the Analytics API response. */
 .admin-analytics--overview .analytics-header { margin-bottom:18px; }
