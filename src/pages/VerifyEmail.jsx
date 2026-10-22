@@ -13,21 +13,31 @@ const VerifyEmail = () => {
     if (!token || status === 'loading') return;
     setStatus('loading');
     setMessage('');
-    window.history.replaceState(null, '', window.location.pathname);
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/auth/verify-email`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token })
+        body: JSON.stringify({ token }),
+        signal: AbortSignal.timeout(20_000)
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'The verification link is invalid or expired.');
+      if (!response.ok) {
+        if (data.code === 'VERIFICATION_TOKEN_INVALID') {
+          setStatus('invalid');
+          setMessage(data.error || 'Liên kết xác minh không hợp lệ hoặc đã hết hạn.');
+          return;
+        }
+        throw new Error(data.error || 'Chưa thể xác minh email. Vui lòng thử lại.');
+      }
+      window.history.replaceState(null, '', window.location.pathname);
       setStatus('success');
       setMessage(data.message);
     } catch (error) {
       setStatus('error');
-      setMessage(error.message);
+      setMessage(error instanceof TypeError || error.name === 'TimeoutError'
+        ? 'Không thể kết nối để xác minh email. Vui lòng thử lại.'
+        : error.message);
     }
   };
 
@@ -35,9 +45,9 @@ const VerifyEmail = () => {
     <AuthLayout title="Xác minh email" subtitle="Hoàn tất xác minh để kích hoạt đăng nhập.">
       {!token && <p role="alert">Liên kết không hợp lệ hoặc đã hết hạn. Hãy yêu cầu gửi lại email xác minh.</p>}
       {message && <p role="status" style={{ textAlign: 'center', color: status === 'success' ? 'green' : 'crimson' }}>{message}</p>}
-      {token && status === 'ready' && (
+      {token && (status === 'ready' || status === 'error') && (
         <Button type="button" fullWidth variant="primary" onClick={handleVerify}>
-          Xác minh email
+          {status === 'error' ? 'Thử lại xác minh' : 'Xác minh email'}
         </Button>
       )}
       {status === 'loading' && <p role="status" style={{ textAlign: 'center' }}>Đang xác minh...</p>}

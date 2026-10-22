@@ -20,17 +20,54 @@ const SECTIONS = [
   { id: 'transactions', label: 'Giao dịch', icon: ReceiptText, title: 'Lịch sử giao dịch', description: 'Tra cứu các giao dịch thanh toán đã được ghi nhận trong hệ thống.' }
 ];
 const USER_SERIES = {
-  total: [{ key: 'total', name: 'Tất cả tài khoản mới' }],
-  customers: [{ key: 'customers', name: 'Khách hàng mới' }],
-  agents: [{ key: 'agents', name: 'Môi giới mới' }],
-  comparison: [{ key: 'customers', name: 'Khách hàng mới' }, { key: 'agents', name: 'Môi giới mới' }]
+  all: [
+    { key: 'total', name: 'Tổng tài khoản mới', color: '#2563eb' },
+    { key: 'customers', name: 'Khách hàng mới', color: '#1493e6' },
+    { key: 'agents', name: 'Môi giới mới', color: '#0aa89f' }
+  ],
+  total: [{ key: 'total', name: 'Tổng tài khoản mới', color: '#2563eb' }],
+  customers: [{ key: 'customers', name: 'Khách hàng mới', color: '#1493e6' }],
+  agents: [{ key: 'agents', name: 'Môi giới mới', color: '#0aa89f' }],
+  comparison: [{ key: 'customers', name: 'Khách hàng mới', color: '#1493e6' }, { key: 'agents', name: 'Môi giới mới', color: '#0aa89f' }]
 };
+const USER_ROLE_COLORS = ['#2563eb', '#0aa89f', '#8b5cf6', '#f59e0b'];
 
 function Kpi({ icon: Icon, label, value, detail, growth, moneyValue = false }) {
   return <article className="analytics-kpi">
     <div className="analytics-kpi-label"><span>{label}</span><span className="analytics-kpi-icon"><Icon size={19} /></span></div>
     <strong className="analytics-kpi-value">{moneyValue ? money(value) : number(value)}</strong>
     {growth != null && <span className={`analytics-change ${growth < 0 ? 'negative' : ''}`}><TrendingUp size={14} /> {growth > 0 ? '+' : ''}{percent(growth)}</span>}
+    <small>{detail}</small>
+  </article>;
+}
+
+function MiniTrend({ data, dataKey, color }) {
+  const values = (data || []).map((row) => Number(row[dataKey] || 0));
+  if (!values.length || !values.some((value) => value > 0)) return <span className="analytics-user-sparkline-empty" aria-hidden="true" />;
+  const width = 112;
+  const height = 42;
+  const max = Math.max(...values, 1);
+  const points = values.map((value, index) => `${values.length === 1 ? width / 2 : (index * width) / (values.length - 1)},${height - 3 - (value / max) * (height - 8)}`);
+  const line = `M ${points.join(' L ')}`;
+  return <svg className="analytics-user-sparkline" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Lượt đăng ký mới theo thời gian đã chọn">
+    <path d={`${line} L ${width} ${height} L 0 ${height} Z`} fill={color} opacity=".08" />
+    <path d={line} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <circle cx={points.at(-1).split(',')[0]} cy={points.at(-1).split(',')[1]} r="2.8" fill={color} />
+  </svg>;
+}
+
+function UserKpi({ icon: Icon, label, value, growth, detail, trendData, trendKey, tone = 'blue' }) {
+  const negative = growth != null && growth < 0;
+  const ChangeIcon = negative ? TrendingDown : TrendingUp;
+  return <article className={`analytics-kpi analytics-user-kpi analytics-user-kpi--${tone}`}>
+    <div className="analytics-kpi-label"><span>{label}</span><span className="analytics-kpi-icon"><Icon size={19} /></span></div>
+    <div className="analytics-user-kpi-main">
+      <div>
+        <strong className="analytics-kpi-value">{number(value)}</strong>
+        <span className={`analytics-change${negative ? ' negative' : ''}`}>{growth == null ? 'Chưa đủ dữ liệu so sánh' : <><ChangeIcon size={13} /> {growth > 0 ? '+' : ''}{percent(growth)}</>}</span>
+      </div>
+      <MiniTrend data={trendData} dataKey={trendKey} color={`var(--analytics-user-${tone})`} />
+    </div>
     <small>{detail}</small>
   </article>;
 }
@@ -75,21 +112,39 @@ function OverviewAnalytics({ data, onNavigate }) {
 
 function UserAnalytics({ data, metric, onMetricChange }) {
   const { users } = data;
-  return <section className="analytics-section" aria-labelledby="analytics-users-title">
-    <h2 id="analytics-users-title"><Users size={20} /> Người dùng hệ thống</h2>
-    <div className="analytics-kpis">
-      <Kpi icon={Users} label="Tổng tài khoản" value={users.total} growth={users.totalGrowthPercent} detail="Tất cả tài khoản · thay đổi so với đầu kỳ" />
-      <Kpi icon={UserRound} label="Khách hàng" value={users.customers} growth={users.customerGrowthPercent} detail="Tài khoản khách hàng · thay đổi so với đầu kỳ" />
-      <Kpi icon={BriefcaseBusiness} label="Môi giới" value={users.agents} growth={users.agentGrowthPercent} detail="Tài khoản môi giới · thay đổi so với đầu kỳ" />
-      <Kpi icon={Users} label="Tài khoản mới trong kỳ" value={users.newAccounts} growth={users.newGrowthPercent} detail={`Kỳ trước (${data.previousPeriod.start} → ${data.previousPeriod.end}): ${number(users.previousNewAccounts)}`} />
+  const roleRows = [
+    { name: 'Khách hàng', count: users.customers, color: USER_ROLE_COLORS[0] },
+    { name: 'Môi giới', count: users.agents, color: USER_ROLE_COLORS[1] },
+    { name: 'Quản trị viên', count: users.admins, color: USER_ROLE_COLORS[2] },
+    { name: 'Vai trò khác / chưa xác định', count: users.otherRoles, color: USER_ROLE_COLORS[3] }
+  ].map((row) => ({ ...row, sharePercent: users.total > 0 ? row.count * 100 / users.total : 0 }));
+  const statusRows = [
+    { name: 'Đang hoạt động', count: users.active, color: '#10b981' },
+    { name: 'Vô hiệu hóa', count: users.inactive, color: '#94a3b8' },
+    { name: 'Chưa rõ trạng thái', count: users.unknownStatus, color: '#ef4444' }
+  ].map((row) => ({ ...row, sharePercent: users.total > 0 ? row.count * 100 / users.total : 0 }));
+
+  return <section className="analytics-section analytics-users-view" aria-label="Thống kê người dùng">
+    <div className="analytics-kpis analytics-users-kpis">
+      <UserKpi icon={Users} label="Tổng tài khoản" value={users.total} growth={users.totalGrowthPercent} detail="Mọi vai trò · thay đổi so với đầu kỳ" trendData={data.userGrowth} trendKey="total" tone="blue" />
+      <UserKpi icon={UserRound} label="Khách hàng" value={users.customers} growth={users.customerGrowthPercent} detail="Tài khoản khách hàng hiện tại" trendData={data.userGrowth} trendKey="customers" tone="sky" />
+      <UserKpi icon={BriefcaseBusiness} label="Môi giới" value={users.agents} growth={users.agentGrowthPercent} detail="Tài khoản môi giới hiện tại" trendData={data.userGrowth} trendKey="agents" tone="teal" />
+      <UserKpi icon={UserPlus} label="Tài khoản mới trong kỳ" value={users.newAccounts} growth={users.newGrowthPercent} detail={`Kỳ trước: ${number(users.previousNewAccounts)} tài khoản`} trendData={data.userGrowth} trendKey="total" tone="violet" />
     </div>
-    <div className="analytics-status-strip"><span><i /> Đang hoạt động <strong>{number(users.active)}</strong></span><span>Vô hiệu hóa <strong>{number(users.inactive)}</strong></span><span>Chưa rõ trạng thái <strong>{number(users.unknownStatus)}</strong></span></div>
-    <div className="analytics-grid">
-      <Panel title="Đăng ký tài khoản mới" subtitle="Số đăng ký trong từng kỳ; không phải tổng tài khoản lũy kế" wide action={<select aria-label="Nhóm người dùng trên biểu đồ" value={metric} onChange={(event) => onMetricChange(event.target.value)}><option value="total">Tất cả tài khoản</option><option value="customers">Khách hàng</option><option value="agents">Môi giới</option><option value="comparison">So sánh khách hàng / môi giới</option></select>}>
-        <TrendChart data={data.userGrowth} series={USER_SERIES[metric]} bucket={data.filters.bucket} />
+    <div className="analytics-grid analytics-users-charts">
+      <Panel title="Số lượt đăng ký người dùng mới" subtitle={`Theo ${data.filters.bucket === 'day' ? 'ngày' : data.filters.bucket === 'week' ? 'tuần' : data.filters.bucket === 'month' ? 'tháng' : 'năm'} trong khoảng thời gian đã chọn`} action={<select aria-label="Nhóm người dùng trên biểu đồ" value={metric} onChange={(event) => onMetricChange(event.target.value)}><option value="all">Tất cả loại tài khoản</option><option value="total">Tổng tài khoản</option><option value="customers">Khách hàng</option><option value="agents">Môi giới</option><option value="comparison">So sánh khách hàng / môi giới</option></select>}>
+        <TrendChart data={data.userGrowth} series={USER_SERIES[metric] || USER_SERIES.all} bucket={data.filters.bucket} />
       </Panel>
-      <Panel title="Khách hàng / môi giới" subtitle={`Không gồm ${number(users.admins)} Admin và ${number(users.otherRoles)} tài khoản nhóm khác`}>
-        <DistributionChart data={[{ name: 'Khách hàng', count: users.customers, sharePercent: users.customerShare }, { name: 'Môi giới', count: users.agents, sharePercent: users.agentShare }]} dataKey="count" />
+      <Panel title="Cơ cấu người dùng hiện tại" subtitle={`Tỷ lệ theo vai trò trên tổng ${number(users.total)} tài khoản`}>
+        <DistributionChart data={roleRows} dataKey="count" center={<><span>Tổng</span><strong>{number(users.total)}</strong><small>tài khoản</small></>} />
+      </Panel>
+    </div>
+    <div className="analytics-grid analytics-users-tables">
+      <Panel title="Tổng quan theo loại tài khoản" subtitle="Số lượng và tỷ lệ trong tổng người dùng hiện tại">
+        <div className="analytics-table-wrap"><table className="analytics-users-table"><thead><tr><th>Loại tài khoản</th><th>Số lượng</th><th>Tỷ lệ</th></tr></thead><tbody>{roleRows.map((row) => <tr key={row.name}><td><span className="analytics-table-category"><i style={{ '--analytics-category-color': row.color }} />{row.name}</span></td><td>{number(row.count)}</td><td>{percent(row.sharePercent)}</td></tr>)}</tbody></table></div>
+      </Panel>
+      <Panel title="Hoạt động người dùng" subtitle="Trạng thái is_active hiện tại trong cơ sở dữ liệu">
+        <div className="analytics-table-wrap"><table className="analytics-users-table"><thead><tr><th>Trạng thái</th><th>Số lượng</th><th>Tỷ lệ</th></tr></thead><tbody>{statusRows.map((row) => <tr key={row.name}><td><span className="analytics-table-category"><i style={{ '--analytics-category-color': row.color }} />{row.name}</span></td><td>{number(row.count)}</td><td>{percent(row.sharePercent)}</td></tr>)}</tbody></table></div>
       </Panel>
     </div>
   </section>;
@@ -174,7 +229,7 @@ function DashboardContent({ data, section, onNavigate, userMetric, onUserMetricC
 
 export default function AdminAnalyticsPage() {
   const [activeSection, setActiveSection] = useState('overview');
-  const [userMetric, setUserMetric] = useState('total');
+  const [userMetric, setUserMetric] = useState('all');
   const [comparison, setComparison] = useState('package');
   const [filters, setFilters] = useState({ preset: '30d', bucket: 'day' });
   const [revision, setRevision] = useState(0);

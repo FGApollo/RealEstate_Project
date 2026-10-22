@@ -20,6 +20,26 @@ The public register/resend messages do not confirm whether an email exists. Gmai
 
 Password registration also uses `USER_SIGNUP` or `AGENT_SIGNUP` intent now. The backend rejects a raw `role` field on both registration and Google endpoints; older frontend builds that send `role: AGENT` to `/api/register` must be replaced with this frontend during rollout.
 
+## Verification mail accepted but not received
+
+`202 REGISTRATION_ACCEPTED` and `202 VERIFICATION_REQUEST_ACCEPTED` mean the request was accepted. Delivery runs asynchronously; those responses do not confirm that Google sent the email. Check the Render backend logs for `Email verification delivery failed`.
+
+For `GMAIL_OAUTH_REFRESH_REJECTED`, the logs now include Google's allowlisted `providerCode` and HTTP `providerStatus`, without the email address, tokens or raw provider response:
+
+- `invalid_grant`: the refresh token may be expired, revoked, invalid or issued for a different client. Renew the sender's OAuth grant and check the client/token pairing.
+- `invalid_client`: check that `GMAIL_CLIENT_ID` and `GMAIL_CLIENT_SECRET` belong to the same active OAuth client.
+
+To renew the sender's grant:
+
+1. In Google Cloud, confirm that the Gmail API is enabled and identify the OAuth client used for sending mail.
+2. If using [OAuth Playground](https://developers.google.com/oauthplayground/), configure **Use your own OAuth credentials** with that client. Add `https://developers.google.com/oauthplayground` to its authorized redirect URIs.
+3. Authorize only `https://www.googleapis.com/auth/gmail.send` using the mailbox configured as `GMAIL_SENDER_EMAIL`, request offline access, and exchange the authorization code. The sender's owner must complete Google sign-in and consent.
+4. Save the **refresh_token**, rather than the access token, directly in Render's `GMAIL_REFRESH_TOKEN`. Check that `GMAIL_CLIENT_ID` and `GMAIL_CLIENT_SECRET` match the client used to obtain it, and that `GMAIL_SENDER_EMAIL` matches the authorized mailbox. Keep these values in the backend's secret manager.
+5. Set `FRONTEND_URL=https://real-estate-project-tan-omega.vercel.app` for the current production site, with no trailing slash, and restart the backend after saving the environment variables.
+6. Request a fresh verification email; resending revokes the previous unused link. Confirm actual mailbox receipt, follow the newest link, verify, then check password login. Do not mark the user verified manually to work around delivery failure.
+
+External OAuth apps in **Testing** issue refresh tokens that expire after seven days when Gmail scopes are requested. Plan the app's production/verification setup or renew the test grant as needed. Google's [refresh token documentation](https://developers.google.com/identity/protocols/oauth2#expiration) and [web server OAuth guide](https://developers.google.com/identity/protocols/oauth2/web-server#offline) describe expiration and renewal.
+
 ## Lifestyle onboarding rollout
 
 Apply `db-migration/009-lifestyle-recommendations.sql` to the Supabase database before deploying the frontend and API changes. It adds the per-user preference and property-event tables, recommendation indexes, and nullable `properties.listing_type`. Classify new and edited listings as `RENT` or `SALE`; existing listings stay unclassified until an agent edits them and remain available as lower-ranked fallback candidates. Customers can open the optional onboarding from their profile, or use Swipe immediately for mixed rent and sale recommendations that improve from their interactions. Agents and admins do not use customer onboarding.

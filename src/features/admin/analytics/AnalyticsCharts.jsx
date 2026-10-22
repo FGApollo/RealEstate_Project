@@ -45,7 +45,10 @@ export function TrendChart({ data, series, currency = false, bucket = 'day' }) {
         <YAxis allowDecimals={currency} tickFormatter={currency ? trendMoney : number} axisLine={false} tickLine={false} tickMargin={12} tickCount={5} width={currency ? 88 : 48} domain={currency ? ['auto', 'auto'] : [0, 'auto']} tick={{ fontSize: 12, fill: '#7b8190' }} />
         <Tooltip cursor={{ stroke: '#dfe3e9', strokeWidth: 1 }} content={<TrendTooltip bucket={bucket} multipleYears={multipleYears} currency={currency} />} />
         {series.length > 1 && <Legend iconType="circle" iconSize={8} wrapperStyle={{ paddingTop: 16, fontSize: 12 }} />}
-        {series.map((item, i) => <Line key={item.key} type="linear" dataKey={item.key} name={item.name} stroke={TREND_COLORS[i % TREND_COLORS.length]} strokeWidth={2.4} dot={data.length <= 45 ? { r: 4.5, fill: TREND_COLORS[i % TREND_COLORS.length], stroke: '#fff', strokeWidth: 2 } : false} activeDot={{ r: 6, fill: TREND_COLORS[i % TREND_COLORS.length], stroke: '#fff', strokeWidth: 3 }} isAnimationActive={false} />)}
+        {series.map((item, i) => {
+          const color = item.color || TREND_COLORS[i % TREND_COLORS.length];
+          return <Line key={item.key} type="linear" dataKey={item.key} name={item.name} stroke={color} strokeWidth={2.4} dot={data.length <= 45 ? { r: 4.5, fill: color, stroke: '#fff', strokeWidth: 2 } : false} activeDot={{ r: 6, fill: color, stroke: '#fff', strokeWidth: 3 }} isAnimationActive={false} />;
+        })}
       </LineChart>
     </ResponsiveContainer>
   </div>;
@@ -66,22 +69,23 @@ export function ComparisonChart({ data, dataKey, currency = false, label }) {
   </div>;
 }
 
-export function DistributionChart({ data, dataKey, currency = false }) {
+export function DistributionChart({ data, dataKey, currency = false, center = null }) {
   const visible = data?.filter((row) => Number(row[dataKey]) > 0) || [];
   if (!visible.length) return <Empty />;
   return <div className="analytics-distribution">
-    <div className="analytics-donut" role="group" aria-label="Biểu đồ tỷ trọng">
+    <div className={`analytics-donut${center ? ' analytics-donut-with-center' : ''}`} role="group" aria-label="Biểu đồ tỷ trọng">
       <ResponsiveContainer width="100%" height="100%" minWidth={0}>
         <PieChart accessibilityLayer>
           <Pie data={visible} dataKey={dataKey} nameKey="name" innerRadius="58%" outerRadius="82%" paddingAngle={2} isAnimationActive={false}>
-            {visible.map((row, i) => <Cell key={row.name} fill={COLORS[i % COLORS.length]} />)}
+            {visible.map((row, i) => <Cell key={row.name} fill={row.color || COLORS[i % COLORS.length]} />)}
           </Pie>
           <Tooltip formatter={(value, name, item) => [`${currency ? money(value) : number(value)} · ${percent(item.payload.sharePercent)}`, name]} />
         </PieChart>
       </ResponsiveContainer>
+      {center && <div className="analytics-donut-center">{center}</div>}
     </div>
     <ul className="analytics-legend">{visible.map((row, i) => <li key={row.name}>
-      <i style={{ background: COLORS[i % COLORS.length] }} /><span>{row.name}</span>
+      <i style={{ background: row.color || COLORS[i % COLORS.length] }} /><span>{row.name}</span>
       <strong>{currency ? money(row[dataKey]) : number(row[dataKey])}</strong><small>{percent(row.sharePercent)}</small>
     </li>)}</ul>
   </div>;

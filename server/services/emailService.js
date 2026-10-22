@@ -3,6 +3,11 @@ const crypto = require('node:crypto');
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const GMAIL_SEND_URL = 'https://gmail.googleapis.com/gmail/v1/users/me/messages/send';
 const TOKEN_REFRESH_SKEW_MS = 60_000;
+const GOOGLE_OAUTH_ERROR_CODES = new Set([
+  'invalid_grant', 'invalid_client', 'unauthorized_client', 'deleted_client',
+  'invalid_request', 'invalid_scope', 'access_denied', 'admin_policy_enforced',
+  'temporarily_unavailable', 'server_error'
+]);
 
 const isMailboxAddress = (value) => (
   typeof value === 'string'
@@ -91,6 +96,14 @@ const getAccessToken = async (config) => {
       || !Number.isFinite(Number(tokenData.expires_in))) {
       const error = new Error('Google OAuth token refresh was rejected');
       error.code = 'GMAIL_OAUTH_REFRESH_REJECTED';
+      // Log only documented error codes and HTTP status, never the provider's
+      // raw response or error_description, which may contain sensitive data.
+      if (GOOGLE_OAUTH_ERROR_CODES.has(tokenData?.error)) {
+        error.providerCode = tokenData.error;
+      }
+      if (Number.isInteger(response.status) && response.status >= 100 && response.status <= 599) {
+        error.providerStatus = response.status;
+      }
       throw error;
     }
 
