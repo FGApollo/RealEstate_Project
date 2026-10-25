@@ -57,6 +57,8 @@ const authUrlencodedParser = express.urlencoded({ limit: '24kb', extended: true 
 // Listing/review photos currently use bounded base64 JSON uploads. Keep their
 // existing aggregate cap while keeping ordinary API DTOs small.
 app.use('/api/properties', express.json({ limit: '50mb' }));
+// Up to five 5MB chat images encoded as base64, plus bounded message metadata.
+app.use('/api/chat/messages', express.json({ limit: '36mb' }));
 app.use('/api/payments', express.json({ limit: '32kb' }));
 app.use(express.json({ limit: '256kb' }));
 app.use(express.urlencoded({ limit: '32kb', extended: false, parameterLimit: 100 }));

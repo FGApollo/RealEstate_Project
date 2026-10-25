@@ -80,15 +80,21 @@ const createProperty = async (propertyData) => {
 
   console.log('createProperty service called. Title:', title);
   
-  // Verify owner is an AGENT with adequate trust score (> 30)
+  // Verify owner is an AGENT with adequate trust score (> 30) and verified KYC (F28)
   const { data: ownerUser, error: ownerError } = await supabase
     .from('users')
-    .select('role, trust_score')
+    .select('role, trust_score, verification_status')
     .eq('id', owner_id)
     .single();
 
   if (ownerError || !ownerUser || ownerUser.role !== 'AGENT') {
     const err = new Error('Chỉ tài khoản có vai trò Môi giới (AGENT) mới có quyền đăng tin.');
+    err.statusCode = 403;
+    throw err;
+  }
+
+  if (ownerUser.verification_status !== 'VERIFIED') {
+    const err = new Error('Tài khoản chưa hoàn tất xác minh danh tính (KYC). Vui lòng hoàn tất KYC để đăng tin.');
     err.statusCode = 403;
     throw err;
   }
@@ -99,6 +105,29 @@ const createProperty = async (propertyData) => {
     err.statusCode = 403;
     throw err;
   }
+
+  // Validate contact phone format (F28)
+  const cleanPhone = (contact_phone || '').trim().replace(/[\s().-]/g, '').replace(/^\+84/, '0');
+  if (!/^0[35789]\d{8}$/.test(cleanPhone)) {
+    const err = new Error('Số điện thoại liên hệ không hợp lệ. Vui lòng cung cấp số di động Việt Nam hợp lệ.');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  // F32: Hard blocking for multi-listing portfolio descriptions
+  const geminiService = require('./geminiService');
+  if (description) {
+    const spamCheck = await geminiService.checkDescriptionIsMultiListing(description);
+    if (spamCheck.is_multi_listing) {
+      const err = new Error(`Tin đăng bị từ chối: Mô tả vi phạm quy định giỏ hàng / nhiều căn hộ (${spamCheck.reason}).`);
+      err.statusCode = 400;
+      throw err;
+    }
+  }
+
+  // F31: Silent penalty for duplicate own property (-50 priority score)
+  const similarityResult = await checkSimilarity(propertyData);
+  const duplicatePenalty = similarityResult.similarOwn ? -50 : 0;
 
   console.log('thumbnail input length:', thumbnail ? thumbnail.length : 'empty');
   
@@ -131,6 +160,7 @@ const createProperty = async (propertyData) => {
       contact_phone,
       latitude: parseFloat(latitude) || null,
       longitude: parseFloat(longitude) || null,
+      priority_score: duplicatePenalty,
       views: 0
     }])
     .select()
@@ -358,10 +388,10 @@ const updateProperty = async (id, actorId, propertyData) => {
 
 const deleteProperty = async (id, actorId) => {
   id = positiveId(id);
-  // 1. Verify ownership and get old images
+  // Verify ownership before soft-deleting the listing and retaining its assets.
   const { data: existingProp, error: getPropError } = await supabase
     .from('properties')
-    .select('owner_id, thumbnail, property_images(image_url)')
+    .select('owner_id')
     .eq('id', id)
     .single();
 
@@ -377,24 +407,13 @@ const deleteProperty = async (id, actorId) => {
     throw error;
   }
 
-  // Collect all unique image URLs to delete
-  const urlsToDelete = [...new Set([
-    existingProp.thumbnail,
-    ...(existingProp.property_images ? existingProp.property_images.map(img => img.image_url) : [])
-  ].filter(Boolean))];
+  // Soft delete: keep record and assets in DB, update status to DELETED
+  const { error } = await supabase
+    .from('properties')
+    .update({ status: 'DELETED' })
+    .eq('id', id);
 
-  // Delete child records first (cascade)
-  await supabase.from('property_features').delete().eq('property_id', id);
-  await supabase.from('property_images').delete().eq('property_id', id);
-  await supabase.from('lifestyle_tags').delete().eq('property_id', id);
-
-  const { error } = await supabase.from('properties').delete().eq('id', id);
   if (error) throw new Error(error.message);
-
-  // ponytail: delete physical image files (Supabase Storage or local fallback)
-  for (const url of urlsToDelete) {
-    await deleteOwnedListingImage(url, actorId);
-  }
 };
 
 const checkSimilarity = async (propertyData, excludeId = null) => {

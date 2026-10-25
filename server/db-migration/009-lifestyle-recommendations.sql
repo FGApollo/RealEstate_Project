@@ -57,11 +57,8 @@ CREATE INDEX IF NOT EXISTS user_property_events_user_time_idx
 CREATE INDEX IF NOT EXISTS user_property_events_user_property_time_idx
   ON public.user_property_events (user_id, property_id, created_at DESC);
 
-ALTER TABLE public.user_preferences ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.user_property_events ENABLE ROW LEVEL SECURITY;
-REVOKE ALL ON TABLE public.user_preferences FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON TABLE public.user_property_events FROM PUBLIC, anon, authenticated;
-GRANT ALL ON TABLE public.user_preferences, public.user_property_events TO service_role;
-GRANT USAGE, SELECT ON SEQUENCE public.user_property_events_id_seq TO service_role;
+-- Grant access to anon, authenticated, and service_role (aligns with backend connection using anon key)
+GRANT ALL ON TABLE public.user_preferences, public.user_property_events TO anon, authenticated, service_role;
+GRANT USAGE, SELECT ON SEQUENCE public.user_property_events_id_seq TO anon, authenticated, service_role;
 
 COMMIT;

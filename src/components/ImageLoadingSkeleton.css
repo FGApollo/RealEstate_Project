@@ -1,0 +1,95 @@
+/* ImageLoadingSkeleton.css - Premium Shimmer & Progressive Image Loader */
+.img-skeleton-container {
+  position: relative;
+  overflow: hidden;
+  display: block;
+  background-color: #f1f5f9;
+  vertical-align: middle;
+}
+
+.img-skeleton-shimmer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    #f1f5f9 0%,
+    #e2e8f0 35%,
+    #f8fafc 50%,
+    #e2e8f0 65%,
+    #f1f5f9 100%
+  );
+  background-size: 250% 100%;
+  animation: imgSkeletonShimmerAnim 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.img-skeleton-icon {
+  color: #94a3b8;
+  opacity: 0.5;
+  animation: imgSkeletonPulse 2s ease-in-out infinite;
+}
+
+.img-skeleton-element {
+  display: block;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity 0.35s ease-in-out;
+  position: relative;
+  z-index: 2;
+}
+
+.img-skeleton-element.img-loaded {
+  opacity: 1;
+}
+
+.img-skeleton-fallback {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background-color: #f8fafc;
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 8px;
+  text-align: center;
+  z-index: 2;
+}
+
+@keyframes imgSkeletonShimmerAnim {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes imgSkeletonPulse {
+  0%, 100% {
+    opacity: 0.35;
+    transform: scale(0.97);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.03);
+  }
+}

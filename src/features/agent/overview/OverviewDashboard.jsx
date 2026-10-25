@@ -1,26 +1,28 @@
 import { useState, useMemo } from 'react';
-import { 
-  Home, Eye, Heart, ChevronRight, Plus, SlidersHorizontal, 
+import {
+  Home, Eye, Heart, ChevronRight, Plus, SlidersHorizontal,
   MapPin, Bed, Bath, Maximize, ShieldAlert, ShieldCheck, Search,
-  Edit3, Trash2, ExternalLink, X, Lock, EyeOff
+  Edit3, Trash2, ExternalLink, X, Lock, EyeOff, CheckCircle2
 } from 'lucide-react';
 import PropertyDetailModal from '../../../components/PropertyDetailModal';
 import DeleteConfirmModal from './DeleteConfirmModal';
+import PropertyStatusModal from './PropertyStatusModal';
 import './OverviewDashboard.css';
 
 import { WARDS_BY_REGION, ALL_WARDS, normalizeWard } from '../../../services/administrativeService';
 
 // ponytail: extract overview and listings tab components into a single dashboard component
-const OverviewDashboard = ({ 
-  activeTab, 
-  setActiveTab, 
-  data, 
+const OverviewDashboard = ({
+  activeTab,
+  setActiveTab,
+  data,
   loading,
   searchQuery = '',
-  setSearchQuery = () => {},
+  setSearchQuery = () => { },
   currentUser = {},
   onEditProperty,
-  onDeleteProperty
+  onDeleteProperty,
+  onUpdateStatus
 }) => {
   const [wardSearchQuery, setWardSearchQuery] = useState('');
   const [tempSelectedWards, setTempSelectedWards] = useState([]);
@@ -40,14 +42,15 @@ const OverviewDashboard = ({
   const [currentPage, setCurrentPage] = useState(1);
   const [previewProperty, setPreviewProperty] = useState(null);
   const [deletingProperty, setDeletingProperty] = useState(null);
+  const [statusModalProperty, setStatusModalProperty] = useState(null);
   const itemsPerPage = 5;
 
   // Ward suggestions logic
   const suggestedWards = useMemo(() => {
     if (!wardSearchQuery.trim()) return [];
     const query = wardSearchQuery.toLowerCase();
-    return ALL_WARDS.filter(ward => 
-      ward.toLowerCase().includes(query) && 
+    return ALL_WARDS.filter(ward =>
+      ward.toLowerCase().includes(query) &&
       !tempSelectedWards.some(selected => normalizeWard(selected) === normalizeWard(ward))
     ).slice(0, 5);
   }, [wardSearchQuery, tempSelectedWards]);
@@ -120,7 +123,7 @@ const OverviewDashboard = ({
     // Filter by Search Query
     if (searchQuery.trim() !== '') {
       const q = searchQuery.toLowerCase();
-      result = result.filter(listing => 
+      result = result.filter(listing =>
         (listing.address && listing.address.toLowerCase().includes(q)) ||
         (listing.title && listing.title.toLowerCase().includes(q))
       );
@@ -166,7 +169,7 @@ const OverviewDashboard = ({
     if (!price || price === 0) return 'Liên hệ';
     const billion = 1000000000;
     const million = 1000000;
-    
+
     if (price >= billion) {
       return `${(price / billion).toFixed(1).replace('.0', '')} Tỷ VND`;
     }
@@ -176,6 +179,23 @@ const OverviewDashboard = ({
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
   };
 
+  const statusCounts = useMemo(() => {
+    const list = data.activeListings || [];
+    return {
+      ALL: list.length,
+      AVAILABLE: list.filter(item => item.status === 'AVAILABLE').length,
+      RENTED: list.filter(item => item.status === 'RENTED').length,
+      SOLD: list.filter(item => item.status === 'SOLD').length,
+      DELETED: list.filter(item => item.status === 'DELETED').length,
+    };
+  }, [data.activeListings]);
+
+  const handleQuickStatusChange = (status) => {
+    setFilterStatus(status);
+    setAppliedStatus(status);
+    setCurrentPage(1);
+  };
+
   return (
     <div className="overview-dashboard-feature">
       {/* VIEW 1: OVERVIEW TAB */}
@@ -183,7 +203,7 @@ const OverviewDashboard = ({
         <>
           <div className="dashboard-header-container">
             <div>
-              <h1>Xin chào, {currentUser?.name || 'Zăn Cao'}</h1>
+              <h1>Xin chào, {currentUser?.name || 'Môi giới'}</h1>
               <p className="subtitle">Theo dõi hiệu suất các tin đăng của bạn trong hôm nay.</p>
             </div>
 
@@ -219,9 +239,9 @@ const OverviewDashboard = ({
                   <div className="notification-tooltip dashboard-tooltip">
                     <div className="tooltip-content">
                       <span className="tooltip-text">Tài khoản của bạn chưa được xác minh.</span>
-                      <a 
-                        href="#kyc" 
-                        className="tooltip-action" 
+                      <a
+                        href="#kyc"
+                        className="tooltip-action"
                         onClick={(e) => {
                           e.preventDefault();
                           if (typeof setActiveTab === 'function') {
@@ -286,7 +306,7 @@ const OverviewDashboard = ({
                       <h3>{listing.title}</h3>
                       <p>
                         {formatPrice(listing.price)}
-                        {listing.status === 'AVAILABLE' && <span className="agent-status-badge">Đang bán</span>}
+                        {listing.status === 'AVAILABLE' && <span className="agent-status-badge">Đang hiển thị</span>}
                       </p>
                     </div>
                     <div className="listing-stats">
@@ -316,23 +336,44 @@ const OverviewDashboard = ({
           {/* Page header */}
           <div className="tab-header-container">
             <div>
-              <h1>Danh sách tin đăng hoạt động</h1>
-              <p className="subtitle">Quản lý danh mục {filteredListings.length} bất động sản đang hoạt động.</p>
+              <h1>Danh sách bất động sản</h1>
+              <p className="subtitle">Quản lý danh mục {filteredListings.length} bất động sản.</p>
             </div>
+          </div>
+
+          {/* Quick status filter pills */}
+          <div className="status-quick-pills">
+            {[
+              { id: 'ALL', label: 'Tất cả' },
+              { id: 'AVAILABLE', label: 'Đang hiển thị' },
+              { id: 'RENTED', label: 'Đã cho thuê' },
+              { id: 'SOLD', label: 'Đã bán' },
+              { id: 'DELETED', label: 'Đã gỡ' }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                type="button"
+                className={`status-pill-btn ${appliedStatus === tab.id ? 'active' : ''}`}
+                onClick={() => handleQuickStatusChange(tab.id)}
+              >
+                <span>{tab.label}</span>
+                <span className="status-pill-count">{statusCounts[tab.id] || 0}</span>
+              </button>
+            ))}
           </div>
 
           {/* Search + Filter toggle row */}
           <div className="search-filter-row">
             <div className="listings-search-bar">
               <Search size={16} className="listings-search-icon" />
-              <input 
-                type="text" 
-                placeholder="Tìm kiếm địa chỉ..." 
+              <input
+                type="text"
+                placeholder="Tìm kiếm địa chỉ..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <button 
+            <button
               className={`filter-green-btn ${showFilters ? 'active' : ''}`}
               onClick={() => setShowFilters(!showFilters)}
             >
@@ -349,16 +390,16 @@ const OverviewDashboard = ({
                 <label className="filter-label">Khu vực</label>
                 <div className="ward-search-input-group" style={{ display: 'flex', gap: '8px' }}>
                   <div className="ward-search-input-wrapper" style={{ position: 'relative', flex: 1 }}>
-                    <input 
-                      type="text" 
-                      placeholder="Tìm phường..." 
-                      value={wardSearchQuery} 
+                    <input
+                      type="text"
+                      placeholder="Tìm phường..."
+                      value={wardSearchQuery}
                       onChange={(e) => setWardSearchQuery(e.target.value)}
                       style={{ width: '100%' }}
                     />
                     {wardSearchQuery && (
-                      <button 
-                        className="clear-search-btn" 
+                      <button
+                        className="clear-search-btn"
                         onClick={() => setWardSearchQuery('')}
                         style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer' }}
                       >
@@ -366,9 +407,9 @@ const OverviewDashboard = ({
                       </button>
                     )}
                   </div>
-                  <button 
-                    type="button" 
-                    className="btn-select-ward-list" 
+                  <button
+                    type="button"
+                    className="btn-select-ward-list"
                     onClick={handleOpenWardListModal}
                     style={{ padding: '6px 12px', fontSize: '12px', border: '1px solid #cbd5e1', borderRadius: '6px', background: '#f8fafc', cursor: 'pointer' }}
                   >
@@ -380,8 +421,8 @@ const OverviewDashboard = ({
                 {suggestedWards.length > 0 && (
                   <ul className="ward-dropdown-suggestions" style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', zIndex: 10, padding: '4px 0', margin: '4px 0', listStyle: 'none' }}>
                     {suggestedWards.map((ward) => (
-                      <li 
-                        key={ward} 
+                      <li
+                        key={ward}
                         onClick={() => handleSelectWard(ward)}
                         style={{ padding: '8px 12px', cursor: 'pointer' }}
                         onMouseEnter={(e) => e.target.style.backgroundColor = '#f1f5f9'}
@@ -391,7 +432,7 @@ const OverviewDashboard = ({
                       </li>
                     ))}
                   </ul>
-                 )}
+                )}
 
                 {/* Selected Ward Badges */}
                 {tempSelectedWards.length > 0 && (
@@ -399,7 +440,7 @@ const OverviewDashboard = ({
                     {tempSelectedWards.map((ward) => (
                       <span key={ward} className="ward-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '9999px', fontSize: '11px', color: '#334155' }}>
                         {ward}
-                        <button 
+                        <button
                           onClick={() => handleRemoveTempWard(ward)}
                           style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center' }}
                         >
@@ -443,7 +484,7 @@ const OverviewDashboard = ({
                   <option value="AVAILABLE">Đang hiển thị</option>
                   <option value="RENTED">Đã cho thuê</option>
                   <option value="SOLD">Đã bán</option>
-                  <option value="PENDING">Chờ duyệt</option>
+                  <option value="DELETED">Đã gỡ</option>
                 </select>
               </div>
 
@@ -462,7 +503,7 @@ const OverviewDashboard = ({
           {/* Listings cards grid */}
           <div className="listings-grid-layout">
             {Number(currentUser?.trust_score ?? 50) <= 30 ? (
-              <div 
+              <div
                 className="listing-card dashed-create-card disabled-locked"
                 onClick={() => alert(`Quyền đăng tin của bạn đang bị khóa do điểm uy tín hiện tại là ${currentUser?.trust_score ?? 0} (từ 30 điểm trở xuống).\nBạn cần đạt tối thiểu từ 31 điểm trở lên để mở lại quyền đăng bài.\nVui lòng giải quyết khiếu nại hoặc thực hiện nhiệm vụ phục hồi điểm uy tín.`)}
                 title="Quyền đăng tin bị khóa do điểm uy tín <= 30"
@@ -477,7 +518,7 @@ const OverviewDashboard = ({
                 </div>
               </div>
             ) : (
-              <div 
+              <div
                 className="listing-card dashed-create-card"
                 onClick={() => setActiveTab('create-listing')}
               >
@@ -515,9 +556,9 @@ const OverviewDashboard = ({
                 )}
 
                 {/* Full-image background */}
-                <img 
-                  src={listing.thumbnail || 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800&q=80'} 
-                  alt={listing.title} 
+                <img
+                  src={listing.thumbnail || 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800&q=80'}
+                  alt={listing.title}
                   className="property-card-img"
                 />
 
@@ -533,35 +574,42 @@ const OverviewDashboard = ({
                   fontWeight: '600',
                   color: '#ffffff',
                   boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
-                  backgroundColor: 
+                  backgroundColor:
                     listing.status === 'RENTED' ? '#3b82f6' :
-                    listing.status === 'SOLD' ? '#ef4444' :
-                    listing.status === 'PENDING' ? '#f59e0b' : '#10b981'
+                      listing.status === 'SOLD' ? '#ef4444' :
+                        listing.status === 'DELETED' ? '#64748b' : '#10b981'
                 }}>
                   {listing.status === 'RENTED' ? 'ĐÃ CHO THUÊ' :
-                   listing.status === 'SOLD' ? 'ĐÃ BÁN' :
-                   listing.status === 'PENDING' ? 'CHỜ DUYỆT' : 'ĐANG HIỂN THỊ'}
+                    listing.status === 'SOLD' ? 'ĐÃ BÁN' :
+                      listing.status === 'DELETED' ? 'ĐÃ GỠ' : 'ĐANG HIỂN THỊ'}
                 </div>
 
                 {/* Hover overlay with agent actions */}
                 <div className="property-card-actions-overlay">
-                  <button 
-                    className="card-action-icon" 
+                  <button
+                    className="card-action-icon success"
+                    title="Cập nhật trạng thái giao dịch (Đã thuê / Đã bán / Đang hiển thị)"
+                    onClick={() => setStatusModalProperty(listing)}
+                  >
+                    <CheckCircle2 size={16} />
+                  </button>
+                  <button
+                    className="card-action-icon"
                     title="Xem chi tiết"
                     onClick={() => setPreviewProperty(listing)}
                   >
                     <ExternalLink size={16} />
                   </button>
-                  <button 
-                    className="card-action-icon" 
+                  <button
+                    className="card-action-icon"
                     title="Chỉnh sửa"
                     onClick={() => onEditProperty && onEditProperty(listing.id)}
                   >
                     <Edit3 size={16} />
                   </button>
-                  <button 
-                    className="card-action-icon danger" 
-                    title="Xoá tin đăng"
+                  <button
+                    className="card-action-icon danger"
+                    title="Gỡ tin đăng"
                     onClick={() => setDeletingProperty(listing)}
                   >
                     <Trash2 size={16} />
@@ -594,14 +642,14 @@ const OverviewDashboard = ({
           {/* Pagination */}
           {totalPages > 1 && (
             <div className="pagination-container">
-              <button 
+              <button
                 disabled={currentPage === 1}
                 onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
               >
                 Trước
               </button>
               {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                <button 
+                <button
                   key={page}
                   className={currentPage === page ? 'active' : ''}
                   onClick={() => setCurrentPage(page)}
@@ -609,7 +657,7 @@ const OverviewDashboard = ({
                   {page}
                 </button>
               ))}
-              <button 
+              <button
                 disabled={currentPage === totalPages}
                 onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
               >
@@ -622,22 +670,36 @@ const OverviewDashboard = ({
 
       {/* Property Details Modal */}
       {previewProperty && (
-        <PropertyDetailModal 
-          property={previewProperty} 
-          onClose={() => setPreviewProperty(null)} 
+        <PropertyDetailModal
+          property={previewProperty}
+          onClose={() => setPreviewProperty(null)}
           showFavoriteActions={false}
         />
       )}
 
       {/* Delete Confirmation Modal */}
       {deletingProperty && (
-        <DeleteConfirmModal 
-          property={deletingProperty} 
+        <DeleteConfirmModal
+          property={deletingProperty}
           onConfirm={(id) => {
             onDeleteProperty && onDeleteProperty(id);
             setDeletingProperty(null);
           }}
           onCancel={() => setDeletingProperty(null)}
+        />
+      )}
+
+      {/* Property Status Modal */}
+      {statusModalProperty && (
+        <PropertyStatusModal
+          property={statusModalProperty}
+          onClose={() => setStatusModalProperty(null)}
+          onConfirm={(propertyId, newStatus) => {
+            if (onUpdateStatus) {
+              onUpdateStatus(propertyId, newStatus);
+            }
+            setStatusModalProperty(null);
+          }}
         />
       )}
 
@@ -649,10 +711,10 @@ const OverviewDashboard = ({
               <X size={24} />
             </button>
             <h3>Chọn Phường từ danh sách</h3>
-            
+
             <div className="region-tabs">
               {Object.keys(WARDS_BY_REGION).map((region) => (
-                <button 
+                <button
                   key={region}
                   type="button"
                   className={`region-tab-btn ${activeRegionTab === region ? 'active' : ''}`}
@@ -667,9 +729,9 @@ const OverviewDashboard = ({
             </div>
 
             <div className="list-search-container">
-              <input 
-                type="text" 
-                placeholder="Tìm phường..." 
+              <input
+                type="text"
+                placeholder="Tìm phường..."
                 value={listModalSearchQuery}
                 onChange={(e) => setListModalSearchQuery(e.target.value)}
               />
@@ -684,7 +746,7 @@ const OverviewDashboard = ({
                     const isChecked = subTempSelectedWards.includes(ward);
                     return (
                       <label key={ward} className="ward-checkbox-label">
-                        <input 
+                        <input
                           type="checkbox"
                           checked={isChecked}
                           onChange={() => handleToggleSubTempWard(ward)}

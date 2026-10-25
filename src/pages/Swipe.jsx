@@ -3,7 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { 
   Heart, X, MapPin,
   Bed, Bath, Maximize,
-  MessageSquare
+  MessageSquare, Loader2
 } from 'lucide-react';
 import { useMotionValue, useTransform, useAnimation } from 'framer-motion';
 import PropertyDetailModal from '../components/PropertyDetailModal';
@@ -87,6 +87,10 @@ const Swipe = () => {
   const filterSignatureRef = useRef(null);
   const [currentProperties, setCurrentProperties] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const isSwipingRef = useRef(false);
+  const [isSwiping, setIsSwiping] = useState(false);
+  const [openingChatPropertyId, setOpeningChatPropertyId] = useState(null);
+  const pendingFavoritesRef = useRef(new Set());
   const [swipeHistory, setSwipeHistory] = useState([]);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
@@ -531,50 +535,58 @@ const Swipe = () => {
   };
 
   const swipeCard = async (direction) => {
-    const exitX = direction === 'right' ? 500 : -500;
-    
-    // Animate current card flying out
-    await cardController.start({ 
-      x: exitX, 
-      opacity: 0, 
-      rotate: direction === 'right' ? 35 : -35,
-      transition: { duration: 0.25 } 
-    });
+    if (isSwipingRef.current) return;
+    isSwipingRef.current = true;
+    setIsSwiping(true);
 
-    if (currentProperty) {
-      recordPropertyAction(currentProperty.id, direction === 'right' ? 'LIKE' : 'DISLIKE');
-      setSwipeHistory(prev => {
-        const filtered = prev.filter(item => item.id !== currentProperty.id);
-        return [
-          { ...currentProperty, swipeType: direction },
-          ...filtered
-        ].slice(0, 15);
+    try {
+      const exitX = direction === 'right' ? 500 : -500;
+      
+      // Animate current card flying out
+      await cardController.start({ 
+        x: exitX, 
+        opacity: 0, 
+        rotate: direction === 'right' ? 35 : -35,
+        transition: { duration: 0.25 } 
       });
 
-      // Synchronize with database favorites if swiped right (like)
-      if (direction === 'right' && user?.id) {
-        setDbFavorites(prev => {
-          if (prev.some(f => f.id === currentProperty.id)) return prev;
-          return [...prev, currentProperty];
+      if (currentProperty) {
+        recordPropertyAction(currentProperty.id, direction === 'right' ? 'LIKE' : 'DISLIKE');
+        setSwipeHistory(prev => {
+          const filtered = prev.filter(item => item.id !== currentProperty.id);
+          return [
+            { ...currentProperty, swipeType: direction },
+            ...filtered
+          ].slice(0, 15);
         });
-        apiFetch(`${API_BASE_URL}/api/favorites`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ propertyId: currentProperty.id })
-        }).catch(err => console.error('Error adding favorite to DB:', err));
-      }
 
+        // Synchronize with database favorites if swiped right (like)
+        if (direction === 'right' && user?.id) {
+          setDbFavorites(prev => {
+            if (prev.some(f => f.id === currentProperty.id)) return prev;
+            return [...prev, currentProperty];
+          });
+          apiFetch(`${API_BASE_URL}/api/favorites`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ propertyId: currentProperty.id })
+          }).catch(err => console.error('Error adding favorite to DB:', err));
+        }
+      }
+      
+      // Reset values silently at center with opacity 0
+      x.set(0);
+      cardController.set({ x: 0, y: 0, rotate: 0, opacity: 0 });
+      
+      // Switch to next card
+      setCurrentIndex(prev => prev + 1);
+      
+      // Smoothly fade in the new card
+      await cardController.start({ opacity: 1, transition: { duration: 0.2 } });
+    } finally {
+      isSwipingRef.current = false;
+      setIsSwiping(false);
     }
-    
-    // Reset values silently at center with opacity 0
-    x.set(0);
-    cardController.set({ x: 0, y: 0, rotate: 0, opacity: 0 });
-    
-    // Switch to next card
-    setCurrentIndex(prev => prev + 1);
-    
-    // Smoothly fade in the new card
-    cardController.start({ opacity: 1, transition: { duration: 0.2 } });
   };
 
   const resetSwipes = () => {
@@ -584,30 +596,31 @@ const Swipe = () => {
 
   const toggleFavorite = async (property = currentProperty) => {
     if (!property || !user?.id) return;
+    const propId = Number(property.id);
+    if (!propId || pendingFavoritesRef.current.has(propId)) return;
+    pendingFavoritesRef.current.add(propId);
     
-    const isFav = dbFavorites.some(fav => fav.id === property.id);
-    if (isFav) {
-      setDbFavorites(prev => prev.filter(fav => fav.id !== property.id));
-      try {
+    try {
+      const isFav = dbFavorites.some(fav => fav.id === property.id);
+      if (isFav) {
+        setDbFavorites(prev => prev.filter(fav => fav.id !== property.id));
         await apiFetch(`${API_BASE_URL}/api/favorites/delete`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ propertyId: property.id })
         });
-      } catch (err) {
-        console.error('Error removing favorite:', err);
-      }
-    } else {
-      setDbFavorites(prev => [...prev, property]);
-      try {
+      } else {
+        setDbFavorites(prev => [...prev, property]);
         await apiFetch(`${API_BASE_URL}/api/favorites`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ propertyId: property.id })
         });
-      } catch (err) {
-        console.error('Error adding favorite:', err);
       }
+    } catch (err) {
+      console.error('Error toggling favorite in DB:', err);
+    } finally {
+      pendingFavoritesRef.current.delete(propId);
     }
   };
 
@@ -747,6 +760,7 @@ const Swipe = () => {
             handleDragEnd={handleDragEnd}
             currentIndex={currentIndex}
             propertyCount={currentProperties.length}
+            isSwiping={isSwiping}
           />
           <SwipeSuggestionsPanel
             categories={suggestedCategories}
@@ -928,14 +942,30 @@ const Swipe = () => {
                         ) : (
                           <button 
                             className="saved-card-chat-btn"
-                            onClick={(e) => {
+                            disabled={openingChatPropertyId === property.id}
+                            onClick={async (e) => {
                               e.stopPropagation();
-                              openPropertyChat({ propertyId: property.id, requireAuth, navigate })
-                                .catch((error) => alert(error.message || 'Không thể mở cuộc trò chuyện lúc này.'));
+                              if (openingChatPropertyId) return;
+                              try {
+                                setOpeningChatPropertyId(property.id);
+                                await openPropertyChat({ propertyId: property.id, requireAuth, navigate });
+                              } catch (error) {
+                                alert(error.message || 'Không thể mở cuộc trò chuyện lúc này.');
+                              } finally {
+                                setOpeningChatPropertyId(null);
+                              }
                             }}
                             title="Nhắn tin với môi giới"
+                            style={{ 
+                              opacity: openingChatPropertyId === property.id ? 0.7 : 1, 
+                              cursor: openingChatPropertyId === property.id ? 'not-allowed' : 'pointer' 
+                            }}
                           >
-                            <MessageSquare size={16} />
+                            {openingChatPropertyId === property.id ? (
+                              <Loader2 size={16} className="animate-spin" />
+                            ) : (
+                              <MessageSquare size={16} />
+                            )}
                           </button>
                         )}
                       </div>

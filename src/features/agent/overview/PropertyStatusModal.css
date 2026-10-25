@@ -1,0 +1,260 @@
+/* PropertyStatusModal.css */
+.status-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 16px;
+  animation: statusFadeIn 0.2s ease-out;
+}
+
+.status-modal-card {
+  position: relative;
+  background-color: #ffffff;
+  border-radius: 20px;
+  width: 100%;
+  max-width: 480px;
+  padding: 24px 28px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  animation: statusSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.status-modal-close {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.status-modal-close:hover {
+  background-color: #f1f5f9;
+  color: #334155;
+}
+
+.status-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.status-header-icon-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background-color: #eff6ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.status-modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.status-modal-subtitle {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: #64748b;
+}
+
+/* Property Preview Box */
+.status-property-preview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  margin-bottom: 20px;
+}
+
+.status-preview-thumb {
+  width: 52px;
+  height: 52px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.status-preview-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.status-preview-info h4 {
+  margin: 0 0 4px 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.status-preview-address {
+  margin: 0 0 2px 0;
+  font-size: 11px;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.status-preview-price {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: #2563eb;
+}
+
+/* Status Options List */
+.status-options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.status-option-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.status-option-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.status-opt-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.status-opt-text {
+  flex: 1;
+}
+
+.status-opt-title {
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.current-status-tag {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background-color: #f1f5f9;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.status-opt-desc {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 1px;
+}
+
+.status-radio-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid #cbd5e1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+
+.status-radio-inner {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+/* Footer Buttons */
+.status-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.btn-cancel {
+  padding: 10px 18px;
+  border: 1px solid #cbd5e1;
+  background-color: #ffffff;
+  color: #475569;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-cancel:hover {
+  background-color: #f8fafc;
+}
+
+.btn-confirm-status {
+  padding: 10px 22px;
+  border: none;
+  background-color: #2563eb;
+  color: #ffffff;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.25);
+  transition: all 0.2s;
+}
+
+.btn-confirm-status:hover:not(:disabled) {
+  background-color: #1d4ed8;
+  transform: translateY(-1px);
+}
+
+@keyframes statusFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes statusSlideUp {
+  from { transform: translateY(12px) scale(0.98); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}

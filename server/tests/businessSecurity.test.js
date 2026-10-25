@@ -189,6 +189,69 @@ test('chat hides database error details from the HTTP response', async (t) => {
   assert.equal(JSON.stringify(res.body).includes('schema'), false);
 });
 
+test('merged chat supports image-only messages using validated storage and explicit null property context', async (t) => {
+  const sharp = require('sharp');
+  const image = await sharp({ create: { width: 2, height: 2, channels: 3, background: 'blue' } }).png().toBuffer();
+  const calls = mockQueries(t, [
+    { table: 'users', result: { data: { id: 11, is_active: true } } },
+    { table: 'messages', result: { data: { id: 7, message: '' } } },
+    { table: 'users', result: { data: [] } }
+  ]);
+  const uploads = [];
+  t.mock.method(supabase.storage, 'from', (bucket) => {
+    assert.equal(bucket, 'property-images');
+    return {
+      async upload(path, buffer, options) { uploads.push({ path, buffer, options }); return {}; },
+      getPublicUrl(path) { return { data: { publicUrl: `https://images.example.test/${path}` } }; }
+    };
+  });
+  await chatService.sendMessage(10, 11, null, '', [{ url: `data:image/png;base64,${image.toString('base64')}`, name: 'photo.png' }]);
+  const inserted = calls[1].methods.find(([method]) => method === 'insert')[1][0];
+  assert.equal(inserted.message, '');
+  assert.equal(inserted.property_id, null);
+  assert.equal(inserted.attachments[0].name, 'photo.png');
+  assert.match(inserted.attachments[0].url, /^https:\/\/images\.example\.test\/chat\/10\/chat-10-/);
+  assert.equal(uploads.length, 1);
+  assert.equal(uploads[0].options.contentType, 'image/png');
+});
+
+test('merged chat rejects malformed attachments, unsafe IDs and empty messages before database access', async (t) => {
+  mockQueries(t, []);
+  for (const attachments of [{}, Array(6).fill({}), [{ url: 'javascript:alert(1)' }], [{ url: 'data:image/svg+xml;base64,PHN2Zz4=' }]]) {
+    await assert.rejects(chatService.sendMessage(10, 11, null, '', attachments), { statusCode: 400 });
+  }
+  await assert.rejects(chatService.sendMessage(10, '11oops', null, 'hello'), { statusCode: 400 });
+  await assert.rejects(chatService.sendMessage(10, 11, null, ''), { statusCode: 400 });
+  await assert.rejects(chatService.markMessagesAsRead(10, '11,receiver_id.gt.0'), { statusCode: 400 });
+});
+
+test('merged chat rejects corrupt image data without storing a message', async (t) => {
+  const calls = mockQueries(t, [{ table: 'users', result: { data: { id: 11, is_active: true } } }]);
+  await assert.rejects(chatService.sendMessage(10, 11, null, '', [{ url: 'data:image/png;base64,bm90LWEtcG5n' }]), { statusCode: 400 });
+  assert.equal(calls.length, 1);
+});
+
+test('read receipts update only unread messages sent by the partner to the current user', async (t) => {
+  const calls = mockQueries(t, [{ table: 'messages', result: { data: [{ id: 1 }] } }]);
+  const result = await chatService.markMessagesAsRead(10, '11');
+  assert.equal(result.updatedCount, 1);
+  for (const [key, value] of [['receiver_id', 10], ['sender_id', 11], ['is_read', false]]) {
+    assert.ok(calls[0].methods.some(([method, field, actual]) => method === 'eq' && field === key && actual === value));
+  }
+});
+
+test('merged listing deletion checks ownership and retains images and child records for soft-deleted listings', async (t) => {
+  const calls = mockQueries(t, [
+    { table: 'properties', result: { data: { owner_id: 10 } } },
+    { table: 'properties', result: {} },
+    { table: 'properties', result: { data: { owner_id: 11 } } }
+  ]);
+  await propertyService.deleteProperty('3', 10);
+  assert.deepEqual(calls[1].methods.find(([method]) => method === 'update')[1], { status: 'DELETED' });
+  await assert.rejects(propertyService.deleteProperty(4, 10), { statusCode: 403 });
+  assert.equal(calls.some((call) => call.methods.some(([method]) => method === 'delete')), false);
+});
+
 test('agents cannot discover the identity of users who reported their listings', async (t) => {
   mockQueries(t, [
     { table: 'properties', result: { data: [{ id: 4, owner_id: 9 }] } },

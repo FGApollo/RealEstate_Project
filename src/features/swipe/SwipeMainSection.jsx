@@ -7,7 +7,7 @@ import {
 const SwipeMainSection = ({
   discoveryTitle, currentProperty, isAlreadyFavorite, formatPrice, onOpenFilters, activeFiltersCount,
   onPrevious, onNext, onToggleFavorite, onShowDetails, onRestart, onAdjustPreferences, isLoading, hasError,
-  cardMotion, cardController, handleDragEnd, currentIndex, propertyCount
+  cardMotion, cardController, handleDragEnd, currentIndex, propertyCount, isSwiping
 }) => {
   const location = currentProperty?.address || [currentProperty?.ward, currentProperty?.district, currentProperty?.city].filter(Boolean).join(', ');
   const verified = currentProperty?.owner?.verification_status === 'VERIFIED';
@@ -35,8 +35,8 @@ const SwipeMainSection = ({
         <div className="swipe-experience-deck">
           {currentProperty && (
             <>
-              <button type="button" className="swipe-deck-arrow previous" onClick={onPrevious} aria-label="Bỏ qua bất động sản"><ChevronLeft size={23} /></button>
-              <button type="button" className="swipe-deck-arrow next" onClick={onNext} aria-label="Thích bất động sản"><ChevronRight size={23} /></button>
+              <button type="button" className="swipe-deck-arrow previous" onClick={onPrevious} disabled={isSwiping} aria-label="Bỏ qua bất động sản"><ChevronLeft size={23} /></button>
+              <button type="button" className="swipe-deck-arrow next" onClick={onNext} disabled={isSwiping} aria-label="Thích bất động sản"><ChevronRight size={23} /></button>
             </>
           )}
 
@@ -91,9 +91,9 @@ const SwipeMainSection = ({
         {currentProperty && (
           <>
             <div className="swipe-experience-actions">
-              <button type="button" className="swipe-action-button dislike" onClick={onPrevious} aria-label="Bỏ qua"><X size={30} /></button>
+              <button type="button" className="swipe-action-button dislike" onClick={onPrevious} disabled={isSwiping} aria-label="Bỏ qua"><X size={30} /></button>
               <button type="button" className="swipe-action-button details" onClick={onShowDetails} aria-label="Xem thông tin chi tiết"><Info size={24} /></button>
-              <button type="button" className={`swipe-action-button like ${isAlreadyFavorite ? 'active' : ''}`} onClick={onToggleFavorite} aria-label="Thêm yêu thích"><Heart size={29} fill={isAlreadyFavorite ? 'currentColor' : 'none'} /></button>
+              <button type="button" className={`swipe-action-button like ${isAlreadyFavorite ? 'active' : ''}`} onClick={onToggleFavorite} disabled={isSwiping} aria-label="Thêm yêu thích"><Heart size={29} fill={isAlreadyFavorite ? 'currentColor' : 'none'} /></button>
             </div>
             <div className="swipe-discover-hint"><span>Vuốt để khám phá thêm</span></div>
             <div className="swipe-pagination" aria-label={`Bất động sản ${currentIndex + 1} trên ${propertyCount}`}>

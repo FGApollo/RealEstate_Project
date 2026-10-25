@@ -126,6 +126,24 @@
   white-space: nowrap;
 }
 
+.conv-unread-pill {
+  background-color: #ef4444;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5px;
+  line-height: 1;
+  box-shadow: 0 1px 3px rgba(239, 68, 68, 0.4);
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
 .last-msg {
   font-size: 12px;
   color: #64748b;
@@ -340,7 +358,7 @@
 }
 
 .own .msg-time {
-  color: #94a3b8;
+  color: rgba(255, 255, 255, 0.75);
 }
 
 .partner .msg-time {
@@ -414,4 +432,94 @@
   max-width: 320px;
   line-height: 1.5;
   margin: 0;
+}
+
+/* Messages Skeleton Loader */
+.chat-messages-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 12px 4px;
+  width: 100%;
+}
+
+.skeleton-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  width: 100%;
+}
+
+.skeleton-row.partner {
+  justify-content: flex-start;
+}
+
+.skeleton-row.own {
+  justify-content: flex-end;
+}
+
+.skeleton-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+  background-size: 200% 100%;
+  animation: chatSkeletonShimmer 1.5s infinite;
+  flex-shrink: 0;
+}
+
+.skeleton-bubble-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 70%;
+}
+
+.skeleton-bubble {
+  height: 40px;
+  border-radius: 18px;
+  background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+  background-size: 200% 100%;
+  animation: chatSkeletonShimmer 1.5s infinite;
+}
+
+.skeleton-bubble.own-bubble {
+  background: linear-gradient(90deg, #dbeafe 25%, #eff6ff 50%, #dbeafe 75%);
+  background-size: 200% 100%;
+  border-bottom-right-radius: 4px;
+}
+
+.skeleton-row.partner .skeleton-bubble {
+  border-bottom-left-radius: 4px;
+}
+
+.skeleton-bubble-sm {
+  width: 140px;
+}
+
+.skeleton-bubble-md {
+  width: 220px;
+}
+
+.skeleton-bubble-lg {
+  width: 320px;
+  max-width: 100%;
+}
+
+.skeleton-card {
+  width: 260px;
+  height: 160px;
+  border-radius: 14px;
+  background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+  background-size: 200% 100%;
+  animation: chatSkeletonShimmer 1.5s infinite;
+}
+
+@keyframes chatSkeletonShimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }

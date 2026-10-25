@@ -40,7 +40,7 @@ const EditListingWizard = ({ propertyId, setActiveTab, setData, currentUser }) =
     toggleSelectImage, setFeaturedImage, deleteSelectedImages,
     toggleAmenity, toggleLifestyleTag, toggleChannel,
     handleSubmitListing, resetForm,
-    warnings, showWarningsModal, setShowWarningsModal, isCheckingSave, executeSaveListing
+    warnings, showWarningsModal, setShowWarningsModal, isCheckingSave, isSaving, executeSaveListing
   } = useListingForm({
     mode: 'edit',
     editingPropertyId: propertyId,
@@ -92,11 +92,11 @@ const EditListingWizard = ({ propertyId, setActiveTab, setData, currentUser }) =
       )}
 
       {/* Unverified banner */}
-      {currentStep < 4 && currentUser.verification_status !== 'VERIFIED' && (
+      {currentStep < 4 && currentUser?.verification_status !== 'VERIFIED' && (
         <div className="unverified-warning-alert">
           <div className="alert-left">
             <ShieldCheck size={20} color="#b45309" />
-            <span>Tài khoản của bạn chưa được xác minh. Tin vẫn có thể đăng, nhưng sẽ chưa có badge Verified Seller.</span>
+            <span>Tài khoản của bạn chưa hoàn tất xác thực danh tính (KYC). Vui lòng hoàn tất xác thực để nhận huy hiệu Môi giới xác thực (Verified Seller).</span>
           </div>
           <button 
             type="button"
@@ -153,8 +153,9 @@ const EditListingWizard = ({ propertyId, setActiveTab, setData, currentUser }) =
               <div className="input-group">
                 <label>Trạng thái tin</label>
                 <select value={listing.status} onChange={(e) => setListing(prev => ({ ...prev, status: e.target.value }))}>
-                  <option value="AVAILABLE">Đang bán / Cho thuê</option>
-                  <option value="PENDING">Chờ duyệt</option>
+                  <option value="AVAILABLE">Đang hiển thị</option>
+                  <option value="RENTED">Đã cho thuê</option>
+                  <option value="SOLD">Đã bán</option>
                 </select>
               </div>
             </div>
@@ -474,8 +475,8 @@ const EditListingWizard = ({ propertyId, setActiveTab, setData, currentUser }) =
               <span>Tiếp theo</span><ArrowRight size={16} />
             </button>
           ) : (
-            <button type="button" className="nav-primary-btn submit-action" onClick={handleSubmitListing} disabled={isCheckingSave}>
-              <span>{isCheckingSave ? 'Đang kiểm tra...' : 'Lưu thông tin thay đổi'}</span>
+            <button type="button" className="nav-primary-btn submit-action" onClick={handleSubmitListing} disabled={isCheckingSave || isSaving}>
+              <span>{isCheckingSave ? 'Đang kiểm tra...' : isSaving ? 'Đang lưu tin...' : 'Lưu thông tin thay đổi'}</span>
               <Send size={16} />
             </button>
           )}
@@ -495,23 +496,44 @@ const EditListingWizard = ({ propertyId, setActiveTab, setData, currentUser }) =
                 </div>
               ))}
             </div>
-            <div className="filter-actions" style={{ display: 'flex', gap: '15px', justifyContent: 'flex-end' }}>
-              <button 
-                type="button" 
-                className="btn-secondary" 
-                onClick={() => setShowWarningsModal(false)}
-                style={{ padding: '10px 20px', borderRadius: '8px', border: '1px solid #d1d5db', cursor: 'pointer', backgroundColor: 'transparent', fontWeight: '600', color: '#4b5563' }}
-              >
-                Chỉnh sửa thêm
-              </button>
-              <button 
-                type="button" 
-                className="btn-primary" 
-                onClick={executeSaveListing}
-                style={{ padding: '10px 20px', borderRadius: '8px', backgroundColor: '#ea580c', color: 'white', border: 'none', cursor: 'pointer', fontWeight: '600' }}
-              >
-                Vẫn đăng tin
-              </button>
+            <div className="filter-actions" style={{ display: 'flex', gap: '15px', justifyContent: 'flex-end', alignItems: 'center' }}>
+              {warnings.some(w => w.isBlocking) ? (
+                <>
+                  <p style={{ color: '#b91c1c', fontSize: '13px', fontWeight: '600', margin: '0 auto 0 0' }}>
+                    Bắt buộc chỉnh sửa các vi phạm trên để tiếp tục cập nhật tin.
+                  </p>
+                  <button 
+                    type="button" 
+                    className="btn-secondary" 
+                    onClick={() => setShowWarningsModal(false)}
+                    disabled={isSaving}
+                    style={{ padding: '10px 20px', borderRadius: '8px', border: '1px solid #d1d5db', cursor: isSaving ? 'not-allowed' : 'pointer', backgroundColor: '#f1f5f9', fontWeight: '600', color: '#1e293b' }}
+                  >
+                    Quay lại chỉnh sửa
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button 
+                    type="button" 
+                    className="btn-secondary" 
+                    onClick={() => setShowWarningsModal(false)}
+                    disabled={isSaving}
+                    style={{ padding: '10px 20px', borderRadius: '8px', border: '1px solid #d1d5db', cursor: isSaving ? 'not-allowed' : 'pointer', backgroundColor: 'transparent', fontWeight: '600', color: '#4b5563' }}
+                  >
+                    Chỉnh sửa thêm
+                  </button>
+                  <button 
+                    type="button" 
+                    className="btn-primary" 
+                    onClick={executeSaveListing}
+                    disabled={isSaving}
+                    style={{ padding: '10px 20px', borderRadius: '8px', backgroundColor: isSaving ? '#9a3412' : '#ea580c', color: 'white', border: 'none', cursor: isSaving ? 'not-allowed' : 'pointer', fontWeight: '600', opacity: isSaving ? 0.75 : 1 }}
+                  >
+                    {isSaving ? 'Đang lưu...' : 'Tôi đã hiểu, tiếp tục lưu'}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>

@@ -140,6 +140,7 @@ export default function LifestyleOnboarding() {
   };
 
   const save = async () => {
+    if (saving) return;
     setSaving(true);
     setError('');
     try {
