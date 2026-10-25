@@ -1,6 +1,8 @@
 import { startTransition, useCallback, useEffect, useRef, useState } from 'react';
 import { API_BASE_URL } from '../config';
-import { apiFetch, clearAccessToken, getAccessSessionKey, restoreSession, setAccessToken } from './apiClient';
+import { apiFetch, clearAccessToken, getAccessSessionKey, getAccessToken, restoreSession, setAccessToken } from './apiClient';
+import { isSessionUser } from './roleDestination.js';
+import { withSessionLock } from './sessionClient.js';
 import { AuthContext } from './context';
 import { clearOnboardingSkip, effectiveOnboardingStatus, skipOnboardingForSession } from './onboardingSession.js';
 import { clearPendingAuthAction } from './pendingAuthAction';
@@ -11,12 +13,12 @@ const initialAuthState = {
   onboardingStatus: 'unknown'
 };
 
-const persistUser = (user) => {
+const clearLegacyCache = () => {
   try {
-    if (user) localStorage.setItem('user', JSON.stringify(user));
-    else localStorage.removeItem('user');
+    localStorage.removeItem('user');
+    localStorage.removeItem('swipeHistory');
   } catch {
-    // Session state always comes from the backend; storage is only a UI cache.
+    // Authentication and private history stay in memory, even if storage is unavailable.
   }
 };
 
@@ -50,6 +52,16 @@ export const AuthProvider = ({ children }) => {
       onboardingWaitersRef.current.clear();
     }
   }, []);
+
+  const expireSession = useCallback(() => {
+    authGenerationRef.current += 1;
+    onboardingCheckRef.current = null;
+    clearOnboardingSkip();
+    clearPendingAuthAction();
+    clearAccessToken();
+    clearLegacyCache();
+    updateAuthState({ user: null, authStatus: 'unauthenticated', onboardingStatus: 'unknown' });
+  }, [updateAuthState]);
 
   const waitForAuth = useCallback(() => {
     const current = authStateRef.current;
@@ -101,7 +113,7 @@ export const AuthProvider = ({ children }) => {
     restoreSession()
       .then((restoredUser) => {
         if (!active || generation !== authGenerationRef.current) return;
-        persistUser(restoredUser);
+        clearLegacyCache();
         if (restoredUser) {
           const isRegularUser = String(restoredUser.role).toUpperCase() === 'USER';
           updateAuthState({
@@ -118,43 +130,56 @@ export const AuthProvider = ({ children }) => {
       .catch(() => {
         if (!active || generation !== authGenerationRef.current) return;
         clearOnboardingSkip();
-        persistUser(null);
+        clearAccessToken();
+        clearLegacyCache();
         updateAuthState({ user: null, authStatus: 'unauthenticated', onboardingStatus: 'unknown' });
       });
 
-    const handleExpiry = () => {
-      authGenerationRef.current += 1;
-      onboardingCheckRef.current = null;
-      clearOnboardingSkip();
-      clearAccessToken();
-      persistUser(null);
-      updateAuthState({ user: null, authStatus: 'unauthenticated', onboardingStatus: 'unknown' });
+    const handleRefresh = ({ detail: refreshedUser }) => {
+      const previous = authStateRef.current;
+      if (previous.authStatus !== 'authenticated') return;
+      if (!isSessionUser(refreshedUser) || String(previous.user?.id) !== String(refreshedUser.id)) {
+        expireSession();
+        return;
+      }
+      if (previous.user.role !== refreshedUser.role) {
+        authGenerationRef.current += 1;
+        onboardingCheckRef.current = null;
+        clearPendingAuthAction();
+        updateAuthState({ user: refreshedUser, onboardingStatus: refreshedUser.role === 'USER' ? 'checking' : 'not_required' });
+        if (refreshedUser.role === 'USER') void refreshOnboardingStatus(refreshedUser);
+      } else updateAuthState({ user: refreshedUser });
     };
-    window.addEventListener('auth:expired', handleExpiry);
+    window.addEventListener('auth:expired', expireSession);
+    window.addEventListener('auth:refreshed', handleRefresh);
     return () => {
       active = false;
-      window.removeEventListener('auth:expired', handleExpiry);
+      window.removeEventListener('auth:expired', expireSession);
+      window.removeEventListener('auth:refreshed', handleRefresh);
     };
-  }, [refreshOnboardingStatus, updateAuthState]);
+  }, [expireSession, refreshOnboardingStatus, updateAuthState]);
 
   const completeLogin = useCallback(({ user: nextUser, accessToken }) => {
+    if (!isSessionUser(nextUser) || typeof accessToken !== 'string' || !accessToken) {
+      expireSession();
+      throw new Error('Phiên đăng nhập không hợp lệ. Vui lòng thử lại.');
+    }
     authGenerationRef.current += 1;
     onboardingCheckRef.current = null;
     clearOnboardingSkip();
-    setAccessToken(accessToken);
-    persistUser(nextUser);
+    setAccessToken(accessToken, nextUser.id);
+    clearLegacyCache();
     updateAuthState({
       user: nextUser,
       authStatus: 'authenticated',
       onboardingStatus: String(nextUser?.role).toUpperCase() === 'USER' ? 'checking' : 'not_required'
     });
-  }, [updateAuthState]);
+  }, [expireSession, updateAuthState]);
 
   const updateUser = useCallback((changes) => {
     const previous = authStateRef.current.user;
     if (!previous) return;
     const nextUser = { ...previous, ...changes };
-    persistUser(nextUser);
     updateAuthState({ user: nextUser });
   }, [updateAuthState]);
 
@@ -174,24 +199,20 @@ export const AuthProvider = ({ children }) => {
   }, [updateAuthState]);
 
   const logout = useCallback(async (onLoggedOut) => {
-    const response = await fetch(`${API_BASE_URL}/api/auth/logout`, {
+    const token = getAccessToken();
+    const response = await withSessionLock(() => fetch(`${API_BASE_URL}/api/auth/logout`, {
       method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
       credentials: 'include'
-    });
+    }));
     if (!response.ok) throw new Error('Không thể đăng xuất. Vui lòng thử lại.');
 
-    authGenerationRef.current += 1;
-    onboardingCheckRef.current = null;
-    clearOnboardingSkip();
-    clearPendingAuthAction();
-    clearAccessToken();
-    persistUser(null);
     // Commit navigation and session reset together so private guards cannot save the old route.
     startTransition(() => {
       if (typeof onLoggedOut === 'function') onLoggedOut();
-      updateAuthState({ user: null, authStatus: 'unauthenticated', onboardingStatus: 'unknown' });
+      expireSession();
     });
-  }, [updateAuthState]);
+  }, [expireSession]);
 
   return (
     <AuthContext.Provider value={{
@@ -204,7 +225,8 @@ export const AuthProvider = ({ children }) => {
       waitForOnboardingStatus,
       markOnboardingCompleted,
       skipOnboardingForCurrentSession,
-      logout
+      logout,
+      expireSession
     }}>
       {children}
     </AuthContext.Provider>

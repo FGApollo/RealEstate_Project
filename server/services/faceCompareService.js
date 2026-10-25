@@ -1,6 +1,7 @@
 const axios = require('axios');
 const FormData = require('form-data');
 const sharp = require('sharp');
+const { isKycDemoAllowed } = require('./kycPolicy');
 
 const MIN_IMAGE_BYTES = 1024;
 const MIN_IMAGE_WIDTH = 180;
@@ -199,6 +200,14 @@ const getFacePlusPlusTimeoutMs = () => {
   return parsedTimeout;
 };
 
+const getFacePlusPlusApiUrl = () => {
+  const url = new URL(process.env.FACEPP_API_URL || DEFAULT_FACEPP_API_URL);
+  if (url.protocol !== 'https:' || !['api-us.faceplusplus.com', 'api-cn.faceplusplus.com'].includes(url.hostname)
+    || url.username || url.password || (url.port && url.port !== '443')
+    || url.pathname !== '/facepp/v3/compare' || url.search || url.hash) throw new Error('Invalid Face++ endpoint');
+  return url.href;
+};
+
 const normalizeImageForFacePlusPlus = async (imageBuffer) => sharp(imageBuffer)
   .rotate()
   .resize({
@@ -321,13 +330,14 @@ const compareFacesWithFacePlusPlus = async (cardFrontImageBuffer, selfieImageBuf
     });
 
     const response = await axios.post(
-      process.env.FACEPP_API_URL || DEFAULT_FACEPP_API_URL,
+      getFacePlusPlusApiUrl(),
       form,
       {
         headers: form.getHeaders(),
         timeout: getFacePlusPlusTimeoutMs(),
-        maxBodyLength: Infinity,
-        maxContentLength: Infinity
+        maxBodyLength: 15 * 1024 * 1024,
+        maxContentLength: 1024 * 1024,
+        maxRedirects: 0
       }
     );
 
@@ -361,7 +371,7 @@ const compareFacesWithFacePlusPlus = async (cardFrontImageBuffer, selfieImageBuf
       };
     }
 
-    console.error('Face++ Compare API failed:', facePlusPlusErrorMessage || error?.message || error?.name || error);
+    console.error('Face++ Compare API failed:', error?.code || error?.name || 'provider_error');
 
     return {
       isMatch: false,
@@ -468,23 +478,17 @@ const compareFacesWithDemo = async (cardFrontImageBuffer, selfieImageBuffer) => 
 const compareFaces = async (cardFrontImageBuffer, selfieImageBuffer) => {
   if (shouldUseFacePlusPlusProvider()) {
     if (hasFacePlusPlusConfig()) {
-      try {
-        const faceppResult = await compareFacesWithFacePlusPlus(cardFrontImageBuffer, selfieImageBuffer);
-        if (faceppResult.isMatch) {
-          return faceppResult;
-        }
-        console.warn('Face++ returned no match or error:', faceppResult.errorMessage, '- falling back to demo comparison');
-      } catch (err) {
-        console.warn('Face++ call threw error:', err.message, '- falling back to demo comparison');
-      }
-    } else {
-      console.warn('KYC_FACE_MATCH_PROVIDER is facepp but Face++ configuration is missing. Falling back to demo face comparison.');
+      return compareFacesWithFacePlusPlus(cardFrontImageBuffer, selfieImageBuffer);
     }
+    return { isMatch: false, errorMessage: FACE_VERIFY_ERROR_MESSAGE, provider: 'facepp' };
   }
-
-  return compareFacesWithDemo(cardFrontImageBuffer, selfieImageBuffer);
+  if (isKycDemoAllowed() && (process.env.KYC_FACE_MATCH_PROVIDER || '').toLowerCase() === 'demo') {
+    return compareFacesWithDemo(cardFrontImageBuffer, selfieImageBuffer);
+  }
+  return { isMatch: false, errorMessage: FACE_VERIFY_ERROR_MESSAGE, provider: 'unconfigured' };
 };
 
 module.exports = {
-  compareFaces
+  compareFaces,
+  getFacePlusPlusApiUrl
 };

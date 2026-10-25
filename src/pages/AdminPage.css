@@ -140,6 +140,20 @@
   min-width: 0;
 }
 
+.admin-analytics-topbar-label { font-weight: 650; color: #1e3a5f; font-size: 14px; }
+
+@media (max-width: 900px) {
+  .admin-dashboard.analytics-active { flex-direction: column; }
+  .analytics-active .admin-sidebar { width: 100%; height: auto; position: static; padding: 12px; box-sizing: border-box; }
+  .analytics-active .admin-logo-wrapper { padding: 0 8px 10px; margin-bottom: 10px; }
+  .analytics-active .admin-nav-section { flex-direction: row; overflow-x: auto; }
+  .analytics-active .admin-nav-btn { flex: 0 0 auto; white-space: nowrap; padding: 10px 12px; font-size: 12px; }
+  .analytics-active .admin-nav-label, .analytics-active .admin-sidebar-bottom { display: none; }
+  .analytics-active .admin-main { width: 100%; }
+  .analytics-active .admin-topbar { padding: 0 16px; }
+  .analytics-active .admin-content-area { padding: 20px 16px; }
+}
+
 /* TOPBAR */
 .admin-topbar {
   height: 72px;

@@ -1,14 +1,17 @@
 const favoritesService = require('../services/favoritesService');
+const { toPublicProperty } = require('../services/publicPropertyDto');
 
 const getFavorites = async (req, res) => {
   const userId = req.user.id;
 
   try {
     const favorites = await favoritesService.getFavorites(userId);
-    res.status(200).json({ favorites });
+    res.status(200).json({ favorites: favorites.map((property) => ({
+      ...toPublicProperty(property), favorite_id: property.favorite_id
+    })) });
   } catch (error) {
     console.error('Error fetching favorites:', error);
-    res.status(500).json({ error: error.message || 'Internal server error' });
+    res.status(error.statusCode || 500).json({ error: error.statusCode ? error.message : 'Internal server error' });
   }
 };
 
@@ -24,7 +27,7 @@ const addFavorite = async (req, res) => {
     res.status(201).json({ message: 'Added to favorites', favorite });
   } catch (error) {
     console.error('Error adding favorite:', error);
-    res.status(500).json({ error: error.message || 'Internal server error' });
+    res.status(error.statusCode || 500).json({ error: error.statusCode ? error.message : 'Internal server error' });
   }
 };
 
@@ -40,7 +43,7 @@ const removeFavorite = async (req, res) => {
     res.status(200).json({ message: 'Removed from favorites' });
   } catch (error) {
     console.error('Error removing favorite:', error);
-    res.status(500).json({ error: error.message || 'Internal server error' });
+    res.status(error.statusCode || 500).json({ error: error.statusCode ? error.message : 'Internal server error' });
   }
 };
 

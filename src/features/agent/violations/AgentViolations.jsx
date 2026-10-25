@@ -27,8 +27,7 @@ const AgentViolations = ({ currentUser }) => {
   const fileInputRef = useRef(null);
   const [selectedReport, setSelectedReport] = useState(null);
   const [appealReason, setAppealReason] = useState('');
-  const [evidenceList, setEvidenceList] = useState([]); // [{ url, name }]
-  const [urlInput, setUrlInput] = useState('');
+  const [evidenceList, setEvidenceList] = useState([]); // Private reference + temporary preview URL.
   const [uploadingFile, setUploadingFile] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -61,7 +60,6 @@ const AgentViolations = ({ currentUser }) => {
     setSelectedReport(report);
     setAppealReason('');
     setEvidenceList([]);
-    setUrlInput('');
     setUploadingFile(false);
     setUploadError('');
   };
@@ -70,7 +68,6 @@ const AgentViolations = ({ currentUser }) => {
     setSelectedReport(null);
     setAppealReason('');
     setEvidenceList([]);
-    setUrlInput('');
     setUploadingFile(false);
     setUploadError('');
   };
@@ -111,16 +108,15 @@ const AgentViolations = ({ currentUser }) => {
       });
 
       const data = await res.json();
-      if (res.ok && data.urls && Array.isArray(data.urls)) {
-        const newItems = data.urls.map((u, idx) => ({
-          url: u,
+      if (res.ok && Array.isArray(data.files)) {
+        const newItems = data.files.map((file, idx) => ({
+          reference: file.reference,
+          url: file.previewUrl,
           name: files[idx]?.name || `Bằng chứng ${evidenceList.length + idx + 1}`
         }));
         setEvidenceList(prev => [...prev, ...newItems]);
-      } else if (res.ok && data.url) {
-        setEvidenceList(prev => [...prev, { url: data.url, name: files[0]?.name || 'Ảnh bằng chứng' }]);
       } else {
-        setUploadError(data.error || 'Tải ảnh lên thất bại. Bạn có thể dán link trực tiếp bên dưới.');
+        setUploadError(data.error || 'Tải ảnh lên thất bại. Vui lòng thử lại.');
       }
     } catch (err) {
       console.error('Lỗi khi tải ảnh:', err);
@@ -137,26 +133,6 @@ const AgentViolations = ({ currentUser }) => {
     setEvidenceList(prev => prev.filter((_, idx) => idx !== indexToRemove));
   };
 
-  const handleAddUrl = (e) => {
-    if (e && e.preventDefault) e.preventDefault();
-    const cleanUrl = urlInput.trim();
-    if (!cleanUrl) return;
-
-    if (evidenceList.length >= 5) {
-      setUploadError('Bạn chỉ có thể thêm tối đa 5 hình ảnh bằng chứng.');
-      return;
-    }
-
-    if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
-      setUploadError('Đường dẫn ảnh phải bắt đầu bằng http:// hoặc https://');
-      return;
-    }
-
-    setEvidenceList(prev => [...prev, { url: cleanUrl, name: `Link ảnh ${prev.length + 1}` }]);
-    setUrlInput('');
-    setUploadError('');
-  };
-
   const handleSubmitAppeal = async (e) => {
     e.preventDefault();
     if (submitting) return;
@@ -165,7 +141,7 @@ const AgentViolations = ({ currentUser }) => {
       return;
     }
 
-    const urls = evidenceList.map(item => item.url);
+    const urls = evidenceList.map(item => item.reference);
 
     setSubmitting(true);
     try {
@@ -535,36 +511,6 @@ const AgentViolations = ({ currentUser }) => {
                   <div className="v-upload-error-msg">
                     <AlertTriangle size={14} />
                     <span>{uploadError}</span>
-                  </div>
-                )}
-
-                {/* Alternative URL Input */}
-                {evidenceList.length < 5 && (
-                  <div className="v-alt-url-toggle">
-                    <span className="v-alt-label">Hoặc nhập link URL ảnh trực tiếp:</span>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <input
-                        type="url"
-                        className="v-input v-input-sm"
-                        placeholder="https://... hoặc link ảnh trực tiếp"
-                        value={urlInput}
-                        onChange={(e) => setUrlInput(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            handleAddUrl();
-                          }
-                        }}
-                      />
-                      <button
-                        type="button"
-                        className="v-btn-add-url"
-                        onClick={handleAddUrl}
-                        disabled={!urlInput.trim() || evidenceList.length >= 5}
-                      >
-                        Thêm
-                      </button>
-                    </div>
                   </div>
                 )}
 

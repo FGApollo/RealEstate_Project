@@ -1,7 +1,8 @@
 import { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './useAuth';
-import { savePendingAuthAction } from './pendingAuthAction';
+import { clearPendingAuthAction, savePendingAuthAction } from './pendingAuthAction';
+import { canResumeAuthAction, roleDestination } from './roleDestination.js';
 
 export const useRequireAuth = () => {
   const navigate = useNavigate();
@@ -12,6 +13,12 @@ export const useRequireAuth = () => {
     if (authState.authStatus !== 'authenticated' || !authState.user) {
       savePendingAuthAction(pendingAction);
       navigate('/login');
+      return null;
+    }
+
+    if (!canResumeAuthAction(authState.user.role, pendingAction)) {
+      clearPendingAuthAction();
+      navigate(roleDestination(authState.user.role), { replace: true });
       return null;
     }
 

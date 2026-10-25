@@ -1,0 +1,44 @@
+{
+  "Phòng Trọ": [
+    { "url": "https://ctpt.cdn.static123.com/images/thumbs/450x300/fit/2026/04/06/1c036bb924278b79d2369_1775466283.jpg", "source": "https://chothuephongtro.me/ho-chi-minh.html", "location": "TP.HCM" },
+    { "url": "https://cdn.phongtot.com/store/phongtot/images/2025/08/11/z6885803119554-cc6c621c4e5cbd1c95863a5aaf62255c-638905296053029503.jpg", "source": "https://phongtot.com/cho-thue-phong-tro-hcm/quan-go-vap/duong-thong-nhat", "location": "Gò Vấp, TP.HCM" },
+    { "url": "https://pt123.cdn.static123.com/images/thumbs/450x300/fit/2025/12/07/img-3993_1765102178.jpg", "source": "https://phongtro123.com/tags/phong-tro-quan-1-co-gac.html", "location": "Quận 1, TP.HCM" },
+    { "url": "https://api.nhatrovn.vn/api/common/img/68175e25d155c0633daef6aa/images-room/69bebc73962e11735acfbd77/69bebc73962e11735acfbd79/69bebf02962e11735acfbddd.jpg", "source": "https://nhatrovn.vn/cho-thue-phong-tro/ho-chi-minh/huyen-hoc-mon/", "location": "Hóc Môn, TP.HCM" },
+    { "url": "https://cdn.thuviennhadat.vn/upload/tin-dang/hinh-anh/20250312114747/20250312114747638773768676927916.jpg", "source": "https://thuviennhadat.vn/cho-thue-nha-tro-phong-tro-phuong-binh-trung-tay/cho-thue-phong-tro-co-gac-binh-trung-tay-thu-duc-20m2-giam-ngay-1-trieu-thang-dau-tien-pst81507.html", "location": "Thủ Đức, TP.HCM" }
+  ],
+  "Căn Hộ": [
+    { "url": "https://vnrenthome.com/storage/uploads/2023/10/2782/Serviced-apartment-for-rent-in-Phu-Nhuan-HCMC-5.jpg", "source": "https://vnrenthome.com/v2782/dhts-serviced-apartment-for-rent-in-nguyen-van-troi-phu-nhuan-hcmc.html", "location": "Phú Nhuận, TP.HCM" },
+    { "url": "https://pix10.agoda.net/hotelImages/71484121/0/18fd6b76b0204c228e75bdad0469e161.jpg?ce=2&s=1024x768", "source": "https://www.agoda.com/hana-home-service-apartment/hotel/ho-chi-minh-city-vn.html", "location": "Hana Home, TP.HCM" },
+    { "url": "https://cf.bstatic.com/xdata/images/hotel/max1024x768/502000981.jpg?k=0bd6b9e75c1d8f8e6864460826d7e49e32002c083a07db0b027d7d78e0869e8d&o=", "source": "https://www.booking.com/hotel/vn/home-away-serviced-apartment.en-gb.html", "location": "Home Away Minh Khai, TP.HCM" },
+    { "url": "https://a0.muscache.com/im/pictures/928aa330-9d43-43df-8837-75cec2926e25.jpg?im_w=720", "source": "https://www.airbnb.co.in/rooms/40763956", "location": "JOMO, Quận 3, TP.HCM" },
+    { "url": "https://media.vrbo.com/lodging/111000000/110700000/110693800/110693772/d686c471.jpg?impolicy=resizecrop&ra=fit&rw=598", "source": "https://www.vrbo.com/pdp/lo/110693772", "location": "DHTS, TP.HCM" }
+  ],
+  "Chung Cư": [
+    { "url": "https://image.vietnamnews.vn/uploadvnnews/Article/2024/10/7/379311_broker.jpg", "source": "https://vietnamnews.vn/economy/1664453/domestic-property-market-has-only-40-000-licensed-brokers.html", "location": "TP.HCM" },
+    { "url": "https://cdn-merchant.vinid.net/images/image_upload_1683034011_1.png", "source": "https://onehousing.vn/blog/nhung-cau-hoi-thuong-gap-ve-chung-cu-feliz-en-vista-cho-nguoi-mua-lan-dau-tham-khao-n17t", "location": "Feliz en Vista, TP.HCM" },
+    { "url": "https://thanhnienviet.mediacdn.vn/zoom/700_438/uploads/2022_12/20221223113308-404b.jpg", "source": "https://thanhnienviet.vn/cap-nhat-tien-do-topaz-elite-quan-8-phi-quan-ly-thiet-ke-va-gia-ban-209243107210042232.htm", "location": "Topaz Elite, Quận 8, TP.HCM" },
+    { "url": "https://cdn2.tuoitre.vn/zoom/700_525/471584752817336320/2025/3/3/chung-cu-tp-hcm-17409789603251597442589-0-0-1340-2560-crop-17409790164731089453904.jpg", "source": "https://tuoitre.vn/tp-hcm-co-quy-dinh-moi-ve-noi-de-xe-dieu-kien-kinh-doanh-luu-tru-trong-chung-cu-2025030312174872.htm", "location": "TP.HCM" },
+    { "url": "https://image.vietstock.vn/2024/01/16/BDS-20240116-3_1650467.jpg", "source": "https://www.funan.com.vn/vi/cw-ca-nam-2023-tphcm-co-them-hon-81-ngan-can-ho-moi.1146251", "location": "TP.HCM" }
+  ],
+  "Nhà Ở": [
+    { "url": "https://static2.cafeland.vn/static01/sgd/news/2019/10/nha-pho-quan-thu-duc-tp-ho-chi-minh-1572419343-nhadat.cafeland.vn.jpg", "source": "https://nhadat.cafeland.vn/cho-thue-nha-mat-tien-tien-kinh-doanh-duong-so-6-binh-chieu-thu-duc-gia-tot-1236619.html", "location": "Thủ Đức, TP.HCM" },
+    { "url": "https://d1kurvztuo3cyi.cloudfront.net/normal/LandedProperty/Images/05718faf-ccfb-4298-b488-f333eec7482b/68a2db10-6a7d-476d-ace0-378f7cd1dc20.jpg", "source": "https://hoozing.com/cho-thue/cho-thue-nha-1-tret-2-lau-hem-dien-bien-phu-quan-binh-thanh-121149787", "location": "Bình Thạnh, TP.HCM" },
+    { "url": "https://d1kurvztuo3cyi.cloudfront.net/normal/LandedProperty/Images/f2fdbdfa-9edc-4efd-9433-595fdcc23be3/c57ad19f-f19f-4bc1-a472-eb50266949eb.jpg", "source": "https://hoozing.com/cho-thue/cho-thue-nha-hem-pham-van-bach-quan-tan-binh-61360006", "location": "Tân Bình, TP.HCM" },
+    { "url": "https://cdn.thuviennhadat.vn/Upload/images/post-image/2503271032450563-21703-1000002387.jpg", "source": "https://thuviennhadat.vn/cho-thue-nha-mat-pho-phuong-13/cho-thue-nha-mat-pho-216m2-tran-van-kieu-quan-6-tien-ich-day-du-pst36711.html", "location": "Quận 6, TP.HCM" },
+    { "url": "https://cdn.thuviennhadat.vn/Upload/images/post-image/2510010529365939-16892-1000004371.jpg", "source": "https://thuviennhadat.vn/cho-thue-nha-rieng-phuong-hiep-binh-chanh", "location": "Thủ Đức, TP.HCM" }
+  ],
+  "Văn Phòng": [
+    { "url": "https://saigonoffice.com.vn/contents_saigonoffice/uploads/images/cho-ngoi-van-phong-lam-viec-van-phong-tron-goi-the-nexx-quan-3.jpg", "source": "https://saigonoffice.com.vn/en/the-nexx-serviced-offices-for-lease-in-district-3.html", "location": "The Nexx, Quận 3, TP.HCM" },
+    { "url": "https://saigonoffice.com.vn/contents_saigonoffice/uploads/images/office-for-lease-paragon-q7.jpg", "source": "https://saigonoffice.com.vn/en/work-easy-saigon-paragon-q7-serviced-offices-for-lease-in-district-2.html", "location": "Saigon Paragon, Quận 7, TP.HCM" },
+    { "url": "https://storage.googleapis.com/circo-coworking--1550040568856.appspot.com/images/Thiet_ke_chua_co_ten_81_97363a8947.png", "source": "https://circo.co/en/locations/circo-nam-ky-khoi-nghia", "location": "cirCO Nam Kỳ Khởi Nghĩa, TP.HCM" },
+    { "url": "https://storage.googleapis.com/circo-coworking--1550040568856.appspot.com/images/IMG_9098_02a3f0f294.JPG", "source": "https://circo.co/locations/circo-nam-ky-khoi-nghia", "location": "cirCO Nam Kỳ Khởi Nghĩa, TP.HCM" },
+    { "url": "https://storage.googleapis.com/lb-images-asia/vn/6624945/2474181-me-linh-point-tower-no-2-ngo-duc-ke-street-level-6-7-district-1.jpg?v=m1702527909", "source": "https://www.matchoffice.com/vn/lease/virtual-office/ho-chi-minh-city/me-linh-point-tower-no-68518", "location": "Mê Linh Point, Quận 1, TP.HCM" }
+  ],
+  "Mặt Bằng": [
+    { "url": "https://chothuenha.com.vn/datafiles/images/cho-thue-mat-bang-quan-thu-duc-5%281%29.jpg", "source": "https://chothuenha.com.vn/cho-thue-mat-bang-quan-thu-duc-ho-chi-minh", "location": "Thủ Đức, TP.HCM" },
+    { "url": "https://static.wixstatic.com/media/380472_3d6c5e166c264226833934d6e2ece387~mv2.jpeg/v1/fill/w_956%2Ch_500%2Cfp_0.50_0.50%2Cq_90/380472_3d6c5e166c264226833934d6e2ece387~mv2.jpeg", "source": "https://www.relocationvietnam.com/post/bright-commercial-space-for-rent-in-thao-dien-90-sqm", "location": "Thảo Điền, TP.HCM" },
+    { "url": "https://static2.cafeland.vn/static01/sgd/news/2020/02/mat-bang-quan-12-tp-ho-chi-minh-1581147626-nhadat.cafeland.vn.jpg", "source": "https://nhadat.cafeland.vn/cho-thue-nha-nguyen-can-mat-bang-kinh-doanh-quan-12-khu-dan-cu-sam-uat-1295747.html", "location": "Quận 12, TP.HCM" },
+    { "url": "https://www.thuematbang.com/uploads/product/z6978633627145_e91e5365b0f9d2a362e995d4f6706b54.jpg", "source": "https://www.thuematbang.com/mat-bang/cho-thue-mat-bang-huynh-tan-phat-quan-7", "location": "Quận 7, TP.HCM" },
+    { "url": "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2022/12/17/5b5de713-1418-4f01-a0bc-b928ad5dc4db_1671264713.jpg", "source": "https://phongtro123.com/cho-thue-mbkd-nguyen-dinh-chieu-q3-80m2-pr612984.html", "location": "Quận 3, TP.HCM" }
+  ]
+}

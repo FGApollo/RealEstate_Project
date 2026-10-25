@@ -1,3 +1,4 @@
+const { safeErrorMessage } = require('../services/httpError');
 const appealService = require('../services/appealService');
 
 const submitAppeal = async (req, res) => {
@@ -16,7 +17,7 @@ const submitAppeal = async (req, res) => {
   } catch (error) {
     console.error('Error in submitAppeal controller:', error);
     const status = error.statusCode || 500;
-    return res.status(status).json({ error: error.message || 'Lỗi gửi khiếu nại' });
+    return res.status(status).json({ error: safeErrorMessage(error, 'Lỗi gửi khiếu nại') });
   }
 };
 
@@ -29,7 +30,7 @@ const getAgentViolations = async (req, res) => {
   } catch (error) {
     console.error('Error in getAgentViolations controller:', error);
     const status = error.statusCode || 500;
-    return res.status(status).json({ error: error.message || 'Lỗi tải danh sách vi phạm' });
+    return res.status(status).json({ error: safeErrorMessage(error, 'Lỗi tải danh sách vi phạm') });
   }
 };
 
@@ -42,7 +43,7 @@ const getAdminAppeals = async (req, res) => {
   } catch (error) {
     console.error('Error in getAdminAppeals controller:', error);
     const status = error.statusCode || 500;
-    return res.status(status).json({ error: error.message || 'Lỗi tải danh sách khiếu nại' });
+    return res.status(status).json({ error: safeErrorMessage(error, 'Lỗi tải danh sách khiếu nại') });
   }
 };
 
@@ -62,7 +63,7 @@ const approveAppeal = async (req, res) => {
   } catch (error) {
     console.error('Error in approveAppeal controller:', error);
     const status = error.statusCode || 500;
-    return res.status(status).json({ error: error.message || 'Lỗi chấp thuận khiếu nại' });
+    return res.status(status).json({ error: safeErrorMessage(error, 'Lỗi chấp thuận khiếu nại') });
   }
 };
 
@@ -77,7 +78,7 @@ const rejectAppeal = async (req, res) => {
   } catch (error) {
     console.error('Error in rejectAppeal controller:', error);
     const status = error.statusCode || 500;
-    return res.status(status).json({ error: error.message || 'Lỗi bác bỏ khiếu nại' });
+    return res.status(status).json({ error: safeErrorMessage(error, 'Lỗi bác bỏ khiếu nại') });
   }
 };
 
@@ -100,19 +101,23 @@ const uploadEvidence = async (req, res) => {
 
     const urls = [];
     for (const file of files) {
-      const url = await appealService.saveEvidenceImage(file);
+      const url = await appealService.saveEvidenceImage(file, req.user.id);
       urls.push(url);
     }
 
     return res.status(200).json({
       success: true,
+      files: await Promise.all(urls.map(async (reference) => ({
+        reference,
+        previewUrl: (await require('../services/evidenceStorage').signEvidenceUrls([reference]))[0] || null
+      }))),
       urls,
       url: urls[0],
       message: `Tải thành công ${urls.length} ảnh bằng chứng!`
     });
   } catch (error) {
     console.error('Error in uploadEvidence controller:', error);
-    return res.status(500).json({ error: error.message || 'Lỗi tải lên ảnh bằng chứng' });
+    return res.status(500).json({ error: safeErrorMessage(error, 'Lỗi tải lên ảnh bằng chứng') });
   }
 };
 
@@ -121,7 +126,7 @@ const handleUploadError = (err, req, res, next) => {
   if (err.code === 'LIMIT_FILE_SIZE') {
     return res.status(400).json({ error: 'Kích thước file ảnh không được vượt quá 5MB' });
   }
-  return res.status(400).json({ error: err.message || 'Lỗi tải lên file' });
+  return res.status(400).json({ error: safeErrorMessage(err, 'Lỗi tải lên file') });
 };
 
 module.exports = {

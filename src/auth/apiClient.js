@@ -1,75 +1,16 @@
 import { API_BASE_URL } from '../config';
 import { getOnboardingSessionKey } from './onboardingSession.js';
+import { createSessionClient, withSessionLock } from './sessionClient.js';
 
-let accessToken = null;
-let refreshPromise = null;
+const client = createSessionClient({
+  apiBaseUrl: API_BASE_URL,
+  fetchImpl: (...args) => fetch(...args),
+  withLock: withSessionLock,
+  onExpired: () => window.dispatchEvent(new Event('auth:expired')),
+  onUser: (user) => window.dispatchEvent(new CustomEvent('auth:refreshed', { detail: user }))
+});
 
-export const getAccessSessionKey = (userId) => getOnboardingSessionKey(userId, accessToken);
-
-export const setAccessToken = (token) => {
-  accessToken = token || null;
-};
-
-export const clearAccessToken = () => {
-  accessToken = null;
-};
-
-// Public reads must not wait for session restoration. If a token is already in
-// memory, send it opportunistically so optional-auth responses can personalize.
-export const publicApiFetch = (url, options = {}) => {
-  const headers = new Headers(options.headers || {});
-  if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
-  return fetch(url, { ...options, headers, credentials: 'include' });
-};
-
-export const restoreSession = () => {
-  if (!refreshPromise) {
-    refreshPromise = fetch(`${API_BASE_URL}/api/auth/refresh`, {
-      method: 'POST',
-      credentials: 'include'
-    }).then(async (response) => {
-      if (response.status === 401) {
-        clearAccessToken();
-        return null;
-      }
-      if (!response.ok) throw new Error('Could not restore session');
-
-      const data = await response.json();
-      setAccessToken(data.accessToken);
-      return data.user;
-    }).finally(() => {
-      refreshPromise = null;
-    });
-  }
-
-  return refreshPromise;
-};
-
-export const apiFetch = async (url, options = {}) => {
-  if (typeof url !== 'string' || !url.startsWith(`${API_BASE_URL}/api/`)) {
-    return fetch(url, options);
-  }
-
-  if (!accessToken) {
-    await restoreSession();
-  }
-
-  const send = () => {
-    const headers = new Headers(options.headers || {});
-    if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
-    return fetch(url, { ...options, headers, credentials: 'include' });
-  };
-
-  let response = await send();
-  if (response.status === 401 && accessToken) {
-    clearAccessToken();
-    const user = await restoreSession();
-    if (user) {
-      response = await send();
-    } else {
-      window.dispatchEvent(new Event('auth:expired'));
-    }
-  }
-
-  return response;
-};
+export const { apiFetch, publicApiFetch, restoreSession, setAccessToken, clearAccessToken, getAccessToken } = client;
+export const getAccessSessionKey = (userId) => getOnboardingSessionKey(userId, getAccessToken());
+// Login, refresh and logout all rotate the browser's shared HttpOnly cookie.
+export const authSessionFetch = (url, options) => withSessionLock(() => fetch(url, options));

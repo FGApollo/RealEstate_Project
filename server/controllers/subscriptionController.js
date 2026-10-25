@@ -1,3 +1,4 @@
+const { safeErrorMessage } = require('../services/httpError');
 const subscriptionService = require('../services/subscriptionService');
 
 const getSubscription = async (req, res) => {
@@ -8,7 +9,7 @@ const getSubscription = async (req, res) => {
     res.status(200).json(data || null);
   } catch (error) {
     console.error('Error fetching subscription:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: safeErrorMessage(error) });
   }
 };
 
@@ -21,7 +22,7 @@ const createOrUpdateSubscription = async (req, res) => {
     res.status(200).json(data);
   } catch (error) {
     console.error('Error updating subscription:', error);
-    res.status(error.statusCode || 500).json({ error: error.message });
+    res.status(error.statusCode || 500).json({ error: safeErrorMessage(error) });
   }
 };
 

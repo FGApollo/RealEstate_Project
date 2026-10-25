@@ -1,5 +1,6 @@
 const { supabase } = require('../config/supabase');
 const trustScoreService = require('./trustScoreService');
+const { positiveId, text, badRequest } = require('./businessValidation');
 
 const VALID_REASONS = [
   'WRONG_PRICE',
@@ -38,7 +39,7 @@ const validateReportReason = (reason) => {
 const getPropertyForReport = async (propertyId) => {
   const { data: property, error } = await supabase
     .from('properties')
-    .select('id, title, owner_id, is_hidden')
+    .select('id, title, owner_id, status, is_hidden')
     .eq('id', propertyId)
     .single();
 
@@ -57,6 +58,8 @@ const getPropertyForReport = async (propertyId) => {
 };
 
 const createReport = async ({ propertyId, reporterId, reason, description }) => {
+  propertyId = positiveId(propertyId, 'propertyId');
+  description = text(description, 'description', 5000);
   if (!propertyId || !reporterId || !reason) {
     throw createServiceError('Thiếu thông tin bắt buộc (propertyId, reporterId, reason)', 400);
   }
@@ -68,7 +71,7 @@ const createReport = async ({ propertyId, reporterId, reason, description }) => 
     throw createServiceError('You cannot report your own property', 400);
   }
 
-  if (property.is_hidden) {
+  if (property.is_hidden || property.status !== 'AVAILABLE') {
     throw createServiceError('Tin đăng này hiện đã bị ẩn hoặc đang tạm khóa khỏi sàn.', 400);
   }
 
@@ -136,12 +139,14 @@ const attachPropertiesToReports = async (reports) => {
 };
 
 const getAdminReports = async (status) => {
+  if (status !== undefined && (typeof status !== 'string'
+    || !['PENDING', 'RESOLVED', 'REJECTED', 'ALL'].includes(status.toUpperCase()))) throw badRequest('Invalid report status.');
   let query = supabase
     .from('property_reports')
     .select('*, reporter:users!reporter_id(id, name, email)')
     .order('created_at', { ascending: false });
 
-  if (status) {
+  if (status && status.toUpperCase() !== 'ALL') {
     query = query.eq('status', status.toUpperCase());
   }
 
@@ -157,6 +162,7 @@ const getAdminReports = async (status) => {
 };
 
 const resolveReport = async (reportId, adminId) => {
+  reportId = positiveId(reportId, 'reportId');
   if (!reportId || !adminId) {
     throw createServiceError('Thiếu adminId trong body', 400);
   }
@@ -199,6 +205,7 @@ const resolveReport = async (reportId, adminId) => {
 };
 
 const rejectReport = async (reportId, adminId) => {
+  reportId = positiveId(reportId, 'reportId');
   if (!reportId || !adminId) {
     throw createServiceError('Thiếu adminId trong body', 400);
   }

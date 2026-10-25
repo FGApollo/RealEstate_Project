@@ -2,51 +2,13 @@ const { supabase } = require('../config/supabase');
 const ocrService = require('./ocrService');
 const faceCompareService = require('./faceCompareService');
 const trustScoreService = require('./trustScoreService');
+const { KYC_BUCKET, getKycImageBuffer, getKycStoragePath } = require('./kycStorage');
 
-const KYC_BUCKET = 'kyc-documents';
 const VERIFIED_STATUS = 'VERIFIED';
 const PENDING_STATUS = 'PENDING';
 const REJECTED_STATUS = 'REJECTED';
 const APPROVED_STATUS = 'APPROVED';
 const MAX_SELFIE_ATTEMPTS = 5;
-const SELFIE_ATTEMPT_TTL_MS = 30 * 60 * 1000;
-const selfieAttemptFailures = new Map();
-
-const getSelfieAttemptKey = (userId, verificationId) => `${userId}:${verificationId}`;
-
-const cleanupExpiredSelfieAttempts = () => {
-  const now = Date.now();
-
-  for (const [key, value] of selfieAttemptFailures.entries()) {
-    if (!value?.updatedAt || now - value.updatedAt > SELFIE_ATTEMPT_TTL_MS) {
-      selfieAttemptFailures.delete(key);
-    }
-  }
-};
-
-const getSelfieAttemptsUsed = (userId, verificationId) => {
-  cleanupExpiredSelfieAttempts();
-
-  const attemptState = selfieAttemptFailures.get(getSelfieAttemptKey(userId, verificationId));
-  return attemptState?.count || 0;
-};
-
-const recordSelfieAttemptFailure = (userId, verificationId) => {
-  cleanupExpiredSelfieAttempts();
-
-  const key = getSelfieAttemptKey(userId, verificationId);
-  const currentState = selfieAttemptFailures.get(key);
-  const attempts = (currentState?.count || 0) + 1;
-  selfieAttemptFailures.set(key, {
-    count: attempts,
-    updatedAt: Date.now()
-  });
-  return attempts;
-};
-
-const clearSelfieAttemptFailures = (userId, verificationId) => {
-  selfieAttemptFailures.delete(getSelfieAttemptKey(userId, verificationId));
-};
 
 const buildFaceCompareDebug = (faceResult = {}) => {
   const debug = {};
@@ -147,7 +109,7 @@ const getKycStatus = async (userId) => {
 
   const latestVerificationStatus = latestVerification?.status || null;
   const attemptsUsed = latestVerificationStatus === PENDING_STATUS
-    ? getSelfieAttemptsUsed(userId, latestVerification.id)
+    ? Number(latestVerification.selfie_attempts || 0)
     : 0;
 
   let kycDetails = null;
@@ -211,7 +173,7 @@ const getKycStatus = async (userId) => {
 };
 
 const buildStoragePath = (userId, suffix, mimetype) => {
-  const extension = mimetype === 'image/png' ? 'png' : 'jpg';
+  const extension = mimetype === 'image/png' ? 'png' : mimetype === 'image/webp' ? 'webp' : 'jpg';
   return `kyc/${userId}/${Date.now()}-${suffix}.${extension}`;
 };
 
@@ -227,50 +189,10 @@ const uploadKycFile = async (buffer, filePath, mimetype) => {
     throw new Error(uploadError.message);
   }
 
-  const { data } = supabase.storage.from(KYC_BUCKET).getPublicUrl(filePath);
-
   return {
     path: filePath,
-    url: data.publicUrl
+    url: filePath
   };
-};
-
-const getStoragePathFromPublicUrl = (storedUrlOrPath) => {
-  const marker = `/storage/v1/object/public/${KYC_BUCKET}/`;
-  const markerIndex = storedUrlOrPath.indexOf(marker);
-
-  if (markerIndex === -1) {
-    return storedUrlOrPath;
-  }
-
-  return storedUrlOrPath.slice(markerIndex + marker.length);
-};
-
-const getKycImageBuffer = async (storedUrlOrPath) => {
-  if (!storedUrlOrPath) {
-    throw new Error('Missing stored KYC image');
-  }
-
-  const storagePath = getStoragePathFromPublicUrl(storedUrlOrPath);
-  if (storagePath !== storedUrlOrPath || !/^https?:\/\//i.test(storedUrlOrPath)) {
-    const { data, error } = await supabase.storage
-      .from(KYC_BUCKET)
-      .download(storagePath);
-
-    if (error || !data) {
-      throw new Error(error?.message || 'Failed to download stored KYC image');
-    }
-
-    return Buffer.from(await data.arrayBuffer());
-  }
-
-  const response = await fetch(storedUrlOrPath);
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch stored KYC image: ${response.status}`);
-  }
-
-  return Buffer.from(await response.arrayBuffer());
 };
 
 const createOrUpdatePendingVerification = async ({
@@ -293,6 +215,7 @@ const createOrUpdatePendingVerification = async ({
     ocr_data: ocrData || null,
     id_number: idNumber || null,
     reject_reason: null,
+    selfie_attempts: 0,
     updated_at: now
   };
 
@@ -368,6 +291,7 @@ const uploadCard = async ({ userId, fullName, phone, frontImage, backImage }) =>
       .limit(1)
       .maybeSingle();
 
+    if (checkError) throw new Error('Failed to check existing identity verification');
     if (existingVerified) {
       return {
         success: false,
@@ -406,7 +330,7 @@ const uploadCard = async ({ userId, fullName, phone, frontImage, backImage }) =>
     nextStep: 'SELFIE',
     data: mergedOcrData,
     warnings: ocrResult.warnings || [],
-    verification
+    verification: { id: verification.id, status: verification.status }
   };
 };
 
@@ -445,11 +369,11 @@ const rejectVerification = async (userId, verificationId, rejectReason) => {
   await updateUserVerificationStatus(userId, REJECTED_STATUS);
 };
 
-const approveVerification = async (userId, verificationId, selfieUrl) => {
+const approveVerification = async (userId, verification, selfieUrl) => {
   const currentUser = await getUserVerificationStatus(userId);
   const now = new Date().toISOString();
 
-  const { error: verificationError } = await supabase
+  const { data: approvedVerification, error: verificationError } = await supabase
     .from('identity_verifications')
     .update({
       selfie_url: selfieUrl,
@@ -457,11 +381,17 @@ const approveVerification = async (userId, verificationId, selfieUrl) => {
       reject_reason: null,
       updated_at: now
     })
-    .eq('id', verificationId);
+    .eq('id', verification.id)
+    .eq('user_id', userId)
+    .eq('status', PENDING_STATUS)
+    .eq('id_card_front_url', verification.id_card_front_url)
+    .select('id')
+    .maybeSingle();
 
   if (verificationError) {
     throw new Error(verificationError.message);
   }
+  if (!approvedVerification) throw new Error('KYC verification changed; restart verification');
 
   await updateUserVerificationStatus(userId, VERIFIED_STATUS);
 
@@ -476,8 +406,20 @@ const uploadSelfie = async ({ userId, selfieImage }) => {
     throw new Error('No pending KYC verification found');
   }
 
+  // Atomic DB reservation bounds provider calls across concurrent requests,
+  // multiple server instances and process restarts. Missing migration fails closed.
+  const { data: attemptsUsed, error: attemptError } = await supabase.rpc('reserve_kyc_selfie_attempt', {
+    p_verification_id: verification.id, p_user_id: userId
+  });
+  if (attemptError) throw new Error('Failed to reserve KYC verification attempt');
+  if (!Number.isInteger(attemptsUsed) || attemptsUsed < 1 || attemptsUsed > MAX_SELFIE_ATTEMPTS) {
+    await rejectVerification(userId, verification.id, 'Ban da thu xac minh khuon mat qua 5 lan. Vui long thuc hien lai tu buoc CCCD.');
+    return { success: false, canRetrySelfie: false, attemptsUsed: MAX_SELFIE_ATTEMPTS, attemptsLeft: 0, error: 'Vui lòng thực hiện lại từ bước CCCD.' };
+  }
+
   let cardFrontImageBuffer;
   try {
+    if (!getKycStoragePath(verification.id_card_front_url).startsWith(`kyc/${userId}/`)) throw new Error('Invalid KYC image owner');
     cardFrontImageBuffer = await getKycImageBuffer(verification.id_card_front_url);
   } catch (error) {
     console.error('Failed to read stored KYC card front image:', error);
@@ -492,15 +434,17 @@ const uploadSelfie = async ({ userId, selfieImage }) => {
   if (!faceResult.isMatch) {
     const faceDebug = buildFaceCompareDebug(faceResult);
 
-    if (faceResult.errorMessage === 'Khong the xac minh khuon mat, vui long thu lai') {
+    if (faceResult.errorMessage === 'Khong the xac minh khuon mat, vui long thu lai' && attemptsUsed < MAX_SELFIE_ATTEMPTS) {
       return {
         success: false,
         error: faceResult.errorMessage,
+        canRetrySelfie: true,
+        attemptsUsed,
+        attemptsLeft: MAX_SELFIE_ATTEMPTS - attemptsUsed,
         debug: faceDebug
       };
     }
 
-    const attemptsUsed = recordSelfieAttemptFailure(userId, verification.id);
     const attemptsLeft = Math.max(0, MAX_SELFIE_ATTEMPTS - attemptsUsed);
 
     if (attemptsUsed < MAX_SELFIE_ATTEMPTS) {
@@ -518,7 +462,6 @@ const uploadSelfie = async ({ userId, selfieImage }) => {
 
     const reason = 'Ban da thu xac minh khuon mat qua 5 lan. Vui long thuc hien lai tu buoc CCCD.';
     await rejectVerification(userId, verification.id, reason);
-    clearSelfieAttemptFailures(userId, verification.id);
 
     return {
       success: false,
@@ -534,8 +477,7 @@ const uploadSelfie = async ({ userId, selfieImage }) => {
   const selfiePath = buildStoragePath(userId, 'selfie', selfieImage.mimetype);
   const uploadedSelfie = await uploadKycFile(selfieImage.buffer, selfiePath, selfieImage.mimetype);
 
-  await approveVerification(userId, verification.id, uploadedSelfie.url);
-  clearSelfieAttemptFailures(userId, verification.id);
+  await approveVerification(userId, verification, uploadedSelfie.url);
 
   return {
     success: true,

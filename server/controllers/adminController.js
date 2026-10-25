@@ -1,3 +1,4 @@
+const { safeErrorMessage } = require('../services/httpError');
 const { supabase } = require('../config/supabase');
 
 const getAllReviews = async (req, res) => {
@@ -12,11 +13,11 @@ const getAllReviews = async (req, res) => {
       `)
       .order('created_at', { ascending: false });
 
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) return res.status(500).json({ error: safeErrorMessage(error) });
     return res.status(200).json(reviews || []);
   } catch (error) {
     console.error('Error in getAllReviews:', error);
-    return res.status(500).json({ error: error.message || 'Internal server error' });
+    return res.status(500).json({ error: safeErrorMessage(error, 'Internal server error') });
   }
 };
 
@@ -39,7 +40,7 @@ const updateReviewStatus = async (req, res) => {
       .select()
       .single();
 
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) return res.status(500).json({ error: safeErrorMessage(error) });
 
     if (updatedReview?.property_id) {
       const { data: approvedReviews } = await supabase
@@ -66,7 +67,7 @@ const updateReviewStatus = async (req, res) => {
     });
   } catch (error) {
     console.error('Error in updateReviewStatus:', error);
-    return res.status(500).json({ error: error.message || 'Internal server error' });
+    return res.status(500).json({ error: safeErrorMessage(error, 'Internal server error') });
   }
 };
 
@@ -81,7 +82,7 @@ const hideProperty = async (req, res) => {
     return res.status(200).json(result);
   } catch (error) {
     console.error('Error in hideProperty:', error);
-    return res.status(500).json({ error: error.message || 'Internal server error' });
+    return res.status(500).json({ error: safeErrorMessage(error, 'Internal server error') });
   }
 };
 
@@ -107,7 +108,7 @@ const unhideProperty = async (req, res) => {
     });
   } catch (error) {
     console.error('Error in unhideProperty:', error);
-    return res.status(500).json({ error: error.message || 'Internal server error' });
+    return res.status(500).json({ error: safeErrorMessage(error, 'Internal server error') });
   }
 };
 

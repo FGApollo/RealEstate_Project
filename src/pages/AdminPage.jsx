@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { useNavigate, Link, useOutletContext } from 'react-router-dom';
 import {
   ShieldCheck, AlertTriangle, Search, LogOut, HelpCircle, UserX, CheckCircle,
@@ -10,6 +10,8 @@ import { API_BASE_URL } from '../config';
 import { apiFetch } from '../auth/apiClient';
 import { useAuth } from '../auth/useAuth';
 import './AdminPage.css';
+
+const AdminAnalyticsPage = lazy(() => import('../features/admin/analytics/AdminAnalyticsPage'));
 
 const REASON_LABELS = {
   'WRONG_PRICE': { label: 'Sai giá', penalty: -5, color: '#f59e0b', bg: '#fef3c7' },
@@ -36,7 +38,7 @@ const AdminPage = () => {
   const { currentUser } = useOutletContext();
   const { logout } = useAuth();
 
-  // Exactly 2 navbar items: 'account-verification' (Kiểm duyệt tài khoản) & 'report-moderation' (Kiểm duyệt báo cáo)
+  // Keep moderation and analytics inside the shared Admin shell.
   const [activeTab, setActiveTab] = useState('account-verification');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -694,8 +696,8 @@ const AdminPage = () => {
   const selectedReasonInfo = selectedReport ? (REASON_LABELS[selectedReport.reason] || { label: selectedReport.reason, penalty: 0, color: '#64748b', bg: '#f1f5f9' }) : null;
 
   return (
-    <div className="admin-dashboard">
-      {/* LEFT NAVBAR - Exactly 2 items as requested */}
+    <div className={`admin-dashboard ${activeTab === 'analytics' ? 'analytics-active' : ''}`}>
+      {/* LEFT NAVBAR */}
       <aside className="admin-sidebar">
         <div className="admin-logo-wrapper">
           <div 
@@ -709,6 +711,13 @@ const AdminPage = () => {
 
         <div className="admin-nav-label">Điều hướng Admin</div>
         <nav className="admin-nav-section">
+          <button
+            className={`admin-nav-btn ${activeTab === 'analytics' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('analytics'); setSearchQuery(''); }}
+          >
+            <TrendingUp size={20} />
+            <span>Thống kê & Báo cáo</span>
+          </button>
           <button
             className={`admin-nav-btn ${activeTab === 'account-verification' ? 'active' : ''}`}
             onClick={() => {
@@ -781,7 +790,7 @@ const AdminPage = () => {
       <main className="admin-main">
         {/* TOPBAR */}
         <header className="admin-topbar">
-          <div className="admin-search-wrapper">
+          {activeTab === 'analytics' ? <span className="admin-analytics-topbar-label">Thống kê & Báo cáo</span> : <div className="admin-search-wrapper">
             <Search size={18} color="#94a3b8" />
             <input
               type="text"
@@ -800,7 +809,7 @@ const AdminPage = () => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
-          </div>
+          </div>}
 
           <div className="admin-topbar-right">
             <div className="admin-shield-icon">
@@ -818,7 +827,7 @@ const AdminPage = () => {
 
         {/* CONTENT AREA */}
         <div className="admin-content-area">
-          <div className="admin-header-banner">
+          {activeTab !== 'analytics' && <div className="admin-header-banner">
             <div className="admin-header-title">
               <h1>Admin</h1>
               <p>Xác minh và kiểm duyệt thủ công, đảm bảo sự công bằng và minh bạch</p>
@@ -851,7 +860,9 @@ const AdminPage = () => {
                 Xử lý khiếu nại
               </button>
             </div>
-          </div>
+          </div>}
+
+          {activeTab === 'analytics' && <Suspense fallback={<div className="admin-empty-state" role="status">Đang mở thống kê…</div>}><AdminAnalyticsPage /></Suspense>}
 
           {/* TAB 1: KIỂM DUYỆT TÀI KHOẢN (KYC) */}
           {activeTab === 'account-verification' && (

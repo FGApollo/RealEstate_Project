@@ -1,6 +1,6 @@
 import { API_BASE_URL } from '../config';
 import { apiFetch } from './apiClient';
-import { roleDestination } from './roleDestination';
+import { canResumeAuthAction, roleDestination } from './roleDestination.js';
 import { clearPendingAuthAction, readPendingAuthAction } from './pendingAuthAction';
 import { resolveOnboardingAction } from './onboardingFlow.js';
 
@@ -54,7 +54,8 @@ export const finishAuthentication = async ({ data, completeLogin, refreshOnboard
   }
 
   const fallback = roleDestination(role);
-  if (!readPendingAuthAction()) {
+  if (!canResumeAuthAction(role, readPendingAuthAction())) {
+    clearPendingAuthAction();
     navigate(fallback, { replace: true });
     return;
   }

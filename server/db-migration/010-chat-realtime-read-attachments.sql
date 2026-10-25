@@ -28,7 +28,7 @@ DO $$
 BEGIN
   ALTER TABLE public.properties DROP CONSTRAINT IF EXISTS properties_status_check;
   ALTER TABLE public.properties ADD CONSTRAINT properties_status_check 
-    CHECK (status::text = ANY (ARRAY['AVAILABLE'::text, 'SOLD'::text, 'RENTED'::text, 'PENDING'::text, 'DELETED'::text]));
+    CHECK (status::text = ANY (ARRAY['AVAILABLE'::text, 'SOLD'::text, 'RENTED'::text, 'PENDING'::text, 'INACTIVE'::text, 'DELETED'::text]));
 END $$;
 
 COMMIT;

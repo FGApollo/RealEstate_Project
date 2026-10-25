@@ -1,41 +1,13 @@
 const { supabase } = require('../config/supabase');
-const fs = require('fs');
-const path = require('path');
-const crypto = require('crypto');
+const { positiveId, boundedInteger, text, badRequest } = require('./businessValidation');
+const { savePublicImage } = require('./publicImageStorage');
 
-// Helper to save base64 attachments if needed
-const saveChatAttachment = async (attachment) => {
-  if (!attachment || !attachment.url) return attachment;
-  const base64Str = attachment.url;
-  if (typeof base64Str !== 'string' || !base64Str.startsWith('data:image/')) {
-    return attachment;
-  }
-  try {
-    const matches = base64Str.match(/^data:image\/([A-Za-z-+\/]+);base64,(.+)$/);
-    if (!matches || matches.length !== 3) return attachment;
-    
-    const ext = matches[1].replace('jpeg', 'jpg');
-    const buffer = Buffer.from(matches[2], 'base64');
-    const filename = `chat_${Date.now()}_${crypto.randomBytes(6).toString('hex')}.${ext}`;
-    
-    const uploadDir = path.join(__dirname, '../../public/uploads/chat');
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    fs.writeFileSync(path.join(uploadDir, filename), buffer);
-    return {
-      ...attachment,
-      url: `/uploads/chat/${filename}`
-    };
-  } catch (err) {
-    console.error('Failed to save chat attachment locally:', err);
-    return attachment;
-  }
-};
-
-const getMessages = async (userId, otherId, limit = 50) => {
-  const numLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 100);
-  // Fetch latest messages between userId and otherId up to numLimit
+const getMessages = async (userId, otherId, { limit, offset } = {}) => {
+  userId = positiveId(userId, 'userId');
+  otherId = positiveId(otherId, 'otherId');
+  const pageLimit = boundedInteger(limit, 200, 1, 200);
+  const pageOffset = boundedInteger(offset, 0, 0, 100000);
+  // Fetch messages between userId and otherId
   const { data, error } = await supabase
     .from('messages')
     .select(`
@@ -44,31 +16,56 @@ const getMessages = async (userId, otherId, limit = 50) => {
     `)
     .or(`and(sender_id.eq.${userId},receiver_id.eq.${otherId}),and(sender_id.eq.${otherId},receiver_id.eq.${userId})`)
     .order('created_at', { ascending: false })
-    .limit(numLimit);
+    .order('id', { ascending: false })
+    .range(pageOffset, pageOffset + pageLimit - 1);
 
   if (error) {
     throw new Error(error.message);
   }
-  // Reverse to chronological order (oldest to newest for chat UI)
   return (data || []).reverse();
 };
 
 const sendMessage = async (senderId, receiverId, propertyId, message, rawAttachments = []) => {
-  // F33: Only attach property_id when explicitly sent (e.g. from PropertyDetailModal CTA or property card picker)
-  const effectivePropertyId = propertyId ? Number(propertyId) : null;
-
-  // F35: Process attachments if provided
-  let processedAttachments = [];
-  if (Array.isArray(rawAttachments) && rawAttachments.length > 0) {
-    processedAttachments = await Promise.all(rawAttachments.map(saveChatAttachment));
+  senderId = positiveId(senderId, 'senderId');
+  receiverId = positiveId(receiverId, 'receiverId');
+  if (!Array.isArray(rawAttachments) || rawAttachments.length > 5) throw badRequest('Tối đa 5 ảnh mỗi tin nhắn.');
+  message = text(message, 'message', 2000, { required: rawAttachments.length === 0 });
+  const attachments = rawAttachments.map((attachment) => {
+    if (!attachment || typeof attachment !== 'object' || Array.isArray(attachment)
+      || typeof attachment.url !== 'string'
+      || !/^data:image\/(?:jpeg|jpg|png|webp);base64,/.test(attachment.url)) {
+      throw badRequest('Ảnh đính kèm phải có định dạng JPG, PNG hoặc WEBP.');
+    }
+    return { url: attachment.url, name: text(attachment.name, 'attachment name', 255) };
+  });
+  if (senderId === receiverId) throw badRequest('Bạn không thể tự gửi tin nhắn cho chính mình');
+  const { data: receiver, error: receiverError } = await supabase.from('users')
+    .select('id, is_active').eq('id', receiverId).maybeSingle();
+  if (receiverError) throw new Error(receiverError.message);
+  if (!receiver || receiver.is_active !== true) {
+    throw Object.assign(badRequest('Không tìm thấy người nhận đang hoạt động.'), { statusCode: 404 });
   }
-
+  if (propertyId !== undefined && propertyId !== null) {
+    propertyId = positiveId(propertyId, 'propertyId');
+    const { data: property, error: propertyError } = await supabase.from('properties')
+      .select('id, owner_id, status, is_hidden').eq('id', propertyId).maybeSingle();
+    if (propertyError) throw new Error(propertyError.message);
+    if (!property || property.is_hidden === true || property.status !== 'AVAILABLE'
+      || ![senderId, receiverId].includes(Number(property.owner_id))) {
+      throw Object.assign(badRequest('Không thể đính kèm tin đăng này.'), { statusCode: 404 });
+    }
+  }
+  // Preserve explicit property context; validate recipients and ownership before saving attachments.
+  const processedAttachments = [];
+  for (const attachment of attachments) {
+    processedAttachments.push({ name: attachment.name, url: await savePublicImage(attachment.url, 'chat', senderId) });
+  }
   const { data, error } = await supabase
     .from('messages')
     .insert([{
       sender_id: senderId,
       receiver_id: receiverId,
-      property_id: effectivePropertyId,
+      property_id: propertyId ?? null,
       message,
       attachments: processedAttachments,
       is_read: false
@@ -129,6 +126,8 @@ const sendMessage = async (senderId, receiverId, propertyId, message, rawAttachm
 };
 
 const markMessagesAsRead = async (userId, partnerId) => {
+  userId = positiveId(userId, 'userId');
+  partnerId = positiveId(partnerId, 'partnerId');
   const now = new Date().toISOString();
   const { data, error } = await supabase
     .from('messages')
@@ -145,7 +144,8 @@ const markMessagesAsRead = async (userId, partnerId) => {
 };
 
 const getConversations = async (userId) => {
-  // 1. Fetch lightweight recent messages involving the user (skip large base64 attachments/full joins)
+  userId = positiveId(userId, 'userId');
+  // Fetch lightweight recent messages involving the user.
   const { data: messages, error: msgError } = await supabase
     .from('messages')
     .select('id, sender_id, receiver_id, message, is_read, created_at, property_id')
@@ -235,6 +235,8 @@ const getConversations = async (userId) => {
 };
 
 const updateFunnelStage = async (agentId, userId, stage) => {
+  agentId = positiveId(agentId, 'agentId');
+  userId = positiveId(userId, 'userId');
   if (!['AWARENESS', 'CONSIDERATION', 'INTENT', 'ACTION'].includes(stage)) {
     const error = new Error('Invalid funnel stage');
     error.statusCode = 400;

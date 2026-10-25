@@ -16,7 +16,7 @@ const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1535713875002-d1d0cf37
 
 export default function UserProfile() {
   const navigate = useNavigate();
-  const { user: authUser, updateUser, logout } = useAuth();
+  const { user: authUser, updateUser, logout, expireSession } = useAuth();
   const fileInputRef = useRef(null);
 
   const [activeTab, setActiveTab] = useState('info'); // 'info' | 'security'
@@ -208,6 +208,12 @@ export default function UserProfile() {
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.error || 'Đổi mật khẩu thất bại');
+      }
+
+      if (data.requiresLogin) {
+        expireSession();
+        navigate('/login', { replace: true, state: { message: 'Đã đổi mật khẩu và đăng xuất các phiên cũ. Vui lòng đăng nhập lại.' } });
+        return;
       }
 
       setPasswordMessage({ type: 'success', text: 'Đổi mật khẩu thành công! Hãy ghi nhớ mật khẩu mới của bạn.' });

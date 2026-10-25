@@ -1,3 +1,4 @@
+const { safeErrorMessage } = require('../services/httpError');
 const phoneOtpService = require('../services/phoneOtpService');
 
 const sendOtp = async (req, res) => {
@@ -15,7 +16,7 @@ const sendOtp = async (req, res) => {
     if (error.retryAfterSeconds) {
       res.set('Retry-After', String(error.retryAfterSeconds));
     }
-    res.status(error.statusCode || 500).json({ error: error.message || 'Internal server error' });
+    res.status(error.statusCode || 500).json({ error: safeErrorMessage(error, 'Internal server error') });
   }
 };
 
@@ -34,7 +35,7 @@ const verifyOtp = async (req, res) => {
     if (error.retryAfterSeconds) {
       res.set('Retry-After', String(error.retryAfterSeconds));
     }
-    res.status(error.statusCode || 500).json({ error: error.message || 'Internal server error' });
+    res.status(error.statusCode || 500).json({ error: safeErrorMessage(error, 'Internal server error') });
   }
 };
 
