@@ -2,11 +2,16 @@ const express = require('express');
 const router = express.Router();
 const adminController = require('../controllers/adminController');
 const analyticsController = require('../controllers/analyticsController');
+const adminPlanController = require('../controllers/adminPlanController');
 const trustScoreController = require('../controllers/trustScoreController');
 const { authenticate, requireRole } = require('../middleware/authenticate');
 const { rateLimiters } = require('../middleware/rateLimiters');
 
 router.use(authenticate, requireRole('ADMIN'));
+
+router.get('/service-plans', rateLimiters.read, adminPlanController.catalog);
+router.get('/service-plans/history', rateLimiters.read, adminPlanController.history);
+router.post('/service-plans/paid', rateLimiters.write, adminPlanController.change);
 
 // Authentication re-reads users from the DB. A disabled/unknown-status account
 // cannot read business analytics even if its session still has time remaining.

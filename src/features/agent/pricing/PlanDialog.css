@@ -1,0 +1,8 @@
+.plan-dialog { box-sizing: border-box; width: min(540px, calc(100% - 32px)); max-height: calc(100dvh - 48px); overflow: auto; border: 1px solid #dce6f6; border-radius: 20px; padding: 26px; color: #142b4b; background: #fff; box-shadow: 0 25px 100px #132a4d33; }
+.plan-dialog::backdrop { background: #142b4b66; backdrop-filter: blur(3px); }
+.plan-dialog-wide { width: min(1100px, calc(100% - 32px)); }
+.plan-dialog-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+.plan-dialog-heading h2 { font-size: 20px; margin: 0; }
+.plan-dialog-heading button { border: 1px solid #dce6f6; background: #f5f8fd; border-radius: 8px; padding: 7px; display: inline-flex; cursor: pointer; }
+.plan-dialog p { line-height: 1.65; }
+.plan-dialog :focus-visible { outline: 3px solid #93c5fd; outline-offset: 3px; }

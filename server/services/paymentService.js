@@ -65,12 +65,13 @@ function createPaymentService(repo = repository, provider = createPayosService()
       return { ...data, items: data.items.map(dto) };
     },
     async create(userId, body) {
-      if (!body || Array.isArray(body) || Object.keys(body).some((key) => !['planCode', 'requestId'].includes(key))
-        || body.planCode !== 'PAID' || !UUID.test(body.requestId || '')) {
+      if (!body || Array.isArray(body) || Object.keys(body).some((key) => !['planCode', 'requestId', 'planVersion'].includes(key))
+        || body.planCode !== 'PAID' || typeof body.requestId !== 'string' || !UUID.test(body.requestId)
+        || !Number.isSafeInteger(body.planVersion) || body.planVersion < 1 || body.planVersion > 2147483647) {
         throw paymentError(400, 'Thông tin tạo đơn không hợp lệ.', 'INVALID_PAYMENT_REQUEST');
       }
       if (!provider.availability().available) throw paymentError(503, 'Thanh toán payOS chưa sẵn sàng.', 'PAYMENT_NOT_CONFIGURED');
-      const order = await repo.reserve(userId, body.planCode, body.requestId);
+      const order = await repo.reserve(userId, body.planCode, body.requestId, body.planVersion);
       if (!OPEN.has(order.status)) return dto(order);
       if (order.checkout_url) return dto(await sync(order));
       // Retry the same immutable order code after ambiguous failures; never issue

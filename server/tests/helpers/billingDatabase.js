@@ -6,7 +6,7 @@ async function createBillingDatabase() {
   const db = await createAnalyticsDatabase();
   await db.exec("SET timezone='UTC'");
   await db.exec("CREATE SEQUENCE test_billing_sub_id; ALTER TABLE seller_subscriptions ALTER COLUMN id SET DEFAULT nextval('test_billing_sub_id');");
-  for (const file of ['014-agent-payos-payments.sql', '015-payos-revenue-analytics.sql']) {
+  for (const file of ['014-agent-payos-payments.sql', '015-payos-revenue-analytics.sql', '017-admin-service-plans.sql']) {
     await db.exec(fs.readFileSync(path.join(__dirname, '../../db-migration', file), 'utf8'));
   }
   return db;

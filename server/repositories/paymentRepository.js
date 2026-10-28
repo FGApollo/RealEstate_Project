@@ -3,6 +3,10 @@ const { paymentError } = require('../services/payosService');
 
 function result({ data, error }) {
   if (error) {
+    if (error.code === '40001') throw paymentError(409,
+      'Gói dịch vụ vừa thay đổi. Hãy làm mới bảng giá và xác nhận lại trước khi thanh toán.', 'PLAN_PRICE_CHANGED');
+    if (error.code === '22023') throw paymentError(409,
+      'Gói dịch vụ hiện không thể đăng ký. Hãy làm mới bảng giá.', 'PLAN_UNAVAILABLE');
     if (['PGRST202', '42P01', '42883'].includes(error.code)) {
       throw paymentError(503, 'Thanh toán chưa được cấu hình trong database.', 'PAYMENT_MIGRATION_REQUIRED');
     }
@@ -13,7 +17,8 @@ function result({ data, error }) {
 const rpc = async (name, args) => result(await supabase.rpc(name, args));
 module.exports = {
   async plans() {
-    return result(await supabase.from('agent_billing_plans').select('code,name,amount_vnd,duration_months').eq('active', true).order('amount_vnd'));
+    const catalog = await rpc('agent_service_catalog', {});
+    return catalog.plans;
   },
   async find(id, userId) {
     let query = supabase.from('agent_payment_orders').select('*').eq('id', id);
@@ -28,7 +33,9 @@ module.exports = {
       .order('created_at', { ascending: false }).order('id').range((page - 1) * limit, page * limit - 1);
     return { items: result(response), total: response.count, page, limit };
   },
-  reserve: (userId, planCode, requestId) => rpc('reserve_agent_payment', { p_user_id: userId, p_plan_code: planCode, p_request_id: requestId }),
+  reserve: (userId, planCode, requestId, version) => rpc('reserve_agent_payment', {
+    p_user_id: userId, p_plan_code: planCode, p_request_id: requestId, p_expected_version: version
+  }),
   claimSync: (id) => rpc('claim_agent_payment_sync', { p_id: id }),
   update: (order, provider, url, status) => rpc('update_agent_payment', {
     p_id: order.id, p_link_id: provider.paymentLinkId || provider.id, p_checkout_url: url, p_status: status

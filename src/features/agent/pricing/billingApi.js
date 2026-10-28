@@ -6,7 +6,9 @@ export async function billingRequest(path, options = {}) {
     ...options, ...(options.body ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(options.body) } : {})
   });
   const data = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(data?.error || 'Không thể tải thông tin thanh toán. Vui lòng thử lại.');
+  if (!response.ok) throw Object.assign(new Error(data?.error || 'Không thể tải thông tin thanh toán. Vui lòng thử lại.'), {
+    status: response.status, code: data?.code
+  });
   return data;
 }
 export const billingMoney = (value) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
