@@ -1,7 +1,7 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { useNavigate, Link, useOutletContext } from 'react-router-dom';
 import {
-  ShieldCheck, AlertTriangle, Search, LogOut, HelpCircle, UserX, CheckCircle,
+  ShieldCheck, AlertTriangle, Search, UserX, CheckCircle,
   XCircle, FileText, Image, ImageIcon, User, Check, X, ShieldAlert, Flag, Home, Mail, Clock, Award,
   Star, EyeOff, Eye, Scale, ExternalLink, Activity, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, RotateCcw, History,
   SlidersHorizontal
@@ -9,9 +9,11 @@ import {
 import { API_BASE_URL } from '../config';
 import { apiFetch } from '../auth/apiClient';
 import { useAuth } from '../auth/useAuth';
+import AdminSidebar from '../features/admin/AdminSidebar';
 import './AdminPage.css';
 
 const AdminAnalyticsPage = lazy(() => import('../features/admin/analytics/AdminAnalyticsPage'));
+const ServicePlansPage = lazy(() => import('../features/admin/service-plans/ServicePlansPage'));
 
 const REASON_LABELS = {
   'WRONG_PRICE': { label: 'Sai giá', penalty: -5, color: '#f59e0b', bg: '#fef3c7' },
@@ -696,101 +698,14 @@ const AdminPage = () => {
   const selectedReasonInfo = selectedReport ? (REASON_LABELS[selectedReport.reason] || { label: selectedReport.reason, penalty: 0, color: '#64748b', bg: '#f1f5f9' }) : null;
 
   return (
-    <div className={`admin-dashboard ${activeTab === 'analytics' ? 'analytics-active' : ''}`}>
-      {/* LEFT NAVBAR */}
-      <aside className="admin-sidebar">
-        <div className="admin-logo-wrapper">
-          <div 
-            className="admin-logo" 
-            onClick={() => navigate('/')} 
-            style={{ cursor: 'pointer' }}
-          >
-            SWIPE NEST
-          </div>
-        </div>
-
-        <div className="admin-nav-label">Điều hướng Admin</div>
-        <nav className="admin-nav-section">
-          <button
-            className={`admin-nav-btn ${activeTab === 'analytics' ? 'active' : ''}`}
-            onClick={() => { setActiveTab('analytics'); setSearchQuery(''); }}
-          >
-            <TrendingUp size={20} />
-            <span>Thống kê & Báo cáo</span>
-          </button>
-          <button
-            className={`admin-nav-btn ${activeTab === 'account-verification' ? 'active' : ''}`}
-            onClick={() => {
-              setActiveTab('account-verification');
-              setSearchQuery('');
-            }}
-          >
-            <ShieldCheck size={20} />
-            <span>Kiểm duyệt tài khoản</span>
-          </button>
-
-          <button
-            className={`admin-nav-btn ${activeTab === 'report-moderation' ? 'active' : ''}`}
-            onClick={() => {
-              setActiveTab('report-moderation');
-              setSearchQuery('');
-            }}
-          >
-            <AlertTriangle size={20} />
-            <span>Kiểm duyệt báo cáo</span>
-          </button>
-
-          <button
-            className={`admin-nav-btn ${activeTab === 'review-moderation' ? 'active' : ''}`}
-            onClick={() => {
-              setActiveTab('review-moderation');
-              setSearchQuery('');
-            }}
-          >
-            <Star size={20} />
-            <span>Kiểm duyệt đánh giá</span>
-          </button>
-
-          <button
-            className={`admin-nav-btn ${activeTab === 'appeal-moderation' ? 'active' : ''}`}
-            onClick={() => {
-              setActiveTab('appeal-moderation');
-              setSearchQuery('');
-            }}
-          >
-            <Scale size={20} />
-            <span>Xử lý khiếu nại</span>
-          </button>
-
-          <button
-            className={`admin-nav-btn ${activeTab === 'audit-logs' ? 'active' : ''}`}
-            onClick={() => {
-              setActiveTab('audit-logs');
-              setSearchQuery('');
-            }}
-          >
-            <Activity size={20} />
-            <span>Nhật ký điểm uy tín</span>
-          </button>
-        </nav>
-
-        <div className="admin-sidebar-bottom">
-          <a href="#" className="admin-bottom-link">
-            <HelpCircle size={18} />
-            <span>Help Center</span>
-          </a>
-          <a href="#" className="admin-bottom-link" onClick={handleLogout}>
-            <LogOut size={18} />
-            <span>Log Out</span>
-          </a>
-        </div>
-      </aside>
+    <div className={`admin-dashboard ${['analytics','service-plans'].includes(activeTab) ? 'analytics-active' : ''} ${activeTab === 'service-plans' ? 'service-page-active' : ''}`}>
+      <AdminSidebar activeTab={activeTab} onNavigate={tab => { setActiveTab(tab); setSearchQuery(''); }} onLogout={handleLogout} />
 
       {/* MAIN AREA */}
       <main className="admin-main">
         {/* TOPBAR */}
         <header className="admin-topbar">
-          {activeTab === 'analytics' ? <span className="admin-analytics-topbar-label">Thống kê & Báo cáo</span> : <div className="admin-search-wrapper">
+          {['analytics','service-plans'].includes(activeTab) ? <span className="admin-analytics-topbar-label">{activeTab === 'analytics' ? 'Thống kê & Báo cáo' : 'Admin › Quản lý gói dịch vụ'}</span> : <div className="admin-search-wrapper">
             <Search size={18} color="#94a3b8" />
             <input
               type="text"
@@ -827,7 +742,7 @@ const AdminPage = () => {
 
         {/* CONTENT AREA */}
         <div className="admin-content-area">
-          {activeTab !== 'analytics' && <div className="admin-header-banner">
+          {!['analytics','service-plans'].includes(activeTab) && <div className="admin-header-banner">
             <div className="admin-header-title">
               <h1>Admin</h1>
               <p>Xác minh và kiểm duyệt thủ công, đảm bảo sự công bằng và minh bạch</p>
@@ -863,6 +778,7 @@ const AdminPage = () => {
           </div>}
 
           {activeTab === 'analytics' && <Suspense fallback={<div className="admin-empty-state" role="status">Đang mở thống kê…</div>}><AdminAnalyticsPage /></Suspense>}
+          {activeTab === 'service-plans' && <Suspense fallback={<div className="admin-empty-state" role="status">Đang mở quản lý gói dịch vụ…</div>}><ServicePlansPage /></Suspense>}
 
           {/* TAB 1: KIỂM DUYỆT TÀI KHOẢN (KYC) */}
           {activeTab === 'account-verification' && (

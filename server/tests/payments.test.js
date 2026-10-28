@@ -128,18 +128,18 @@ test('new payment tables and every RPC deny anonymous/authenticated access', asy
 });
 test('service ignores browser payment status, prevents IDOR and rejects client price/user injection', async () => {
   const pay = gateway(); const service = createPaymentService(repo, pay);
-  const order = await service.create(9, { planCode: 'PAID', requestId: randomUUID() });
+  const order = await service.create(9, { planCode: 'PAID', planVersion: 1, requestId: randomUUID() });
   assert.equal(order.status, 'PENDING');
   await assert.rejects(service.get(10, order.id), { statusCode: 404 });
   await assert.rejects(service.cancel(10, order.id), { statusCode: 404 });
-  await assert.rejects(service.create(9, { planCode: 'PAID', requestId: randomUUID(), amount: 1 }), { statusCode: 400 });
-  await assert.rejects(service.create(9, { planCode: 'PAID', requestId: randomUUID(), userId: 10 }), { statusCode: 400 });
+  await assert.rejects(service.create(9, { planCode: 'PAID', planVersion: 1, requestId: randomUUID(), amount: 1 }), { statusCode: 400 });
+  await assert.rejects(service.create(9, { planCode: 'PAID', planVersion: 1, requestId: randomUUID(), userId: 10 }), { statusCode: 400 });
   assert.equal((await row(order.id)).status, 'PENDING');
   assert.equal((await service.get(9, order.id)).status, 'PAID');
 });
 test('duplicate webhooks and polling settle only once; unknown confirmation samples are acknowledged', async () => {
   const service = createPaymentService(repo, gateway());
-  const order = await service.create(9, { planCode: 'PAID', requestId: randomUUID() });
+  const order = await service.create(9, { planCode: 'PAID', planVersion: 1, requestId: randomUUID() });
   const body = { data: { orderCode: order.orderCode, paymentLinkId: LINK, code: '00' } };
   await Promise.all([service.webhook(body), service.webhook(body)]);
   const first = await row(order.id);
@@ -154,7 +154,7 @@ test('provider mismatch, underpayment, outages and forged webhook never activate
     const get = base.get;
     base.get = async () => ({ ...await get(), ...remote });
     const service = createPaymentService(repo, base);
-    const order = await service.create(9, { planCode: 'PAID', requestId: randomUUID() });
+    const order = await service.create(9, { planCode: 'PAID', planVersion: 1, requestId: randomUUID() });
     await assert.rejects(service.get(9, order.id));
     assert.equal((await row(order.id)).status, 'PENDING');
   }
@@ -166,7 +166,7 @@ test('ambiguous create response recovers the same order without a second reserva
   const pay = gateway(); const create = pay.create;
   pay.create = async (order) => { await create(order); throw new Error('network interrupted'); };
   const service = createPaymentService(repo, pay);
-  const order = await service.create(9, { planCode: 'PAID', requestId: randomUUID() });
+  const order = await service.create(9, { planCode: 'PAID', planVersion: 1, requestId: randomUUID() });
   assert.equal(order.status, 'PAID');
   assert.equal(Number((await db.query('SELECT count(*) n FROM agent_payment_orders')).rows[0].n), 1);
 });
@@ -245,14 +245,14 @@ test('HTTP uses real JWT/session and Agent ownership guards, with public signed-
     for (const userId of [1,2]) assert.equal((await fetch(`${base}/catalog`, { headers: { Authorization: `Bearer ${await tokenFor(userId)}` } })).status, 403);
     const headers = { Authorization: `Bearer ${await tokenFor(9)}`, 'Content-Type':'application/json' };
     assert.equal((await fetch(`${base}/catalog`,{headers})).status,200);
-    const response = await fetch(base,{ method:'POST',headers,body:JSON.stringify({planCode:'PAID',requestId:randomUUID()}) });
+    const response = await fetch(base,{ method:'POST',headers,body:JSON.stringify({planCode:'PAID',planVersion:1,requestId:randomUUID()}) });
     assert.equal(response.status,200); const order=await response.json();
     assert.equal((await fetch(`${base}/${order.id}`,{headers:{Authorization:`Bearer ${await tokenFor(10)}`}})).status,404);
     assert.equal((await fetch(`${base}/payos/webhook`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})).status,400);
     const webhook = { signature:'verified-fixture',data:{orderCode:order.orderCode,code:'00',paymentLinkId:LINK} };
     assert.equal((await fetch(`${base}/payos/webhook`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(webhook)})).status,200);
     assert.equal((await row(order.id)).status,'PAID');
-    assert.equal((await fetch(base,{method:'POST',headers,body:JSON.stringify({planCode:'PAID',requestId:randomUUID(),amount:1})})).status,400);
+    assert.equal((await fetch(base,{method:'POST',headers,body:JSON.stringify({planCode:'PAID',planVersion:1,requestId:randomUUID(),amount:1})})).status,400);
     await db.exec('UPDATE users SET is_active=false WHERE id=9');
     assert.equal((await fetch(`${base}/catalog`,{headers})).status,403);
   } finally {
