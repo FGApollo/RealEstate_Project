@@ -21,6 +21,9 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
   const requireAuth = useRequireAuth();
   const [fetchedProperty, setFetchedProperty] = useState(null);
   const property = fetchedProperty || prop;
+  const matchScore = property?.matchScore;
+  const hasMatchScore = (typeof matchScore === 'number' || (typeof matchScore === 'string' && matchScore.trim() !== ''))
+    && Number.isFinite(Number(matchScore)) && Number(matchScore) >= 0 && Number(matchScore) <= 100;
 
   const [activeSliderIdx, setActiveSliderIdx] = useState(0);
   const [similarProperties, setSimilarProperties] = useState([]);
@@ -493,9 +496,9 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
           <div className="detail-content-wrapper">
             {/* 2. Rating & Match Score */}
             <div className="detail-meta-row">
-              <span className="match-score-tag">
-                <Sparkles size={12} /> {property.matchScore || 95}% MATCH SCORE
-              </span>
+              {hasMatchScore && <span className="match-score-tag">
+                <Sparkles size={12} /> {Math.round(Number(matchScore))}% MATCH SCORE
+              </span>}
               
               <div className="detail-rating">
                 <span className="rating-num">{localRating ? localRating.toFixed(1) : '0'}</span>

@@ -50,6 +50,7 @@ export default function Header({
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const drawerRef = useRef(null);
 
   const handleSearchAction = onSearchClick || onSearch;
   const shouldShowSearch = showSearch || Boolean(handleSearchAction);
@@ -71,13 +72,14 @@ export default function Header({
 
   // Prevent body scroll when mobile drawer is open
   useEffect(() => {
-    if (mobileDrawerOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
+    if (!mobileDrawerOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    const drawer = drawerRef.current;
+    drawer?.showModal();
+    document.body.style.overflow = 'hidden';
     return () => {
-      document.body.style.overflow = '';
+      drawer?.close();
+      document.body.style.overflow = previousOverflow;
     };
   }, [mobileDrawerOpen]);
 
@@ -201,6 +203,8 @@ export default function Header({
             className="app-header-mobile-toggle" 
             type="button" 
             aria-label={mobileDrawerOpen ? 'Đóng menu' : 'Mở menu'} 
+            aria-expanded={mobileDrawerOpen}
+            aria-controls="app-mobile-navigation"
             onClick={() => {
               if (onMenuClick) {
                 onMenuClick();
@@ -276,7 +280,7 @@ export default function Header({
 
       {/* Unified Mobile Navigation Drawer */}
       {mobileDrawerOpen && (
-        <div className="app-header-mobile-backdrop" onClick={() => setMobileDrawerOpen(false)}>
+        <dialog ref={drawerRef} id="app-mobile-navigation" aria-label="Menu điều hướng" className="app-header-mobile-backdrop" onCancel={event => { event.preventDefault(); setMobileDrawerOpen(false); }} onClick={() => setMobileDrawerOpen(false)}>
           <div className="app-header-mobile-drawer" onClick={(e) => e.stopPropagation()}>
             <div className="app-header-drawer-top">
               <div 
@@ -379,7 +383,7 @@ export default function Header({
               )}
             </div>
           </div>
-        </div>
+        </dialog>
       )}
     </>
   );

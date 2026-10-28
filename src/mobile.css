@@ -1,0 +1,224 @@
+/* Shared responsive foundations. Content is reflowed, never hidden to mask
+   horizontal overflow. Wide data tables scroll inside their own containers. */
+body .dashboard-mobile-menu-toggle, body .agent-chat-mobile-back { display: none; }
+body .dashboard-sidebar-navigation { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+body .page-loading { display: flex; align-items: center; justify-content: center; gap: 12px; min-height: 65dvh; padding: 24px; color: #587398; font-size: 15px; }
+body .page-loading > span { width: 23px; height: 23px; border: 2px solid #dbe8fc; border-top-color: #2563eb; border-radius: 50%; animation: page-loading-spin .7s linear infinite; }
+@keyframes page-loading-spin { to { transform: rotate(360deg); } }
+body .page-failure { max-width: min(460px, calc(100% - 32px)); margin: 12vh auto; padding: 26px; background: #fff; border: 1px solid #dce6f5; border-radius: 18px; color: #233d60; }
+body .page-failure h1 { font-size: 25px; margin-bottom: 12px; }
+body .page-failure p { line-height: 1.75; color: #667d9c; }
+body .page-failure button { display: block; width: 100%; margin: 20px 0 12px; min-height: 44px; border-radius: 10px; background: #2563eb; color: #fff; font-size: 15px; }
+body dialog.app-header-mobile-backdrop { margin: 0; padding: 0; border: 0; max-width: none; max-height: none; color: inherit; }
+body dialog.app-header-mobile-backdrop::backdrop { background: transparent; }
+
+@media (max-width: 900px) {
+  body #root { min-width: 0; }
+  body :is(.auth-container, .home-container, .swipe-page, .swipe-experience, .chat-page-container, .uprofile-page-wrapper,
+    .lifestyle-onboarding, .agent-dashboard, .admin-dashboard, .modal-backdrop, .plan-dialog) :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) { font-size: 16px; }
+  body :is(.agent-dashboard, .admin-dashboard, .chat-page-container, .uprofile-page-wrapper, .auth-content) :is(button, a[class*="btn"]) { min-height: 44px; }
+  body :is(.agent-dashboard, .admin-dashboard) :is(input, select, textarea, fieldset) { min-width: 0; max-width: 100%; }
+  body .dashboard-mobile-menu-toggle { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; gap: 7px; min-width: 44px; min-height: 44px; padding: 8px 10px; border: 1px solid #dce6f5; border-radius: 10px; background: #f5f8ff; color: #254b86; font: inherit; font-size: 13px; cursor: pointer; }
+
+  /* Both dashboards use the same compact disclosure navigation on every tab. */
+  body .admin-dashboard, body .admin-dashboard.analytics-active, body .agent-dashboard, body .agent-dashboard.agent-billing-view { flex-direction: column; height: auto; min-height: 100dvh; width: 100%; }
+  body .admin-dashboard .admin-sidebar, body .agent-dashboard .sidebar, body .agent-billing-view .sidebar { position: sticky; top: 0; z-index: 200; width: 100%; height: auto; flex: none; padding: 8px 12px; background: #fff; border-right: 0; border-bottom: 1px solid #e0e8f5; }
+  body .admin-dashboard .admin-logo-wrapper { justify-content: space-between; min-height: 44px; padding: 0; margin: 0; border: 0; }
+  body .admin-dashboard .admin-logo { font-size: 18px; gap: 8px; }
+  body .agent-dashboard .sidebar { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; }
+  body .agent-dashboard .sidebar-logo { padding: 8px 4px; font-size: 18px; }
+  body .agent-dashboard .sidebar-section-label { display: none; }
+  body .admin-dashboard .dashboard-sidebar-navigation, body .agent-dashboard .dashboard-sidebar-navigation { display: none; position: absolute; top: calc(100% + 6px); left: 12px; right: 12px; max-height: calc(var(--app-viewport-height, 100dvh) - 90px); padding: 10px; overflow-y: auto; overscroll-behavior: contain; border: 1px solid #dce6f5; border-radius: 14px; background: #fff; box-shadow: 0 14px 40px #18345f26; }
+  body .admin-dashboard .mobile-nav-open .dashboard-sidebar-navigation, body .agent-dashboard .mobile-nav-open .dashboard-sidebar-navigation { display: flex; }
+  body .admin-dashboard .admin-nav-section, body .agent-dashboard .sidebar-nav { flex-direction: column; overflow: visible; flex: none; gap: 4px; padding: 0; }
+  body .admin-dashboard .admin-nav-label { display: block; padding: 8px 10px; margin: 0; }
+  body .admin-dashboard .admin-nav-btn, body .agent-dashboard .sidebar-nav .nav-btn { width: 100%; white-space: normal; padding: 12px; font-size: 14px; text-transform: none; }
+  body .admin-dashboard .admin-sidebar-bottom, body .agent-dashboard .sidebar-bottom { display: flex; flex-direction: column; overflow: visible; padding: 8px 0 0; margin: 10px 0 0; border-top: 1px solid #e5edf6; }
+  body .admin-dashboard .admin-bottom-link, body .agent-dashboard .sidebar-bottom .nav-item { white-space: normal; padding: 12px; font-size: 14px; }
+  body .admin-dashboard .admin-main, body .agent-dashboard .main-content { min-width: 0; width: 100%; overflow: visible; }
+  body .admin-dashboard .admin-content-area { padding: 20px 16px; min-width: 0; }
+  body .admin-dashboard .admin-topbar { position: static; height: auto; min-height: 60px; padding: 10px 16px; gap: 10px; flex-wrap: wrap; }
+  body .admin-dashboard .admin-search-wrapper { width: auto; min-width: 0; flex: 1 1 180px; padding: 8px 12px; }
+  body .admin-dashboard .admin-search-input { min-width: 0; width: 100%; }
+  body .admin-dashboard .admin-topbar-right { gap: 8px; margin-left: auto; }
+  body .admin-dashboard .admin-user-info { display: none; }
+  body .admin-dashboard .admin-profile-pill { padding: 4px; }
+  body .admin-dashboard .admin-header-banner { flex-direction: column; align-items: stretch; gap: 18px; padding: 20px; margin-bottom: 20px; }
+  body .admin-dashboard .admin-header-title h1 { font-size: 25px; }
+  body .admin-dashboard .admin-header-pills { max-width: 100%; overflow-x: auto; border-radius: 12px; gap: 5px; }
+  body .admin-dashboard .admin-pill-btn { flex: 0 0 auto; white-space: nowrap; padding: 10px 14px; font-size: 13px; }
+  body .admin-dashboard .admin-grid-container { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  body .admin-dashboard :is(.admin-list-column, .admin-detail-column, .admin-audit-table-card) { min-width: 0; max-width: 100%; }
+  body .admin-dashboard :is(.admin-info-grid, .admin-cards-grid) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  body .admin-dashboard .admin-audit-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  body .admin-dashboard :is(.admin-audit-header, .admin-audit-filters) { flex-direction: column; align-items: stretch; gap: 14px; }
+  body .admin-dashboard .admin-audit-header > div { min-width: 0; }
+  body .admin-dashboard .admin-audit-header > div:last-child { flex-wrap: wrap; }
+  body .admin-dashboard .admin-audit-header button { flex: 1 1 140px; }
+  body .admin-dashboard .admin-section-title { font-size: 23px; }
+  body .admin-dashboard :is(.admin-audit-table-responsive, .admin-header-pills) { overscroll-behavior-x: contain; }
+  body .agent-dashboard .topbar { padding: 12px 16px; gap: 10px; flex-wrap: wrap; position: static; }
+  body .agent-dashboard .topbar .search-bar { width: auto; min-width: 0; max-width: 100%; flex: 1 1 180px; }
+  body .agent-dashboard .topbar .search-bar input { min-width: 0; width: 100%; }
+  body .agent-dashboard .dashboard-content { min-width: 0; padding: 20px 16px; overflow: visible; }
+  body .agent-dashboard .topbar-right { gap: 10px; margin-left: auto; }
+  body .agent-billing-view .dashboard-content { padding: 0; }
+  body .agent-dashboard .funnel-row { flex-direction: column; align-items: stretch; gap: 8px; }
+  body .agent-dashboard .funnel-stage-label { width: auto; flex: none; }
+  body .agent-dashboard .funnel-summary { flex-wrap: wrap; gap: 12px; }
+  body .agent-dashboard .funnel-summary .summary-card { min-width: 0; flex: 1 1 140px; }
+
+  /* Listing tables, forms and profile/KYC modules. */
+  body .overview-dashboard-feature :is(.stats-grid, .listings-stats-grid) { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  body .overview-dashboard-feature .stat-card { min-width: 0; padding: 16px 12px; }
+  body .overview-dashboard-feature .section-header { flex-wrap: wrap; align-items: flex-start; gap: 12px; }
+  body .overview-dashboard-feature .listing-item { flex-wrap: wrap; gap: 12px; }
+  body .overview-dashboard-feature .listing-info { min-width: 0; flex: 1 1 150px; }
+  body .overview-dashboard-feature .listing-stats { flex-wrap: wrap; }
+  body .overview-dashboard-feature :is(.filters-bar, .filter-bar) { flex-wrap: wrap; }
+  body .overview-dashboard-feature :is(.table-container, .table-responsive, .listings-table-wrapper) { max-width: 100%; overflow-x: auto; }
+  body .create-flow-container :is(.step-form-grid, .preview-layout, .step-visibility-panel) { grid-template-columns: minmax(0, 1fr); }
+  body .create-flow-container :is(.config-column, .preview-column) { min-width: 0; }
+  body .create-flow-container :is(.preview-specs-chips, .toolbar-buttons, .step-navigation-footer) { flex-wrap: wrap; gap: 10px; }
+  body .create-flow-container :is(.form-column, .form-card, .input-group) { min-width: 0; }
+  body .create-flow-container .form-card { padding: 18px; }
+  body .create-flow-container :is(.form-row-3, .form-row-2) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  body .create-flow-container .stepper-wrapper { padding: 16px 10px; gap: 4px; margin-bottom: 20px; }
+  body .create-flow-container .step-item { flex-direction: column; gap: 6px; flex: 1; text-align: center; }
+  body .create-flow-container .step-line { margin: 0 4px; align-self: flex-start; margin-top: 16px; }
+  body .create-flow-container .step-label { font-size: 12px; }
+  body .create-flow-container :is(.step-navigation, .form-navigation, .unverified-warning-alert) { flex-wrap: wrap; gap: 12px; }
+  body .agent-profile-view { gap: 20px; min-width: 0; }
+  body .agent-profile-view .agent-profile-header-card { padding: 20px; flex-direction: column; align-items: stretch; gap: 20px; }
+  body .agent-profile-view .avatar-section { gap: 16px; min-width: 0; }
+  body .agent-profile-view .profile-avatar-container { width: 84px; height: 84px; flex-shrink: 0; }
+  body .agent-profile-view .agent-text-details { min-width: 0; }
+  body .agent-profile-view .agent-profile-name { font-size: 22px; overflow-wrap: anywhere; }
+  body .agent-profile-view :is(.name-role-row, .contact-details-grid) { display: flex; flex-wrap: wrap; gap: 8px; }
+  body .agent-profile-view .verification-score-card { max-width: 100%; min-width: 0; flex-wrap: wrap; }
+  body .agent-profile-view :is(.reviews-tab-grid, .kyc-tab-grid, .profile-filter-section) { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  body .agent-profile-view .profile-filter-section { display: grid; }
+  body .agent-profile-view .filter-column, body .agent-profile-view .filter-column.ward-column { width: auto; min-width: 0; }
+  body .agent-profile-view :is(.profile-tabs-nav, .review-filter-tabs) { max-width: 100%; overflow-x: auto; flex-wrap: nowrap; }
+  body .agent-profile-view .profile-tab-btn { white-space: nowrap; flex-shrink: 0; padding: 14px; }
+  body .agent-profile-view .profile-listings-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  body .agent-profile-view :is(.kyc-info-card, .reviews-summary-side-card, .s2-upload-card) { padding: 18px; min-width: 0; }
+  body .agent-violations-container .violations-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  body .agent-violations-container :is(.v-item-header, .v-item-footer) { flex-wrap: wrap; gap: 12px; }
+  body .agent-violations-container .v-property-meta { min-width: 0; }
+  body .agent-violations-container .v-property-title { overflow-wrap: anywhere; }
+
+  /* Chat fills the visible viewport, including when a keyboard reduces it. */
+  body .chat-page-container { height: var(--app-viewport-height, 100dvh); min-height: 0; }
+  body .chat-page-container .chat-main-layout { height: auto; min-height: 0; flex: 1; }
+  body .chat-page-container .chat-content-area { min-width: 0; min-height: 0; }
+  body .agent-dashboard.agent-chat-view { height: var(--app-viewport-height, 100dvh); min-height: 0; overflow: hidden; }
+  body .agent-chat-view .main-content { flex: 1; min-height: 0; overflow: hidden; }
+  body .agent-chat-view .dashboard-content { flex: 1; min-height: 0; padding: 0; overflow: hidden; }
+  body .agent-chat-view .agent-chat-container { height: 100%; min-height: 0; border-radius: 0; border: 0; }
+  body .agent-chat-view .agent-chat-sidebar { width: 100%; border: 0; }
+  body .agent-chat-view .agent-chat-main { width: 100%; min-width: 0; min-height: 0; }
+  body .agent-chat-view .agent-chat-container:not(.has-active-chat) .agent-chat-main,
+  body .agent-chat-view .agent-chat-container.has-active-chat .agent-chat-sidebar { display: none; }
+  body .agent-chat-view .agent-chat-mobile-back { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 44px; height: 44px; border-radius: 12px; color: #274774; background: #f1f5fb; }
+  body .agent-chat-container .chat-main-header { padding: 12px; min-height: 64px; height: auto; flex-wrap: wrap; gap: 10px; }
+  body .agent-chat-container .partner-profile { min-width: 0; flex: 1; gap: 9px; }
+  body .agent-chat-container .partner-profile > div:last-child { min-width: 0; }
+  body .agent-chat-container .partner-profile h4, body .agent-chat-container .partner-meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  body .agent-chat-container .funnel-actions-row { width: 100%; padding: 0; margin: 0; gap: 6px; flex-direction: column; align-items: stretch; }
+  body .agent-chat-container .funnel-title { white-space: nowrap; }
+  body .agent-chat-container .funnel-buttons { max-width: 100%; overflow-x: auto; }
+  body .agent-chat-container .funnel-stage-btn { white-space: nowrap; flex-shrink: 0; padding: 8px 10px; }
+  body .agent-chat-container .agent-messages-container { padding: 14px 12px; min-height: 0; }
+  body .agent-chat-container .agent-chat-input-form { padding: 10px 12px max(10px, env(safe-area-inset-bottom)); gap: 8px; }
+  body .agent-chat-container .agent-chat-input-form > button { min-width: 44px; flex-shrink: 0; padding: 8px; justify-content: center; }
+  body .agent-chat-container .attach-property-btn span { display: none; }
+  body :is(.agent-chat-container, .chat-page-container) :is(.chat-text-input, .agent-chat-input-form input) { min-width: 0; flex: 1; }
+  body :is(.agent-chat-container, .chat-page-container) :is(.message-bubble, .msg-bubble, .message-text) { overflow-wrap: anywhere; }
+  body .chat-page-container .active-chat-header { min-height: 64px; height: auto; padding: 10px 12px; }
+  body .chat-page-container .chat-partner-info > div { min-width: 0; }
+  body .chat-page-container .message-input-form { padding-bottom: max(10px, env(safe-area-inset-bottom)); }
+  body .chat-page-container .message-input-form input { min-width: 0; font-size: 16px; }
+  body .chat-page-container :is(.send-msg-btn, .attach-btn, .chat-mobile-back-btn) { width: 44px; height: 44px; flex-shrink: 0; }
+
+  /* Overlays have their own bounded scrolling surface. */
+  body .modal-backdrop { padding: 16px; }
+  body .modal-backdrop > :is(.detail-modal-content, .filter-modal-content, .ward-list-modal-content, .warning-modal-content) { min-width: 0; max-width: 100%; max-height: calc(var(--app-viewport-height, 100dvh) - 32px); overflow-y: auto; overscroll-behavior: contain; }
+  body .detail-modal-content .modal-body { max-height: calc(var(--app-viewport-height, 100dvh) - 32px); }
+  body .detail-modal-content :is(.detail-columns-row, .detail-images-grid-box) { grid-template-columns: minmax(0, 1fr); }
+  body .detail-modal-content .detail-columns-row { flex-direction: column; }
+  body .detail-modal-content .detail-content-wrapper { padding: 20px; }
+  body .detail-modal-content .detail-header-block { flex-wrap: wrap; gap: 14px; }
+  body .detail-modal-content .detail-header-block > div:first-child { min-width: 0; width: 100%; }
+  body .detail-modal-content .detail-action-buttons { width: 100%; flex-wrap: wrap; gap: 8px; }
+  body .detail-modal-content .detail-action-buttons button { min-height: 44px; flex: 1 1 90px; padding: 10px; justify-content: center; }
+  body .detail-modal-content .detail-column { min-width: 0; max-width: 100%; }
+  body .detail-modal-content .poster-card { padding: 16px; gap: 16px; }
+  body .detail-modal-content .poster-left { min-width: 0; gap: 12px; }
+  body .detail-modal-content .poster-name-info { min-width: 0; overflow-wrap: anywhere; }
+  body .detail-modal-content .poster-contact-buttons { flex-wrap: wrap; gap: 8px; width: 100%; }
+  body .detail-modal-content .poster-contact-buttons > :is(a,button) { min-height: 44px; flex: 1 1 130px; justify-content: center; padding: 12px; }
+  body .detail-modal-content .review-header { flex-wrap: wrap; gap: 10px; }
+  body .detail-modal-content .review-comment-text { overflow-wrap: anywhere; }
+  body .rating-modal-backdrop { padding: 12px; }
+  body .rating-modal-content { max-width: 100%; max-height: calc(var(--app-viewport-height, 100dvh) - 24px); overflow-y: auto; }
+  body .ward-list-modal-content .ward-checklist-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  body .detail-modal-content :is(.detail-header-block h2, .detail-header-block h1) { font-size: 22px; overflow-wrap: anywhere; }
+  body .detail-modal-content .main-image-container { height: 240px; }
+  body .detail-modal-content .detail-specs-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  body .detail-modal-content .detail-footer-bar { flex-wrap: wrap; gap: 12px; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+  body .admin-dashboard :is(.admin-adjust-modal, .admin-reject-modal) { width: min(100%, 520px); max-height: calc(var(--app-viewport-height, 100dvh) - 32px); overflow-y: auto; }
+  body .plan-dialog { max-height: calc(var(--app-viewport-height, 100dvh) - 32px); overscroll-behavior: contain; }
+  body :is(.kyc-camera-modal-container, .trust-modal-container) { max-height: calc(var(--app-viewport-height, 100dvh) - 32px); max-width: 100%; overflow-y: auto; overscroll-behavior: contain; }
+  body .app-header-mobile-backdrop { width: 100%; height: var(--app-viewport-height, 100dvh); }
+  body .app-header-mobile-drawer { padding-bottom: max(20px, env(safe-area-inset-bottom)); }
+  body .app-header-drawer-close, body .app-header-mobile-toggle { min-width: 44px; min-height: 44px; }
+  body .app-header-tools { gap: 4px; }
+  body :is(.app-header-tool-btn, .app-header-notification-btn) { width: 44px; height: 44px; }
+}
+
+@media (max-width: 560px) {
+  body .agent-dashboard .dashboard-content, body .admin-dashboard .admin-content-area { padding: 16px 12px; }
+  body .agent-chat-view .dashboard-content, body .agent-billing-view .dashboard-content { padding: 0; }
+  body .agent-dashboard .analytics-panel { padding: 18px 14px; }
+  body .overview-dashboard-feature :is(.stats-grid, .listings-stats-grid) { grid-template-columns: minmax(0, 1fr); }
+  body .overview-dashboard-feature .stat-card { padding: 18px; }
+  body .overview-dashboard-feature .active-listings-section { padding: 18px; }
+  body .create-flow-container :is(.form-row-2, .form-row-3, .checkbox-cards-grid) { grid-template-columns: minmax(0, 1fr); }
+  body .create-flow-container :is(.utilities-toggle-grid, .images-preview-thumbnails-grid) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  body .create-flow-container .card-title-header { flex-wrap: wrap; gap: 8px; }
+  body .agent-profile-view .profile-listings-grid { grid-template-columns: minmax(0, 1fr); }
+  body .agent-profile-view .avatar-section { flex-direction: column; align-items: flex-start; }
+  body .agent-profile-view :is(.kyc-details-grid, .s2-upload-grid, .s2-tips-grid) { grid-template-columns: minmax(0, 1fr); }
+  body .agent-profile-view .kyc-field.full-width { grid-column: auto; }
+  body .agent-profile-view :is(.profile-filter-section, .kyc-info-card) { padding: 16px; }
+  body .agent-profile-view .contact-item { overflow-wrap: anywhere; min-width: 0; }
+  body .agent-violations-container .violations-stats-grid { grid-template-columns: minmax(0, 1fr); }
+  body .admin-dashboard :is(.admin-info-grid, .admin-cards-grid) { grid-template-columns: minmax(0, 1fr); }
+  body .admin-dashboard .admin-detail-header { flex-wrap: wrap; gap: 12px; }
+  body .admin-dashboard .admin-audit-stats-grid { grid-template-columns: minmax(0, 1fr); }
+  body .admin-dashboard .admin-header-banner { padding: 18px; }
+  body .uprofile-page-wrapper .uprofile-main-container { padding: 0 12px; margin: 20px auto; gap: 18px; }
+  body .uprofile-page-wrapper .uprofile-hero-content { padding: 0 18px 22px; }
+  body .uprofile-page-wrapper :is(.uprofile-card, .uprofile-form-card) { padding: 18px; }
+  body .uprofile-page-wrapper .uprofile-form-row { flex-direction: column; grid-template-columns: minmax(0, 1fr); }
+  body .uprofile-page-wrapper .uprofile-submit-btn { width: 100%; justify-content: center; }
+  body .auth-container { padding: 16px 12px max(16px, env(safe-area-inset-bottom)); min-height: 100dvh; }
+  body .auth-card { min-width: 0; max-width: 100%; }
+  body .auth-footer { overflow-wrap: anywhere; }
+  body .app-header-navbar { padding-inline: 10px; }
+  body .app-header-brand { gap: 6px; }
+  body .app-header-brand-title { font-size: 16px; }
+  body .app-header-brand-mark { width: 31px; height: 36px; }
+  body .app-header-auth-links { gap: 4px; }
+  body .app-header-login-btn, body .app-header-register-btn { font-size: 12px; padding: 10px; min-height: 44px; }
+  body .app-header-notification-panel { position: fixed; top: 72px; right: 12px; left: 12px; width: auto; }
+}
+
+@media (max-width: 380px) {
+  body .app-header-notification-wrap, body .app-header-auth-links .app-header-register-btn { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body *, body *::before, body *::after { scroll-behavior: auto; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}

@@ -155,9 +155,7 @@ const Swipe = () => {
     } catch (err) {
       console.error('Error fetching database favorites:', err);
     } finally {
-      setTimeout(() => {
-        setIsLoadingSaved(false);
-      }, 600);
+      setIsLoadingSaved(false);
     }
   };
 

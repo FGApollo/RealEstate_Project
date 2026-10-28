@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { API_BASE_URL } from '../../../config';
 import { apiFetch } from '../../../auth/apiClient';
+import Avatar from '../../../components/Avatar';
 import { useAuth } from '../../../auth/useAuth';
 import PropertyDetailModal from '../../../components/PropertyDetailModal';
 import DeleteConfirmModal from '../overview/DeleteConfirmModal';
@@ -804,7 +805,7 @@ const AgentProfile = ({
   };
 
   const maskPhone = (phone) => {
-    if (!phone) return '0347******';
+    if (!phone) return 'Chưa cập nhật';
     if (phone.length <= 4) return phone + '******';
     return phone.slice(0, 4) + '******';
   };
@@ -816,11 +817,7 @@ const AgentProfile = ({
         <div className="agent-profile-header-card">
           <div className="avatar-section">
             <div className="profile-avatar-container">
-              <img
-                src={currentUser.avatar || "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&h=400&fit=crop&q=80"}
-                alt={currentUser.name}
-                className="profile-avatar-img"
-              />
+              <Avatar src={currentUser.avatar} name={currentUser.name} className="profile-avatar-img" />
               {currentUser.verification_status === 'VERIFIED' && (
                 <div className="avatar-verified-badge" title="Verified Broker">
                   <ShieldCheck size={20} fill="#10b981" color="#ffffff" strokeWidth={2.5} />

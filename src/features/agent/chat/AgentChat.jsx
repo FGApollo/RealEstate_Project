@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MessageSquare, Send, Phone, Shield, User, Sparkles, MessageCircle, Image as ImageIcon, X, Loader2, Building2 } from 'lucide-react';
+import { MessageSquare, Send, Phone, Shield, User, Sparkles, MessageCircle, Image as ImageIcon, X, Loader2, Building2, ArrowLeft } from 'lucide-react';
 import { API_BASE_URL } from '../../../config';
 import { apiFetch } from '../../../auth/apiClient';
 import { supabaseClient, isSupabaseRealtimeConfigured } from '../../../services/supabaseClient';
@@ -475,7 +475,7 @@ const AgentChat = ({ currentUser }) => {
   };
 
   return (
-    <div className="agent-chat-container">
+    <div className={`agent-chat-container${activeConversation ? ' has-active-chat' : ''}`}>
       {/* Sidebar Conversation List */}
       <aside className="agent-chat-sidebar">
         <div className="sidebar-title">
@@ -510,7 +510,9 @@ const AgentChat = ({ currentUser }) => {
               return (
                 <div
                   key={idx}
-                  className={`conv-card ${isActive ? 'active' : ''}`}
+                    className={`conv-card ${isActive ? 'active' : ''}`}
+                    role="button" tabIndex={0}
+                    onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.currentTarget.click(); } }}
                   onClick={() => {
                     if (Number(activeConversation?.partner?.id) !== Number(conv.partner?.id)) {
                       setMessages([]);
@@ -578,6 +580,7 @@ const AgentChat = ({ currentUser }) => {
           <>
             {/* Header info */}
             <header className="chat-main-header">
+              <button type="button" className="agent-chat-mobile-back" aria-label="Quay lại danh sách hội thoại" onClick={() => { setActiveConversation(null); setMessages([]); }}><ArrowLeft size={21} /></button>
               <div className="partner-profile">
                 <div className="avatar-wrap">
                   {activeConversation.partner?.avatar ? (
@@ -857,6 +860,7 @@ const AgentChat = ({ currentUser }) => {
               <button 
                 type="button" 
                 className="attach-property-btn" 
+                aria-label="Gửi bất động sản"
                 onClick={openPropertySelector}
                 style={{ 
                   background: 'none', 
@@ -872,7 +876,7 @@ const AgentChat = ({ currentUser }) => {
                   whiteSpace: 'nowrap'
                 }}
               >
-                [+] Gửi Bất Động Sản
+                <Building2 size={19} /><span>Gửi bất động sản</span>
               </button>
               <input
                 type="text"

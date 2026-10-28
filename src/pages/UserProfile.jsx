@@ -10,9 +10,9 @@ import { API_BASE_URL } from '../config';
 import { apiFetch } from '../auth/apiClient';
 import { useAuth } from '../auth/useAuth';
 import Header from '../components/Header';
+import Avatar from '../components/Avatar';
 import './UserProfile.css';
 
-const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=250&q=80';
 
 export default function UserProfile() {
   const navigate = useNavigate();
@@ -250,7 +250,7 @@ export default function UserProfile() {
     }
   };
 
-  const currentAvatar = profile?.avatar || authUser?.avatar || DEFAULT_AVATAR;
+  const currentAvatar = profile?.avatar || authUser?.avatar;
   const trustScore = profile?.trust_score ?? authUser?.trust_score ?? 80;
   const roleName = profile?.role === 'AGENT' ? 'Môi giới' : profile?.role === 'ADMIN' ? 'Quản trị viên' : 'Người tìm nhà';
 
@@ -280,9 +280,9 @@ export default function UserProfile() {
             {/* Avatar with Camera Button */}
             <div className="uprofile-avatar-box">
               <div className="uprofile-avatar-circle">
-                <img
+                <Avatar
                   src={currentAvatar}
-                  alt={profile?.name || 'User Avatar'}
+                  name={profile?.name || authUser?.name}
                   className="uprofile-avatar-img"
                 />
                 {isUploadingAvatar && (
