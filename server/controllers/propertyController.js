@@ -4,6 +4,8 @@ const reviewService = require('../services/reviewService');
 const geminiService = require('../services/geminiService');
 const { toPublicProperty } = require('../services/publicPropertyDto');
 const { propertyInput, positiveId } = require('../services/businessValidation');
+const { parseSearchFilters } = require('../services/propertySearchFilters');
+const { assertListingCapacity } = require('../services/listingEntitlements');
 
 const isAgentOwner = (property, user) => String(user?.role || '').toUpperCase() === 'AGENT'
   && String(property?.owner_id) === String(user?.id);
@@ -44,16 +46,16 @@ const getProperties = async (req, res) => {
       ? req.query.property_type.trim()
       : '';
     const propertyType = requestedPropertyType.length > 0 && requestedPropertyType.length <= 80
-      && !/[%_*]/.test(requestedPropertyType)
+      && !/[%*]/.test(requestedPropertyType)
       ? requestedPropertyType
       : null;
-    const properties = await propertyService.getProperties(limit, propertyType);
+    const properties = await propertyService.getProperties(limit, propertyType, parseSearchFilters(req.query.filters));
     res.status(200).json({ properties: properties.map((property) => (
       isAgentOwner(property, req.user) ? property : toPublicProperty(property)
     )) });
   } catch (error) {
     console.error('Error fetching properties:', error);
-    res.status(500).json({ error: safeErrorMessage(error, 'Internal server error') });
+    res.status(error.statusCode || 500).json({ error: safeErrorMessage(error, 'Internal server error') });
   }
 };
 
@@ -72,7 +74,7 @@ const createProperty = async (req, res) => {
 const getPropertyById = async (req, res) => {
   try {
     const { id } = req.params;
-    const property = await propertyService.getPropertyById(id);
+    const property = await propertyService.getPropertyById(id, { publicRead: true, viewerId: req.user?.id });
     if (!property || (!isAgentOwner(property, req.user)
       && (property.is_hidden === true || property.status !== 'AVAILABLE'
         || Number(property.owner?.trust_score ?? 50) <= 30))) {
@@ -121,7 +123,7 @@ const deleteProperty = async (req, res) => {
 const getPropertyReviews = async (req, res) => {
   try {
     const { id } = req.params;
-    const property = await propertyService.getPropertyById(id);
+    const property = await propertyService.getPropertyById(id, { publicRead: true, viewerId: req.user?.id });
     if (!property || (!isAgentOwner(property, req.user)
       && (property.is_hidden === true || property.status !== 'AVAILABLE'
         || Number(property.owner?.trust_score ?? 50) <= 30))) {
@@ -161,6 +163,8 @@ const checkBeforeSave = async (req, res) => {
     propertyInput(req.body, { partial: true });
     if (excludeId !== undefined) positiveId(excludeId, 'excludeId');
     const propertyData = { ...req.body, owner_id: req.user.id };
+    if (excludeId === undefined && propertyData.is_public !== false
+      && (!propertyData.status || propertyData.status === 'AVAILABLE')) await assertListingCapacity(req.user.id);
 
     // 1. Check similarity in DB
     const similarityResult = await propertyService.checkSimilarity(propertyData, excludeId);

@@ -20,7 +20,8 @@ import PropertyDetailModal from '../components/PropertyDetailModal';
 import { 
   WARDS_BY_REGION, 
   ALL_WARDS, 
-  CUSTOM_LOCATION_SUGGESTIONS 
+  CUSTOM_LOCATION_SUGGESTIONS,
+  normalizeWard
 } from '../services/administrativeService';
 
 const getCategoryIllustration = (name = '') => {
@@ -148,13 +149,18 @@ const Home = () => {
     }).catch((error) => console.warn('Could not record property view:', error));
   }, [showDetailModal, selectedProperty?.id, user?.id]);
 
-  // Fetch properties from backend API
+  const publicSearchFilters = useMemo(() => JSON.stringify({
+    wards: selectedWards, categories: selectedCategories.filter(item => item !== 'Tất cả'),
+    minPrice, maxPrice, minArea, maxArea, bedrooms: selectedBedrooms.map(String), features: selectedLifestyles
+  }), [selectedWards, selectedCategories, minPrice, maxPrice, minArea, maxArea, selectedBedrooms, selectedLifestyles]);
+  // The server filters and orders before limiting the featured results.
   useEffect(() => {
     const controller = new AbortController();
     let active = true;
     const fetchProperties = async () => {
       try {
-        const response = await publicApiFetch(`${API_BASE_URL}/api/properties?limit=12`, {
+        const query = new URLSearchParams({ limit: '12', filters: publicSearchFilters });
+        const response = await publicApiFetch(`${API_BASE_URL}/api/properties?${query}`, {
           signal: controller.signal
         });
         if (!response.ok) throw new Error('Failed to fetch properties');
@@ -185,12 +191,13 @@ const Home = () => {
       }
     };
 
-    fetchProperties();
+    const timer = setTimeout(fetchProperties, 180);
     return () => {
+      clearTimeout(timer);
       active = false;
       controller.abort();
     };
-  }, [sharedPropertyId, propertiesReloadKey]);
+  }, [sharedPropertyId, propertiesReloadKey, publicSearchFilters]);
 
   const selectCategoryPreview = async (category) => {
     const returnTo = `/swipe/${encodeURIComponent(category.name)}`;
@@ -548,7 +555,7 @@ const Home = () => {
       const categoryKeys = new Set(categoriesToShow.map(normalizePropertyType));
       candidates = candidates.filter((property) => categoryKeys.has(normalizePropertyType(property.property_type)));
     }
-    if (selectedWards.length) candidates = candidates.filter((property) => selectedWards.includes(property.ward));
+    if (selectedWards.length) candidates = candidates.filter((property) => selectedWards.some(ward => normalizeWard(ward) === normalizeWard(property.ward)));
     if (minPrice !== '') candidates = candidates.filter((property) => Number(property.price) >= Number(minPrice));
     if (maxPrice !== '') candidates = candidates.filter((property) => Number(property.price) <= Number(maxPrice));
     if (minArea !== '') candidates = candidates.filter((property) => Number(property.area) >= Number(minArea));

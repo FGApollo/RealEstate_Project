@@ -52,7 +52,7 @@ function PaymentResult({ orderId }) {
       {error && <p className="pricing-message-banner" role="alert">{error}</p>}
       {!order && !error && <p role="status">Đang kiểm tra với hệ thống thanh toán…</p>}
       {order && <><p>Đơn <strong>#{order.orderCode}</strong> · {order.planName} · {order.durationMonths} tháng</p><p className="billing-result-amount">{billingMoney(order.amount)}</p>
-        {order.status === 'PAID' ? <><p>Gói đã được kích hoạt / gia hạn.</p><p>Hạn dùng sau thanh toán: <strong>{billingDate(order.subscriptionEnd)}</strong></p><p>Thanh toán lúc: {billingDate(order.paidAt)}</p></>
+        {order.status === 'PAID' ? <><p>Thanh toán đã xác minh. Gói được sử dụng trong kỳ:</p><p><strong>{billingDate(order.subscriptionStart)} → {billingDate(order.subscriptionEnd)}</strong></p><p>{order.listingLimit} tin công khai · {order.priorityPoints} điểm ưu tiên · Support {order.supportTier}</p><p>Thanh toán lúc: {billingDate(order.paidAt)}</p></>
           : pending ? <><p>Gói sẽ được kích hoạt sau khi hệ thống xác minh thanh toán. Nếu đã chuyển tiền, hãy chờ rồi kiểm tra lại.</p><p>Liên kết có hạn đến {billingDate(order.expiresAt)}.</p></>
             : <p>Đơn này đã kết thúc. Bạn có thể tạo đơn mới từ trang gói dịch vụ. Nếu đã chuyển tiền, hãy kiểm tra lại hoặc liên hệ hỗ trợ kèm mã đơn.</p>}
       </>}

@@ -1,5 +1,6 @@
 const { safeErrorMessage } = require('../services/httpError');
 const { supabase } = require('../config/supabase');
+const { listingDatabaseError } = require('../services/listingEntitlements');
 
 const getAllReviews = async (req, res) => {
   try {
@@ -98,7 +99,7 @@ const unhideProperty = async (req, res) => {
       .single();
 
     if (error) {
-      throw new Error(error.message);
+      throw listingDatabaseError(error);
     }
 
     return res.status(200).json({
@@ -108,7 +109,7 @@ const unhideProperty = async (req, res) => {
     });
   } catch (error) {
     console.error('Error in unhideProperty:', error);
-    return res.status(500).json({ error: safeErrorMessage(error, 'Internal server error') });
+    return res.status(error.statusCode || 500).json({ error: safeErrorMessage(error, 'Internal server error') });
   }
 };
 

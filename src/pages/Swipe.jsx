@@ -297,6 +297,11 @@ const Swipe = () => {
     }
   };
 
+  // Apply explicit search constraints before the server ranks or paginates.
+  const searchFilters = useMemo(() => JSON.stringify({
+    wards: selectedWards, categories: selectedCategories.filter(item => item !== 'Tất cả'),
+    minPrice, maxPrice, minArea, maxArea, bedrooms: selectedBedrooms.map(String), features: selectedLifestyles
+  }), [selectedWards, selectedCategories, minPrice, maxPrice, minArea, maxArea, selectedBedrooms, selectedLifestyles]);
   // Personalized feed pages are ranked by the backend before they reach the swipe UI.
   useEffect(() => {
     let isCurrentRequest = true;
@@ -313,7 +318,7 @@ const Swipe = () => {
         const query = new URLSearchParams({
           category: activeCategoryKey === 'Tất cả' ? 'ALL' : activeCategoryKey,
           limit: '24',
-          offset: '0'
+          offset: '0', filters: searchFilters
         });
         const response = await apiFetch(`${API_BASE_URL}/api/recommendations?${query}`);
         if (!response.ok) throw new Error(`Recommendations request failed (${response.status})`);
@@ -336,7 +341,7 @@ const Swipe = () => {
     };
     fetchRecommendations();
     return () => { isCurrentRequest = false; };
-  }, [propertiesReloadKey, activeCategoryKey, user?.id]);
+  }, [propertiesReloadKey, activeCategoryKey, user?.id, searchFilters]);
 
   const loadMoreRecommendations = useCallback(async () => {
     const paging = recommendationPagingRef.current;
@@ -348,7 +353,7 @@ const Swipe = () => {
       const query = new URLSearchParams({
         category: activeCategoryKey === 'Tất cả' ? 'ALL' : activeCategoryKey,
         limit: '24',
-        offset: String(paging.offset)
+        offset: String(paging.offset), filters: searchFilters
       });
       if (paging.feedToken) query.set('feedToken', paging.feedToken);
       const response = await apiFetch(`${API_BASE_URL}/api/recommendations?${query}`);
@@ -372,7 +377,7 @@ const Swipe = () => {
         setIsLoadingMore(false);
       }
     }
-  }, [activeCategoryKey, user?.id]);
+  }, [activeCategoryKey, user?.id, searchFilters]);
 
   // Filter properties based on current category and active applied filters
   useEffect(() => {

@@ -9,7 +9,8 @@ function dto(order) {
     amount: order.amount_vnd, currency: order.currency, durationMonths: order.duration_months, status: order.status,
     checkoutUrl: order.checkout_url ? checkoutUrl(order.checkout_url) : null,
     createdAt: order.created_at, expiresAt: order.expires_at, paidAt: order.paid_at,
-    subscriptionEnd: order.grant_end };
+    subscriptionStart: order.grant_start, subscriptionEnd: order.grant_end,
+    listingLimit: order.listing_limit, priorityPoints: order.priority_points, supportTier: order.support_tier };
 }
 
 // payOS bank timestamps without an offset are Vietnam local time.
@@ -66,7 +67,7 @@ function createPaymentService(repo = repository, provider = createPayosService()
     },
     async create(userId, body) {
       if (!body || Array.isArray(body) || Object.keys(body).some((key) => !['planCode', 'requestId', 'planVersion'].includes(key))
-        || body.planCode !== 'PAID' || typeof body.requestId !== 'string' || !UUID.test(body.requestId)
+        || !['LITE','PLUS','PRO','PAID'].includes(body.planCode) || typeof body.requestId !== 'string' || !UUID.test(body.requestId)
         || !Number.isSafeInteger(body.planVersion) || body.planVersion < 1 || body.planVersion > 2147483647) {
         throw paymentError(400, 'Thông tin tạo đơn không hợp lệ.', 'INVALID_PAYMENT_REQUEST');
       }

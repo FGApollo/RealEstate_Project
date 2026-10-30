@@ -1,5 +1,7 @@
 const { supabase } = require('../config/supabase');
 const { positiveId, propertyInput } = require('./businessValidation');
+const { listingDatabaseError, assertListingCapacity } = require('./listingEntitlements');
+const propertyRepository = require('../repositories/propertyRepository');
 const { savePublicImage, deleteOwnedListingImage } = require('./publicImageStorage');
 const saveBase64Image = (image, userId) => savePublicImage(image, 'listings', userId);
 
@@ -13,34 +15,8 @@ const syncRelatedRows = async (table, idField, propertyId, rows) => {
   }
 };
 
-const getProperties = async (limit = 24, propertyType = null) => {
-  let query = supabase
-    .from('properties')
-    .select(`
-      *,
-      property_features(feature_name),
-      property_images(image_url),
-      lifestyle_tags(tag_name),
-      owner:users!owner_id(name, role, avatar, trust_score)
-    `)
-    .or('is_hidden.is.null,is_hidden.eq.false')
-    .eq('status', 'AVAILABLE')
-    .limit(limit);
-
-  if (propertyType) query = query.ilike('property_type', propertyType);
-
-  const { data, error } = await query;
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  // Filter out any properties whose owner trust_score is 30 or below (<= 30)
-  return (data || []).filter((p) => {
-    const ownerScore = Number(p.owner?.trust_score ?? 50);
-    return ownerScore > 30;
-  });
-};
+const getProperties = (limit = 24, propertyType = null, filters = {}) =>
+  propertyRepository.fetchPublicProperties({ limit, category: propertyType, filters });
 
 const createProperty = async (propertyData) => {
   propertyInput(propertyData);
@@ -71,6 +47,7 @@ const createProperty = async (propertyData) => {
     images,
     lifestyle_tags
   } = propertyData;
+  const isPublic = propertyData.is_public !== false;
 
   if (!['RENT', 'SALE'].includes(listing_type)) {
     const error = new Error('Chọn tin cho thuê hoặc mua bán.');
@@ -105,6 +82,8 @@ const createProperty = async (propertyData) => {
     err.statusCode = 403;
     throw err;
   }
+
+  if (isPublic && (!status || status === 'AVAILABLE')) await assertListingCapacity(owner_id);
 
   // Validate contact phone format (F28)
   const cleanPhone = (contact_phone || '').trim().replace(/[\s().-]/g, '').replace(/^\+84/, '0');
@@ -161,6 +140,7 @@ const createProperty = async (propertyData) => {
       latitude: parseFloat(latitude) || null,
       longitude: parseFloat(longitude) || null,
       priority_score: duplicatePenalty,
+      is_public: isPublic,
       views: 0
     }])
     .select()
@@ -168,7 +148,7 @@ const createProperty = async (propertyData) => {
 
   if (propertyError) {
     console.error('Supabase Properties Table Insert Error:', propertyError);
-    throw new Error(propertyError.message);
+    throw listingDatabaseError(propertyError);
   }
 
   const propertyId = property.id;
@@ -224,7 +204,7 @@ const createProperty = async (propertyData) => {
   return property;
 };
 
-const getPropertyById = async (id) => {
+const getPropertyById = async (id, { publicRead = false, viewerId } = {}) => {
   id = positiveId(id);
   const { data, error } = await supabase
     .from('properties')
@@ -242,13 +222,18 @@ const getPropertyById = async (id) => {
   if (error) {
     throw new Error(error.message);
   }
+  if (publicRead && String(data?.owner_id) !== String(viewerId)) {
+    const visible = await supabase.from('ranked_properties').select('id').eq('id', id).maybeSingle();
+    if (visible.error) throw new Error('Không thể kiểm tra tin đăng.');
+    if (!visible.data) return null;
+  }
   return data;
 };
 
 const getContactAgentId = async (id, requesterId) => {
   id = positiveId(id);
   const { data: property, error: propertyError } = await supabase
-    .from('properties')
+    .from('ranked_properties')
     .select('id, owner_id, status, is_hidden')
     .eq('id', id)
     .maybeSingle();
@@ -286,7 +271,7 @@ const updateProperty = async (id, actorId, propertyData) => {
   const editableFields = [
     'title', 'description', 'price', 'area', 'bedrooms', 'bathrooms', 'property_type', 'listing_type',
     'status', 'city', 'district', 'ward', 'floor_range', 'address', 'address_detail',
-    'thumbnail', 'virtual_tour_url', 'contact_phone', 'latitude', 'longitude'
+    'thumbnail', 'virtual_tour_url', 'contact_phone', 'latitude', 'longitude', 'is_public'
   ];
   const fields = Object.fromEntries(
     editableFields.filter((field) => Object.hasOwn(propertyData, field))
@@ -348,7 +333,7 @@ const updateProperty = async (id, actorId, propertyData) => {
 
   if (propertyError) {
     console.error('Supabase Properties Table Update Error:', propertyError);
-    throw new Error(propertyError.message);
+    throw listingDatabaseError(propertyError);
   }
 
   if (features !== undefined) {
@@ -511,7 +496,7 @@ const createSimilarityLinks = async (propertyId, similarProperties) => {
 
 const getSimilarProperties = async (propertyId) => {
   const propId = positiveId(propertyId);
-  const source = await getPropertyById(propId);
+  const source = await getPropertyById(propId, { publicRead: true });
   if (!source || source.is_hidden === true || source.status !== 'AVAILABLE'
     || Number(source.owner?.trust_score ?? 50) <= 30) return [];
 
@@ -529,26 +514,8 @@ const getSimilarProperties = async (propertyId) => {
 
   const similarIds = links.map(l => l.property_id_1 === propId ? l.property_id_2 : l.property_id_1);
 
-  const { data: properties, error: propsError } = await supabase
-    .from('properties')
-    .select(`
-      *,
-      property_features(feature_name),
-      property_images(image_url),
-      lifestyle_tags(tag_name),
-      owner:users!owner_id(name, role, avatar, trust_score)
-    `)
-    .in('id', similarIds)
-    .or('is_hidden.is.null,is_hidden.eq.false')
-    .eq('status', 'AVAILABLE')
-    .limit(12);
-
-  if (propsError) {
-    console.error('Error fetching similar properties details:', propsError);
-    return [];
-  }
-
-  return (properties || []).filter((property) => Number(property.owner?.trust_score ?? 50) > 30);
+  const properties = await propertyRepository.fetchPublicProperties({ ids: similarIds.slice(0,500), limit: 500 });
+  return properties.sort((a,b) => b.display_priority-a.display_priority || b.id-a.id).slice(0,12);
 };
 
 module.exports = {

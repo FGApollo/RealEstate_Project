@@ -1,6 +1,7 @@
 const { supabase } = require('../config/supabase');
 const { badRequest, positiveId, text } = require('./businessValidation');
 const { parsePagination } = require('./analyticsQuery');
+const { assertTierCatalog } = require('./agentPlanCatalog');
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const fail = (statusCode, message, code) => Object.assign(new Error(message), { statusCode, code });
 
@@ -15,11 +16,11 @@ async function call(name, args) {
 }
 
 function parseChange(body, now = new Date()) {
-  const allowed = ['requestId','expectedVersion','amount','durationMonths','active','effectiveAt','reason','action'];
+  const allowed = ['planCode','requestId','expectedVersion','amount','durationMonths','active','effectiveAt','reason','action'];
   if (!body || Array.isArray(body) || typeof body !== 'object' || Object.keys(body).some(key => !allowed.includes(key))) {
     throw badRequest('Thông tin cập nhật không hợp lệ.');
   }
-  if (typeof body.requestId !== 'string' || !UUID.test(body.requestId) || !Number.isSafeInteger(body.expectedVersion)
+  if (!['LITE','PLUS','PRO'].includes(body.planCode) || typeof body.requestId !== 'string' || !UUID.test(body.requestId) || !Number.isSafeInteger(body.expectedVersion)
     || body.expectedVersion < 1 || body.expectedVersion > 2147483647
     || !['SAVE','CANCEL'].includes(body.action)) throw badRequest('Mã yêu cầu hoặc phiên bản cấu hình không hợp lệ.');
   const reason = text(body.reason, 'lý do thay đổi', 500, { required: true });
@@ -50,7 +51,11 @@ function parseChange(body, now = new Date()) {
 
 module.exports = {
   parseChange,
-  catalog(actorId) { return call('admin_agent_plan_catalog', { p_actor_id: positiveId(actorId) }); },
+  async catalog(actorId) {
+    const data = await call('admin_agent_plan_catalog', { p_actor_id: positiveId(actorId) });
+    assertTierCatalog(data.plans);
+    return data;
+  },
   history(actorId, query) {
     const { page, limit } = parsePagination(query);
     return call('admin_agent_plan_history', { p_actor_id: positiveId(actorId), p_page: page, p_limit: limit });
@@ -59,6 +64,6 @@ module.exports = {
     const body = parseChange(input);
     return call('admin_change_agent_plan', { p_actor_id: positiveId(actorId), p_request_id: body.requestId,
       p_expected_version: body.expectedVersion, p_amount: body.amount, p_duration: body.durationMonths,
-      p_active: body.active, p_effective_at: body.effectiveAt, p_reason: body.reason, p_action: body.action });
+      p_active: body.active, p_effective_at: body.effectiveAt, p_reason: body.reason, p_action: body.action, p_plan_code: body.planCode });
   }
 };

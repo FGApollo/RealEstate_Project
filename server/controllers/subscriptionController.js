@@ -2,6 +2,7 @@ const { safeErrorMessage } = require('../services/httpError');
 const subscriptionService = require('../services/subscriptionService');
 
 const getSubscription = async (req, res) => {
+  res.set('Cache-Control', 'no-store');
   const userId = req.user.id;
 
   try {

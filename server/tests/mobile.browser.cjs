@@ -7,14 +7,15 @@ const fs = require('node:fs'); const path = require('node:path');
 const assert = require('node:assert/strict'); const { randomUUID } = require('node:crypto');
 const express = require('express'); const jwt = require('jsonwebtoken');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright');
-const { createBillingDatabase, connectBillingDatabase } = require('./helpers/billingDatabase');
+const { connectBillingDatabase } = require('./helpers/billingDatabase');
+const { createTierDatabase } = require('./helpers/tierDatabase');
 const { supabase } = require('../config/supabase');
 const { getJwtConfig } = require('../services/authSessionService');
 const { createPaymentService } = require('../services/paymentService');
 const paymentService = require('../services/paymentService');
 
 (async () => {
-  const db = await createBillingDatabase(); const restore = connectBillingDatabase(supabase, db);
+  const db = await createTierDatabase(); const restore = connectBillingDatabase(supabase, db);
   const originalPayment = { ...paymentService };
   Object.assign(paymentService, createPaymentService(undefined, { availability: () => ({ available: false, reason: 'Thanh toán chưa sẵn sàng trong môi trường kiểm thử.' }) }));
   const out = path.resolve(__dirname, '../../.local/mobile-verification'); fs.mkdirSync(out, { recursive: true });

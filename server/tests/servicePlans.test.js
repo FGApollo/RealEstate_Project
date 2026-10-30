@@ -6,19 +6,20 @@ const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
-const { createBillingDatabase, connectBillingDatabase } = require('./helpers/billingDatabase');
+const { connectBillingDatabase } = require('./helpers/billingDatabase');
+const { createTierDatabase } = require('./helpers/tierDatabase');
 const { supabase } = require('../config/supabase');
 const adminService = require('../services/adminPlanService');
 const paymentRepository = require('../repositories/paymentRepository');
 const { createPaymentService } = require('../services/paymentService');
 let db;
 const rpc = async (name, args = []) => (await db.query(`SELECT public.${name}(${args.map((_, i) => `$${i + 1}`).join(',')}) AS data`, args)).rows[0].data;
-const change = (overrides = {}) => ({ action: 'SAVE', requestId: randomUUID(), expectedVersion: 1,
+const change = (overrides = {}) => ({ planCode: 'PRO', action: 'SAVE', requestId: randomUUID(), expectedVersion: 1,
   amount: 1500000, durationMonths: 3, active: true, effectiveAt: null, reason: 'Chính sách giá mới', ...overrides });
 const sqlChange = (body, actor = 2) => rpc('admin_change_agent_plan', [actor, body.requestId, body.expectedVersion,
-  body.amount ?? null, body.durationMonths ?? null, body.active ?? null, body.effectiveAt ?? null, body.reason, body.action]);
-const reserve = (user = 9, version = 1, request = randomUUID()) => rpc('reserve_agent_payment', [user, 'PAID', request, version]);
-before(async () => { db = await createBillingDatabase(); });
+  body.amount ?? null, body.durationMonths ?? null, body.active ?? null, body.effectiveAt ?? null, body.reason, body.action, body.planCode]);
+const reserve = (user = 9, version = 1, request = randomUUID()) => rpc('reserve_agent_payment', [user, 'PRO', request, version]);
+before(async () => { db = await createTierDatabase(); });
 beforeEach(async () => {
   await db.exec(`TRUNCATE users CASCADE;
     INSERT INTO users(id,name,role) VALUES (1,'Customer','USER'),(2,'Admin','ADMIN'),(3,'Disabled Admin','ADMIN'),
@@ -31,13 +32,13 @@ after(async () => db?.close());
 
 test('catalog uses DB prices and metadata; migration is repeatable and preserves configured prices', async () => {
   await sqlChange(change());
-  await db.exec(fs.readFileSync(path.join(__dirname, '../db-migration/017-admin-service-plans.sql'), 'utf8'));
+  await db.exec(fs.readFileSync(path.join(__dirname, '../db-migration/018-agent-lite-plus-pro.sql'), 'utf8'));
   const data = await rpc('admin_agent_plan_catalog', [2]);
   assert.equal(data.plans.length, 3);
-  const paid = data.plans.find(plan => plan.code === 'PAID');
+  const paid = data.plans.find(plan => plan.code === 'PRO');
   assert.equal(paid.amount_vnd, 1500000); assert.equal(paid.duration_months, 3); assert.equal(paid.version, 2);
-  assert.equal(data.plans.find(plan => plan.code === 'FREE_TRIAL').amount_vnd, 0);
-  assert.equal(data.plans.find(plan => plan.code === 'ENTERPRISE').contact_url, null);
+  assert.equal(data.plans.find(plan => plan.code === 'LITE').listing_limit, 10);
+  assert.equal(data.plans.find(plan => plan.code === 'PLUS').listing_limit, 20);
   assert.deepEqual(data.pending, []);
 });
 
@@ -45,7 +46,7 @@ test('old orders preserve price/duration and settle correctly; fresh quotes must
   const request = randomUUID(); const original = await reserve(9, 1, request);
   await sqlChange(change());
   await assert.rejects(reserve(10, 1), /Stale plan/);
-  await assert.rejects(rpc('reserve_agent_payment', [10, 'PAID', randomUUID()]), /Stale plan/);
+  await assert.rejects(rpc('reserve_agent_payment', [10, 'PRO', randomUUID()]), /Stale plan/);
   const fresh = await reserve(10, 2);
   assert.equal(fresh.amount_vnd, 1500000); assert.equal(fresh.duration_months, 3);
   assert.equal((await reserve(9, 1, request)).id, original.id);
@@ -58,11 +59,11 @@ test('old orders preserve price/duration and settle correctly; fresh quotes must
 test('schedule leaves current price unchanged and applies exactly once at catalog read when due', async () => {
   const scheduled = await sqlChange(change({ effectiveAt: new Date(Date.now() + 3600000).toISOString() }));
   assert.equal(scheduled.pending.length, 1);
-  assert.equal(scheduled.plans.find(plan => plan.code === 'PAID').amount_vnd, 1000000);
+  assert.equal(scheduled.plans.find(plan => plan.code === 'PRO').amount_vnd, 1000000);
   await db.exec("UPDATE agent_plan_schedules SET effective_at=now()-interval '1 second'");
   const applied = await rpc('agent_service_catalog');
-  assert.equal(applied.plans.find(plan => plan.code === 'PAID').amount_vnd, 1500000);
-  assert.equal(applied.plans.find(plan => plan.code === 'PAID').version, 3);
+  assert.equal(applied.plans.find(plan => plan.code === 'PRO').amount_vnd, 1500000);
+  assert.equal(applied.plans.find(plan => plan.code === 'PRO').version, 3);
   await rpc('agent_service_catalog');
   assert.equal(Number((await db.query("SELECT count(*) n FROM agent_plan_audit WHERE action='APPLIED'")).rows[0].n), 1);
 });
@@ -83,8 +84,8 @@ test('pending schedules require cancellation and cancellation preserves the curr
   const cancelled = await sqlChange(change({ action: 'CANCEL', expectedVersion: 2, amount: null,
     durationMonths: null, active: null, reason: 'Hủy lịch theo chính sách' }));
   assert.equal(cancelled.pending.length, 0);
-  assert.equal(cancelled.plans.find(plan => plan.code === 'PAID').amount_vnd, 1000000);
-  assert.equal(cancelled.plans.find(plan => plan.code === 'PAID').version, 3);
+  assert.equal(cancelled.plans.find(plan => plan.code === 'PRO').amount_vnd, 1000000);
+  assert.equal(cancelled.plans.find(plan => plan.code === 'PRO').version, 3);
   assert.equal((await db.query("SELECT status FROM agent_plan_schedules")).rows[0].status, 'CANCELLED');
 });
 
@@ -94,7 +95,7 @@ test('optimistic concurrency and request idempotency prevent lost updates and du
   await assert.rejects(sqlChange(change()), /Stale plan/);
   await assert.rejects(sqlChange({ ...body, amount: 3000000 }), /Request reused/);
   const result = await sqlChange(change({ expectedVersion: 2, amount: 2000000 }));
-  assert.equal(result.plans.find(plan => plan.code === 'PAID').amount_vnd, 2000000);
+  assert.equal(result.plans.find(plan => plan.code === 'PRO').amount_vnd, 2000000);
 });
 
 test('pausing a plan blocks new orders while allowing existing pending orders and paid grants', async () => {
@@ -158,11 +159,11 @@ test('production repositories and services share the SQL catalog and reject stal
   const restore = connectBillingDatabase(supabase, db);
   try {
     const data = await adminService.change(2, change());
-    assert.equal(data.plans.find(plan => plan.code === 'PAID').version, 2);
-    assert.equal((await paymentRepository.plans()).find(plan => plan.code === 'PAID').amount_vnd, 1500000);
+    assert.equal(data.plans.find(plan => plan.code === 'PRO').version, 2);
+    assert.equal((await paymentRepository.plans()).find(plan => plan.code === 'PRO').amount_vnd, 1500000);
     const payment = createPaymentService(paymentRepository, { availability: () => ({ available: true }) });
-    await assert.rejects(payment.create(9, { planCode: 'PAID', requestId: randomUUID(), planVersion: 1 }), { statusCode: 409, code: 'PLAN_PRICE_CHANGED' });
-    await assert.rejects(payment.create(9, { planCode: 'PAID', requestId: randomUUID() }), { statusCode: 400 });
+    await assert.rejects(payment.create(9, { planCode: 'PRO', requestId: randomUUID(), planVersion: 1 }), { statusCode: 409, code: 'PLAN_PRICE_CHANGED' });
+    await assert.rejects(payment.create(9, { planCode: 'PRO', requestId: randomUUID() }), { statusCode: 400 });
     assert.equal((await adminService.history(2, { page: '1', limit: '10' })).total, 1);
   } finally { restore(); }
 });
@@ -189,7 +190,7 @@ test('HTTP enforces authenticated Admin, safe validation and paginated history t
     const headers = { Authorization: `Bearer ${await token(2)}`, 'Content-Type': 'application/json' };
     const catalog = await fetch(base, { headers }); assert.equal(catalog.status, 200); assert.equal(catalog.headers.get('cache-control'), 'no-store');
     const result = await fetch(base + '/paid', { method: 'POST', headers, body: JSON.stringify(change()) });
-    assert.equal(result.status, 200); assert.equal((await result.json()).plans.find(plan => plan.code === 'PAID').amount_vnd, 1500000);
+    assert.equal(result.status, 200); assert.equal((await result.json()).plans.find(plan => plan.code === 'PRO').amount_vnd, 1500000);
     assert.equal((await fetch(base + '/paid', { method: 'POST', headers, body: JSON.stringify(change()) })).status, 409);
     assert.equal((await fetch(base + '/history?page=1&limit=1', { headers })).status, 200);
     assert.equal((await fetch(base + '/history?limit=1000', { headers })).status, 400);
