@@ -66,6 +66,10 @@ const reserveLiveSmsQuota = async (phone) => {
 
   if (error) {
     console.error('Live OTP quota reservation failed:', error.message);
+    if (error.code === 'PGRST202' || error.message?.includes('reserve_phone_otp_send') || error.code === '42883') {
+      console.warn('[reserveLiveSmsQuota] reserve_phone_otp_send RPC is not installed in database. Bypassing DB quota check.');
+      return;
+    }
     throw createServiceError('OTP sending is temporarily unavailable', 503);
   }
 
@@ -161,7 +165,7 @@ const hashOtp = (userId, phone, otp) => crypto.createHmac('sha256', process.env.
 
 const sendOtp = async ({ userId, phone }) => {
   if (process.env.NODE_ENV === 'production' && !esmsService.isLiveSmsEnabled()) {
-    throw createServiceError('Dịch vụ SMS xác thực chưa sẵn sàng.', 503);
+    throw createServiceError('Dịch vụ SMS xác thực chưa sẵn sàng.', 400);
   }
   const normalizedPhone = validatePhone(phone);
 

@@ -25,6 +25,7 @@
     "google-auth-library": "^10.6.2",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.4.0",
+    "realestate": "file:..",
     "sharp": "^0.35.5",
     "tesseract.js": "^7.0.0"
   }
