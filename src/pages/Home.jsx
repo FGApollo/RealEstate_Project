@@ -914,8 +914,8 @@ const Home = () => {
           <div className="footer-col">
             <h4>PHÁP LÝ</h4>
             <div className="footer-links">
-              <a href="#" className="footer-link">Chính Sách Bảo Mật</a>
-              <a href="#" className="footer-link">Điều Khoản Sử Dụng</a>
+              <a href="/privacy.html" className="footer-link">Chính Sách Bảo Mật</a>
+              <a href="/terms.html" className="footer-link">Điều Khoản Sử Dụng</a>
             </div>
           </div>
 
