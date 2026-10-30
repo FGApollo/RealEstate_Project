@@ -1,5 +1,6 @@
 const recommendationService = require('../services/recommendationService');
 const { toPublicProperty } = require('../services/publicPropertyDto');
+const { parseSearchFilters } = require('../services/propertySearchFilters');
 
 const getRecommendations = async (req, res) => {
   try {
@@ -7,7 +8,8 @@ const getRecommendations = async (req, res) => {
       category: req.query.category === 'ALL' ? null : req.query.category,
       limit: req.query.limit,
       offset: req.query.offset,
-      feedToken: req.query.feedToken
+      feedToken: req.query.feedToken,
+      filters: parseSearchFilters(req.query.filters)
     });
     return res.status(200).json({ properties: properties.map(toPublicProperty), pagination });
   } catch (error) {

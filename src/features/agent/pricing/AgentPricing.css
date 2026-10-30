@@ -5,6 +5,10 @@
   font-family: 'Inter', sans-serif;
 }
 
+.subscription-benefits, .subscription-upcoming { margin-top: 16px; padding: 16px; border-radius: 12px; background: #f1f6ff; color: #294872; line-height: 1.7; }
+.subscription-upcoming ul { padding-left: 20px; margin-bottom: 0; }
+.subscription-upcoming li { margin-top: 8px; overflow-wrap: anywhere; }
+
 .pricing-header {
   margin-bottom: 30px;
   text-align: center;

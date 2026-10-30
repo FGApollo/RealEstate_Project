@@ -161,6 +161,10 @@ test('recommendation feed excludes recent dislikes and current favorites, keepin
     feedToken: result.feedToken
   });
   assert.deepEqual(nextPage.properties.map((property) => property.id), [4]);
+  await assert.rejects(
+    recommendationService.getRecommendations(17, { limit: 1, offset: 1, feedToken: result.feedToken, filters: { district: 'Thủ Đức' } }),
+    error => error.code === 'INVALID_RECOMMENDATION_FEED'
+  );
   assert.equal(nextPage.hasMore, false);
   await assert.rejects(
     recommendationService.getRecommendations(99, { limit: 1, offset: 1, feedToken: result.feedToken }),

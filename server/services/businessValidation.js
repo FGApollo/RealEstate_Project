@@ -43,6 +43,7 @@ const propertyInput = (body, { partial = false } = {}) => {
   if (body.status !== undefined && !['AVAILABLE', 'RENTED', 'SOLD', 'PENDING', 'INACTIVE'].includes(body.status)) {
     throw badRequest('Invalid listing status.');
   }
+  if (body.is_public !== undefined && typeof body.is_public !== 'boolean') throw badRequest('Trạng thái công khai không hợp lệ.');
   const ranges = { price: [0, 1e15], area: [0, 1e9], bedrooms: [0, 1000], bathrooms: [0, 1000],
     latitude: [-90, 90], longitude: [-180, 180] };
   for (const [key, [min, max]] of Object.entries(ranges)) {

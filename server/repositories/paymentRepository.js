@@ -1,5 +1,6 @@
 const { supabase } = require('../config/supabase');
 const { paymentError } = require('../services/payosService');
+const { assertTierCatalog } = require('../services/agentPlanCatalog');
 
 function result({ data, error }) {
   if (error) {
@@ -18,7 +19,7 @@ const rpc = async (name, args) => result(await supabase.rpc(name, args));
 module.exports = {
   async plans() {
     const catalog = await rpc('agent_service_catalog', {});
-    return catalog.plans;
+    return assertTierCatalog(catalog.plans);
   },
   async find(id, userId) {
     let query = supabase.from('agent_payment_orders').select('*').eq('id', id);

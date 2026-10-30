@@ -1,62 +1,17 @@
 const { supabase } = require('../config/supabase');
 
-const PROPERTY_SELECT = `
-  *,
-  property_features(feature_name),
-  property_images(image_url),
-  lifestyle_tags(tag_name),
-  owner:users!owner_id(name, role, avatar, trust_score, created_at, verification_status)
-`;
 
-const visibleAndListingTypeFilter = (listingType) => listingType ? [
-  `and(is_hidden.is.null,listing_type.eq.${listingType})`,
-  `and(is_hidden.eq.false,listing_type.eq.${listingType})`,
-  'and(is_hidden.is.null,listing_type.is.null)',
-  'and(is_hidden.eq.false,listing_type.is.null)'
-].join(',') : 'is_hidden.is.null,is_hidden.eq.false';
-
-const fetchRecommendationCandidates = async (listingType, limit) => {
-  let query = supabase.from('properties').select(PROPERTY_SELECT)
-    .eq('status', 'AVAILABLE')
-    .order('id', { ascending: false })
-    .limit(limit);
-
-  query = query.or(visibleAndListingTypeFilter(listingType));
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
-
-  return (data || []).filter((property) => {
-    const trustScore = Number(property.owner?.trust_score ?? 50);
-    return trustScore > 30 && (!listingType || !property.listing_type || property.listing_type === listingType);
+const fetchPublicProperties = async ({ filters = {}, listingType = null, category = null, limit = 24, ids = null } = {}) => {
+  const { data, error } = await supabase.rpc('search_ranked_properties', {
+    p_filters: filters, p_listing_type: listingType, p_category: category === 'ALL' ? null : category,
+    p_limit: limit, p_ids: ids
   });
+  if (error) throw new Error('Không thể tải danh sách bất động sản.');
+  return data || [];
 };
-
-const fetchPreferenceOptions = async (listingType) => {
-  const { data, error } = await supabase.from('properties')
-    .select('listing_type, property_type, city, district, property_features(feature_name), lifestyle_tags(tag_name), owner:users!owner_id(trust_score)')
-    .eq('status', 'AVAILABLE')
-    .or(visibleAndListingTypeFilter(listingType))
-    .order('id', { ascending: false })
-    .limit(1000);
-  if (error) throw new Error(error.message);
-  return (data || []).filter((property) => (!listingType
-    || !property.listing_type || property.listing_type === listingType)
-  && Number(property.owner?.trust_score ?? 50) > 30);
-};
-
-const fetchPropertiesByIds = async (ids, listingType) => {
-  if (!ids.length) return [];
-  const { data, error } = await supabase.from('properties').select(PROPERTY_SELECT)
-    .in('id', ids)
-    .eq('status', 'AVAILABLE')
-    .or('is_hidden.is.null,is_hidden.eq.false');
-  if (error) throw new Error(error.message);
-  const byId = new Map((data || []).filter((property) => {
-    const trustScore = Number(property.owner?.trust_score ?? 50);
-    return trustScore > 30 && (!listingType || !property.listing_type || property.listing_type === listingType);
-  }).map((property) => [Number(property.id), property]));
-  return ids.map((id) => byId.get(Number(id))).filter(Boolean);
-};
+const fetchRecommendationCandidates = (listingType, limit, filters = {}, category) => fetchPublicProperties({ listingType, limit, filters, category });
+const fetchPreferenceOptions = listingType => fetchPublicProperties({ listingType, limit: 1000 });
+const fetchPropertiesByIds = (ids, listingType) => ids.length ? fetchPublicProperties({ ids, listingType, limit: ids.length }) : Promise.resolve([]);
 
 const fetchRecentEvents = async (userId, since, limit) => {
   const { data, error } = await supabase.from('user_property_events')
@@ -97,6 +52,7 @@ const recordEvent = async (userId, propertyId, action) => {
 };
 
 module.exports = {
+  fetchPublicProperties,
   fetchRecommendationCandidates,
   fetchPreferenceOptions,
   fetchPropertiesByIds,

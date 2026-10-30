@@ -159,7 +159,7 @@ const buildBehaviorProfile = async (userId) => {
   return { events, propertyById, profile, now };
 };
 
-const getRecommendations = async (userId, { category, limit, offset, feedToken } = {}) => {
+const getRecommendations = async (userId, { category, limit, offset, feedToken, filters = {} } = {}) => {
   const savedPreferences = await preferenceService.getPreferences(userId);
   const preference = savedPreferences?.onboarding_completed ? savedPreferences : DEFAULT_PREFERENCES;
 
@@ -185,6 +185,7 @@ const getRecommendations = async (userId, { category, limit, offset, feedToken }
     }
     const expectedCategory = category ? categoryKey(category) : 'ALL';
     if (snapshot.sub !== String(userId) || snapshot.category !== expectedCategory
+      || snapshot.filters !== JSON.stringify(filters)
       || snapshot.preferenceUpdatedAt !== preference.updated_at || !Array.isArray(snapshot.ids)) {
       const error = new Error('Recommendation feed token does not match this account or category.');
       error.statusCode = 400;
@@ -204,7 +205,7 @@ const getRecommendations = async (userId, { category, limit, offset, feedToken }
     };
   }
 
-  const candidates = await propertyRepository.fetchRecommendationCandidates(preference.listing_type, SCORING.candidateLimit);
+  const candidates = await propertyRepository.fetchRecommendationCandidates(preference.listing_type, SCORING.candidateLimit, filters, category);
   const [favoriteIds, behavior] = await Promise.all([
     propertyRepository.fetchFavoriteIds(userId, candidates.map((property) => property.id)),
     buildBehaviorProfile(userId)
@@ -228,11 +229,13 @@ const getRecommendations = async (userId, { category, limit, offset, feedToken }
       return !(latest?.action === 'DISLIKE' && behavior.now - new Date(latest.created_at).getTime() < cooldownMs);
     })
     .map((property) => ({ property, match: scoreProperty(property, preference, behavior.profile) }))
-    .sort((a, b) => b.match.score - a.match.score || Number(b.property.id) - Number(a.property.id));
+    .sort((a, b) => (Number(b.property.display_priority) || 0) - (Number(a.property.display_priority) || 0)
+      || b.match.score - a.match.score || Number(b.property.id) - Number(a.property.id));
 
   const categorySnapshotKey = category ? categoryKey(category) : 'ALL';
   const signedFeedToken = jwt.sign({
     category: categorySnapshotKey,
+    filters: JSON.stringify(filters),
     preferenceUpdatedAt: preference.updated_at,
     ids: scored.map(({ property }) => Number(property.id))
   },

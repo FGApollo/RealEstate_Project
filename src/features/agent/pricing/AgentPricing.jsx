@@ -43,21 +43,17 @@ export default function AgentPricing({ currentUser }) {
   const subscribe = () => act(async () => {
     requestId.current ||= crypto.randomUUID();
     const order = await billingRequest('/api/payments', { method: 'POST', body: {
-      planCode: 'PAID', requestId: requestId.current, planVersion: confirmOrder.version
+      planCode: confirmOrder.code, requestId: requestId.current, planVersion: confirmOrder.version
     } });
     setConfirmOrder(null);
     // An existing pending order may have a different, previously confirmed price.
     // Its detail screen shows that immutable amount before opening payOS.
-    if (order.amount !== confirmOrder.amount_vnd || order.durationMonths !== confirmOrder.duration_months) {
+    if (order.planCode !== confirmOrder.code || order.amount !== confirmOrder.amount_vnd || order.durationMonths !== confirmOrder.duration_months) {
       window.location.assign(`/sale/payment/${order.id}`);
     } else if (order.status === 'PENDING' && order.checkoutUrl) openCheckout(order.checkoutUrl);
     else { requestId.current = null; await load(); setMessage(`Đơn #${order.orderCode}: ${paymentStatus(order.status)}.`); }
   });
-  const trial = () => act(async () => {
-    await billingRequest('/api/subscriptions', { method: 'POST', body: { planName: 'FREE_TRIAL' } });
-    await load(); setMessage('Đã kích hoạt một tháng dùng thử.');
-  });
-  const plan = data?.catalog.plans.find((item) => item.code === 'PAID');
+  const plan = data?.catalog.plans.find((item) => item.code === data?.subscription?.plan_name);
   const subscription = data?.subscription;
   const active = subscription?.effective_status === 'ACTIVE';
   return <div className="pricing-panel-container">
@@ -70,14 +66,20 @@ export default function AgentPricing({ currentUser }) {
           {subscription ? <div className="subscription-details"><p><strong>{subscription.plan_name === 'FREE_TRIAL' ? 'Dùng thử miễn phí' : subscription.plan_name === plan?.code ? plan.name : subscription.plan_name}</strong></p>
             <p>Hạn dùng: <strong>{billingDate(subscription.end_date)}</strong></p><span className={active ? 'badge-active' : 'badge-inactive'}>{active ? 'ĐANG HOẠT ĐỘNG' : 'ĐÃ HẾT HẠN / NGỪNG'}</span></div>
             : <p>Bạn chưa đăng ký gói dịch vụ.</p>}
+          {!active && <p>Tin được giữ trong danh mục của bạn và chỉ hiển thị với khách hàng khi có gói còn hiệu lực.</p>}
+          {active && <div className="subscription-benefits"><p><strong>{subscription.visible_listing_count} / {subscription.listing_limit}</strong> tin đang hiển thị · <strong>{subscription.priority_points}</strong> điểm ưu tiên hiển thị</p><p>Support {subscription.support_tier} · Tin đã ẩn hoặc kết thúc không chiếm chỗ.</p>
+            {subscription.public_listing_count > subscription.listing_limit && <p role="status">Có {subscription.public_listing_count} tin bật công khai. Gói hiện tại chỉ hiển thị {subscription.listing_limit} tin mới nhất; tin còn lại được giữ trong danh mục. Hãy ẩn/kết thúc bớt tin để chọn lại các tin muốn hiển thị.</p>}</div>}
+          {Boolean(subscription?.upcoming?.length) && <div className="subscription-upcoming"><h4>Gói đã thanh toán, chờ đến kỳ</h4><ul>{subscription.upcoming.map(item => <li key={item.id}><strong>{item.plan_name}</strong> · {billingDate(item.start_date)} → {billingDate(item.end_date)} · {item.listing_limit} tin · {item.priority_points} điểm</li>)}</ul></div>}
         </div>
         {!data.catalog.checkout.available && <div className="pricing-message-banner" role="status"><AlertCircle size={18} />{data.catalog.checkout.reason}</div>}
         <ServicePlanCards plans={data.catalog.plans} subscription={subscription} checkoutAvailable={data.catalog.checkout.available}
-          busy={busy} onTrial={trial} onSubscribe={() => setConfirmOrder(plan)} />
+          busy={busy} onSubscribe={selectedPlan => { if (confirmOrder?.code !== selectedPlan.code) requestId.current = null; setConfirmOrder(selectedPlan); }} />
         {confirmOrder && <PlanDialog title="Xác nhận thanh toán" locked={busy} onClose={() => setConfirmOrder(null)}>
           <p><strong>{confirmOrder.name}</strong> · {confirmOrder.duration_months} tháng</p>
           <p>Số tiền: <strong>{billingMoney(confirmOrder.amount_vnd)}</strong></p>
-          <p>Gia hạn chủ động, không tự động trừ tiền. Đơn đang chờ trước đó sẽ giữ giá đã chốt và được hiển thị riêng để bạn kiểm tra.</p>
+          <p>{confirmOrder.listing_limit} tin công khai · {confirmOrder.priority_points} điểm ưu tiên · Support {confirmOrder.support_tier}.</p>
+          <p>Gói mới bắt đầu sau tất cả kỳ đã thanh toán còn hạn. Nếu chưa có gói còn hạn, gói bắt đầu khi thanh toán được xác minh. Không tự động trừ tiền.</p>
+          <p>Đơn đang chờ trước đó giữ nguyên gói và giá đã chốt; bạn sẽ được đưa đến trang kiểm tra nếu khác lựa chọn này.</p>
           <div className="billing-actions"><button disabled={busy} onClick={() => setConfirmOrder(null)}>Quay lại</button><button className="btn-plan-action" disabled={busy} onClick={subscribe}>{busy ? 'Đang tạo đơn…' : 'Xác nhận và tiếp tục'}</button></div>
         </PlanDialog>}
         <section className="billing-history current-subscription-card" aria-labelledby="billing-history-title"><div className="billing-heading"><h2 id="billing-history-title">Lịch sử thanh toán</h2><button disabled={busy} onClick={() => act(load)}>Làm mới</button></div>
