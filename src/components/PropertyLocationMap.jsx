@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { MapPin, Navigation, ExternalLink, AlertCircle } from 'lucide-react';
 import './PropertyLocationMap.css';
+import { API_BASE_URL } from '../config';
+import { publicApiFetch } from '../auth/apiClient';
 
 const DEFAULT_CENTER = { lat: 10.7769, lng: 106.7009 }; // TP. Hồ Chí Minh
 
@@ -57,7 +59,7 @@ const PropertyLocationMap = ({ property }) => {
     if (property.address) {
       setIsGeocoding(true);
       const query = encodeURIComponent(property.address);
-      fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${query}&limit=1&accept-language=vi`)
+      publicApiFetch(`${API_BASE_URL}/api/geocode/search?q=${query}&limit=1`)
         .then(res => res.json())
         .then(data => {
           if (data && data.length > 0) {
@@ -102,7 +104,8 @@ const PropertyLocationMap = ({ property }) => {
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      maxZoom: 19
+      maxZoom: 19,
+      crossOrigin: true
     }).addTo(map);
 
     // Custom pulse marker icon for main property

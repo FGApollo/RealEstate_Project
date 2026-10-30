@@ -37,4 +37,10 @@ server/.env
 # Local KYC/OCR test artifacts
 scratch/*.png
 server/*.traineddata
+test_images/
+public/*cccd*
+public/*kyc*
+public/*selfie*
+public/*portrait*
+public/anh-chan-dung-ro-net.jpg
 

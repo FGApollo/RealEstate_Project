@@ -120,7 +120,7 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
 
     for (const q of queries) {
       try {
-        const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&accept-language=vi`);
+        const res = await apiFetch(`${API_BASE_URL}/api/geocode/search?q=${encodeURIComponent(q)}&limit=1`);
         if (res.ok) {
           const data = await res.json();
           if (data && data.length > 0) {
@@ -304,13 +304,13 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
 
     const initialZoom = (listing.latitude && listing.longitude) ? 15 : 13;
     const map = window.L.map('listing-map', { zoomControl: true, scrollWheelZoom: true }).setView([lat, lng], initialZoom);
-    window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
+    window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors', crossOrigin: true }).addTo(map);
     const marker = window.L.marker([lat, lng], { draggable: true }).addTo(map);
 
     const updateCoordinates = async (newLat, newLng) => {
       setListing(prev => ({ ...prev, latitude: newLat, longitude: newLng }));
       try {
-        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${newLat}&lon=${newLng}&format=json&accept-language=vi`);
+        const res = await apiFetch(`${API_BASE_URL}/api/geocode/reverse?lat=${newLat}&lon=${newLng}`);
         if (res.ok) {
           const data = await res.json();
           const addr = data.address || {};
@@ -355,7 +355,7 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
         setListing(prev => ({ ...prev, latitude: lat, longitude: lon }));
         if (mapRef.current && markerRef.current) { mapRef.current.setView([lat, lon], 15); markerRef.current.setLatLng([lat, lon]); }
         try {
-          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=vi`);
+          const res = await apiFetch(`${API_BASE_URL}/api/geocode/reverse?lat=${lat}&lon=${lon}`);
           if (res.ok) {
             const data = await res.json();
             const addr = data.address || {};
