@@ -304,9 +304,9 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
 
     const initialZoom = (listing.latitude && listing.longitude) ? 15 : 13;
     const map = window.L.map('listing-map', { zoomControl: true, scrollWheelZoom: true }).setView([lat, lng], initialZoom);
-    window.L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-      subdomains: 'abcd',
+    window.L.tileLayer('https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+      attribution: '&copy; Google Maps',
+      subdomains: ['0', '1', '2', '3'],
       maxZoom: 20
     }).addTo(map);
     const marker = window.L.marker([lat, lng], { draggable: true }).addTo(map);
