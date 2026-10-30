@@ -135,7 +135,7 @@ const sendOtpSms = async ({ phone, otp, customContent }) => {
     }
     console.error(`[eSMS] Lỗi kết nối tới gateway eSMS:`, err.message);
     const networkError = new Error(`Không thể kết nối đến cổng gửi tin eSMS: ${err.message}`);
-    networkError.statusCode = 502;
+    networkError.statusCode = 400;
     throw networkError;
   }
 };
