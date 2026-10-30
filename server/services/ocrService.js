@@ -229,19 +229,42 @@ const scoreBackOcrText = (text) => {
   return score;
 };
 
-const runOcrBestRotation = async (imageBuffer, scoreText) => {
-  const attempts = await Promise.all(OCR_ROTATION_DEGREES.map(async (degrees) => {
+const runOcrBestRotation = async (imageBuffer, scoreText, confidentScore = 10) => {
+  // Ưu tiên đọc góc 0 độ trước (hầu hết ảnh tải lên đều chụp thẳng)
+  const zeroBuffer = await rotateImageBuffer(imageBuffer, 0);
+  const zeroText = await runOcr(zeroBuffer);
+  const zeroScore = scoreText(zeroText);
+
+  if (zeroScore >= confidentScore) {
+    return {
+      degrees: 0,
+      text: zeroText,
+      score: zeroScore
+    };
+  }
+
+  let best = {
+    degrees: 0,
+    text: zeroText,
+    score: zeroScore
+  };
+
+  // Nếu góc 0 độ chưa đạt điểm tự tin, mới thử tiếp các góc xoay còn lại
+  for (const degrees of [90, 180, 270]) {
     const rotatedBuffer = await rotateImageBuffer(imageBuffer, degrees);
     const text = await runOcr(rotatedBuffer);
+    const score = scoreText(text);
 
-    return {
-      degrees,
-      text,
-      score: scoreText(text)
-    };
-  }));
+    if (score > best.score) {
+      best = { degrees, text, score };
+    }
 
-  return attempts.sort((first, second) => second.score - first.score)[0];
+    if (best.score >= confidentScore) {
+      break;
+    }
+  }
+
+  return best;
 };
 
 const getRequiredFields = () => {
@@ -629,8 +652,8 @@ const analyzeCitizenId = async (frontImageBuffer, backImageBuffer) => {
     }
 
     const [frontOcr, backOcr] = await Promise.all([
-      runOcrBestRotation(frontBuffer, scoreFrontOcrText),
-      runOcrBestRotation(backBuffer, scoreBackOcrText)
+      runOcrBestRotation(frontBuffer, scoreFrontOcrText, 10),
+      runOcrBestRotation(backBuffer, scoreBackOcrText, 6)
     ]);
     const frontText = frontOcr.text;
     const backText = backOcr.text;
