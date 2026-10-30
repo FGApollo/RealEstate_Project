@@ -1,4 +1,15 @@
 const kycService = require('../services/kycService');
+const SAFE_KYC_ERRORS = new Map([
+  ['User not found', 404],
+  ['User is already verified', 400],
+  ['No pending KYC verification found', 400],
+  ['Khong the doc anh CCCD da luu, vui long thu lai', 400]
+]);
+const sendKycError = (res, error) => {
+  const status = SAFE_KYC_ERRORS.get(error.message);
+  if (!status) console.error('KYC operation failed:', error.code || error.name || 'operation_error');
+  return res.status(status || 500).json({ error: status ? error.message : 'Không thể xử lý xác minh lúc này. Vui lòng thử lại.' });
+};
 
 const getKycStatus = async (req, res) => {
   const userId = req.user.id;
@@ -7,8 +18,7 @@ const getKycStatus = async (req, res) => {
     const status = await kycService.getKycStatus(userId);
     res.status(200).json(status);
   } catch (error) {
-    const statusCode = error.message === 'User not found' ? 404 : 500;
-    res.status(statusCode).json({ error: error.message || 'Internal server error' });
+    sendKycError(res, error);
   }
 };
 
@@ -37,8 +47,7 @@ const uploadCard = async (req, res) => {
 
     res.status(200).json(result);
   } catch (error) {
-    const statusCode = error.message === 'User not found' ? 404 : 400;
-    res.status(statusCode).json({ error: error.message || 'Failed to upload ID card images' });
+    sendKycError(res, error);
   }
 };
 
@@ -59,8 +68,7 @@ const uploadSelfie = async (req, res) => {
 
     res.status(200).json(result);
   } catch (error) {
-    const statusCode = error.message === 'User not found' ? 404 : 400;
-    res.status(statusCode).json({ error: error.message || 'Failed to upload selfie' });
+    sendKycError(res, error);
   }
 };
 
@@ -73,7 +81,7 @@ const handleUploadError = (err, req, res, next) => {
     return res.status(400).json({ error: 'Each image must be 5MB or smaller' });
   }
 
-  return res.status(400).json({ error: err.message || 'Invalid upload request' });
+  return res.status(400).json({ error: 'Invalid image upload request' });
 };
 
 module.exports = {

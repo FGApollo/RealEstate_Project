@@ -36,8 +36,12 @@ const issueAndSend = async (user) => {
   // Do not make the public response depend on SMTP latency or delivery outcome.
   // If delivery fails, the user can safely request a new link.
   void emailService.sendVerificationEmail({ email: user.email, token }).catch((sendError) => {
-    // Keep the token usable for a resend, but never put the token or recipient in logs.
-    console.error('Email verification delivery failed:', sendError.code || sendError.name || 'mail_error');
+    // Never put the verification token, recipient or raw OAuth response in logs.
+    console.error('Email verification delivery failed:', {
+      code: sendError.code || sendError.name || 'mail_error',
+      ...(sendError.providerCode && { providerCode: sendError.providerCode }),
+      ...(sendError.providerStatus && { providerStatus: sendError.providerStatus })
+    });
   });
   return true;
 };

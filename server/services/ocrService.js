@@ -1,5 +1,6 @@
 const sharp = require('sharp');
 const Tesseract = require('tesseract.js');
+const { isKycDemoAllowed } = require('./kycPolicy');
 
 const MIN_WIDTH = 300;
 const MIN_HEIGHT = 180;
@@ -61,11 +62,6 @@ const normalizeDate = (dateValue) => {
     && date.getUTCDate() === day
   ) {
     return `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
-  }
-
-  // Cho phép định dạng ngày của thẻ mẫu/test (ví dụ: 99/99/1990)
-  if (year >= 1900 && year <= 2099) {
-    return `${match[1]}/${match[2]}/${year}`;
   }
 
   return null;
@@ -528,6 +524,7 @@ const getBackSideEvidence = (backText) => {
 };
 
 const isForcedDemoResult = () => {
+  if (!isKycDemoAllowed()) return null;
   const mode = (process.env.KYC_OCR_DEMO_RESULT || process.env.KYC_DEMO_MODE || '').toLowerCase();
   if (mode === 'pass' || mode === 'true') return true;
   if (mode === 'fail' || mode === 'false') return false;

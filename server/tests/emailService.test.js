@@ -88,3 +88,42 @@ test('sendVerificationEmail fails closed without Gmail API credentials', async (
     (error) => error.code === 'EMAIL_DELIVERY_UNAVAILABLE' && error.statusCode === 503
   );
 });
+
+for (const providerCode of ['invalid_grant', 'invalid_client', 'sensitive-value-not-for-logs']) {
+  test(`OAuth rejection exposes only safe diagnostics (${providerCode})`, async (t) => {
+    const previousEnv = Object.fromEntries(Object.keys(validConfig).map(key => [key, process.env[key]]));
+    Object.assign(process.env, validConfig);
+    const originalFetch = global.fetch;
+    const requests = [];
+    global.fetch = async (url) => {
+      requests.push(url);
+      return {
+        ok: false,
+        status: 400,
+        json: async () => ({ error: providerCode, error_description: 'private token and recipient data' })
+      };
+    };
+    t.after(() => {
+      global.fetch = originalFetch;
+      for (const key of Object.keys(validConfig)) {
+        if (previousEnv[key] === undefined) delete process.env[key];
+        else process.env[key] = previousEnv[key];
+      }
+    });
+
+    // Use a new instance so a cached access token cannot skip the refresh check.
+    delete require.cache[require.resolve('../services/emailService')];
+    const freshService = require('../services/emailService');
+    await assert.rejects(
+      freshService.sendVerificationEmail({ email: 'recipient@example.com', token: 'A'.repeat(43) }),
+      (error) => {
+        assert.equal(error.code, 'GMAIL_OAUTH_REFRESH_REJECTED');
+        assert.equal(error.providerStatus, 400);
+        assert.equal(error.providerCode, providerCode === 'sensitive-value-not-for-logs' ? undefined : providerCode);
+        assert.doesNotMatch(error.message, /private token|recipient data|sensitive-value/);
+        return true;
+      }
+    );
+    assert.deepEqual(requests, ['https://oauth2.googleapis.com/token']);
+  });
+}

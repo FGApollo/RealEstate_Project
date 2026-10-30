@@ -4,6 +4,7 @@ const kycController = require('../controllers/kycController');
 const { upload } = require('../middleware/uploadMiddleware');
 const { authenticate, requireRole } = require('../middleware/authenticate');
 const { rateLimiters } = require('../middleware/rateLimiters');
+const { validateUploadedImages } = require('../services/imageValidation');
 
 router.use(authenticate, requireRole('AGENT'));
 
@@ -16,6 +17,7 @@ router.post(
     { name: 'backImage', maxCount: 1 }
   ]),
   kycController.handleUploadError,
+  validateUploadedImages,
   kycController.uploadCard
 );
 router.post(
@@ -23,6 +25,7 @@ router.post(
   rateLimiters.upload,
   upload.single('selfieImage'),
   kycController.handleUploadError,
+  validateUploadedImages,
   kycController.uploadSelfie
 );
 

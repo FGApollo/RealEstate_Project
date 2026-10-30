@@ -6,7 +6,6 @@ const { getOtpSendLimits, createOtpQuotaHash } = require('./otpSendPolicy');
 
 const OTP_TTL_MS = 5 * 60 * 1000;
 const OTP_COOLDOWN_MS = 60 * 1000;
-const MAX_VERIFY_ATTEMPTS = 5;
 const VIETNAM_PHONE_PATTERN = /^(03|05|07|08|09)\d{8}$/;
 
 const createServiceError = (message, statusCode = 400, code, retryAfterSeconds) => {
@@ -17,7 +16,7 @@ const createServiceError = (message, statusCode = 400, code, retryAfterSeconds) 
   return error;
 };
 
-const normalizePhone = (phone) => String(phone || '').trim();
+const normalizePhone = (phone) => typeof phone === 'string' ? phone.trim() : '';
 
 const parseDatabaseTimestamp = (value) => {
   if (!value) return NaN;
@@ -107,40 +106,14 @@ const ensureUserExists = async (userId) => {
   return user;
 };
 
-const getUserPhoneVerificationState = async (userId) => {
-  const { data: user, error } = await supabase
-    .from('users')
-    .select('id, phone_verified')
-    .eq('id', userId)
-    .single();
-
-  if (error) {
-    if (error.code === 'PGRST116') {
-      throw createServiceError('User not found', 404);
-    }
-
-    throw new Error(error.message);
-  }
-
-  if (!user) {
-    throw createServiceError('User not found', 404);
-  }
-
-  return user;
-};
-
-const getLatestOtp = async (userId, phone, onlyUnused = false) => {
+const getLatestOtp = async (userId, phone) => {
   let query = supabase
     .from('phone_otps')
-    .select('id, otp_code, expires_at, is_used, attempt_count, created_at')
+    .select('id, created_at')
     .eq('user_id', userId)
     .eq('phone', phone)
     .order('created_at', { ascending: false })
     .limit(1);
-
-  if (onlyUnused) {
-    query = query.eq('is_used', false);
-  }
 
   const { data, error } = await query.maybeSingle();
 
@@ -183,8 +156,13 @@ const markOldOtpsUsed = async (userId, phone) => {
 };
 
 const generateOtpCode = () => String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+const hashOtp = (userId, phone, otp) => crypto.createHmac('sha256', process.env.JWT_SECRET)
+  .update(`${userId}:${phone}:${otp}`).digest('hex');
 
 const sendOtp = async ({ userId, phone }) => {
+  if (process.env.NODE_ENV === 'production' && !esmsService.isLiveSmsEnabled()) {
+    throw createServiceError('Dịch vụ SMS xác thực chưa sẵn sàng.', 503);
+  }
   const normalizedPhone = validatePhone(phone);
 
   await ensureUserExists(userId);
@@ -208,7 +186,9 @@ const sendOtp = async ({ userId, phone }) => {
     .insert({
       user_id: userId,
       phone: normalizedPhone,
-      otp_code: otpCode,
+      otp_code: 'REDACTED',
+      otp_hash: hashOtp(userId, normalizedPhone, otpCode),
+      delivered_live: !smsResult.isMock && !smsResult.sandbox,
       expires_at: expiresAt,
       is_used: false,
       attempt_count: 0
@@ -231,81 +211,34 @@ const sendOtp = async ({ userId, phone }) => {
   };
 };
 
-const incrementAttemptCount = async (otpRecord) => {
-  const nextAttemptCount = (otpRecord.attempt_count || 0) + 1;
-  const { error } = await supabase
-    .from('phone_otps')
-    .update({ attempt_count: nextAttemptCount })
-    .eq('id', otpRecord.id);
-
-  if (error) {
-    throw new Error(error.message);
-  }
-};
-
 const verifyOtp = async ({ userId, phone, otp }) => {
   const normalizedPhone = validatePhone(phone);
-  const normalizedOtp = String(otp || '').trim();
+  const normalizedOtp = typeof otp === 'string' ? otp.trim() : '';
 
   if (!/^\d{6}$/.test(normalizedOtp)) {
     throw createServiceError('Invalid OTP');
   }
 
-  await ensureUserExists(userId);
-
-  const otpRecord = await getLatestOtp(userId, normalizedPhone, true);
-  if (!otpRecord) {
-    throw createServiceError('OTP not found');
+  const { data: result, error } = await supabase.rpc('consume_phone_otp', {
+    p_user_id: userId, p_phone: normalizedPhone,
+    p_code_hash: hashOtp(userId, normalizedPhone, normalizedOtp),
+    p_require_live: process.env.NODE_ENV === 'production'
+  });
+  if (error || !result) throw createServiceError('Không thể xác thực OTP lúc này. Vui lòng thử lại.', 503);
+  if (!result.ok) {
+    if (result.code === 'ATTEMPT_LIMIT') throw createServiceError('OTP attempt limit exceeded', 429, 'OTP_ATTEMPT_LIMIT', 300);
+    throw createServiceError('Mã OTP không hợp lệ hoặc đã hết hạn. Vui lòng yêu cầu mã mới.');
   }
-
-  if (parseDatabaseTimestamp(otpRecord.expires_at) <= Date.now()) {
-    throw createServiceError('OTP has expired');
-  }
-
-  if ((otpRecord.attempt_count || 0) >= MAX_VERIFY_ATTEMPTS) {
-    const retryAfterSeconds = Math.max(1, Math.ceil(
-      (parseDatabaseTimestamp(otpRecord.expires_at) - Date.now()) / 1000
-    ));
-    throw createServiceError('OTP attempt limit exceeded', 429, 'OTP_ATTEMPT_LIMIT', retryAfterSeconds);
-  }
-
-  if (otpRecord.otp_code !== normalizedOtp) {
-    await incrementAttemptCount(otpRecord);
-    throw createServiceError('Invalid OTP');
-  }
-
-  const currentUser = await getUserPhoneVerificationState(userId);
-  if (currentUser.phone_verified !== true) {
+  // The phone is verified atomically already; a separate cosmetic bonus failure
+  // must not make the verified OTP reusable or undo the verification result.
+  try {
     await trustScoreService.applyOneTimeBonus(
       userId,
       'PHONE_VERIFIED',
       10,
       'Phone number verified successfully'
     );
-  }
-
-  const verifiedAt = new Date().toISOString();
-  const { error: otpError } = await supabase
-    .from('phone_otps')
-    .update({ is_used: true })
-    .eq('id', otpRecord.id);
-
-  if (otpError) {
-    throw new Error(otpError.message);
-  }
-
-  const { error: userError } = await supabase
-    .from('users')
-    .update({
-      phone: normalizedPhone,
-      phone_verified: true,
-      phone_verified_at: verifiedAt
-    })
-    .eq('id', userId);
-
-  if (userError) {
-    throw new Error(userError.message);
-  }
+  } catch { console.error('Could not apply phone verification bonus'); }
 
   return {
     success: true,

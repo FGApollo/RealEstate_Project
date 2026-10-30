@@ -1,7 +1,9 @@
+const { safeErrorMessage } = require('../services/httpError');
 const propertyService = require('../services/propertyService');
 const reviewService = require('../services/reviewService');
 const geminiService = require('../services/geminiService');
 const { toPublicProperty } = require('../services/publicPropertyDto');
+const { propertyInput, positiveId } = require('../services/businessValidation');
 
 const isAgentOwner = (property, user) => String(user?.role || '').toUpperCase() === 'AGENT'
   && String(property?.owner_id) === String(user?.id);
@@ -51,7 +53,7 @@ const getProperties = async (req, res) => {
     )) });
   } catch (error) {
     console.error('Error fetching properties:', error);
-    res.status(500).json({ error: error.message || 'Internal server error' });
+    res.status(500).json({ error: safeErrorMessage(error, 'Internal server error') });
   }
 };
 
@@ -63,7 +65,7 @@ const createProperty = async (req, res) => {
     res.status(201).json({ success: true, property });
   } catch (error) {
     if (!error.statusCode || error.statusCode >= 500) console.error('Error creating property:', error);
-    res.status(error.statusCode || 500).json({ error: error.message || 'Internal server error' });
+    res.status(error.statusCode || 500).json({ error: safeErrorMessage(error, 'Internal server error') });
   }
 };
 
@@ -72,13 +74,14 @@ const getPropertyById = async (req, res) => {
     const { id } = req.params;
     const property = await propertyService.getPropertyById(id);
     if (!property || (!isAgentOwner(property, req.user)
-      && (property.is_hidden === true || property.status !== 'AVAILABLE'))) {
+      && (property.is_hidden === true || property.status !== 'AVAILABLE'
+        || Number(property.owner?.trust_score ?? 50) <= 30))) {
       return res.status(404).json({ error: 'Property not found' });
     }
     res.status(200).json({ property: isAgentOwner(property, req.user) ? property : toPublicProperty(property) });
   } catch (error) {
     console.error('Error fetching property by id:', error);
-    res.status(500).json({ error: error.message || 'Internal server error' });
+    res.status(error.statusCode || 500).json({ error: error.statusCode ? error.message : 'Internal server error' });
   }
 };
 
@@ -87,7 +90,7 @@ const getContactAgent = async (req, res) => {
     const agentId = await propertyService.getContactAgentId(req.params.id, req.user.id);
     return res.status(200).json({ agentId });
   } catch (error) {
-    return res.status(error.statusCode || 500).json({ error: error.message || 'Could not open this conversation.' });
+    return res.status(error.statusCode || 500).json({ error: safeErrorMessage(error, 'Could not open this conversation.') });
   }
 };
 
@@ -100,7 +103,7 @@ const updateProperty = async (req, res) => {
     res.status(200).json({ success: true, property });
   } catch (error) {
     if (!error.statusCode || error.statusCode >= 500) console.error('Error updating property:', error);
-    res.status(error.statusCode || 500).json({ error: error.message || 'Internal server error' });
+    res.status(error.statusCode || 500).json({ error: safeErrorMessage(error, 'Internal server error') });
   }
 };
 
@@ -111,19 +114,25 @@ const deleteProperty = async (req, res) => {
     res.status(200).json({ success: true });
   } catch (error) {
     if (!error.statusCode || error.statusCode >= 500) console.error('Error deleting property:', error);
-    res.status(error.statusCode || 500).json({ error: error.message || 'Internal server error' });
+    res.status(error.statusCode || 500).json({ error: safeErrorMessage(error, 'Internal server error') });
   }
 };
 
 const getPropertyReviews = async (req, res) => {
   try {
     const { id } = req.params;
+    const property = await propertyService.getPropertyById(id);
+    if (!property || (!isAgentOwner(property, req.user)
+      && (property.is_hidden === true || property.status !== 'AVAILABLE'
+        || Number(property.owner?.trust_score ?? 50) <= 30))) {
+      return res.status(404).json({ error: 'Property not found' });
+    }
     const currentUserId = req.user ? req.user.id : null;
     const reviews = await reviewService.getPropertyReviews(id, currentUserId);
     res.status(200).json({ reviews });
   } catch (error) {
     console.error('Error fetching property reviews:', error);
-    res.status(500).json({ error: error.message || 'Internal server error' });
+    res.status(500).json({ error: safeErrorMessage(error, 'Internal server error') });
   }
 };
 
@@ -140,7 +149,7 @@ const createPropertyReview = async (req, res) => {
     res.status(201).json({ success: true, review });
   } catch (error) {
     console.error('Error creating property review:', error);
-    res.status(error.statusCode || 500).json({ error: error.message || 'Internal server error' });
+    res.status(error.statusCode || 500).json({ error: safeErrorMessage(error, 'Internal server error') });
   }
 };
 
@@ -149,6 +158,8 @@ const checkBeforeSave = async (req, res) => {
     const imageError = validatePropertyImages(req.body);
     if (imageError) return res.status(413).json({ error: imageError });
     const { excludeId } = req.query;
+    propertyInput(req.body, { partial: true });
+    if (excludeId !== undefined) positiveId(excludeId, 'excludeId');
     const propertyData = { ...req.body, owner_id: req.user.id };
 
     // 1. Check similarity in DB
@@ -172,7 +183,7 @@ const checkBeforeSave = async (req, res) => {
     });
   } catch (error) {
     console.error('Error in checkBeforeSave:', error);
-    res.status(500).json({ error: error.message || 'Internal server error' });
+    res.status(500).json({ error: safeErrorMessage(error, 'Internal server error') });
   }
 };
 
@@ -183,7 +194,7 @@ const getSimilarProperties = async (req, res) => {
     res.status(200).json({ success: true, properties: similar.map(toPublicProperty) });
   } catch (error) {
     console.error('Error in getSimilarProperties:', error);
-    res.status(500).json({ error: error.message || 'Internal server error' });
+    res.status(500).json({ error: safeErrorMessage(error, 'Internal server error') });
   }
 };
 
@@ -201,7 +212,7 @@ const createReviewReply = async (req, res) => {
     res.status(201).json(reply);
   } catch (error) {
     console.error('Error replying to review:', error);
-    res.status(error.statusCode || 500).json({ error: error.message || 'Internal server error' });
+    res.status(error.statusCode || 500).json({ error: safeErrorMessage(error, 'Internal server error') });
   }
 };
 
@@ -213,7 +224,7 @@ const toggleReviewHelpful = async (req, res) => {
     res.status(200).json(result);
   } catch (error) {
     console.error('Error toggling review helpful vote:', error);
-    res.status(error.statusCode || 500).json({ error: error.message || 'Internal server error' });
+    res.status(error.statusCode || 500).json({ error: safeErrorMessage(error, 'Internal server error') });
   }
 };
 

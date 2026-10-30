@@ -5,8 +5,11 @@ import { GoogleOAuthProvider } from '@react-oauth/google'
 import './index.css'
 import App from './App.jsx'
 import { AuthProvider } from './auth/AuthContext.jsx'
+import { initializeAnalytics } from './analytics.js'
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "your-google-client-id-here.apps.googleusercontent.com";
+
+initializeAnalytics();
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

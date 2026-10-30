@@ -1,16 +1,18 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, useOutletContext } from 'react-router-dom';
+import { useState, useEffect, lazy, Suspense } from 'react';
+import { useNavigate, useOutletContext, useSearchParams } from 'react-router-dom';
 import {
   Home, Search, LayoutDashboard, Settings, LogOut, BarChart2, HelpCircle, MessageSquare, Shield,
-  User, Star, CreditCard, Scale, ShieldAlert
+  User, Star, CreditCard, Scale, ShieldAlert, Menu, X
 } from 'lucide-react';
 import OverviewDashboard from '../features/agent/overview/OverviewDashboard';
-import CreateListingWizard from '../features/agent/create-listing/CreateListingWizard';
-import EditListingWizard from '../features/agent/edit-listing/EditListingWizard';
-import AgentChat from '../features/agent/chat/AgentChat';
-import AgentProfile from '../features/agent/profile/AgentProfile';
-import AgentPricing from '../features/agent/pricing/AgentPricing';
-import AgentViolations from '../features/agent/violations/AgentViolations';
+const CreateListingWizard = lazy(() => import('../features/agent/create-listing/CreateListingWizard'));
+const EditListingWizard = lazy(() => import('../features/agent/edit-listing/EditListingWizard'));
+const AgentChat = lazy(() => import('../features/agent/chat/AgentChat'));
+const AgentProfile = lazy(() => import('../features/agent/profile/AgentProfile'));
+const AgentPricing = lazy(() => import('../features/agent/pricing/AgentPricing'));
+import { useMobileMenu } from '../hooks/useMobileMenu';
+import Avatar from '../components/Avatar';
+const AgentViolations = lazy(() => import('../features/agent/violations/AgentViolations'));
 import './AgentOverview.css';
 import { API_BASE_URL } from '../config';
 import { apiFetch } from '../auth/apiClient';
@@ -20,6 +22,7 @@ const AgentOverview = () => {
   const navigate = useNavigate();
   const { currentUser: authenticatedUser } = useOutletContext();
   const { logout } = useAuth();
+  const { open: menuOpen, setOpen: setMenuOpen, containerRef: menuRef, toggleRef: menuToggleRef, close: closeMenu } = useMobileMenu();
   const [currentUser, setCurrentUser] = useState(authenticatedUser);
 
   useEffect(() => {
@@ -47,7 +50,8 @@ const AgentOverview = () => {
   const [loading, setLoading] = useState(true);
 
   // Navigation tabs: 'overview', 'listings', 'create-listing', 'profile'
-  const [activeTab, setActiveTab] = useState('overview');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') === 'pricing' ? 'pricing' : 'overview');
 
   // Filter query state (passed down to sync topbar with the listing panel)
   const [searchQuery, setSearchQuery] = useState('');
@@ -74,7 +78,9 @@ const AgentOverview = () => {
   };
 
   const handleTabChange = (tabName) => {
+    closeMenu();
     setActiveTab(tabName);
+    setSearchParams(tabName === 'pricing' ? { tab: 'pricing' } : {}, { replace: true });
     setEditingPropertyId(null);
     if (tabName === 'analytics') {
       fetchFunnelStats();
@@ -94,15 +100,43 @@ const AgentOverview = () => {
       if (response.ok) {
         setData(prev => ({
           ...prev,
-          totalProperties: Math.max(0, prev.totalProperties - 1),
-          activeListings: (prev.activeListings || []).filter(listing => listing.id !== id)
+          activeListings: (prev.activeListings || []).map(listing => 
+            listing.id === id ? { ...listing, status: 'DELETED' } : listing
+          )
         }));
       } else {
-        alert('Xoá tin đăng thất bại.');
+        alert('Gỡ tin đăng thất bại.');
       }
     } catch (err) {
       console.error(err);
       alert('Lỗi kết nối server.');
+    }
+  };
+
+  const handleUpdateStatus = async (id, newStatus) => {
+    try {
+      const response = await apiFetch(`${API_BASE_URL}/api/properties/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      });
+      if (response.ok) {
+        setData(prev => ({
+          ...prev,
+          activeListings: (prev.activeListings || []).map(listing => 
+            listing.id === id ? { ...listing, status: newStatus } : listing
+          )
+        }));
+        return true;
+      } else {
+        const errData = await response.json().catch(() => ({}));
+        alert(errData.error || 'Cập nhật trạng thái thất bại.');
+        return false;
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Lỗi kết nối server.');
+      return false;
     }
   };
 
@@ -132,8 +166,8 @@ const AgentOverview = () => {
   }, [currentUser.id]);
 
   return (
-    <div className="agent-dashboard">
-      <aside className="sidebar">
+    <div className={`agent-dashboard ${activeTab === 'pricing' ? 'agent-billing-view' : ''} ${activeTab === 'chat' ? 'agent-chat-view' : ''}`}>
+      <aside ref={menuRef} className={`sidebar${menuOpen ? ' mobile-nav-open' : ''}`}>
         {/* Logo */}
         <div 
           className="sidebar-logo" 
@@ -143,6 +177,8 @@ const AgentOverview = () => {
           SWIPE NEST
         </div>
 
+        <button ref={menuToggleRef} className="dashboard-mobile-menu-toggle" aria-label={menuOpen ? 'Đóng menu môi giới' : 'Mở menu môi giới'} aria-expanded={menuOpen} aria-controls="agent-dashboard-navigation" onClick={() => setMenuOpen(value => !value)}>{menuOpen ? <X size={21} /> : <Menu size={21} />}<span>Menu</span></button>
+        <div id="agent-dashboard-navigation" className="dashboard-sidebar-navigation">
         {/* Nav section */}
         <div className="sidebar-section-label">Điều hướng</div>
         <nav className="sidebar-nav">
@@ -205,6 +241,7 @@ const AgentOverview = () => {
           <a href="#" className="nav-item"><HelpCircle size={16} /> Help Center</a>
           <a href="#" className="nav-item" onClick={handleLogout}><LogOut size={16} /> Log Out</a>
         </div>
+        </div>
       </aside>
 
       <main className="main-content">
@@ -232,17 +269,14 @@ const AgentOverview = () => {
                 onClick={() => handleTabChange('profile')}
                 title="Hồ sơ cá nhân"
               >
-                <img 
-                  src={currentUser.avatar || "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=80&h=80&fit=crop&q=80"} 
-                  alt={currentUser.name} 
-                  className="topbar-avatar-img"
-                />
+                <Avatar src={currentUser.avatar} name={currentUser.name} className="topbar-avatar-img" />
               </div>
             </div>
           </header>
         )}
 
         <div className="dashboard-content">
+          <Suspense fallback={<div className="page-loading" role="status"><span aria-hidden="true" />Đang mở mục này…</div>}>
           {/* LOW TRUST SCORE WARNING & SUSPENSION BANNER (<= 30) */}
           {Number(currentUser?.trust_score ?? 50) <= 30 && (
             <div className="agent-low-score-alert-banner">
@@ -286,6 +320,7 @@ const AgentOverview = () => {
               currentUser={currentUser}
               onEditProperty={handleEditProperty}
               onDeleteProperty={handleDeleteProperty}
+              onUpdateStatus={handleUpdateStatus}
             />
           )}
 
@@ -417,6 +452,7 @@ const AgentOverview = () => {
               currentUser={currentUser}
             />
           )}
+          </Suspense>
         </div>
       </main>
     </div>

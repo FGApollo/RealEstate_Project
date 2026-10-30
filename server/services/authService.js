@@ -3,9 +3,12 @@ const { supabase } = require('../config/supabase');
 const googleIdentityService = require('./googleIdentityService');
 const emailVerificationService = require('./emailVerificationService');
 const { resolvePublicRegistration } = require('./registrationPolicy');
+const { assertAccountCanAuthenticate, normalizeAccountRole } = require('./authAccountPolicy');
+const { withVerifiedPassword } = require('./credentialProof');
 const {
   createValidationError,
   normalizeEmail,
+  validateEmail,
   normalizeVietnamPhone,
   validateRegistration
 } = require('./registrationValidation');
@@ -14,9 +17,12 @@ const PUBLIC_USER_FIELDS = [
   'id', 'name', 'email', 'avatar', 'role', 'phone', 'phone_verified', 'email_verified_at',
   'verification_status', 'trust_score'
 ];
-const toPublicUser = (user) => Object.fromEntries(
-  PUBLIC_USER_FIELDS.filter((field) => user[field] !== undefined).map((field) => [field, user[field]])
-);
+const toPublicUser = (user) => ({
+  ...Object.fromEntries(
+    PUBLIC_USER_FIELDS.filter((field) => user[field] !== undefined).map((field) => [field, user[field]])
+  ),
+  role: normalizeAccountRole(user.role)
+});
 
 const serviceError = (message, statusCode, code) => {
   const error = new Error(message);
@@ -90,6 +96,10 @@ const registerUser = async ({
 };
 
 const loginUser = async ({ email, password }) => {
+  if (!validateEmail(email) || typeof password !== 'string' || !password
+    || Buffer.byteLength(password, 'utf8') > 72) {
+    throw serviceError('Invalid email or password', 401);
+  }
   const { data: user, error } = await supabase
     .from('users')
     .select('*')
@@ -105,6 +115,8 @@ const loginUser = async ({ email, password }) => {
     throw new Error('Invalid email or password');
   }
 
+  assertAccountCanAuthenticate(user);
+
   if (!user.email_verified_at) {
     throw serviceError(
       'Hãy xác minh email trước khi đăng nhập. Bạn có thể yêu cầu gửi lại liên kết xác minh.',
@@ -113,10 +125,11 @@ const loginUser = async ({ email, password }) => {
     );
   }
 
-  return toPublicUser(user);
+  return withVerifiedPassword(toPublicUser(user), user.password);
 };
 
 const markGoogleEmailVerified = async (user, googleEmail) => {
+  assertAccountCanAuthenticate(user);
   if (normalizeEmail(user.email) !== googleEmail || user.email_verified_at) {
     return toPublicUser(user);
   }
@@ -147,6 +160,7 @@ const googleLogin = async (credential, intent = 'LOGIN', phone = null, linkPassw
 
   const existingUser = await findUserByEmail(identity.email);
   if (existingUser) {
+    assertAccountCanAuthenticate(existingUser);
     const otherIdentity = await findGoogleIdentity('user_id', existingUser.id);
     if (otherIdentity && otherIdentity.subject !== identity.subject) {
       throw serviceError('Account is linked to a different Google identity', 409);
@@ -157,6 +171,9 @@ const googleLogin = async (credential, intent = 'LOGIN', phone = null, linkPassw
       }
       if (typeof linkPassword !== 'string' || !linkPassword) {
         throw serviceError('Confirm your existing account password to link Google', 409, 'PASSWORD_LINK_REQUIRED');
+      }
+      if (Buffer.byteLength(linkPassword, 'utf8') > 72) {
+        throw serviceError('Incorrect account password', 401);
       }
       const passwordMatches = await bcrypt.compare(linkPassword, existingUser.password);
       if (!passwordMatches) throw serviceError('Incorrect account password', 401);

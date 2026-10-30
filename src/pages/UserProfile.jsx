@@ -10,13 +10,13 @@ import { API_BASE_URL } from '../config';
 import { apiFetch } from '../auth/apiClient';
 import { useAuth } from '../auth/useAuth';
 import Header from '../components/Header';
+import Avatar from '../components/Avatar';
 import './UserProfile.css';
 
-const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=250&q=80';
 
 export default function UserProfile() {
   const navigate = useNavigate();
-  const { user: authUser, updateUser, logout } = useAuth();
+  const { user: authUser, updateUser, logout, expireSession } = useAuth();
   const fileInputRef = useRef(null);
 
   const [activeTab, setActiveTab] = useState('info'); // 'info' | 'security'
@@ -210,6 +210,12 @@ export default function UserProfile() {
         throw new Error(data.error || 'Đổi mật khẩu thất bại');
       }
 
+      if (data.requiresLogin) {
+        expireSession();
+        navigate('/login', { replace: true, state: { message: 'Đã đổi mật khẩu và đăng xuất các phiên cũ. Vui lòng đăng nhập lại.' } });
+        return;
+      }
+
       setPasswordMessage({ type: 'success', text: 'Đổi mật khẩu thành công! Hãy ghi nhớ mật khẩu mới của bạn.' });
       setCurrentPassword('');
       setNewPassword('');
@@ -244,7 +250,7 @@ export default function UserProfile() {
     }
   };
 
-  const currentAvatar = profile?.avatar || authUser?.avatar || DEFAULT_AVATAR;
+  const currentAvatar = profile?.avatar || authUser?.avatar;
   const trustScore = profile?.trust_score ?? authUser?.trust_score ?? 80;
   const roleName = profile?.role === 'AGENT' ? 'Môi giới' : profile?.role === 'ADMIN' ? 'Quản trị viên' : 'Người tìm nhà';
 
@@ -274,9 +280,9 @@ export default function UserProfile() {
             {/* Avatar with Camera Button */}
             <div className="uprofile-avatar-box">
               <div className="uprofile-avatar-circle">
-                <img
+                <Avatar
                   src={currentAvatar}
-                  alt={profile?.name || 'User Avatar'}
+                  name={profile?.name || authUser?.name}
                   className="uprofile-avatar-img"
                 />
                 {isUploadingAvatar && (

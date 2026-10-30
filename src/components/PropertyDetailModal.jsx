@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { 
   X, ChevronLeft, ChevronRight, Sparkles, MapPin, 
   Heart, Share2, Maximize, Bath, Calendar, Eye, Shield, 
-  ShieldCheck, MessageSquare, Bed, Star
+  ShieldCheck, MessageSquare, Bed, Star, Loader2, Building2, User
 } from 'lucide-react';
 import './PropertyDetailModal.css';
 import { API_BASE_URL } from '../config';
@@ -12,6 +12,7 @@ import { useAuth } from '../auth/useAuth';
 import { useRequireAuth } from '../auth/useRequireAuth';
 import { openPropertyChat } from '../auth/openPropertyChat';
 import PropertyLocationMap from './PropertyLocationMap';
+import ImageLoadingSkeleton from './ImageLoadingSkeleton';
 
 const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = false, isFavorite = false, onToggleFavorite, onSelectProperty }) => {
   const [activePropertyId, setActivePropertyId] = useState(prop?.id);
@@ -20,6 +21,9 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
   const requireAuth = useRequireAuth();
   const [fetchedProperty, setFetchedProperty] = useState(null);
   const property = fetchedProperty || prop;
+  const matchScore = property?.matchScore;
+  const hasMatchScore = (typeof matchScore === 'number' || (typeof matchScore === 'string' && matchScore.trim() !== ''))
+    && Number.isFinite(Number(matchScore)) && Number(matchScore) >= 0 && Number(matchScore) <= 100;
 
   const [activeSliderIdx, setActiveSliderIdx] = useState(0);
   const [similarProperties, setSimilarProperties] = useState([]);
@@ -44,12 +48,18 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
     ? { selectPropertyId: Number(propertyId) }
     : undefined;
 
+  const [isContacting, setIsContacting] = useState(false);
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+
   const handleContactAgent = async () => {
-    if (!property?.id) return;
+    if (!property?.id || isContacting) return;
     try {
+      setIsContacting(true);
       await openPropertyChat({ propertyId: property.id, requireAuth, navigate });
     } catch (error) {
       alert(error.message || 'Không thể mở cuộc trò chuyện lúc này.');
+    } finally {
+      setIsContacting(false);
     }
   };
 
@@ -199,7 +209,7 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
 
   const handleRatingSubmit = async (e) => {
     e.preventDefault();
-    if (!property) return;
+    if (isSubmittingReview || !property) return;
     const authorizedUser = await requireAuth({
       type: 'NAVIGATE',
       returnTo: propertyReturnTo(property.id),
@@ -211,6 +221,7 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
       return;
     }
 
+    setIsSubmittingReview(true);
     try {
       const response = await apiFetch(`${API_BASE_URL}/api/properties/${property.id}/reviews`, {
         method: 'POST',
@@ -258,6 +269,8 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
     } catch (err) {
       console.error(err);
       alert('Lỗi khi gửi đánh giá: ' + err.message);
+    } finally {
+      setIsSubmittingReview(false);
     }
   };
 
@@ -434,7 +447,13 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
           {/* 1. Top Media Slider */}
           <div className="detail-media-slider">
             <div className="main-image-container">
-              <img src={sliderImages[activeSliderIdx]} alt={property.title} className="slider-main-img" />
+              <ImageLoadingSkeleton 
+                src={sliderImages[activeSliderIdx]} 
+                alt={property.title} 
+                className="slider-main-img"
+                fallbackIcon={Building2}
+                style={{ width: '100%', height: '100%' }}
+              />
               
               {sliderImages.length > 1 && (
                 <>
@@ -462,7 +481,12 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
                     className={`thumb-wrapper ${idx === activeSliderIdx ? 'active' : ''}`}
                     onClick={() => setActiveSliderIdx(idx)}
                   >
-                    <img src={img} alt={`thumbnail-${idx}`} />
+                    <ImageLoadingSkeleton 
+                      src={img} 
+                      alt={`thumbnail-${idx}`} 
+                      fallbackIcon={Building2}
+                      style={{ width: '100%', height: '100%' }}
+                    />
                   </div>
                 ))}
               </div>
@@ -472,9 +496,9 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
           <div className="detail-content-wrapper">
             {/* 2. Rating & Match Score */}
             <div className="detail-meta-row">
-              <span className="match-score-tag">
-                <Sparkles size={12} /> {property.matchScore || 95}% MATCH SCORE
-              </span>
+              {hasMatchScore && <span className="match-score-tag">
+                <Sparkles size={12} /> {Math.round(Number(matchScore))}% MATCH SCORE
+              </span>}
               
               <div className="detail-rating">
                 <span className="rating-num">{localRating ? localRating.toFixed(1) : '0'}</span>
@@ -656,7 +680,13 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
               {ownerDetails ? (
                 <div className="poster-card">
                   <div className="poster-left">
-                    <img src={ownerDetails.avatar || 'https://i.pravatar.cc/150?img=67'} alt={ownerDetails.name} className="poster-avatar" />
+                    <ImageLoadingSkeleton 
+                      src={ownerDetails.avatar || 'https://i.pravatar.cc/150?img=67'} 
+                      alt={ownerDetails.name} 
+                      className="poster-avatar"
+                      fallbackIcon={User}
+                      style={{ width: '48px', height: '48px', borderRadius: '50%' }}
+                    />
                     <div className="poster-name-info">
                       <div className="name-row">
                         <h4>{ownerDetails.name}</h4>
@@ -693,8 +723,18 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
                         <button 
                           className="contact-btn message-btn"
                           onClick={handleContactAgent}
+                          disabled={isContacting}
+                          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', opacity: isContacting ? 0.75 : 1, cursor: isContacting ? 'not-allowed' : 'pointer' }}
                         >
-                          <MessageSquare size={16} /> {user ? 'Nhắn tin' : 'Đăng nhập để liên hệ'}
+                          {isContacting ? (
+                            <>
+                              <Loader2 size={16} className="animate-spin" /> Đang kết nối...
+                            </>
+                          ) : (
+                            <>
+                              <MessageSquare size={16} /> {user ? 'Nhắn tin' : 'Đăng nhập để liên hệ'}
+                            </>
+                          )}
                         </button>
                       </div>
                     )}
@@ -850,7 +890,26 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
                       
                       <div className="form-actions">
                         <button type="button" className="btn-cancel" onClick={() => setShowRatingForm(false)}>Hủy</button>
-                        <button type="submit" className="btn-submit">Gửi đánh giá</button>
+                        <button 
+                          type="submit" 
+                          className="btn-submit" 
+                          disabled={isSubmittingReview}
+                          style={{ 
+                            display: 'inline-flex', 
+                            alignItems: 'center', 
+                            gap: '6px', 
+                            opacity: isSubmittingReview ? 0.75 : 1, 
+                            cursor: isSubmittingReview ? 'not-allowed' : 'pointer' 
+                          }}
+                        >
+                          {isSubmittingReview ? (
+                            <>
+                              <Loader2 size={14} className="animate-spin" /> Đang gửi...
+                            </>
+                          ) : (
+                            'Gửi đánh giá'
+                          )}
+                        </button>
                       </div>
                     </form>
                   </div>

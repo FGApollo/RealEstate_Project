@@ -8,8 +8,7 @@ export const openPropertyChat = async ({ propertyId, requireAuth, navigate }) =>
 
   const response = await apiFetch(`${API_BASE_URL}/api/properties/${id}/contact-agent`);
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || 'Không thể mở cuộc trò chuyện lúc này.');
-
-  navigate(`/chat?propertyId=${encodeURIComponent(id)}`);
+  const agentQuery = data.agentId ? `&agentId=${encodeURIComponent(data.agentId)}` : '';
+  navigate(`/chat?propertyId=${encodeURIComponent(id)}${agentQuery}`);
   return true;
 };

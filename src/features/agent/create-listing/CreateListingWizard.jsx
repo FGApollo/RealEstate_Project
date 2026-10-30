@@ -43,7 +43,7 @@ const CreateListingWizard = ({ setActiveTab, setData, currentUser }) => {
     toggleSelectImage, setFeaturedImage, deleteSelectedImages,
     toggleAmenity, toggleLifestyleTag, toggleChannel,
     handleSubmitListing, resetForm,
-    warnings, showWarningsModal, setShowWarningsModal, isCheckingSave, executeSaveListing
+    warnings, showWarningsModal, setShowWarningsModal, isCheckingSave, isSaving, executeSaveListing
   } = useListingForm({
     mode: 'create',
     currentUser,
@@ -79,6 +79,37 @@ const CreateListingWizard = ({ setActiveTab, setData, currentUser }) => {
             </button>
             <button className="btn-blocked-action outline" onClick={() => setActiveTab('listings')}>
               <ArrowLeft size={16} /> Quay lại danh sách bất động sản
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Guard: If KYC verification status is not VERIFIED, block listing creation (F28)
+  if (currentUser?.verification_status !== 'VERIFIED') {
+    return (
+      <div className="create-flow-container">
+        <div className="agent-low-score-blocked-card" style={{ borderColor: '#f59e0b' }}>
+          <div className="blocked-icon-circle" style={{ backgroundColor: '#fef3c7', color: '#d97706' }}>
+            <ShieldAlert size={44} color="#d97706" />
+          </div>
+          <h2>Yêu cầu xác thực danh tính (KYC)</h2>
+          <p className="blocked-desc">
+            Để đảm bảo an toàn giao dịch và tính minh bạch cho khách tìm nhà, chỉ tài khoản môi giới <strong>đã hoàn tất xác thực danh tính (KYC)</strong> mới được phép tạo tin đăng bất động sản mới.
+          </p>
+          <div className="blocked-notice-box" style={{ backgroundColor: '#fffbeb', borderColor: '#fde68a' }}>
+            <h4 style={{ color: '#92400e' }}>Trạng thái tài khoản: {currentUser?.verification_status === 'PENDING' ? 'Hồ sơ đang chờ Admin phê duyệt' : 'Chưa gửi hồ sơ xác thực'}</h4>
+            <p style={{ margin: '8px 0 0', fontSize: '14px', color: '#78350f' }}>
+              Vui lòng hoàn tất chụp CCCD và ảnh chân dung tại trang Hồ sơ Môi giới để kích hoạt quyền đăng tin.
+            </p>
+          </div>
+          <div className="blocked-actions">
+            <button className="btn-blocked-action primary" style={{ backgroundColor: '#d97706' }} onClick={() => setActiveTab('profile')}>
+              <Shield size={16} /> Đến trang Xác thực KYC ngay
+            </button>
+            <button className="btn-blocked-action outline" onClick={() => setActiveTab('listings')}>
+              <ArrowLeft size={16} /> Quay lại danh sách tin đăng
             </button>
           </div>
         </div>
@@ -128,27 +159,6 @@ const CreateListingWizard = ({ setActiveTab, setData, currentUser }) => {
         </div>
       )}
 
-      {/* Unverified banner */}
-      {currentStep < 4 && currentUser.verification_status !== 'VERIFIED' && (
-        <div className="unverified-warning-alert">
-          <div className="alert-left">
-            <ShieldCheck size={20} color="#b45309" />
-            <span>Tài khoản của bạn chưa được xác minh. Tin vẫn có thể đăng, nhưng sẽ chưa có badge Verified Seller.</span>
-          </div>
-          <button 
-            type="button"
-            className="alert-verify-btn" 
-            onClick={(e) => {
-              e.preventDefault();
-              if (typeof setActiveTab === 'function') {
-                setActiveTab('profile');
-              }
-            }}
-          >
-            Xác minh ngay
-          </button>
-        </div>
-      )}
 
       {/* STEP 1: INFO FORM */}
       {currentStep === 1 && (
@@ -186,13 +196,6 @@ const CreateListingWizard = ({ setActiveTab, setData, currentUser }) => {
                     {propertyTypesList.map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </div>
-              </div>
-              <div className="input-group">
-                <label>Trạng thái tin</label>
-                <select value={listing.status} onChange={(e) => setListing(prev => ({ ...prev, status: e.target.value }))}>
-                  <option value="AVAILABLE">Đang bán / Cho thuê</option>
-                  <option value="PENDING">Chờ duyệt</option>
-                </select>
               </div>
             </div>
 
@@ -511,8 +514,8 @@ const CreateListingWizard = ({ setActiveTab, setData, currentUser }) => {
               <span>Tiếp theo</span><ArrowRight size={16} />
             </button>
           ) : (
-            <button type="button" className="nav-primary-btn submit-action" onClick={handleSubmitListing} disabled={isCheckingSave}>
-              <span>{isCheckingSave ? 'Đang kiểm tra...' : 'Hoàn tất & Đăng tin'}</span>
+            <button type="button" className="nav-primary-btn submit-action" onClick={handleSubmitListing} disabled={isCheckingSave || isSaving}>
+              <span>{isCheckingSave ? 'Đang kiểm tra...' : isSaving ? 'Đang lưu tin...' : 'Hoàn tất & Đăng tin'}</span>
               <CheckCircle2 size={16} />
             </button>
           )}
@@ -532,23 +535,44 @@ const CreateListingWizard = ({ setActiveTab, setData, currentUser }) => {
                 </div>
               ))}
             </div>
-            <div className="filter-actions" style={{ display: 'flex', gap: '15px', justifyContent: 'flex-end' }}>
-              <button 
-                type="button" 
-                className="btn-secondary" 
-                onClick={() => setShowWarningsModal(false)}
-                style={{ padding: '10px 20px', borderRadius: '8px', border: '1px solid #d1d5db', cursor: 'pointer', backgroundColor: 'transparent', fontWeight: '600', color: '#4b5563' }}
-              >
-                Chỉnh sửa thêm
-              </button>
-              <button 
-                type="button" 
-                className="btn-primary" 
-                onClick={executeSaveListing}
-                style={{ padding: '10px 20px', borderRadius: '8px', backgroundColor: '#ea580c', color: 'white', border: 'none', cursor: 'pointer', fontWeight: '600' }}
-              >
-                Vẫn đăng tin
-              </button>
+            <div className="filter-actions" style={{ display: 'flex', gap: '15px', justifyContent: 'flex-end', alignItems: 'center' }}>
+              {warnings.some(w => w.isBlocking) ? (
+                <>
+                  <p style={{ color: '#b91c1c', fontSize: '13px', fontWeight: '600', margin: '0 auto 0 0' }}>
+                    Bắt buộc chỉnh sửa các vi phạm trên để tiếp tục đăng tin.
+                  </p>
+                  <button 
+                    type="button" 
+                    className="btn-secondary" 
+                    onClick={() => setShowWarningsModal(false)}
+                    disabled={isSaving}
+                    style={{ padding: '10px 20px', borderRadius: '8px', border: '1px solid #d1d5db', cursor: isSaving ? 'not-allowed' : 'pointer', backgroundColor: '#f1f5f9', fontWeight: '600', color: '#1e293b' }}
+                  >
+                    Quay lại chỉnh sửa
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button 
+                    type="button" 
+                    className="btn-secondary" 
+                    onClick={() => setShowWarningsModal(false)}
+                    disabled={isSaving}
+                    style={{ padding: '10px 20px', borderRadius: '8px', border: '1px solid #d1d5db', cursor: isSaving ? 'not-allowed' : 'pointer', backgroundColor: 'transparent', fontWeight: '600', color: '#4b5563' }}
+                  >
+                    Chỉnh sửa thêm
+                  </button>
+                  <button 
+                    type="button" 
+                    className="btn-primary" 
+                    onClick={executeSaveListing}
+                    disabled={isSaving}
+                    style={{ padding: '10px 20px', borderRadius: '8px', backgroundColor: isSaving ? '#9a3412' : '#ea580c', color: 'white', border: 'none', cursor: isSaving ? 'not-allowed' : 'pointer', fontWeight: '600', opacity: isSaving ? 0.75 : 1 }}
+                  >
+                    {isSaving ? 'Đang lưu...' : 'Tôi đã hiểu, tiếp tục lưu'}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>

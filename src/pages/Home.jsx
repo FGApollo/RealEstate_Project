@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Mascot } from 'page-mascot';
 import SwipeNestMark from '../components/SwipeNestMark';
@@ -97,6 +97,7 @@ const Home = () => {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [dbFavorites, setDbFavorites] = useState([]);
+  const pendingFavoritesRef = useRef(new Set());
 
   const categories = useMemo(() => {
     const counts = {};
@@ -502,30 +503,39 @@ const Home = () => {
 
   const toggleFavorite = async (property) => {
     const propertyId = Number(property.id);
-    const returnTo = location.pathname === '/'
-      ? `/?propertyId=${encodeURIComponent(propertyId)}`
-      : `${location.pathname}${location.search}`;
-    const routeState = location.pathname.startsWith('/swipe/') ? { selectPropertyId: propertyId } : undefined;
-    const authorizedUser = await requireAuth({
-      type: 'FAVORITE_PROPERTY', propertyId, returnTo, routeState
-    });
-    if (!authorizedUser) return;
-    const isFavorite = dbFavorites.some(fav => fav.id === property.id);
+    if (!propertyId || pendingFavoritesRef.current.has(propertyId)) return;
+    pendingFavoritesRef.current.add(propertyId);
 
-    if (isFavorite) {
-      setDbFavorites(prev => prev.filter(fav => fav.id !== property.id));
-      apiFetch(`${API_BASE_URL}/api/favorites/delete`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ propertyId: property.id })
-      }).catch(err => console.error(err));
-    } else {
-      setDbFavorites(prev => [...prev, property]);
-      apiFetch(`${API_BASE_URL}/api/favorites`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ propertyId: property.id })
-      }).catch(err => console.error(err));
+    try {
+      const returnTo = location.pathname === '/'
+        ? `/?propertyId=${encodeURIComponent(propertyId)}`
+        : `${location.pathname}${location.search}`;
+      const routeState = location.pathname.startsWith('/swipe/') ? { selectPropertyId: propertyId } : undefined;
+      const authorizedUser = await requireAuth({
+        type: 'FAVORITE_PROPERTY', propertyId, returnTo, routeState
+      });
+      if (!authorizedUser) return;
+      const isFavorite = dbFavorites.some(fav => fav.id === property.id);
+
+      if (isFavorite) {
+        setDbFavorites(prev => prev.filter(fav => fav.id !== property.id));
+        await apiFetch(`${API_BASE_URL}/api/favorites/delete`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ propertyId: property.id })
+        });
+      } else {
+        setDbFavorites(prev => [...prev, property]);
+        await apiFetch(`${API_BASE_URL}/api/favorites`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ propertyId: property.id })
+        });
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      pendingFavoritesRef.current.delete(propertyId);
     }
   };
 

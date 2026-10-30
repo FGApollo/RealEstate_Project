@@ -8,10 +8,31 @@ const axios = require('axios');
  * @returns {Promise<{is_multi_listing: boolean, reason: string}>}
  */
 const checkDescriptionIsMultiListing = async (description) => {
+  const normalizedDesc = (description || '').toLowerCase();
+  
+  // Heuristic patterns for multi-listing / portfolio spam
+  const multiListingPatterns = [
+    /giỏ hàng/i,
+    /bảng giá (các|tổng hợp)/i,
+    /danh sách (các căn|phòng trống|căn hộ)/i,
+    /(căn|phòng)\s*(1pn|1 phòng ngủ|studio).*(căn|phòng)\s*(2pn|2 phòng ngủ)/is,
+    /căn\s*a\d+.*căn\s*b\d+/is,
+    /tổng hợp (các căn|danh sách)/i,
+    /giá từ\s*\d+.*đến\s*\d+.*(tùy căn|tùy diện tích)/i
+  ];
+
+  const matchedPattern = multiListingPatterns.find(p => p.test(normalizedDesc));
+  if (matchedPattern) {
+    return {
+      is_multi_listing: true,
+      reason: 'Phát hiện cấu trúc giỏ hàng / nhiều căn hộ trong cùng một bài đăng'
+    };
+  }
+
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    console.warn('GEMINI_API_KEY is not configured in .env. Skipping Gemini check.');
-    return { is_multi_listing: false, reason: 'Gemini API Key missing' };
+    console.warn('GEMINI_API_KEY is not configured in .env. Falling back to heuristic scan.');
+    return { is_multi_listing: false, reason: 'Gemini API Key missing (passed heuristics)' };
   }
 
   if (!description || description.trim().length < 10) {

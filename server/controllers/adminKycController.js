@@ -13,6 +13,7 @@ const ERROR_STATUS_CODES = {
 };
 
 const getStatusCode = (error) => ERROR_STATUS_CODES[error.message] || 500;
+const getSafeError = (error) => ERROR_STATUS_CODES[error.message] ? error.message : 'Internal server error';
 
 const getRejectedVerifications = async (req, res) => {
   try {
@@ -23,7 +24,7 @@ const getRejectedVerifications = async (req, res) => {
       verifications
     });
   } catch (error) {
-    res.status(getStatusCode(error)).json({ error: error.message || 'Internal server error' });
+    res.status(getStatusCode(error)).json({ error: getSafeError(error) });
   }
 };
 
@@ -39,7 +40,7 @@ const getVerificationDetail = async (req, res) => {
       verification
     });
   } catch (error) {
-    res.status(getStatusCode(error)).json({ error: error.message || 'Internal server error' });
+    res.status(getStatusCode(error)).json({ error: getSafeError(error) });
   }
 };
 
@@ -55,7 +56,7 @@ const approveVerification = async (req, res) => {
       ...result
     });
   } catch (error) {
-    res.status(getStatusCode(error)).json({ error: error.message || 'Internal server error' });
+    res.status(getStatusCode(error)).json({ error: getSafeError(error) });
   }
 };
 
@@ -72,7 +73,7 @@ const rejectVerification = async (req, res) => {
       ...result
     });
   } catch (error) {
-    res.status(getStatusCode(error)).json({ error: error.message || 'Internal server error' });
+    res.status(getStatusCode(error)).json({ error: getSafeError(error) });
   }
 };
 
