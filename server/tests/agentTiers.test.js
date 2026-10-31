@@ -32,6 +32,7 @@ test('three real DB plans have exact prices, quotas, priority and support; rerun
     [['LITE',349000,10,100,'LITE'],['PLUS',499000,20,200,'PLUS'],['PRO',999000,50,300,'PRO']]);
   await db.exec("UPDATE agent_billing_plans SET amount_vnd=359000 WHERE code='LITE'");
   await db.exec(fs.readFileSync(path.join(__dirname,'../db-migration/018-agent-lite-plus-pro.sql'),'utf8'));
+  await db.exec(fs.readFileSync(path.join(__dirname,'../db-migration/019-restore-unsubscribed-listing-visibility.sql'),'utf8'));
   assert.equal((await rpc('agent_service_catalog')).plans[0].amount_vnd,359000);
   await assert.rejects(reserve('PAID'),/Plan unavailable/);
   await assert.rejects(rpc('start_agent_free_trial',[9]),/retired/);
@@ -120,7 +121,8 @@ test('priority ordering is applied after type/location constraints and before LI
   await db.exec('UPDATE properties SET priority_score=-50 WHERE owner_id=11');
   assert.equal((await db.query('SELECT max(display_priority) score FROM ranked_properties WHERE owner_id=11')).rows[0].score,250);
   await db.exec("UPDATE seller_subscriptions SET end_date=(now()-interval '1 second') AT TIME ZONE 'UTC' WHERE user_id=11");
-  assert.equal((await db.query('SELECT count(*) n FROM ranked_properties WHERE owner_id=11')).rows[0].n,0);
+  assert.equal((await db.query('SELECT count(*) n FROM ranked_properties WHERE owner_id=11')).rows[0].n,3);
+  assert.equal((await db.query('SELECT max(display_priority) score FROM ranked_properties WHERE owner_id=11')).rows[0].score,-50);
   await db.exec('UPDATE users SET is_active=false WHERE id=10');
   assert.equal((await db.query('SELECT count(*) n FROM ranked_properties WHERE owner_id=10')).rows[0].n,0);
 });

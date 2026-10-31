@@ -12,8 +12,10 @@ dùng kênh hỗ trợ hiện có; chưa có SLA hay thời gian phản hồi ri
 
 ## Triển khai
 
-1. Chạy toàn bộ `db-migration/018-agent-lite-plus-pro.sql` trong Supabase SQL
-   Editor sau các migration đến 017. File chạy trong một transaction; nếu có lỗi,
+1. Chạy `db-migration/018-agent-lite-plus-pro.sql`, rồi
+   `db-migration/019-restore-unsubscribed-listing-visibility.sql` trong Supabase SQL
+   Editor sau các migration đến 017. Nếu 018 đã chạy, chỉ chạy 019; không chạy
+   lại 018 sau 019 vì view cũ sẽ ghi đè bản sửa hiển thị. Các file chạy trong transaction; nếu có lỗi,
    transaction phải rollback, không chạy tiếp riêng các đoạn bên dưới.
 2. Deploy backend và frontend cùng bản code này. Không deploy code mới khi DB
    chưa có 018: bảng giá, quyền đăng tin và tìm kiếm cần các chức năng SQL mới.
@@ -53,8 +55,10 @@ không còn bán mới. File SQL cần quyền quản trị; backend không tự
   tin còn lại được giữ để Agent quản lý, không xóa. Agent cần ẩn/kết thúc bớt tin
   trước khi công khai thêm. Giao diện phân biệt số tin bật công khai và số tin
   thực sự được hiển thị.
-- Khi hết gói, tin vẫn được giữ trong danh mục nhưng không hiển thị công khai.
-  Tài khoản vô hiệu hóa, chưa KYC hoặc uy tín <=30 cũng bị loại khỏi kết quả.
+- Khi chưa có gói hoặc hết gói, tin đã công khai và đủ điều kiện vẫn hiển thị,
+  với 0 điểm cộng từ gói. Điểm phạt của tin vẫn được giữ. Gói hết hạn không tự
+  ẩn tin cũ; đăng thêm/công khai thêm tin vẫn cần gói còn hạn và chỗ trống.
+  Tài khoản vô hiệu hóa, chưa KYC hoặc uy tín <=30 vẫn bị loại khỏi kết quả.
 - Truy vấn áp dụng loại bất động sản, khu vực, giá, diện tích, số phòng và tiện
   ích **trước** xếp hạng và LIMIT. Chuẩn hóa tiền tố phường/quận/thành phố để dữ
   liệu như “Linh Trung” và “Phường Linh Trung” không bị bỏ sót.
