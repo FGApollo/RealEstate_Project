@@ -13,7 +13,9 @@ async function createTierDatabase({ migrate = true } = {}) {
   CREATE TABLE property_features(property_id integer REFERENCES properties(id) ON DELETE CASCADE,feature_name text);
   CREATE TABLE property_images(property_id integer REFERENCES properties(id) ON DELETE CASCADE,image_url text);
   CREATE TABLE lifestyle_tags(property_id integer REFERENCES properties(id) ON DELETE CASCADE,tag_name text);`);
-  if (migrate) await db.exec(fs.readFileSync(path.join(__dirname,'../../db-migration/018-agent-lite-plus-pro.sql'),'utf8'));
+  if (migrate) for (const file of ['018-agent-lite-plus-pro.sql','019-restore-unsubscribed-listing-visibility.sql']) {
+    await db.exec(fs.readFileSync(path.join(__dirname,'../../db-migration',file),'utf8'));
+  }
   return db;
 }
 module.exports = { createTierDatabase };

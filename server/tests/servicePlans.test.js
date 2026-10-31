@@ -33,6 +33,7 @@ after(async () => db?.close());
 test('catalog uses DB prices and metadata; migration is repeatable and preserves configured prices', async () => {
   await sqlChange(change());
   await db.exec(fs.readFileSync(path.join(__dirname, '../db-migration/018-agent-lite-plus-pro.sql'), 'utf8'));
+  await db.exec(fs.readFileSync(path.join(__dirname, '../db-migration/019-restore-unsubscribed-listing-visibility.sql'), 'utf8'));
   const data = await rpc('admin_agent_plan_catalog', [2]);
   assert.equal(data.plans.length, 3);
   const paid = data.plans.find(plan => plan.code === 'PRO');
