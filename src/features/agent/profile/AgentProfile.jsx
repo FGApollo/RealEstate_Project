@@ -4,7 +4,7 @@ import {
   Mail, Phone, Plus, SlidersHorizontal, X, Edit3, Trash2,
   ExternalLink, MessageSquare, Star, Award, Compass, Heart,
   FileText, Lock, TrendingUp, RefreshCw, ThumbsUp, CheckCircle, Upload, AlertCircle,
-  Check, ArrowRight, Grid, Info, Sun, Smile, Camera, ArrowLeft, CheckCircle2
+  Check, ArrowRight, Grid, Info, Sun, Smile, Camera, ArrowLeft, CheckCircle2, Loader2
 } from 'lucide-react';
 import { API_BASE_URL } from '../../../config';
 import { apiFetch } from '../../../auth/apiClient';
@@ -44,6 +44,70 @@ const AgentProfile = ({
   useEffect(() => {
     setSelectedProfileTab(initialTab);
   }, [initialTab]);
+
+  // Avatar upload states
+  const avatarFileInputRef = useRef(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [avatarSuccess, setAvatarSuccess] = useState('');
+  const [avatarError, setAvatarError] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState(currentUser?.avatar || '');
+
+  useEffect(() => {
+    if (currentUser?.avatar) {
+      setAvatarUrl(currentUser.avatar);
+    }
+  }, [currentUser?.avatar]);
+
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setAvatarError('');
+    setAvatarSuccess('');
+
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      setAvatarError('Chỉ hỗ trợ file ảnh JPG, PNG hoặc WEBP');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setAvatarError('Kích thước ảnh đại diện tối đa 5MB');
+      return;
+    }
+
+    try {
+      setIsUploadingAvatar(true);
+      const formData = new FormData();
+      formData.append('avatar', file);
+
+      const res = await apiFetch(`${API_BASE_URL}/api/users/avatar`, {
+        method: 'POST',
+        body: formData
+      });
+
+      const resData = await res.json();
+      if (!res.ok) {
+        throw new Error(resData.error || 'Tải ảnh đại diện thất bại');
+      }
+
+      setAvatarUrl(resData.avatar);
+      const updates = { avatar: resData.avatar };
+      if (resData.profileBonus?.trustScore) {
+        updates.trust_score = resData.profileBonus.trustScore;
+      }
+      updateUser(updates);
+      setAvatarSuccess('Cập nhật ảnh đại diện thành công!');
+
+      if (avatarFileInputRef.current) avatarFileInputRef.current.value = '';
+      setTimeout(() => setAvatarSuccess(''), 4000);
+    } catch (err) {
+      setAvatarError(err.message || 'Lỗi khi tải ảnh đại diện lên');
+      setTimeout(() => setAvatarError(''), 5000);
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
 
   // Ward Filtering states (same as buyer page)
   const [selectedWards, setSelectedWards] = useState([]);
@@ -817,12 +881,37 @@ const AgentProfile = ({
         <div className="agent-profile-header-card">
           <div className="avatar-section">
             <div className="profile-avatar-container">
-              <Avatar src={currentUser.avatar} name={currentUser.name} className="profile-avatar-img" />
+              <Avatar src={avatarUrl || currentUser.avatar} name={currentUser.name} className="profile-avatar-img" />
               {currentUser.verification_status === 'VERIFIED' && (
-                <div className="avatar-verified-badge" title="Verified Broker">
-                  <ShieldCheck size={20} fill="#10b981" color="#ffffff" strokeWidth={2.5} />
+                <div className="avatar-verified-badge" title="Đã xác thực nhà môi giới">
+                  <ShieldCheck size={18} fill="#10b981" color="#ffffff" strokeWidth={2.5} />
                 </div>
               )}
+
+              {isUploadingAvatar && (
+                <div className="profile-avatar-loading" title="Đang tải ảnh...">
+                  <Loader2 size={24} className="agent-avatar-spinner" />
+                </div>
+              )}
+
+              <button
+                type="button"
+                className="avatar-change-btn"
+                onClick={() => avatarFileInputRef.current?.click()}
+                disabled={isUploadingAvatar}
+                title="Thay đổi ảnh đại diện"
+                aria-label="Thay đổi ảnh đại diện"
+              >
+                <Camera size={16} />
+              </button>
+
+              <input
+                ref={avatarFileInputRef}
+                type="file"
+                accept="image/png, image/jpeg, image/webp"
+                className="agent-avatar-file-input"
+                onChange={handleAvatarChange}
+              />
             </div>
 
             <div className="agent-text-details">
@@ -830,6 +919,19 @@ const AgentProfile = ({
                 <h2 className="agent-profile-name">{currentUser.name || 'Zân Cao'}</h2>
                 <span className="role-chip">Saler</span>
               </div>
+
+              {avatarSuccess && (
+                <div className="agent-avatar-toast success">
+                  <Check size={14} />
+                  <span>{avatarSuccess}</span>
+                </div>
+              )}
+              {avatarError && (
+                <div className="agent-avatar-toast error">
+                  <AlertCircle size={14} />
+                  <span>{avatarError}</span>
+                </div>
+              )}
 
               <div className="location-row">
                 <MapPin size={16} color="#64748b" />

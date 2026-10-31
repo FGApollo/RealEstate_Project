@@ -51,7 +51,7 @@
 
 .avatar-verified-badge {
   position: absolute;
-  bottom: 0px;
+  top: 0px;
   right: 0px;
   background-color: #ffffff;
   border-radius: 50%;
@@ -60,6 +60,99 @@
   align-items: center;
   justify-content: center;
   box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+  z-index: 3;
+}
+
+.avatar-change-btn {
+  position: absolute;
+  bottom: 0px;
+  right: 0px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+  color: #ffffff;
+  border: 3px solid #ffffff;
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 4;
+}
+
+.avatar-change-btn:hover {
+  background: linear-gradient(135deg, #4338ca 0%, #4f46e5 100%);
+  transform: scale(1.08);
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.45);
+}
+
+.avatar-change-btn:active {
+  transform: scale(0.95);
+}
+
+.avatar-change-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.profile-avatar-loading {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background-color: rgba(15, 23, 42, 0.65);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  z-index: 5;
+  backdrop-filter: blur(2px);
+}
+
+.agent-avatar-spinner {
+  animation: agent-avatar-spin 1s linear infinite;
+  color: #ffffff;
+}
+
+@keyframes agent-avatar-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.agent-avatar-file-input {
+  display: none;
+}
+
+.agent-avatar-toast {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  margin-top: 4px;
+  animation: fadeIn 0.3s ease;
+  width: fit-content;
+}
+
+.agent-avatar-toast.success {
+  background-color: #ecfdf5;
+  color: #059669;
+  border: 1px solid #a7f3d0;
+}
+
+.agent-avatar-toast.error {
+  background-color: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
 }
 
 .agent-text-details {
