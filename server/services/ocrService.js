@@ -148,7 +148,7 @@ const getImageQualityResult = async (imageBuffer, label) => {
 
   if (longSide < MIN_WIDTH || shortSide < MIN_HEIGHT) {
     return {
-      hardError: `${label} co do phan giai qua thap, vui long chup ro hon`,
+      hardError: `${label} có độ phân giải quá thấp, vui lòng chụp rõ hơn`,
       warnings,
       stats
     };
@@ -157,26 +157,26 @@ const getImageQualityResult = async (imageBuffer, label) => {
   // Chặn ngay các ảnh đen thui / bị che camera / không nhìn thấy thẻ
   if (stats.darkPixelRatio > 0.75 || stats.contrast < 10) {
     return {
-      hardError: `${label} qua toi hoac khong nhin thay the CCCD. Vui long chup lai noi du anh sang`,
+      hardError: `${label} quá tối hoặc không nhìn thấy thẻ CCCD. Vui lòng chụp lại nơi đủ ánh sáng`,
       warnings,
       stats
     };
   }
 
   if (stats.brightPixelRatio > QUALITY_LIMITS.maxBrightPixelRatio && stats.darkPixelRatio < QUALITY_LIMITS.minDarkPixelRatio) {
-    warnings.push(`${label} hoi bi loa sang nhung van se thu doc OCR`);
+    warnings.push(`${label} hơi bị lóa sáng nhưng vẫn sẽ thử đọc OCR`);
   }
 
   if (stats.contrast < QUALITY_LIMITS.minContrast) {
-    warnings.push(`${label} hoi mo hoac thieu tuong phan nhung van se thu doc OCR`);
+    warnings.push(`${label} hơi mờ hoặc thiếu tương phản nhưng vẫn sẽ thử đọc OCR`);
   }
 
   if (stats.sharpness < QUALITY_LIMITS.minSharpness) {
-    warnings.push(`${label} hoi mo nhung van se thu doc OCR`);
+    warnings.push(`${label} hơi mờ nhưng vẫn sẽ thử đọc OCR`);
   }
 
   if (stats.tiltRatio > QUALITY_LIMITS.maxTiltRatio) {
-    warnings.push(`${label} hoi nghieng nhung van se thu doc OCR`);
+    warnings.push(`${label} hơi nghiêng nhưng vẫn sẽ thử đọc OCR`);
   }
 
   return {
@@ -576,7 +576,7 @@ const analyzeCitizenId = async (frontImageBuffer, backImageBuffer) => {
   if (!frontImageBuffer || !backImageBuffer) {
     return {
       isValid: false,
-      errorMessage: 'Vui long tai du anh mat truoc va mat sau CCCD',
+      errorMessage: 'Vui lòng tải đủ ảnh mặt trước và mặt sau CCCD',
       data: {},
       warnings: [],
       debug: {
@@ -616,7 +616,7 @@ const analyzeCitizenId = async (frontImageBuffer, backImageBuffer) => {
   if (forcedResult === false) {
     return {
       isValid: false,
-      errorMessage: 'Khong doc du thong tin CCCD (Demo fail)',
+      errorMessage: 'Không đọc đủ thông tin CCCD (demo)',
       data: {},
       warnings: [],
       debug: { validFieldCount: 0, missingFields: getRequiredFields(), warnings: [] }
@@ -630,8 +630,8 @@ const analyzeCitizenId = async (frontImageBuffer, backImageBuffer) => {
     ]);
 
     const [frontQuality, backQuality] = await Promise.all([
-      getImageQualityResult(frontBuffer, 'Anh mat truoc CCCD'),
-      getImageQualityResult(backBuffer, 'Anh mat sau CCCD')
+      getImageQualityResult(frontBuffer, 'Ảnh mặt trước CCCD'),
+      getImageQualityResult(backBuffer, 'Ảnh mặt sau CCCD')
     ]);
     const warnings = [...frontQuality.warnings, ...backQuality.warnings];
 
@@ -659,18 +659,18 @@ const analyzeCitizenId = async (frontImageBuffer, backImageBuffer) => {
     const backText = backOcr.text;
 
     if (frontOcr.degrees !== 0) {
-      warnings.push(`Anh mat truoc CCCD bi xoay ${frontOcr.degrees} do, he thong da tu xoay de doc OCR`);
+      warnings.push(`Ảnh mặt trước CCCD bị xoay ${frontOcr.degrees} độ, hệ thống đã tự xoay để đọc OCR`);
     }
 
     if (backOcr.degrees !== 0) {
-      warnings.push(`Anh mat sau CCCD bi xoay ${backOcr.degrees} do, he thong da tu xoay de doc OCR`);
+      warnings.push(`Ảnh mặt sau CCCD bị xoay ${backOcr.degrees} độ, hệ thống đã tự xoay để đọc OCR`);
     }
 
     const combinedText = normalizeText(`${frontText} ${backText}`);
     if (!combinedText) {
       return {
         isValid: false,
-        errorMessage: 'Khong the doc thong tin tu anh CCCD, vui long chup ro hon',
+        errorMessage: 'Không thể đọc thông tin từ ảnh CCCD, vui lòng chụp rõ hơn',
         data: {},
         warnings,
         debug: {
@@ -695,7 +695,7 @@ const analyzeCitizenId = async (frontImageBuffer, backImageBuffer) => {
     if (backSideEvidence.count < 1) {
       return {
         isValid: false,
-        errorMessage: 'Khong doc du thong tin mat sau CCCD, vui long chup lai ro hon',
+        errorMessage: 'Không đọc đủ thông tin mặt sau CCCD, vui lòng chụp lại rõ hơn',
         data,
         warnings,
         debug: {
@@ -714,7 +714,7 @@ const analyzeCitizenId = async (frontImageBuffer, backImageBuffer) => {
     if (missingFields.length || validFieldCount < minValidFields) {
       return {
         isValid: false,
-        errorMessage: 'Khong doc du thong tin CCCD, vui long chup lai ro hon',
+        errorMessage: 'Không đọc đủ thông tin CCCD, vui lòng chụp lại rõ hơn',
         data,
         warnings,
         debug: {
@@ -751,7 +751,7 @@ const analyzeCitizenId = async (frontImageBuffer, backImageBuffer) => {
 
     return {
       isValid: false,
-      errorMessage: 'Khong the doc thong tin tu anh CCCD, vui long chup ro hon',
+      errorMessage: 'Không thể đọc thông tin từ ảnh CCCD, vui lòng chụp rõ hơn',
       data: {},
       warnings: [],
       debug: {

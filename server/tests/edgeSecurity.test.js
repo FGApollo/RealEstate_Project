@@ -60,6 +60,12 @@ test('KYC storage supports legacy same-project URLs and rejects SSRF/path traver
   const signed = await signVerificationImages({ id: 1, id_card_front_url: objectPath });
   assert.match(signed.id_card_front_url, /signed.invalid/);
   assert.equal(signed.image_urls_expire_in, 300);
+  assert.equal(Object.hasOwn(signed, 'image_errors'), false);
+  // Một ảnh trỏ ra ngoài project (ví dụ dữ liệu chép từ project khác) không làm hỏng cả hồ sơ, và không bao giờ bị tải về.
+  const partial = await signVerificationImages({ id: 2, id_card_front_url: objectPath, id_card_back_url: 'https://other.example/kyc/1/x.png' });
+  assert.match(partial.id_card_front_url, /signed.invalid/);
+  assert.equal(partial.id_card_back_url, null);
+  assert.deepEqual(partial.image_errors, ['id_card_back_url']);
 });
 
 test('appeal evidence accepts only own uploaded references and signs only trusted stored paths', async (t) => {

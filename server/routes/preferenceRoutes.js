@@ -9,5 +9,6 @@ router.get('/preferences', rateLimiters.read, preferenceController.getPreference
 router.put('/preferences', rateLimiters.write, preferenceController.savePreferences);
 router.get('/preference-options', rateLimiters.read, preferenceController.getOptions);
 router.post('/property-events', rateLimiters.write, preferenceController.recordEvent);
+router.get('/swipe-history', rateLimiters.read, preferenceController.getSwipeHistory);
 
 module.exports = router;

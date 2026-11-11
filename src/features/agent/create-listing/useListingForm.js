@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { API_BASE_URL } from '../../../config';
 import { apiFetch } from '../../../auth/apiClient';
+import { loadAdminAreas, findProvince, findWard } from '../../location/adminAreas';
 
 const MAX_LISTING_IMAGES = 6;
 const MAX_LISTING_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -42,13 +43,6 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
   const [isCheckingSave, setIsCheckingSave] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Location dropdowns
-  const [provinces, setProvinces] = useState([]);
-  const [districts, setDistricts] = useState([]);
-  const [wards, setWards] = useState([]);
-  const [selectedProvinceCode, setSelectedProvinceCode] = useState('');
-  const [selectedDistrictCode, setSelectedDistrictCode] = useState('');
-
   // Map
   const [mapLoaded, setMapLoaded] = useState(false);
   const mapRef = useRef(null);
@@ -68,19 +62,6 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
     document.body.appendChild(script);
   }, []);
 
-  // Fetch provinces once
-  useEffect(() => {
-    const fetchProvinces = async () => {
-      try {
-        const res = await apiFetch('https://provinces.open-api.vn/api/p/');
-        if (res.ok) setProvinces(await res.json());
-      } catch (err) {
-        console.error('Failed to fetch provinces:', err);
-      }
-    };
-    fetchProvinces();
-  }, []);
-
   // Hierarchical geocoder to resolve Vietnamese addresses reliably with fallback
   const geocodeAddressHierarchical = async ({ address_detail, ward, district, city }) => {
     const cleanDetail = (address_detail || '').trim();
@@ -88,35 +69,17 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
     const cleanDistrict = (district || '').trim();
     const cleanCity = (city || '').trim();
 
+    // Đơn vị hành chính mới không còn cấp quận/huyện: chỉ ghép những phần có giá trị (tin cũ vẫn có quận).
+    const area = [cleanWard, cleanDistrict, cleanCity].filter(Boolean);
     const queries = [];
-
-    // 1. Full detailed address
-    if (cleanDetail && cleanWard && cleanDistrict && cleanCity) {
-      queries.push(`${cleanDetail}, ${cleanWard}, ${cleanDistrict}, ${cleanCity}`);
-    }
-
-    // 2. Road/number only without complex compound/building prefix
-    if (cleanDetail.includes(',')) {
+    if (cleanDetail && cleanWard && cleanCity) queries.push([cleanDetail, ...area].join(', '));
+    if (cleanDetail.includes(',') && cleanWard && cleanCity) {
       const afterComma = cleanDetail.split(',').pop().trim();
-      if (afterComma && cleanWard && cleanDistrict && cleanCity) {
-        queries.push(`${afterComma}, ${cleanWard}, ${cleanDistrict}, ${cleanCity}`);
-      }
+      if (afterComma) queries.push([afterComma, ...area].join(', '));
     }
-
-    // 3. Ward + District + City
-    if (cleanWard && cleanDistrict && cleanCity) {
-      queries.push(`${cleanWard}, ${cleanDistrict}, ${cleanCity}`);
-    }
-
-    // 4. District + City
-    if (cleanDistrict && cleanCity) {
-      queries.push(`${cleanDistrict}, ${cleanCity}`);
-    }
-
-    // 5. City only
-    if (cleanCity) {
-      queries.push(cleanCity);
-    }
+    if (cleanWard && cleanCity) queries.push(area.join(', '));
+    if (cleanDistrict && cleanCity) queries.push(`${cleanDistrict}, ${cleanCity}`);
+    if (cleanCity) queries.push(cleanCity);
 
     for (const q of queries) {
       try {
@@ -141,7 +104,7 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
 
   // Preload data when editing
   useEffect(() => {
-    if (mode !== 'edit' || !editingPropertyId || provinces.length === 0) return;
+    if (mode !== 'edit' || !editingPropertyId) return;
 
     const fetchProperty = async () => {
       try {
@@ -213,28 +176,12 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
           markerRef.current.setLatLng([finalLat, finalLng]);
         }
 
-        // Preload province → district → ward codes
-        if (prop.city) {
-          const pMatch = provinces.find(p => p.name.includes(prop.city) || prop.city.includes(p.name));
-          if (pMatch) {
-            setSelectedProvinceCode(pMatch.code);
-            const distRes = await apiFetch(`https://provinces.open-api.vn/api/p/${pMatch.code}?depth=2`);
-            if (distRes.ok) {
-              const distData = await distRes.json();
-              setDistricts(distData.districts || []);
-              if (prop.district) {
-                const dMatch = distData.districts?.find(d => d.name.includes(prop.district) || prop.district.includes(d.name));
-                if (dMatch) {
-                  setSelectedDistrictCode(dMatch.code);
-                  const wardRes = await apiFetch(`https://provinces.open-api.vn/api/d/${dMatch.code}?depth=2`);
-                  if (wardRes.ok) {
-                    const wardData = await wardRes.json();
-                    setWards(wardData.wards || []);
-                  }
-                }
-              }
-            }
-          }
+        // Đổi tỉnh / phường của tin cũ sang đơn vị hành chính mới khi khớp được; nếu không, người đăng chọn lại.
+        const areas = await loadAdminAreas().catch(() => []);
+        const province = findProvince(areas, prop.city);
+        if (province) {
+          const ward = findWard(province, prop.ward);
+          setListing(prev => ({ ...prev, city: province.name, ward: ward ? ward.name : '', district: ward ? '' : prev.district }));
         }
       } catch (err) {
         console.error('Error fetching property for editing:', err);
@@ -242,48 +189,15 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
     };
 
     fetchProperty();
-  }, [mode, editingPropertyId, provinces]);
+  }, [mode, editingPropertyId]);
 
-  // Location loaders
-  const loadDistricts = async (provinceCode) => {
-    if (!provinceCode) { setDistricts([]); setWards([]); return; }
-    try {
-      const res = await apiFetch(`https://provinces.open-api.vn/api/p/${provinceCode}?depth=2`);
-      if (res.ok) { setDistricts((await res.json()).districts || []); setWards([]); }
-    } catch (err) { console.error('Failed to load districts:', err); }
-  };
-
-  const loadWards = async (districtCode) => {
-    if (!districtCode) { setWards([]); return; }
-    try {
-      const res = await apiFetch(`https://provinces.open-api.vn/api/d/${districtCode}?depth=2`);
-      if (res.ok) setWards((await res.json()).wards || []);
-    } catch (err) { console.error('Failed to load wards:', err); }
-  };
-
-  const selectLocationByNames = async (cityName, districtName, wardName) => {
-    if (provinces.length === 0) return;
-    const pMatch = provinces.find(p => p.name.toLowerCase().includes(cityName.toLowerCase()) || cityName.toLowerCase().includes(p.name.toLowerCase()));
-    if (!pMatch) return;
-    setSelectedProvinceCode(pMatch.code);
-    const distRes = await apiFetch(`https://provinces.open-api.vn/api/p/${pMatch.code}?depth=2`);
-    if (!distRes.ok) return;
-    const distData = await distRes.json();
-    setDistricts(distData.districts || []);
-    const dMatch = distData.districts?.find(d => d.name.toLowerCase().includes(districtName.toLowerCase()) || districtName.toLowerCase().includes(d.name.toLowerCase()));
-    if (!dMatch) return;
-    setSelectedDistrictCode(dMatch.code);
-    const wardRes = await apiFetch(`https://provinces.open-api.vn/api/d/${dMatch.code}?depth=2`);
-    if (!wardRes.ok) return;
-    const wardData = await wardRes.json();
-    setWards(wardData.wards || []);
-    const wMatch = wardData.wards?.find(w => w.name.toLowerCase().includes(wardName.toLowerCase()) || wardName.toLowerCase().includes(w.name.toLowerCase()));
-    setListing(prev => ({
-      ...prev,
-      city: pMatch.name,
-      district: dMatch.name,
-      ward: wMatch ? wMatch.name : (wardData.wards[0]?.name || '')
-    }));
+  // Điền Tỉnh/TP + Phường/xã (đơn vị mới) từ tên lấy được khi định vị / kéo ghim trên bản đồ.
+  const applyAreaFromNames = async (cityName, wardName) => {
+    const areas = await loadAdminAreas().catch(() => []);
+    const province = findProvince(areas, cityName);
+    if (!province) return;
+    const ward = findWard(province, wardName);
+    setListing(prev => ({ ...prev, city: province.name, ward: ward ? ward.name : '', district: '' }));
   };
 
   // Leaflet map setup
@@ -309,7 +223,16 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
       subdomains: ['0', '1', '2', '3'],
       maxZoom: 20
     }).addTo(map);
-    const marker = window.L.marker([lat, lng], { draggable: true }).addTo(map);
+    // Icon ghi rõ URL: Leaflet tự đoán đường dẫn ảnh từ file CSS, nếu CSS chưa tải xong nó tìm
+    // "marker-icon.png" ngay trên localhost và ra ảnh lỗi.
+    const LEAFLET_IMAGES = 'https://unpkg.com/leaflet@1.9.4/dist/images/';
+    const pinIcon = window.L.icon({
+      iconUrl: `${LEAFLET_IMAGES}marker-icon.png`,
+      iconRetinaUrl: `${LEAFLET_IMAGES}marker-icon-2x.png`,
+      shadowUrl: `${LEAFLET_IMAGES}marker-shadow.png`,
+      iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
+    });
+    const marker = window.L.marker([lat, lng], { draggable: true, icon: pinIcon }).addTo(map);
 
     const updateCoordinates = async (newLat, newLng) => {
       setListing(prev => ({ ...prev, latitude: newLat, longitude: newLng }));
@@ -325,7 +248,7 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
           const houseNumber = addr.house_number || '';
           const address_detail = [houseNumber, road].filter(Boolean).join(' ') || addr.amenity || addr.building || '';
           setListing(prev => ({ ...prev, address_detail, address: data.display_name || `${address_detail}, ${wardName}, ${districtName}, ${cityName}` }));
-          if (cityName && districtName) selectLocationByNames(cityName, districtName, wardName);
+          if (cityName) applyAreaFromNames(cityName, wardName);
         }
       } catch (err) { console.error('Reverse geocoding error:', err); }
     };
@@ -370,7 +293,7 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
             const houseNumber = addr.house_number || '';
             const address_detail = [houseNumber, road].filter(Boolean).join(' ') || addr.amenity || addr.building || '';
             setListing(prev => ({ ...prev, address_detail, address: data.display_name || `${address_detail}, ${wardName}, ${districtName}, ${cityName}` }));
-            if (cityName && districtName) selectLocationByNames(cityName, districtName, wardName);
+            if (cityName) applyAreaFromNames(cityName, wardName);
           }
         } catch (err) { console.error('Auto location geocode error:', err); }
       },
@@ -380,7 +303,7 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
 
   const handleSearchAddressOnMap = async () => {
     if (!listing.city && !listing.district && !listing.ward && !listing.address_detail) {
-      alert('Vui lòng chọn Tỉnh, Quận, Phường hoặc nhập địa chỉ trước khi tìm.');
+      alert('Vui lòng chọn Tỉnh/Thành phố, Phường/Xã hoặc nhập địa chỉ trước khi tìm.');
       return;
     }
 
@@ -504,8 +427,8 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
         ward: listing.ward,
         floor_range: listing.floor_range || '',
         address_detail: listing.address_detail,
-        address: `${listing.address_detail}, ${listing.ward}, ${listing.district}, ${listing.city}`,
-        thumbnail: listing.thumbnail || (listing.images.find(img => img.isFeatured)?.url || 'https://via.placeholder.com/400'),
+        address: [listing.address_detail, listing.ward, listing.district, listing.city].filter(Boolean).join(', '),
+        thumbnail: listing.thumbnail || (listing.images.find(img => img.isFeatured)?.url || '/listing-placeholder.svg'),
         virtual_tour_url: listing.virtual_tour_url || null,
         contact_phone: listing.contact_phone,
         latitude: parseFloat(listing.latitude) || null,
@@ -544,7 +467,9 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
         }
         setCurrentStep(4);
       } else {
-        alert(mode === 'edit' ? 'Cập nhật tin thất bại, vui lòng thử lại.' : 'Đăng tin thất bại, vui lòng thử lại.');
+        // Hiện đúng lý do server trả về (hết hạn mức tin, chưa có gói, ảnh quá lớn...) thay vì một câu chung chung.
+        const errData = await response.json().catch(() => ({}));
+        alert(errData.error || (mode === 'edit' ? 'Cập nhật tin thất bại, vui lòng thử lại.' : 'Đăng tin thất bại, vui lòng thử lại.'));
       }
     } catch (err) {
       console.error(err);
@@ -558,7 +483,7 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
   const handleSubmitListing = async () => {
     if (isCheckingSave || isSaving) return;
 
-    if (mode === 'create' && currentUser?.verification_status !== 'VERIFIED') {
+    if (mode === 'create' && currentUser?.verification_status !== 'VERIFIED' && currentUser?.is_official !== true) {
       alert('Tài khoản chưa hoàn tất xác thực KYC. Vui lòng xác thực danh tính trước khi đăng tin.');
       return;
     }
@@ -592,8 +517,8 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
         ward: listing.ward,
         floor_range: listing.floor_range || '',
         address_detail: listing.address_detail,
-        address: `${listing.address_detail}, ${listing.ward}, ${listing.district}, ${listing.city}`,
-        thumbnail: listing.thumbnail || (listing.images.find(img => img.isFeatured)?.url || 'https://via.placeholder.com/400'),
+        address: [listing.address_detail, listing.ward, listing.district, listing.city].filter(Boolean).join(', '),
+        thumbnail: listing.thumbnail || (listing.images.find(img => img.isFeatured)?.url || '/listing-placeholder.svg'),
         virtual_tour_url: listing.virtual_tour_url || null,
         contact_phone: listing.contact_phone,
         latitude: parseFloat(listing.latitude) || null,
@@ -660,11 +585,7 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
     listing, setListing,
     currentStep, setCurrentStep,
     submittedProperty,
-    provinces, districts, wards,
-    selectedProvinceCode, setSelectedProvinceCode,
-    selectedDistrictCode, setSelectedDistrictCode,
     mapLoaded, mapRef, markerRef,
-    loadDistricts, loadWards,
     handleAutoLocation, handleSearchAddressOnMap,
     geocodeAddress: geocodeAddressHierarchical,
     handleImageFileChange, handleDragOver, handleDrop,

@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { 
   X, ChevronLeft, ChevronRight, Sparkles, MapPin, 
   Heart, Share2, Maximize, Bath, Calendar, Eye, Shield, 
-  ShieldCheck, MessageSquare, Bed, Star, Loader2, Building2, User
+  ShieldCheck, BadgeCheck, MessageSquare, Bed, Star, Loader2, Building2, User, Flag
 } from 'lucide-react';
 import './PropertyDetailModal.css';
 import { API_BASE_URL } from '../config';
@@ -13,6 +13,19 @@ import { useRequireAuth } from '../auth/useRequireAuth';
 import { openPropertyChat } from '../auth/openPropertyChat';
 import PropertyLocationMap from './PropertyLocationMap';
 import ImageLoadingSkeleton from './ImageLoadingSkeleton';
+import { SwipeNestBadges, PlusUpsell } from '../features/plus/SwipeNestBadges';
+
+// Lý do báo cáo: mã phải khớp ràng buộc property_reports.reason trong database.
+const REPORT_REASONS = [
+  { value: 'WRONG_PRICE', label: 'Sai giá' },
+  { value: 'WRONG_IMAGE', label: 'Ảnh không đúng thực tế' },
+  { value: 'WRONG_LOCATION', label: 'Sai vị trí / địa chỉ' },
+  { value: 'SCAM', label: 'Có dấu hiệu lừa đảo' },
+  { value: 'DUPLICATE', label: 'Tin trùng lặp' },
+  { value: 'ALREADY_RENTED', label: 'Đã cho thuê / đã bán nhưng vẫn đăng' },
+  { value: 'OTHER', label: 'Lý do khác' }
+];
+const CLOSED_STATUS_LABELS = { SOLD: 'Đã bán', RENTED: 'Đã cho thuê' };
 
 const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = false, isFavorite = false, onToggleFavorite, onSelectProperty }) => {
   const [activePropertyId, setActivePropertyId] = useState(prop?.id);
@@ -21,9 +34,6 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
   const requireAuth = useRequireAuth();
   const [fetchedProperty, setFetchedProperty] = useState(null);
   const property = fetchedProperty || prop;
-  const matchScore = property?.matchScore;
-  const hasMatchScore = (typeof matchScore === 'number' || (typeof matchScore === 'string' && matchScore.trim() !== ''))
-    && Number.isFinite(Number(matchScore)) && Number(matchScore) >= 0 && Number(matchScore) <= 100;
 
   const [activeSliderIdx, setActiveSliderIdx] = useState(0);
   const [similarProperties, setSimilarProperties] = useState([]);
@@ -49,7 +59,50 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
     : undefined;
 
   const [isContacting, setIsContacting] = useState(false);
+  // Thông báo mời nâng cấp Plus, gắn với id tin để tự ẩn khi chuyển sang tin khác.
+  const [plusPrompt, setPlusPrompt] = useState(null);
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const [showReportForm, setShowReportForm] = useState(false);
+  const [reportReason, setReportReason] = useState('');
+  const [reportDescription, setReportDescription] = useState('');
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+
+  const handleSubmitReport = async () => {
+    if (!property?.id || isSubmittingReport) return;
+    if (!reportReason) {
+      alert('Vui lòng chọn lý do báo cáo.');
+      return;
+    }
+    const authorizedUser = await requireAuth({
+      type: 'NAVIGATE',
+      returnTo: propertyReturnTo(property.id),
+      routeState: propertyRouteState(property.id)
+    });
+    if (!authorizedUser) return;
+    try {
+      setIsSubmittingReport(true);
+      const res = await apiFetch(`${API_BASE_URL}/api/reports`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ propertyId: property.id, reason: reportReason, description: reportDescription.trim() })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data.error === 'You cannot report your own property'
+          ? 'Bạn không thể báo cáo tin đăng của chính mình.'
+          : (data.error || 'Không thể gửi báo cáo lúc này.'));
+        return;
+      }
+      alert('Đã gửi báo cáo. Quản trị viên sẽ xem xét tin đăng này.');
+      setShowReportForm(false);
+      setReportReason('');
+      setReportDescription('');
+    } catch {
+      alert('Không thể gửi báo cáo lúc này.');
+    } finally {
+      setIsSubmittingReport(false);
+    }
+  };
 
   const handleContactAgent = async () => {
     if (!property?.id || isContacting) return;
@@ -57,6 +110,7 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
       setIsContacting(true);
       await openPropertyChat({ propertyId: property.id, requireAuth, navigate });
     } catch (error) {
+      if (error.code === 'PLUS_REQUIRED') { setPlusPrompt({ propertyId: property.id, message: error.message }); return; }
       alert(error.message || 'Không thể mở cuộc trò chuyện lúc này.');
     } finally {
       setIsContacting(false);
@@ -259,8 +313,6 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
         setLocalRating(newRating);
         setLocalReviewCount(newCount);
 
-        property.average_rating = newRating;
-        property.review_count = newCount;
 
         alert(`Cảm ơn bạn đã đánh giá ${ratingVal} sao cho tin đăng này!`);
         setReviewText('');
@@ -387,21 +439,25 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
     }
   };
 
+  const lifestyleChips = useMemo(() => {
+    const raw = property?.lifestyle_tags || [];
+    return raw.map(t => (typeof t === 'string' ? t : t?.tag_name)).filter(Boolean);
+  }, [property?.lifestyle_tags]);
+
+  const amenityChips = useMemo(() => {
+    const raw = property?.property_features || property?.features || [];
+    return raw.map(f => (typeof f === 'string' ? f : f?.feature_name)).filter(Boolean);
+  }, [property?.property_features, property?.features]);
+
   if (!property) return null;
+
+  // Tin đã bán / đã cho thuê (mở lại từ Yêu thích): chỉ xem, vẫn nhắn môi giới được, không đánh giá mới.
+  const closedLabel = CLOSED_STATUS_LABELS[property.status] || null;
+  const isOwnListing = user && property.owner_id !== undefined && String(user.id) === String(property.owner_id);
 
   const sliderImages = (property.property_images && property.property_images.length > 0)
     ? property.property_images.map(img => img.image_url)
     : [property.thumbnail];
-
-  const lifestyleChips = useMemo(() => {
-    const raw = property.lifestyle_tags || [];
-    return raw.map(t => (typeof t === 'string' ? t : t?.tag_name)).filter(Boolean);
-  }, [property.lifestyle_tags]);
-
-  const amenityChips = useMemo(() => {
-    const raw = property.property_features || property.features || [];
-    return raw.map(f => (typeof f === 'string' ? f : f?.feature_name)).filter(Boolean);
-  }, [property.property_features, property.features]);
 
   const ownerDetails = property.owner;
 
@@ -494,12 +550,9 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
           </div>
 
           <div className="detail-content-wrapper">
-            {/* 2. Rating & Match Score */}
+            {/* 2. Rating */}
             <div className="detail-meta-row">
-              {hasMatchScore && <span className="match-score-tag">
-                <Sparkles size={12} /> {Math.round(Number(matchScore))}% MATCH SCORE
-              </span>}
-              
+
               <div className="detail-rating">
                 <span className="rating-num">{localRating ? localRating.toFixed(1) : '0'}</span>
                 <div className="rating-stars">
@@ -515,6 +568,8 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
             <div className="detail-header-block">
               <div className="title-section">
                 <h2>{property.title}</h2>
+                {closedLabel && <span className="detail-closed-badge">{closedLabel}</span>}
+                <SwipeNestBadges property={property} className="detail-sn-badges" />
                 <div className="detail-address-row">
                   <MapPin size={16} />
                   <span>{property.address}</span>
@@ -543,8 +598,15 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
 
                 <button className="action-btn rate-btn" onClick={() => setShowRatingForm(true)}>
                   <Star size={16} />
-                  <span>Đánh giá</span>
+                  <span>{closedLabel ? 'Xem đánh giá' : 'Đánh giá'}</span>
                 </button>
+
+                {!isOwnListing && !closedLabel && (
+                  <button className="action-btn report-btn" onClick={() => setShowReportForm(true)}>
+                    <Flag size={16} />
+                    <span>Báo cáo</span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -690,9 +752,12 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
                     <div className="poster-name-info">
                       <div className="name-row">
                         <h4>{ownerDetails.name}</h4>
-                        <span className="role-verified-badge">
-                          <ShieldCheck size={12} /> {ownerDetails.role === 'AGENT' ? 'Môi giới' : 'Chính chủ'}
-                        </span>
+                        {/* Không ghi vai trò: tài khoản Swipe Nest có nhãn riêng, người đã xác thực danh tính có icon tích xanh. */}
+                        {ownerDetails.is_official
+                          ? <span className="role-verified-badge"><ShieldCheck size={12} /> Swipe Nest</span>
+                          : ownerDetails.verification_status === 'VERIFIED' && (
+                            <BadgeCheck size={16} className="owner-verified-icon" role="img" aria-label="Đã xác thực danh tính"><title>Đã xác thực danh tính</title></BadgeCheck>
+                          )}
                       </div>
                       <p>Thông tin công khai về người đăng tin</p>
                     </div>
@@ -739,6 +804,8 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
                       </div>
                     )}
                   </div>
+                  {/* Mời nâng cấp Plus: hàng riêng, rộng hết thẻ, không chen vào cạnh nút Nhắn tin. */}
+                  {plusPrompt?.propertyId === property.id && <PlusUpsell message={plusPrompt.message} />}
                 </div>
               ) : (
                 <div className="poster-card" style={{ display: 'flex', justifyContent: 'center', padding: '20px', color: '#94a3b8' }}>
@@ -762,6 +829,36 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
                 <span>Mã tin: {property.property_type === 'Mặt Bằng' ? 'MBKD' : 'CHCH'}-{124000 + (property.id || 0)}</span>
               </div>
             </div>
+
+            {showReportForm && (
+              <div className="rating-modal-backdrop" onClick={(e) => { e.stopPropagation(); setShowReportForm(false); }}>
+                <div className="rating-modal-content report-modal-content" onClick={(e) => e.stopPropagation()}>
+                  <button className="rating-modal-close-btn" onClick={() => setShowReportForm(false)} aria-label="Đóng">
+                    <X size={20} />
+                  </button>
+                  <h3 className="rating-modal-title">Báo cáo tin đăng</h3>
+                  <p className="report-modal-hint">Chọn lý do để quản trị viên kiểm tra tin đăng này.</p>
+                  <div className="report-reason-list" role="radiogroup" aria-label="Lý do báo cáo">
+                    {REPORT_REASONS.map((item) => (
+                      <label key={item.value} className={`report-reason-item ${reportReason === item.value ? 'selected' : ''}`}>
+                        <input type="radio" name="report-reason" value={item.value}
+                          checked={reportReason === item.value} onChange={() => setReportReason(item.value)} />
+                        <span>{item.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <textarea className="report-description" rows={3} maxLength={1000}
+                    placeholder="Mô tả thêm (không bắt buộc)"
+                    value={reportDescription} onChange={(e) => setReportDescription(e.target.value)} />
+                  <div className="report-modal-actions">
+                    <button type="button" className="report-cancel-btn" onClick={() => setShowReportForm(false)} disabled={isSubmittingReport}>Hủy</button>
+                    <button type="button" className="report-submit-btn" onClick={handleSubmitReport} disabled={isSubmittingReport || !reportReason}>
+                      {isSubmittingReport ? 'Đang gửi…' : 'Gửi báo cáo'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {showRatingForm && (
               <div className="rating-modal-backdrop" onClick={(e) => { e.stopPropagation(); setShowRatingForm(false); }}>
@@ -827,7 +924,7 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
                   </div>
                   
                   {/* Rating form box */}
-                  <div className="rating-form-card">
+                  <div className="rating-form-card" style={closedLabel ? { display: 'none' } : undefined}>
                     <h4>Chia sẻ trải nghiệm của bạn</h4>
                     <p className="form-subtext">Đánh giá của bạn giúp người khác dễ dàng quyết định hơn.</p>
                     
@@ -989,7 +1086,7 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
                                 {rev.images.map((img, idx) => {
                                   const imgUrl = typeof img === 'string' ? img : img.image_url;
                                   return (
-                                    <img key={idx} src={imgUrl} alt="review-comment" onClick={() => window.open(imgUrl)} />
+                                    <img key={idx} src={imgUrl} alt="review-comment" onClick={() => window.open(imgUrl, '_blank', 'noopener,noreferrer')} />
                                   );
                                 })}
                               </div>

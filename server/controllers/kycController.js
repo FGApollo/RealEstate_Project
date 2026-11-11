@@ -3,7 +3,8 @@ const SAFE_KYC_ERRORS = new Map([
   ['User not found', 404],
   ['User is already verified', 400],
   ['No pending KYC verification found', 400],
-  ['Khong the doc anh CCCD da luu, vui long thu lai', 400]
+  ['Không thể đọc ảnh CCCD đã lưu, vui lòng thử lại', 400],
+  ['Không thể lưu ảnh selfie, vui lòng thử lại', 503]
 ]);
 const sendKycError = (res, error) => {
   const status = SAFE_KYC_ERRORS.get(error.message);

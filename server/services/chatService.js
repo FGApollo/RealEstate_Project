@@ -1,6 +1,7 @@
 const { supabase } = require('../config/supabase');
 const { positiveId, boundedInteger, text, badRequest } = require('./businessValidation');
 const { savePublicImage } = require('./publicImageStorage');
+const plusService = require('./plusService');
 
 const getMessages = async (userId, otherId, { limit, offset } = {}) => {
   userId = positiveId(userId, 'userId');
@@ -40,17 +41,29 @@ const sendMessage = async (senderId, receiverId, propertyId, message, rawAttachm
   });
   if (senderId === receiverId) throw badRequest('Bạn không thể tự gửi tin nhắn cho chính mình');
   const { data: receiver, error: receiverError } = await supabase.from('users')
-    .select('id, is_active').eq('id', receiverId).maybeSingle();
+    .select('id, role, is_active, is_official').eq('id', receiverId).maybeSingle();
   if (receiverError) throw new Error(receiverError.message);
   if (!receiver || receiver.is_active !== true) {
     throw Object.assign(badRequest('Không tìm thấy người nhận đang hoạt động.'), { statusCode: 404 });
   }
+  // Chỉ được mở cuộc trò chuyện mới với môi giới. Người không phải môi giới (người dùng, admin) chỉ nhận tin
+  // từ người mà họ đã nhắn trước, để không ai nhắn rác hay dò thông tin của tài khoản bất kỳ.
+  if (String(receiver.role).toUpperCase() !== 'AGENT') {
+    const { data: priorContact, error: priorError } = await supabase.from('messages')
+      .select('id').eq('sender_id', receiverId).eq('receiver_id', senderId).limit(1);
+    if (priorError) throw new Error(priorError.message);
+    if (!priorContact?.length) {
+      throw Object.assign(badRequest('Bạn chỉ có thể trả lời người đã nhắn tin cho bạn.'), { statusCode: 403 });
+    }
+  }
+  // Nhắn tin cho tài khoản chính thức của Swipe Nest là quyền lợi của gói Plus.
+  if (receiver.is_official === true) await plusService.assertPlusForOfficialContact(senderId);
   if (propertyId !== undefined && propertyId !== null) {
     propertyId = positiveId(propertyId, 'propertyId');
     const { data: property, error: propertyError } = await supabase.from('properties')
       .select('id, owner_id, status, is_hidden').eq('id', propertyId).maybeSingle();
     if (propertyError) throw new Error(propertyError.message);
-    if (!property || property.is_hidden === true || property.status !== 'AVAILABLE'
+    if (!property || property.is_hidden === true || !['AVAILABLE', 'SOLD', 'RENTED'].includes(property.status)
       || ![senderId, receiverId].includes(Number(property.owner_id))) {
       throw Object.assign(badRequest('Không thể đính kèm tin đăng này.'), { statusCode: 404 });
     }
@@ -164,6 +177,8 @@ const getConversations = async (userId) => {
 
   (messages || []).forEach(msg => {
     const partnerId = msg.sender_id === userId ? msg.receiver_id : msg.sender_id;
+    // Tin tự gửi cho chính mình (dữ liệu cũ, trước khi server chặn) không phải một cuộc trò chuyện.
+    if (partnerId === userId) return;
     if (!uniquePartnersMap.has(partnerId)) {
       uniquePartnersMap.set(partnerId, msg);
     }
@@ -188,7 +203,7 @@ const getConversations = async (userId) => {
   const [partnersResult, propertiesResult, funnelsResult] = await Promise.all([
     supabase
       .from('users')
-      .select('id, name, email, avatar, role, phone, verification_status')
+      .select('id, name, avatar, role, phone, verification_status, is_official')
       .in('id', partnerIds),
     activePropertyIds.length > 0
       ? supabase
@@ -217,8 +232,10 @@ const getConversations = async (userId) => {
     funnelsResult.data.forEach(f => funnelMap.set(f.user_id, f.funnel_stage));
   }
 
-  // 4. Combine into final lightweight conversation list
-  return partnersResult.data.map(partner => {
+  // 4. Combine into final lightweight conversation list.
+  // Không lộ email; số điện thoại chỉ hiện khi đối phương là môi giới (số liên hệ công việc).
+  return partnersResult.data.map(({ phone, ...rest }) => {
+    const partner = String(rest.role).toUpperCase() === 'AGENT' ? { ...rest, phone } : rest;
     const lastMsg = uniquePartnersMap.get(partner.id);
     const propId = partnerPropertyIdMap.get(partner.id);
     return {
@@ -229,9 +246,36 @@ const getConversations = async (userId) => {
       isRead: lastMsg.is_read,
       unreadCount: unreadCountMap.get(partner.id) || 0,
       property: propId ? propertyMap.get(propId) || null : null,
-      funnelStage: funnelMap.get(partner.id) || 'AWARENESS'
+      // Phễu khách hàng chỉ áp dụng cho người dùng (USER), không áp dụng cho môi giới khác hay admin.
+      funnelStage: isCustomer(partner) ? funnelMap.get(partner.id) || 'AWARENESS' : null
     };
   }).sort((a, b) => new Date(b.lastMessageTime) - new Date(a.lastMessageTime));
+};
+
+const isCustomer = (user) => String(user?.role || '').toUpperCase() === 'USER';
+
+// Mọi khách hàng (USER) đã từng nhắn tin qua lại với môi giới này.
+const listCustomerPartnerIds = async (agentId) => {
+  const partnerIds = new Set();
+  const PAGE = 1000;
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from('messages')
+      .select('sender_id, receiver_id')
+      .or(`sender_id.eq.${agentId},receiver_id.eq.${agentId}`)
+      .order('id', { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(error.message);
+    (data || []).forEach((msg) => {
+      const partnerId = msg.sender_id === agentId ? msg.receiver_id : msg.sender_id;
+      if (partnerId !== agentId) partnerIds.add(partnerId);
+    });
+    if (!data || data.length < PAGE) break;
+  }
+  if (partnerIds.size === 0) return [];
+  const { data: users, error } = await supabase.from('users').select('id, role').in('id', [...partnerIds]);
+  if (error) throw new Error(error.message);
+  return (users || []).filter(isCustomer).map((user) => user.id);
 };
 
 const updateFunnelStage = async (agentId, userId, stage) => {
@@ -255,6 +299,13 @@ const updateFunnelStage = async (agentId, userId, stage) => {
     error.statusCode = 403;
     throw error;
   }
+  const { data: customer, error: customerError } = await supabase.from('users').select('id, role').eq('id', userId).maybeSingle();
+  if (customerError) throw new Error(customerError.message);
+  if (!isCustomer(customer)) {
+    const error = new Error('Chỉ gán phễu cho khách hàng, không gán cho môi giới hay quản trị viên.');
+    error.statusCode = 400;
+    throw error;
+  }
 
   const { data, error } = await supabase
     .from('agent_user_funnel')
@@ -275,16 +326,22 @@ const updateFunnelStage = async (agentId, userId, stage) => {
   return data;
 };
 
+// Đếm giống hệt danh sách chat: mỗi khách hàng đã nhắn tin được tính một lần, khách chưa được gán
+// (chưa có dòng trong agent_user_funnel) thì tính là "Nhận biết".
 const getFunnelStats = async (agentId) => {
-  // Fetch funnel statistics for the agent
-  const { data, error } = await supabase
-    .from('agent_user_funnel')
-    .select('funnel_stage')
-    .eq('agent_id', agentId);
-
-  if (error) {
-    throw new Error(error.message);
+  agentId = positiveId(agentId, 'agentId');
+  const customerIds = await listCustomerPartnerIds(agentId);
+  const stageByCustomer = new Map();
+  if (customerIds.length > 0) {
+    const { data: rows, error } = await supabase
+      .from('agent_user_funnel')
+      .select('user_id, funnel_stage')
+      .eq('agent_id', agentId)
+      .in('user_id', customerIds);
+    if (error) throw new Error(error.message);
+    (rows || []).forEach((row) => stageByCustomer.set(row.user_id, row.funnel_stage));
   }
+  const data = customerIds.map((id) => ({ funnel_stage: stageByCustomer.get(id) || 'AWARENESS' }));
 
   // Count by stage
   const counts = {

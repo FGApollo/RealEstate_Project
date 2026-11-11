@@ -1,6 +1,7 @@
 const authService = require('../services/authService');
 const authSessionService = require('../services/authSessionService');
 const emailVerificationService = require('../services/emailVerificationService');
+const passwordResetService = require('../services/passwordResetService');
 const { createValidationError, validateEmail } = require('../services/registrationValidation');
 
 const preventSessionCaching = (res) => {
@@ -101,6 +102,35 @@ const verifyEmail = async (req, res) => {
   }
 };
 
+const forgotPassword = async (req, res) => {
+  try {
+    const submitted = req.body || {};
+    if (typeof submitted !== 'object' || Array.isArray(submitted)
+      || Object.keys(submitted).some((key) => key !== 'email')) {
+      throw createValidationError({ request: 'Only email is accepted' });
+    }
+    const result = await passwordResetService.requestPasswordReset(submitted.email);
+    return res.status(202).json({ ...result, code: 'PASSWORD_RESET_REQUEST_ACCEPTED' });
+  } catch (error) {
+    return sendError(res, error, 'Password reset request failed');
+  }
+};
+
+const resetPassword = async (req, res) => {
+  try {
+    const submitted = req.body || {};
+    if (typeof submitted !== 'object' || Array.isArray(submitted)
+      || Object.keys(submitted).some((key) => !['token', 'password', 'confirmPassword'].includes(key))) {
+      throw createValidationError({ request: 'Only token, password and confirmPassword are accepted' });
+    }
+    const result = await passwordResetService.resetPassword(submitted);
+    preventSessionCaching(res);
+    return res.status(200).json(result);
+  } catch (error) {
+    return sendError(res, error, 'Password reset failed');
+  }
+};
+
 const googleLogin = async (req, res) => {
   try {
     const submitted = req.body || {};
@@ -181,6 +211,8 @@ module.exports = {
   register,
   resendVerification,
   verifyEmail,
+  forgotPassword,
+  resetPassword,
   login,
   googleLogin,
   getUserById,

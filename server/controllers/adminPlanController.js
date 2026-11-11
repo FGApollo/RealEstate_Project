@@ -11,5 +11,9 @@ const action = fn => async (req, res) => {
 module.exports = {
   catalog: action(req => service.catalog(req.user.id)),
   history: action(req => service.history(req.user.id, req.query)),
-  change: action(req => service.change(req.user.id, req.body))
+  change: action(req => service.change(req.user.id, req.body)),
+  agentSubscription: action(req => service.agentSubscription(req.user.id, req.query)),
+  grantAgentPlan: action(async req => ({ subscription: await service.grantAgentPlan(req.user.id, req.params.agentId, req.body) })),
+  changeAgentPeriod: action(async req => ({ subscription: await service.changeAgentPeriod(req.user.id, req.params.agentId, req.body) })),
+  removeAgentPlan: action(async req => ({ subscription: await service.removeAgentPlan(req.user.id, req.params.agentId, req.body) }))
 };

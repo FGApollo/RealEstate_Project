@@ -1,0 +1,25 @@
+.plus-admin-page { display: grid; gap: 20px; padding: 4px 0 32px; }
+.plus-admin-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 20px; display: grid; gap: 12px; }
+.plus-admin-card h2 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 1.05rem; color: #0f172a; }
+.plus-admin-hint { margin: 0; color: #64748b; font-size: .88rem; }
+.plus-admin-search, .plus-admin-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.plus-admin-search input:not([type="checkbox"]), .plus-admin-form input, .plus-admin-form select { flex: 1 1 220px; min-width: 0; padding: 9px 12px; border: 1px solid #cbd5e1; border-radius: 10px; font: inherit; }
+.plus-admin-form select { flex: 0 0 auto; }
+.plus-admin-card button { display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; border: 0; border-radius: 10px; background: #1d4ed8; color: #fff; font-weight: 600; cursor: pointer; }
+.plus-admin-card button.danger { background: #dc2626; }
+.plus-admin-card button.checked { background: #16a34a; }
+.plus-admin-card button:disabled { opacity: .55; cursor: not-allowed; }
+.plus-admin-message { margin: 0; padding: 8px 12px; border-radius: 8px; background: #f1f5f9; color: #0f172a; font-size: .9rem; }
+.plus-admin-result { display: grid; gap: 10px; padding: 14px; border-radius: 10px; background: #f8fafc; }
+.plus-admin-result p { margin: 0; }
+.plus-admin-audit { margin: 0; padding-left: 18px; color: #475569; font-size: .85rem; display: grid; gap: 4px; }
+.plus-admin-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.plus-admin-list li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 10px; }
+.plus-admin-list li div { display: grid; gap: 2px; min-width: 0; }
+.plus-admin-list li strong { overflow-wrap: anywhere; }
+.plus-admin-list li span { color: #64748b; font-size: .83rem; }
+.plus-admin-list li button { flex: none; }
+@media (max-width: 640px) {
+  .plus-admin-card { padding: 16px; }
+  .plus-admin-list li { flex-direction: column; align-items: stretch; }
+}

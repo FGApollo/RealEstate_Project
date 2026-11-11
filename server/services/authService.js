@@ -15,7 +15,7 @@ const {
 
 const PUBLIC_USER_FIELDS = [
   'id', 'name', 'email', 'avatar', 'role', 'phone', 'phone_verified', 'email_verified_at',
-  'verification_status', 'trust_score'
+  'verification_status', 'trust_score', 'is_official'
 ];
 const toPublicUser = (user) => ({
   ...Object.fromEntries(

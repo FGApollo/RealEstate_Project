@@ -40,7 +40,7 @@ const propertyInput = (body, { partial = false } = {}) => {
   if ((!partial || body.listing_type !== undefined) && !['RENT', 'SALE'].includes(body.listing_type)) {
     throw badRequest('Chọn tin cho thuê hoặc mua bán.');
   }
-  if (body.status !== undefined && !['AVAILABLE', 'RENTED', 'SOLD', 'PENDING', 'INACTIVE'].includes(body.status)) {
+  if (body.status !== undefined && !['AVAILABLE', 'RENTED', 'SOLD', 'PENDING'].includes(body.status)) {
     throw badRequest('Invalid listing status.');
   }
   if (body.is_public !== undefined && typeof body.is_public !== 'boolean') throw badRequest('Trạng thái công khai không hợp lệ.');

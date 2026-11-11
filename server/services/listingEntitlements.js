@@ -9,6 +9,10 @@ function listingDatabaseError(error) {
   return key ? Object.assign(new Error(errors[key][1]), { statusCode: errors[key][0], code: key }) : new Error('Không thể lưu tin đăng lúc này.');
 }
 async function assertListingCapacity(userId) {
+  // Tài khoản chính thức của Swipe Nest không cần gói và không giới hạn số tin (trigger DB cũng miễn trừ).
+  // Lỗi đọc cờ này thì coi như tài khoản thường: bước kiểm tra gói phía dưới vẫn chặn đúng.
+  const official = await supabase.from('users').select('is_official').eq('id', userId).maybeSingle();
+  if (official.data?.is_official === true) return { official: true };
   const { data, error } = await supabase.rpc('agent_subscription_state', { p_user_id: userId });
   if (error) throw Object.assign(new Error('Chưa thể kiểm tra quyền đăng tin. Vui lòng thử lại.'), { statusCode: 503 });
   const now = Date.now();

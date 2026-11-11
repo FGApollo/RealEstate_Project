@@ -165,7 +165,7 @@ const hashOtp = (userId, phone, otp) => crypto.createHmac('sha256', process.env.
 
 const sendOtp = async ({ userId, phone }) => {
   if (process.env.NODE_ENV === 'production' && !esmsService.isLiveSmsEnabled()) {
-    throw createServiceError('Dịch vụ SMS xác thực chưa sẵn sàng.', 400);
+    throw createServiceError('Dịch vụ SMS xác thực chưa sẵn sàng.', 503);
   }
   const normalizedPhone = validatePhone(phone);
 
@@ -204,7 +204,9 @@ const sendOtp = async ({ userId, phone }) => {
 
   return {
     success: true,
-    message: smsResult.isMock
+    message: smsResult.devConsole
+      ? 'Chế độ dev: mã OTP được in ở terminal của server (không gửi SMS).'
+      : smsResult.isMock
       ? 'Mã OTP đã được tạo (Chế độ giả lập eSMS)'
       : (smsResult.sandbox
           ? 'Mã OTP đã gửi qua Sandbox eSMS (Thử nghiệm kết nối thành công, không trừ tiền)'

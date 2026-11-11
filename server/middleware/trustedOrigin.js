@@ -1,4 +1,7 @@
 const DEVELOPMENT_ORIGINS = ['http://localhost:5173', 'http://127.0.0.1:5173'];
+if (process.env.CORS_ALLOWED_ORIGINS === undefined && process.env.CLIENT_ORIGINS !== undefined) {
+  console.warn('CLIENT_ORIGINS đã cũ; hãy đổi tên biến thành CORS_ALLOWED_ORIGINS trong server/.env.');
+}
 const configuredOrigins = process.env.CORS_ALLOWED_ORIGINS ?? process.env.CLIENT_ORIGINS;
 const rawOrigins = configuredOrigins === undefined
   ? (process.env.NODE_ENV === 'production' ? null : DEVELOPMENT_ORIGINS.join(','))

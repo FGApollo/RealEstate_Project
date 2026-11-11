@@ -1078,3 +1078,13 @@
   font-weight: 600;
 }
 
+
+/* Danh sách tin chiếm hết chiều cao màn hình, thanh phân trang luôn nằm ở cuối thay vì dính ngay dưới hàng thẻ. */
+.listings-tab-container { min-height: calc(100vh - 96px); }
+.listings-tab-container > .pagination-container { margin-top: auto; padding: 16px 0 4px; }
+
+/* Nhãn trạng thái tin ở "Danh sách tin đăng hiện tại" (mặc định xanh = đang hiển thị). */
+.overview-dashboard-feature .agent-status-badge.is-rented { background-color: #dbeafe; color: #1e40af; }
+.overview-dashboard-feature .agent-status-badge.is-sold { background-color: #fef3c7; color: #92400e; }
+.overview-dashboard-feature .agent-status-badge.is-deleted { background-color: #f1f5f9; color: #475569; }
+.overview-dashboard-feature .agent-status-badge.is-hidden { background-color: #fee2e2; color: #b91c1c; }

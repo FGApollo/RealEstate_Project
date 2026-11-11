@@ -17,12 +17,10 @@ import { apiFetch, publicApiFetch } from '../auth/apiClient';
 import { useAuth } from '../auth/useAuth';
 import { useRequireAuth } from '../auth/useRequireAuth';
 import PropertyDetailModal from '../components/PropertyDetailModal';
-import { 
-  WARDS_BY_REGION, 
-  ALL_WARDS, 
-  CUSTOM_LOCATION_SUGGESTIONS,
-  normalizeWard
-} from '../services/administrativeService';
+import CheckedListingsSection from '../features/plus/CheckedListingsSection';
+import { SwipeNestBadges } from '../features/plus/SwipeNestBadges';
+import { writeSearch } from '../features/search/searchParams';
+import AreaSelect from '../features/location/AreaSelect';
 
 const getCategoryIllustration = (name = '') => {
   const normalized = String(name).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -60,6 +58,7 @@ const Home = () => {
   const [searchParams] = useSearchParams();
   const sharedPropertyId = searchParams.get('propertyId');
   const { user, authStatus } = useAuth();
+  const normalizedRole = String(user?.role || '').toUpperCase();
   const requireAuth = useRequireAuth();
   const [properties, setProperties] = useState([]);
   const [isLoadingProperties, setIsLoadingProperties] = useState(true);
@@ -68,15 +67,13 @@ const Home = () => {
   const actionNotice = location.state?.authActionNotice || '';
   
   // Search parameters
-  const [searchLoc, setSearchLoc] = useState('');
+  // Khu vực chọn từ dropdown (đơn vị hành chính mới).
+  const [searchArea, setSearchArea] = useState({ province: '', ward: '' });
   const [searchType, setSearchType] = useState('ALL');
   const [priceRange, setPriceRange] = useState('ALL');
   
   // Advanced Filter state
   const [showAdvModal, setShowAdvModal] = useState(false);
-  const [selectedProvince, setSelectedProvince] = useState('');
-  const [wardSearchQuery, setWardSearchQuery] = useState('');
-  const [selectedWards, setSelectedWards] = useState([]);
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [minPrice, setMinPrice] = useState('');
   const [maxPrice, setMaxPrice] = useState('');
@@ -85,14 +82,8 @@ const Home = () => {
   const [selectedBedrooms, setSelectedBedrooms] = useState([]);
   const [selectedLifestyles, setSelectedLifestyles] = useState([]);
 
-  // Ward checklist modal states
-  const [showWardListModal, setShowWardListModal] = useState(false);
-  const [listModalSearchQuery, setListModalSearchQuery] = useState('');
-  const [activeRegionTab, setActiveRegionTab] = useState('TP.HCM');
-  const [subTempSelectedWards, setSubTempSelectedWards] = useState([]);
 
   // Suggestions state
-  const [showSuggestions, setShowSuggestions] = useState(false);
 
   const [filteredProperties, setFilteredProperties] = useState([]);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -150,9 +141,26 @@ const Home = () => {
   }, [showDetailModal, selectedProperty?.id, user?.id]);
 
   const publicSearchFilters = useMemo(() => JSON.stringify({
-    wards: selectedWards, categories: selectedCategories.filter(item => item !== 'Tất cả'),
+    ...(searchArea.province ? { province: searchArea.province } : {}),
+    ...(searchArea.province && searchArea.ward ? { ward: searchArea.ward } : {}),
+    categories: selectedCategories.filter(item => item !== 'Tất cả'),
     minPrice, maxPrice, minArea, maxArea, bedrooms: selectedBedrooms.map(String), features: selectedLifestyles
-  }), [selectedWards, selectedCategories, minPrice, maxPrice, minArea, maxArea, selectedBedrooms, selectedLifestyles]);
+  }), [searchArea, selectedCategories, minPrice, maxPrice, minArea, maxArea, selectedBedrooms, selectedLifestyles]);
+  // "Dành cho bạn": người dùng đã đăng nhập thấy 4 tin từ chính bộ máy gợi ý của trang Khám phá (khảo sát +
+  // lịch sử thích / bỏ qua), có áp bộ lọc trên thanh tìm kiếm. Khách hoặc khi chưa có gợi ý thì dùng "Nổi bật".
+  const [personalPicks, setPersonalPicks] = useState({ key: null, items: [] });
+  useEffect(() => {
+    if (normalizedRole !== 'USER') return undefined;
+    const controller = new AbortController();
+    const key = `${user?.id}|${publicSearchFilters}`;
+    const query = new URLSearchParams({ category: 'ALL', limit: '4', offset: '0', filters: publicSearchFilters });
+    apiFetch(`${API_BASE_URL}/api/recommendations?${query}`, { signal: controller.signal })
+      .then((response) => (response.ok ? response.json() : { properties: [] }))
+      .then((data) => setPersonalPicks({ key, items: (data.properties || []).filter((property) => !property.is_hidden).slice(0, 4) }),
+        () => {});
+    return () => controller.abort();
+  }, [normalizedRole, user?.id, publicSearchFilters]);
+
   // The server filters and orders before limiting the featured results.
   useEffect(() => {
     const controller = new AbortController();
@@ -175,8 +183,14 @@ const Home = () => {
           setFilteredProperties(visibleProperties);
 
           if (sharedPropertyId) {
-            const found = visibleProperties.find(p => String(p.id) === String(sharedPropertyId));
-            if (found) {
+            // Liên kết chia sẻ / quay lại sau đăng nhập (/?propertyId=…) phải mở được cả tin không nằm trong
+            // 12 tin nổi bật đang tải: khi không có sẵn thì tải riêng tin đó theo id.
+            let found = visibleProperties.find(p => String(p.id) === String(sharedPropertyId));
+            if (!found && /^[1-9]\d{0,15}$/.test(sharedPropertyId)) {
+              const single = await publicApiFetch(`${API_BASE_URL}/api/properties/${sharedPropertyId}`, { signal: controller.signal });
+              if (single.ok) found = (await single.json()).property || null;
+            }
+            if (found && active) {
               setSelectedProperty(found);
               setShowDetailModal(true);
             }
@@ -201,47 +215,10 @@ const Home = () => {
 
   const selectCategoryPreview = async (category) => {
     const returnTo = `/swipe/${encodeURIComponent(category.name)}`;
-    const routeState = { filters: { categories: [category.name] } };
-    const authorizedUser = await requireAuth({ type: 'NAVIGATE', returnTo, routeState });
-    if (authorizedUser) navigate(returnTo, { state: routeState });
+    // Danh mục nằm sẵn trên đường dẫn (/swipe/<loại>); không gửi kèm bộ lọc để tránh nút "Lọc" hiện số khó hiểu.
+    const authorizedUser = await requireAuth({ type: 'NAVIGATE', returnTo });
+    if (authorizedUser) navigate(returnTo);
   };
-
-  const locationSuggestions = useMemo(() => {
-    if (!searchLoc.trim()) return [];
-    const query = searchLoc.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    const rawQuery = searchLoc.toLowerCase();
-    
-    const customMatches = CUSTOM_LOCATION_SUGGESTIONS.filter(item => {
-      return item.keywords.some(kw => kw.includes(rawQuery) || kw.includes(query)) ||
-             item.name.toLowerCase().includes(rawQuery) ||
-             item.subtext.toLowerCase().includes(rawQuery);
-    });
-
-    const standardMatches = [];
-    ALL_WARDS.forEach(wardName => {
-      const normalizedWard = wardName.toLowerCase();
-      if (normalizedWard.includes(rawQuery) || normalizedWard.normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes(query)) {
-        const alreadyCustom = customMatches.some(c => c.ward === wardName);
-        if (!alreadyCustom) {
-          let region = '';
-          for (const [r, wList] of Object.entries(WARDS_BY_REGION)) {
-            if (wList.includes(wardName)) {
-              region = r;
-              break;
-            }
-          }
-          standardMatches.push({
-            name: wardName,
-            subtext: region ? `Khu vực: ${region}` : 'Khu vực khác',
-            ward: wardName,
-            region: region
-          });
-        }
-      }
-    });
-
-    return [...customMatches, ...standardMatches].slice(0, 10);
-  }, [searchLoc]);
 
   const groupedFeatures = useMemo(() => {
     const groups = {
@@ -284,28 +261,19 @@ const Home = () => {
     return groups;
   }, [properties]);
 
-  const executeSearch = async (e) => {
+  // Tìm kiếm mở trang kết quả (/search), không chuyển thẳng sang chế độ quẹt. Trang kết quả xem được cả khi chưa đăng nhập.
+  const executeSearch = (e) => {
     if (e) e.preventDefault();
-    
-    let targetCategory = 'Tất cả';
-    if (selectedCategories.length === 1) {
-      targetCategory = selectedCategories[0];
-    }
-    
-    const filters = {
-      minPrice,
-      maxPrice,
-      wards: selectedWards,
-      lifestyles: selectedLifestyles,
-      minArea,
-      maxArea,
-      bedrooms: selectedBedrooms,
-      categories: selectedCategories
-    };
-
-    const returnTo = `/swipe/${encodeURIComponent(targetCategory)}`;
-    const authorizedUser = await requireAuth({ type: 'NAVIGATE', returnTo, routeState: { filters } });
-    if (authorizedUser) navigate(returnTo, { state: { filters } });
+    const query = writeSearch({
+      province: searchArea.province,
+      ward: searchArea.ward,
+      types: selectedCategories,
+      listing: '',
+      minPrice, maxPrice, minArea, maxArea,
+      beds: selectedBedrooms,
+      tags: selectedLifestyles
+    });
+    navigate(`/search${query ? `?${query}` : ''}`);
   };
 
   // Handle price range quick select
@@ -396,27 +364,8 @@ const Home = () => {
     }
   };
 
-  const handleSelectLocationSuggestion = (sug) => {
-    setSearchLoc(sug.name);
-    if (sug.ward && !selectedWards.includes(sug.ward)) {
-      setSelectedWards([...selectedWards, sug.ward]);
-    }
-    setShowSuggestions(false);
-  };
-
-  const handleSelectWardFromAdv = (ward) => {
-    if (!selectedWards.includes(ward)) {
-      setSelectedWards([...selectedWards, ward]);
-    }
-    setWardSearchQuery('');
-  };
-
-  const handleRemoveWard = (ward) => {
-    setSelectedWards(selectedWards.filter(w => w !== ward));
-  };
-
   const handleClearFilters = () => {
-    setSelectedWards([]);
+    setSearchArea({ province: '', ward: '' });
     setSelectedCategories([]);
     setMinPrice('');
     setMaxPrice('');
@@ -424,76 +373,21 @@ const Home = () => {
     setMaxArea('');
     setSelectedBedrooms([]);
     setSelectedLifestyles([]);
-    setSearchLoc('');
   };
 
-  // Close suggestions dropdown on outside click
-  useEffect(() => {
-    const handleOutsideClick = (e) => {
-      if (!e.target.closest('.location-field-wrapper')) {
-        setShowSuggestions(false);
-      }
-    };
-    document.addEventListener('click', handleOutsideClick);
-    return () => document.removeEventListener('click', handleOutsideClick);
-  }, []);
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
-    if (selectedWards.length > 0) count += selectedWards.length;
+    if (searchArea.province) count++;
+    if (searchArea.ward) count++;
     if (selectedCategories.length > 0) count += selectedCategories.length;
     if (minPrice || maxPrice) count++;
     if (minArea || maxArea) count++;
     if (selectedBedrooms.length > 0) count += selectedBedrooms.length;
     if (selectedLifestyles.length > 0) count += selectedLifestyles.length;
     return count;
-  }, [selectedWards, selectedCategories, minPrice, maxPrice, minArea, maxArea, selectedBedrooms, selectedLifestyles]);
+  }, [searchArea, selectedCategories, minPrice, maxPrice, minArea, maxArea, selectedBedrooms, selectedLifestyles]);
 
-  // Checklist modal handlers
-  const handleOpenWardListModal = () => {
-    setSubTempSelectedWards([...selectedWards]);
-    setListModalSearchQuery('');
-    setShowWardListModal(true);
-  };
-
-  const handleSaveWardList = () => {
-    setSelectedWards(subTempSelectedWards);
-    setShowWardListModal(false);
-  };
-
-  const handleCancelWardList = () => {
-    setShowWardListModal(false);
-  };
-
-  const handleToggleSubTempWard = (ward) => {
-    if (subTempSelectedWards.includes(ward)) {
-      setSubTempSelectedWards(subTempSelectedWards.filter(w => w !== ward));
-    } else {
-      setSubTempSelectedWards([...subTempSelectedWards, ward]);
-    }
-  };
-
-  const filteredListWards = useMemo(() => {
-    const wardsInRegion = WARDS_BY_REGION[activeRegionTab] || [];
-    if (!listModalSearchQuery.trim()) return wardsInRegion;
-    const query = listModalSearchQuery.toLowerCase();
-    return wardsInRegion.filter(ward => ward.toLowerCase().includes(query));
-  }, [activeRegionTab, listModalSearchQuery]);
-
-  const suggestedWards = useMemo(() => {
-    if (!wardSearchQuery.trim()) return [];
-    const query = wardSearchQuery.toLowerCase();
-    
-    let wardsList = ALL_WARDS;
-    if (selectedProvince) {
-      wardsList = WARDS_BY_REGION[selectedProvince] || [];
-    }
-    
-    return wardsList.filter(ward => 
-      ward.toLowerCase().includes(query) && 
-      !selectedWards.some(selected => selected === ward)
-    ).slice(0, 8);
-  }, [wardSearchQuery, selectedWards, selectedProvince]);
 
   const formatPrice = (price) => {
     if (!price || price === 0) return 'Liên hệ';
@@ -555,7 +449,6 @@ const Home = () => {
       const categoryKeys = new Set(categoriesToShow.map(normalizePropertyType));
       candidates = candidates.filter((property) => categoryKeys.has(normalizePropertyType(property.property_type)));
     }
-    if (selectedWards.length) candidates = candidates.filter((property) => selectedWards.some(ward => normalizeWard(ward) === normalizeWard(property.ward)));
     if (minPrice !== '') candidates = candidates.filter((property) => Number(property.price) >= Number(minPrice));
     if (maxPrice !== '') candidates = candidates.filter((property) => Number(property.price) <= Number(maxPrice));
     if (minArea !== '') candidates = candidates.filter((property) => Number(property.area) >= Number(minArea));
@@ -573,7 +466,12 @@ const Home = () => {
       });
     }
     return candidates.slice(0, 4);
-  }, [filteredProperties, selectedCategories, searchType, selectedWards, minPrice, maxPrice, minArea, maxArea, selectedBedrooms, selectedLifestyles]);
+  }, [filteredProperties, selectedCategories, searchType, minPrice, maxPrice, minArea, maxArea, selectedBedrooms, selectedLifestyles]);
+
+  // Người dùng có gợi ý cá nhân (khớp đúng bộ lọc hiện tại) thì hiện "Dành cho bạn", nếu không thì "Nổi bật".
+  const showPersonal = normalizedRole === 'USER' && personalPicks.key === `${user?.id}|${publicSearchFilters}`
+    && personalPicks.items.length > 0;
+  const showcaseProperties = showPersonal ? personalPicks.items : featuredProperties;
 
   if (isLoadingProperties || authStatus === 'authenticating') {
     return (
@@ -589,7 +487,7 @@ const Home = () => {
       {/* Header */}
       <SwipeHeader 
         activeView="home" 
-        onSearch={() => setShowAdvModal(true)} 
+        onSearch={() => navigate('/search')} 
       />
 
       {/* Hero Section */}
@@ -645,46 +543,11 @@ const Home = () => {
             <div className="search-field location-field-wrapper">
               <div className="search-field-icon-wrapper light-blue-bg"><MapPin size={18} color="#1a42b8" /></div>
               <div className="search-field-content">
-                <label>Nhập địa điểm</label>
-                <div className="selected-wards-inline">
-                  {selectedWards.map(ward => (
-                    <span key={ward} className="ward-pill-badge">
-                      {ward}
-                      <button type="button" className="remove-ward-pill-btn" onClick={() => handleRemoveWard(ward)}>
-                        <X size={10} />
-                      </button>
-                    </span>
-                  ))}
-                  <input
-                    type="text"
-                    aria-label="Địa điểm"
-                    placeholder={selectedWards.length === 0 ? "Phường, quận, thành phố..." : ""}
-                    value={searchLoc}
-                    onChange={(e) => {
-                      setSearchLoc(e.target.value);
-                      setShowSuggestions(true);
-                    }}
-                    onFocus={() => setShowSuggestions(true)}
-                  />
-                </div>
+                <label>Khu vực</label>
+                {/* Chọn theo đơn vị hành chính mới; server vẫn khớp được tin ghi theo quận/phường cũ. */}
+                <AreaSelect province={searchArea.province} ward={searchArea.ward} className="home-area-select"
+                  onChange={setSearchArea} />
               </div>
-              {searchLoc && (
-                <button type="button" className="clear-search-btn" onClick={() => setSearchLoc('')}>
-                  <X size={16} />
-                </button>
-              )}
-
-              {/* Suggestions list */}
-              {showSuggestions && locationSuggestions.length > 0 && (
-                <ul className="location-autocomplete-dropdown">
-                  {locationSuggestions.map((sug, idx) => (
-                    <li key={idx} onClick={() => handleSelectLocationSuggestion(sug)}>
-                      <div className="sug-name">{sug.name}</div>
-                      <div className="sug-subtext">{sug.subtext}</div>
-                    </li>
-                  ))}
-                </ul>
-              )}
             </div>
             
             <div className="search-field-divider"></div>
@@ -795,12 +658,22 @@ const Home = () => {
         </div>
       </section>
 
+      {/* Nguồn hàng Swipe Nest: danh sách cho thành viên Plus, lời mời nâng cấp cho người chưa có */}
+      {normalizedRole === 'USER' && (
+        <CheckedListingsSection
+          formatPrice={formatPrice}
+          onOpen={(property) => { setSelectedProperty(property); setShowDetailModal(true); }}
+        />
+      )}
+
       {/* Dành Cho Bạn (Recommended Properties) */}
       <section className="recommended-section" id="featured-properties">
         <div className="section-heading-row listings-heading">
           <div>
-            <h2>Bất Động Sản Nổi Bật <Sparkles size={16} /></h2>
-            <p>Những lựa chọn được yêu thích nhất từ cộng đồng Swipe Nest</p>
+            <h2>{showPersonal ? 'Dành cho bạn' : 'Bất Động Sản Nổi Bật'} <Sparkles size={16} /></h2>
+            <p>{showPersonal
+              ? 'Gợi ý theo khảo sát của bạn và những căn bạn đã thích hoặc bỏ qua'
+              : 'Những lựa chọn được yêu thích nhất từ cộng đồng Swipe Nest'}</p>
           </div>
           <button className="view-all-link" onClick={() => executeSearch()}>
             Xem tất cả <ArrowRight size={14} />
@@ -809,7 +682,7 @@ const Home = () => {
 
         <div className="featured-properties-grid">
           {actionNotice && <p className="home-action-notice" role="status">{actionNotice}</p>}
-          {featuredProperties.map((property) => {
+          {showcaseProperties.map((property) => {
             const isFavorite = dbFavorites.some(fav => fav.id === property.id);
             return (
               <article
@@ -829,7 +702,6 @@ const Home = () => {
                       e.target.src = 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=600&q=80';
                     }}
                   />
-                  {property.is_highlighted && <span className="listing-highlight-badge"><Sparkles size={11} /> Nổi bật</span>}
                   <button
                     className={`listing-favorite ${isFavorite ? 'active' : ''}`}
                     aria-label={isFavorite ? 'Bỏ lưu' : 'Lưu bất động sản'}
@@ -842,6 +714,7 @@ const Home = () => {
                   </button>
                 </div>
                 <div className="listing-card-body">
+                  <SwipeNestBadges property={property} />
                   <h3>{property.title}</h3>
                   <p className="listing-address"><MapPin size={12} /> {property.address}</p>
                   <div className="listing-card-bottom">
@@ -877,7 +750,7 @@ const Home = () => {
             </div>
           )}
 
-          {!propertiesError && featuredProperties.length === 0 && (
+          {!propertiesError && showcaseProperties.length === 0 && (
             <div className="listings-empty-state">
               {selectedCategories.length
                 ? `Chưa có tin ${selectedCategories[0]} trong phần xem trước.`
@@ -964,69 +837,11 @@ const Home = () => {
             <h3>Bộ lọc nâng cao</h3>
             
             <div className="filter-modal-body">
-              {/* Khu vực */}
+              {/* Khu vực: dùng chung dropdown (đơn vị hành chính mới) với thanh tìm kiếm */}
               <div className="filter-group">
                 <label className="filter-section-title">Khu vực</label>
-                <div className="area-filter-inputs">
-                  <select 
-                    value={selectedProvince}
-                    onChange={(e) => {
-                      setSelectedProvince(e.target.value);
-                      if (e.target.value) {
-                        setActiveRegionTab(e.target.value);
-                      }
-                    }}
-                  >
-                    <option value="">Tất cả Tỉnh/TP</option>
-                    {Object.keys(WARDS_BY_REGION).map((region) => (
-                      <option key={region} value={region}>{region}</option>
-                    ))}
-                  </select>
-
-                  <div className="ward-search-wrapper">
-                    <div className="ward-search-input-container">
-                      <input 
-                        type="text" 
-                        placeholder="Tìm phường..." 
-                        value={wardSearchQuery} 
-                        onChange={(e) => setWardSearchQuery(e.target.value)} 
-                      />
-                      {wardSearchQuery && (
-                        <button type="button" className="clear-search-btn" onClick={() => setWardSearchQuery('')}>
-                          <X size={16} />
-                        </button>
-                      )}
-                    </div>
-                    <button type="button" className="btn-select-list" onClick={handleOpenWardListModal}>
-                      Chọn từ danh sách
-                    </button>
-                  </div>
-                </div>
-
-                {/* Suggestions List */}
-                {suggestedWards.length > 0 && (
-                  <ul className="ward-suggestions">
-                    {suggestedWards.map((ward) => (
-                      <li key={ward} onClick={() => handleSelectWardFromAdv(ward)}>
-                        {ward}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-
-                {/* Selected Ward Badges */}
-                {selectedWards.length > 0 && (
-                  <div className="selected-ward-badges">
-                    {selectedWards.map((ward) => (
-                      <span key={ward} className="ward-badge">
-                        {ward}
-                        <button type="button" onClick={() => handleRemoveWard(ward)}>
-                          <X size={12} />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
+                <AreaSelect province={searchArea.province} ward={searchArea.ward} className="home-adv-area-select"
+                  onChange={setSearchArea} />
               </div>
 
               {/* Loại bất động sản */}
@@ -1189,70 +1004,6 @@ const Home = () => {
         </div>
       )}
 
-      {/* Ward List Checklist Modal (Sub-Modal) */}
-      {showWardListModal && (
-        <div className="modal-backdrop sub-modal-backdrop" onClick={handleCancelWardList}>
-          <div className="ward-list-modal-content" onClick={(e) => e.stopPropagation()}>
-            <button className="modal-close-btn" onClick={handleCancelWardList}>
-              <X size={24} />
-            </button>
-            <h3>Chọn Phường từ danh sách</h3>
-            
-            <div className="region-tabs">
-              {Object.keys(WARDS_BY_REGION).map((region) => (
-                <button 
-                  key={region}
-                  type="button"
-                  className={`region-tab-btn ${activeRegionTab === region ? 'active' : ''}`}
-                  onClick={() => {
-                    setActiveRegionTab(region);
-                    setListModalSearchQuery('');
-                  }}
-                >
-                  {region}
-                </button>
-              ))}
-            </div>
-
-            <div className="list-search-container">
-              <input 
-                type="text" 
-                placeholder="Tìm phường..." 
-                value={listModalSearchQuery}
-                onChange={(e) => setListModalSearchQuery(e.target.value)}
-              />
-            </div>
-
-            <div className="ward-checklist-container">
-              {filteredListWards.length === 0 ? (
-                <div className="empty-checklist">Không tìm thấy phường phù hợp.</div>
-              ) : (
-                <div className="ward-checklist-grid">
-                  {filteredListWards.map((ward) => {
-                    const isChecked = subTempSelectedWards.includes(ward);
-                    return (
-                      <label key={ward} className="ward-checkbox-label">
-                        <input 
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => handleToggleSubTempWard(ward)}
-                        />
-                        <span className="custom-checkbox"></span>
-                        <span className="ward-name-text">{ward}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            <div className="filter-actions">
-              <button type="button" className="btn-secondary" onClick={handleCancelWardList}>Hủy</button>
-              <button type="button" className="btn-primary" onClick={handleSaveWardList}>Lưu</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

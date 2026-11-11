@@ -27,12 +27,12 @@ const savePublicImage = async (value, category, userId) => {
   const objectPath = `${category}/${ownerId}/${filename}`;
   const { error } = await supabase.storage.from('property-images')
     .upload(objectPath, image.buffer, { contentType: image.mimetype, upsert: false });
-  if (!error) return supabase.storage.from('property-images').getPublicUrl(objectPath).data.publicUrl;
-
-  const uploadDirectory = path.resolve(__dirname, '../public/uploads');
-  await fs.mkdir(uploadDirectory, { recursive: true });
-  await fs.writeFile(path.join(uploadDirectory, filename), image.buffer, { flag: 'wx' });
-  return `/uploads/${filename}`;
+  if (error) {
+    // Không ghi tạm ra ổ đĩa: trên máy chủ deploy, ổ đĩa bị xóa mỗi lần triển khai nên ảnh sẽ mất.
+    console.error('Public image upload failed:', error.message || error);
+    throw Object.assign(new Error('Không thể lưu ảnh lúc này, vui lòng thử lại.'), { statusCode: 503 });
+  }
+  return supabase.storage.from('property-images').getPublicUrl(objectPath).data.publicUrl;
 };
 
 // Client-supplied URLs are never authority to delete another user's object.

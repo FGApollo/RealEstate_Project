@@ -31,9 +31,22 @@ const propertyTypeKey = (value) => {
   return key.toUpperCase();
 };
 
+// "TP. Hồ Chí Minh", "Thành phố Hồ Chí Minh" và "Hồ Chí Minh" là cùng một nơi: bỏ tiền tố hành chính.
+// Giữ "quan_" vì nhiều quận chỉ có số (Quận 1, Quận 7).
+const ADMIN_PREFIX = /^(thanh_pho|tp|tinh|thi_xa|huyen)_/;
+const canonicalPlace = (value) => normalizeKey(value).replace(ADMIN_PREFIX, '');
+
+// Chuẩn hóa cả khóa đã lưu từ trước (ví dụ "tp_ho_chi_minh|quan_1") để so khớp với khóa mới.
+const canonicalLocationKey = (key) => {
+  const [city, district] = String(key || '').split('|');
+  const cityKey = canonicalPlace(city);
+  const districtKey = canonicalPlace(district);
+  return cityKey && districtKey ? `${cityKey}|${districtKey}` : '';
+};
+
 const locationKey = ({ city, district } = {}) => {
-  const cityKey = normalizeKey(city);
-  const districtKey = normalizeKey(district);
+  const cityKey = canonicalPlace(city);
+  const districtKey = canonicalPlace(district);
   return cityKey && districtKey ? `${cityKey}|${districtKey}` : '';
 };
 
@@ -42,4 +55,4 @@ const propertyFeatureKeys = (property) => [
   ...(property?.lifestyle_tags || []).map((tag) => typeof tag === 'string' ? tag : tag?.tag_name)
 ].map(normalizeKey).filter(Boolean);
 
-module.exports = { PROPERTY_TYPES, normalizeKey, propertyTypeKey, locationKey, propertyFeatureKeys };
+module.exports = { PROPERTY_TYPES, normalizeKey, propertyTypeKey, locationKey, canonicalLocationKey, propertyFeatureKeys };

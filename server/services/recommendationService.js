@@ -1,6 +1,6 @@
 const preferenceService = require('./preferenceService');
 const propertyRepository = require('../repositories/propertyRepository');
-const { propertyTypeKey, locationKey, propertyFeatureKeys } = require('./recommendationKeys');
+const { propertyTypeKey, locationKey, canonicalLocationKey, propertyFeatureKeys } = require('./recommendationKeys');
 const jwt = require('jsonwebtoken');
 
 const SCORING = Object.freeze({
@@ -52,7 +52,8 @@ const scoreProperty = (property, preference, behaviorProfile) => {
     reasons.push('property type match');
   }
 
-  const preferredLocations = preference.preferred_location_keys || [];
+  // Khóa đã lưu từ trước có thể còn tiền tố ("tp_ho_chi_minh|…"): chuẩn hóa trước khi so.
+  const preferredLocations = (preference.preferred_location_keys || []).map(canonicalLocationKey);
   const propertyLocation = locationKey(property);
   if (propertyLocation && preferredLocations.includes(propertyLocation)) {
     score += weights.location;
@@ -159,8 +160,14 @@ const buildBehaviorProfile = async (userId) => {
   return { events, propertyById, profile, now };
 };
 
+// Mỗi truy vấn tới Supabase mất ~250ms (mạng), nên các bước không phụ thuộc nhau được chạy song song.
 const getRecommendations = async (userId, { category, limit, offset, feedToken, filters = {} } = {}) => {
-  const savedPreferences = await preferenceService.getPreferences(userId);
+  // Trang tiếp theo (có feedToken) chỉ cần khảo sát để đối chiếu; trang đầu thì tải sẵn nguồn tin + hành vi cùng lúc.
+  const [savedPreferences, pool, behaviorResult] = await Promise.all([
+    preferenceService.getPreferences(userId),
+    feedToken ? null : propertyRepository.fetchRecommendationCandidates(null, SCORING.candidateLimit, filters, category),
+    feedToken ? null : buildBehaviorProfile(userId)
+  ]);
   const preference = savedPreferences?.onboarding_completed ? savedPreferences : DEFAULT_PREFERENCES;
 
   const requestedLimit = Number(limit);
@@ -193,8 +200,11 @@ const getRecommendations = async (userId, { category, limit, offset, feedToken, 
       throw error;
     }
     const ids = snapshot.ids.slice(pageOffset, pageOffset + pageSize);
-    const properties = (await propertyRepository.fetchPropertiesByIds(ids, preference.listing_type))
-      .filter((property) => !preference.listing_type || !property.listing_type || property.listing_type === preference.listing_type);
+    // Danh sách id đã được lọc khi tạo feed; phần "Phổ biến" có thể khác loại thuê/bán của khảo sát nên không lọc lại.
+    const popularFrom = Number.isInteger(snapshot.popularFrom) ? snapshot.popularFrom : snapshot.ids.length;
+    const sectionById = new Map(ids.map((id, index) => [Number(id), pageOffset + index >= popularFrom ? 'popular' : 'for_you']));
+    const properties = (await propertyRepository.fetchPropertiesByIds(ids, null))
+      .map((property) => ({ ...property, feed_section: sectionById.get(Number(property.id)) || 'for_you' }));
     const nextOffset = pageOffset + ids.length;
     return {
       properties,
@@ -205,10 +215,19 @@ const getRecommendations = async (userId, { category, limit, offset, feedToken, 
     };
   }
 
-  const candidates = await propertyRepository.fetchRecommendationCandidates(preference.listing_type, SCORING.candidateLimit, filters, category);
-  const [favoriteIds, behavior] = await Promise.all([
-    propertyRepository.fetchFavoriteIds(userId, candidates.map((property) => property.id)),
-    buildBehaviorProfile(userId)
+  // Nguồn cho phần "Phổ biến" nối sau khi hết tin hợp gu: bỏ giới hạn thuê/bán của khảo sát (bộ lọc người dùng tự chọn vẫn giữ).
+  const popularPool = pool;
+  const behavior = behaviorResult;
+  // Nguồn chưa chạm giới hạn thì đã chứa mọi tin đủ điều kiện: lọc thuê/bán ngay tại đây, khỏi gọi RPC lần hai.
+  const candidates = !preference.listing_type ? popularPool
+    : popularPool.length < SCORING.candidateLimit
+      // Giống điều kiện của RPC search_ranked_properties: tin chưa ghi thuê/bán vẫn được tính.
+      ? popularPool.filter((property) => !property.listing_type || property.listing_type === preference.listing_type)
+      : await propertyRepository.fetchRecommendationCandidates(preference.listing_type, SCORING.candidateLimit, filters, category);
+  const poolIds = [...new Set([...candidates, ...popularPool].map((property) => property.id))];
+  const [favoriteIds, favoriteCounts] = await Promise.all([
+    propertyRepository.fetchFavoriteIds(userId, poolIds),
+    propertyRepository.fetchFavoriteCounts(poolIds)
   ]);
 
   const latestFeedbackByProperty = new Map();
@@ -232,12 +251,36 @@ const getRecommendations = async (userId, { category, limit, offset, feedToken, 
     .sort((a, b) => (Number(b.property.display_priority) || 0) - (Number(a.property.display_priority) || 0)
       || b.match.score - a.match.score || Number(b.property.id) - Number(a.property.id));
 
+  // Hết tin hợp gu thì feed không rỗng: nối tiếp các tin còn lại theo độ phổ biến (lượt xem + lượt thích),
+  // giống "có thể bạn cũng thích" của các sàn thương mại điện tử. Tin đã thích (nằm trong Yêu thích) không lặp lại;
+  // tin từng bỏ qua xếp cuối, tin bỏ qua lâu nhất lên trước.
+  const mainIds = new Set(scored.map(({ property }) => Number(property.id)));
+  const rest = popularPool.filter((property) => !mainIds.has(Number(property.id)) && !favoriteSet.has(Number(property.id))
+    && (!category || category === 'ALL' || categoryKey(property.property_type) === categoryKey(category)));
+  const popularity = (property) => (Number(property.views) || 0) + 3 * (favoriteCounts.get(Number(property.id)) || 0)
+    + (Number(property.display_priority) || 0) / 100;
+  const dislikedAt = (property) => {
+    const latest = latestFeedbackByProperty.get(Number(property.id));
+    return latest?.action === 'DISLIKE' ? new Date(latest.created_at).getTime() : null;
+  };
+  const popular = rest.sort((a, b) => {
+    const da = dislikedAt(a); const db = dislikedAt(b);
+    if ((da === null) !== (db === null)) return da === null ? -1 : 1;
+    if (da !== null) return da - db;
+    return popularity(b) - popularity(a) || Number(b.id) - Number(a.id);
+  });
+  const feed = [
+    ...scored.map(({ property, match }) => ({ property, match, section: 'for_you' })),
+    ...popular.map((property) => ({ property, match: null, section: 'popular' }))
+  ];
+
   const categorySnapshotKey = category ? categoryKey(category) : 'ALL';
   const signedFeedToken = jwt.sign({
     category: categorySnapshotKey,
     filters: JSON.stringify(filters),
     preferenceUpdatedAt: preference.updated_at,
-    ids: scored.map(({ property }) => Number(property.id))
+    ids: feed.map(({ property }) => Number(property.id)),
+    popularFrom: scored.length
   },
     getFeedTokenSecret(), {
       algorithm: 'HS256',
@@ -245,15 +288,16 @@ const getRecommendations = async (userId, { category, limit, offset, feedToken, 
       audience: FEED_TOKEN_AUDIENCE,
       expiresIn: '2h'
     });
-  const scoredPage = scored.slice(pageOffset, pageOffset + pageSize);
-  const page = scoredPage.map(({ property, match }) => ({
+  const feedPage = feed.slice(pageOffset, pageOffset + pageSize);
+  const page = feedPage.map(({ property, match, section }) => ({
     ...property,
-    ...(process.env.NODE_ENV === 'production' ? {} : {
+    feed_section: section,
+    ...(process.env.NODE_ENV === 'production' || !match ? {} : {
       recommendation_debug: { score: match.score, baseScore: match.baseScore, behaviorDelta: match.behaviorDelta, reasons: match.reasons }
     })
   }));
-  const nextOffset = pageOffset + scoredPage.length;
-  return { properties: page, offset: pageOffset, nextOffset, hasMore: nextOffset < scored.length, feedToken: signedFeedToken };
+  const nextOffset = pageOffset + feedPage.length;
+  return { properties: page, offset: pageOffset, nextOffset, hasMore: nextOffset < feed.length, feedToken: signedFeedToken };
 };
 
 module.exports = { getRecommendations, scoreProperty, buildBehaviorProfile, SCORING, DEFAULT_PREFERENCES };

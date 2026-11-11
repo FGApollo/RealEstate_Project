@@ -1,4 +1,6 @@
-const ESMS_ENDPOINT = 'https://rest.esms.vn/MainService.svc/json/SendMultipleMessage_V4_post_json/';
+const { isDevConsoleDeliveryEnabled } = require('./devDeliveryPolicy');
+
+const ESMS_ENDPOINT ='https://rest.esms.vn/MainService.svc/json/SendMultipleMessage_V4_post_json/';
 
 // Bảng tra mã lỗi phản hồi từ hệ thống eSMS.vn
 const ESMS_ERROR_MESSAGES = {
@@ -65,10 +67,14 @@ const sendOtpSms = async ({ phone, otp, customContent }) => {
   // Fallback Mock Mode: Nếu chưa cấu hình Key hoặc được cấu hình force mock
   if (!isConfigured() || forceMock) {
     console.warn(`[eSMS] Mock mode; no outbound SMS sent to ${maskPhone(phone)}.`);
+    const devConsole = isDevConsoleDeliveryEnabled();
+    // Chỉ máy dev đã bật DEV_CONSOLE_DELIVERY: in mã ra terminal để chạy được luồng xác minh số điện thoại.
+    if (devConsole) console.info(`[DEV] Mã OTP cho ${maskPhone(phone)}: ${otp}`);
 
     return {
       success: true,
       isMock: true,
+      devConsole,
       smsId: `MOCK_${Date.now()}`,
       message: 'Mã OTP đã được tạo (Chế độ giả lập eSMS do chưa có API Key)'
     };

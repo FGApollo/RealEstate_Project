@@ -21,9 +21,10 @@ const safeReturnTo = (value) => {
 
   const pathname = url.pathname;
   const isSwipe = /^\/swipe\/[^/]+\/?$/.test(pathname);
-  const isPayment = /^\/sale\/payment\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(pathname);
+  // Trang kết quả thanh toán: gói của môi giới (/sale/payment) và gói Plus của người dùng (/plus/payment).
+  const isPayment = /^\/(?:sale|plus)\/payment\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(pathname);
   if (!(pathname === '/' || pathname === '/onboarding' || pathname === '/chat'
-    || pathname === '/profile' || pathname === '/sale/overview' || pathname === '/admin' || isSwipe || isPayment)) return null;
+    || pathname === '/profile' || pathname === '/plus' || pathname === '/sale/overview' || pathname === '/admin' || isSwipe || isPayment)) return null;
   // payOS appends its own redirect parameters. Resume the owned order page
   // after login; no redirect parameter is accepted as payment evidence.
   if (isPayment) return pathname;

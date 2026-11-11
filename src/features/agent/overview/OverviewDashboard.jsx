@@ -2,16 +2,29 @@ import { useState, useMemo } from 'react';
 import {
   Home, Eye, Heart, ChevronRight, Plus, SlidersHorizontal,
   MapPin, Bed, Bath, Maximize, ShieldAlert, ShieldCheck, Search,
-  Edit3, Trash2, ExternalLink, X, Lock, EyeOff, CheckCircle2
+  Edit3, Trash2, ExternalLink, Lock, EyeOff, CheckCircle2
 } from 'lucide-react';
 import PropertyDetailModal from '../../../components/PropertyDetailModal';
 import DeleteConfirmModal from './DeleteConfirmModal';
 import PropertyStatusModal from './PropertyStatusModal';
 import './OverviewDashboard.css';
 
-import { WARDS_BY_REGION, ALL_WARDS, normalizeWard } from '../../../services/administrativeService';
+import AreaSelect from '../../location/AreaSelect';
+import { sameProvince, sameWard } from '../../location/adminAreas';
 
 // ponytail: extract overview and listings tab components into a single dashboard component
+// Nhãn trạng thái cho từng tin (tin bị admin ẩn thì báo "Đang bị ẩn" dù trạng thái vẫn là đang bán).
+const listingBadge = (listing) => {
+  if (listing.is_hidden && listing.status === 'AVAILABLE') return { label: 'Đang bị ẩn', tone: 'is-hidden' };
+  switch (listing.status) {
+    case 'AVAILABLE': return { label: 'Đang hiển thị', tone: '' };
+    case 'RENTED': return { label: 'Đã cho thuê', tone: 'is-rented' };
+    case 'SOLD': return { label: 'Đã bán', tone: 'is-sold' };
+    case 'DELETED': return { label: 'Đã gỡ', tone: 'is-deleted' };
+    default: return { label: listing.status || 'Không rõ', tone: 'is-deleted' };
+  }
+};
+
 const OverviewDashboard = ({
   activeTab,
   setActiveTab,
@@ -24,16 +37,11 @@ const OverviewDashboard = ({
   onDeleteProperty,
   onUpdateStatus
 }) => {
-  const [wardSearchQuery, setWardSearchQuery] = useState('');
-  const [tempSelectedWards, setTempSelectedWards] = useState([]);
-  const [showWardListModal, setShowWardListModal] = useState(false);
-  const [listModalSearchQuery, setListModalSearchQuery] = useState('');
-  const [activeRegionTab, setActiveRegionTab] = useState('TP.HCM');
-  const [subTempSelectedWards, setSubTempSelectedWards] = useState([]);
+  const [tempArea, setTempArea] = useState({ province: '', ward: '' });
   const [filterPriceSort, setFilterPriceSort] = useState('ALL');
   const [filterType, setFilterType] = useState('ALL');
   const [filterStatus, setFilterStatus] = useState('ALL');
-  const [appliedWards, setAppliedWards] = useState([]);
+  const [appliedArea, setAppliedArea] = useState({ province: '', ward: '' });
   const [appliedType, setAppliedType] = useState('ALL');
   const [appliedPriceSort, setAppliedPriceSort] = useState('ALL');
   const [appliedStatus, setAppliedStatus] = useState('ALL');
@@ -43,61 +51,11 @@ const OverviewDashboard = ({
   const [previewProperty, setPreviewProperty] = useState(null);
   const [deletingProperty, setDeletingProperty] = useState(null);
   const [statusModalProperty, setStatusModalProperty] = useState(null);
-  const itemsPerPage = 5;
-
-  // Ward suggestions logic
-  const suggestedWards = useMemo(() => {
-    if (!wardSearchQuery.trim()) return [];
-    const query = wardSearchQuery.toLowerCase();
-    return ALL_WARDS.filter(ward =>
-      ward.toLowerCase().includes(query) &&
-      !tempSelectedWards.some(selected => normalizeWard(selected) === normalizeWard(ward))
-    ).slice(0, 5);
-  }, [wardSearchQuery, tempSelectedWards]);
-
-  const filteredListWards = useMemo(() => {
-    const wardsInRegion = WARDS_BY_REGION[activeRegionTab] || [];
-    if (!listModalSearchQuery.trim()) return wardsInRegion;
-    const query = listModalSearchQuery.toLowerCase();
-    return wardsInRegion.filter(ward => ward.toLowerCase().includes(query));
-  }, [activeRegionTab, listModalSearchQuery]);
-
-  const handleSelectWard = (ward) => {
-    if (!tempSelectedWards.includes(ward)) {
-      setTempSelectedWards([...tempSelectedWards, ward]);
-    }
-    setWardSearchQuery('');
-  };
-
-  const handleRemoveTempWard = (ward) => {
-    setTempSelectedWards(tempSelectedWards.filter(w => w !== ward));
-  };
-
-  const handleOpenWardListModal = () => {
-    setSubTempSelectedWards([...tempSelectedWards]);
-    setListModalSearchQuery('');
-    setShowWardListModal(true);
-  };
-
-  const handleSaveWardList = () => {
-    setTempSelectedWards(subTempSelectedWards);
-    setShowWardListModal(false);
-  };
-
-  const handleCancelWardList = () => {
-    setShowWardListModal(false);
-  };
-
-  const handleToggleSubTempWard = (ward) => {
-    if (subTempSelectedWards.includes(ward)) {
-      setSubTempSelectedWards(subTempSelectedWards.filter(w => w !== ward));
-    } else {
-      setSubTempSelectedWards([...subTempSelectedWards, ward]);
-    }
-  };
+  // 11 tin + ô "Tạo tin đăng mới" = 12 ô, chia đều cho lưới 2, 3, 4 hoặc 6 cột.
+  const itemsPerPage = 11;
 
   const handleApplyFilter = () => {
-    setAppliedWards([...tempSelectedWards]);
+    setAppliedArea(tempArea);
     setAppliedType(filterType);
     setAppliedPriceSort(filterPriceSort);
     setAppliedStatus(filterStatus);
@@ -105,15 +63,14 @@ const OverviewDashboard = ({
   };
 
   const handleResetFilter = () => {
-    setTempSelectedWards([]);
-    setAppliedWards([]);
+    setTempArea({ province: '', ward: '' });
+    setAppliedArea({ province: '', ward: '' });
     setFilterType('ALL');
     setAppliedType('ALL');
     setFilterPriceSort('ALL');
     setAppliedPriceSort('ALL');
     setFilterStatus('ALL');
     setAppliedStatus('ALL');
-    setWardSearchQuery('');
   };
 
   // Filter listings
@@ -139,12 +96,12 @@ const OverviewDashboard = ({
       result = result.filter(p => p.status === appliedStatus);
     }
 
-    // Filter by Wards
-    if (appliedWards.length > 0) {
-      const normalizedWards = appliedWards.map(w => normalizeWard(w));
+    // Lọc khu vực theo đơn vị mới. admin_area do server quy đổi (tin cũ ghi quận/phường cũ vẫn ra đúng phường mới).
+    if (appliedArea.province) {
       result = result.filter(p => {
-        if (!p.ward) return false;
-        return normalizedWards.includes(normalizeWard(p.ward));
+        const area = p.admin_area || { province: p.city, ward: p.ward };
+        return sameProvince(area.province, appliedArea.province)
+          && (!appliedArea.ward || sameWard(area.ward, appliedArea.ward));
       });
     }
 
@@ -156,13 +113,14 @@ const OverviewDashboard = ({
     }
 
     return result;
-  }, [data.activeListings, appliedWards, appliedType, appliedPriceSort, appliedStatus, searchQuery]);
+  }, [data.activeListings, appliedArea, appliedType, appliedPriceSort, appliedStatus, searchQuery]);
 
   // Paginated listings
   const totalPages = Math.ceil(filteredListings.length / itemsPerPage) || 1;
+  const safePage = Math.min(currentPage, totalPages);
   const paginatedListings = filteredListings.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
+    (safePage - 1) * itemsPerPage,
+    safePage * itemsPerPage
   );
 
   const formatPrice = (price) => {
@@ -178,6 +136,12 @@ const OverviewDashboard = ({
     }
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
   };
+
+  // Tổng quan: ưu tiên tin đang hiển thị, sau đó mới tới tin đã bán / cho thuê / gỡ (giữ thứ tự mới nhất trước).
+  const recentListings = useMemo(() => {
+    const rank = (item) => (item.status === 'AVAILABLE' && !item.is_hidden ? 0 : item.status === 'AVAILABLE' ? 1 : item.status === 'DELETED' ? 3 : 2);
+    return [...(data.activeListings || [])].sort((a, b) => rank(a) - rank(b)).slice(0, 3);
+  }, [data.activeListings]);
 
   const statusCounts = useMemo(() => {
     const list = data.activeListings || [];
@@ -263,8 +227,8 @@ const OverviewDashboard = ({
               <div className="stat-icon properties-icon">
                 <Home size={24} />
               </div>
-              <div className="stat-label">Tổng số nhà đang bán</div>
-              <div className="stat-value">{loading ? '-' : data.totalProperties}</div>
+              <div className="stat-label">Tin đang bán / cho thuê</div>
+              <div className="stat-value">{loading ? '-' : statusCounts.AVAILABLE}</div>
               <div className="stat-trend">Cập nhật lúc {new Date().toLocaleTimeString()}</div>
             </div>
 
@@ -297,16 +261,16 @@ const OverviewDashboard = ({
               {loading ? (
                 <p>Đang tải dữ liệu...</p>
               ) : data.activeListings.length === 0 ? (
-                <p>Chưa có tin đăng nào hoạt động.</p>
+                <p>Bạn chưa có tin đăng nào.</p>
               ) : (
-                data.activeListings.slice(0, 3).map(listing => (
+                recentListings.map(listing => (
                   <div key={listing.id} className="listing-item">
                     <img src={listing.thumbnail || 'https://via.placeholder.com/80'} alt={listing.title} className="listing-image" />
                     <div className="listing-info">
                       <h3>{listing.title}</h3>
                       <p>
                         {formatPrice(listing.price)}
-                        {listing.status === 'AVAILABLE' && <span className="agent-status-badge">Đang hiển thị</span>}
+                        {(() => { const badge = listingBadge(listing); return <span className={`agent-status-badge ${badge.tone}`}>{badge.label}</span>; })()}
                       </p>
                     </div>
                     <div className="listing-stats">
@@ -385,71 +349,10 @@ const OverviewDashboard = ({
           {/* Collapsible filter panel */}
           {showFilters && (
             <div className="filter-dropdown-panel new-profile-filter-style" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', padding: '16px' }}>
-              {/* Ward / Khu vực */}
-              <div className="filter-field ward-filter-field" style={{ position: 'relative' }}>
+              {/* Khu vực: chọn theo đơn vị hành chính mới; tin cũ được server quy đổi sẵn (listing.admin_area). */}
+              <div className="filter-field ward-filter-field">
                 <label className="filter-label">Khu vực</label>
-                <div className="ward-search-input-group" style={{ display: 'flex', gap: '8px' }}>
-                  <div className="ward-search-input-wrapper" style={{ position: 'relative', flex: 1 }}>
-                    <input
-                      type="text"
-                      placeholder="Tìm phường..."
-                      value={wardSearchQuery}
-                      onChange={(e) => setWardSearchQuery(e.target.value)}
-                      style={{ width: '100%' }}
-                    />
-                    {wardSearchQuery && (
-                      <button
-                        className="clear-search-btn"
-                        onClick={() => setWardSearchQuery('')}
-                        style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer' }}
-                      >
-                        <X size={14} />
-                      </button>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    className="btn-select-ward-list"
-                    onClick={handleOpenWardListModal}
-                    style={{ padding: '6px 12px', fontSize: '12px', border: '1px solid #cbd5e1', borderRadius: '6px', background: '#f8fafc', cursor: 'pointer' }}
-                  >
-                    Chọn từ danh sách
-                  </button>
-                </div>
-
-                {/* Suggestions List */}
-                {suggestedWards.length > 0 && (
-                  <ul className="ward-dropdown-suggestions" style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', zIndex: 10, padding: '4px 0', margin: '4px 0', listStyle: 'none' }}>
-                    {suggestedWards.map((ward) => (
-                      <li
-                        key={ward}
-                        onClick={() => handleSelectWard(ward)}
-                        style={{ padding: '8px 12px', cursor: 'pointer' }}
-                        onMouseEnter={(e) => e.target.style.backgroundColor = '#f1f5f9'}
-                        onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-                      >
-                        {ward}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-
-                {/* Selected Ward Badges */}
-                {tempSelectedWards.length > 0 && (
-                  <div className="filter-ward-badges" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
-                    {tempSelectedWards.map((ward) => (
-                      <span key={ward} className="ward-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '9999px', fontSize: '11px', color: '#334155' }}>
-                        {ward}
-                        <button
-                          onClick={() => handleRemoveTempWard(ward)}
-                          style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                        >
-                          <X size={10} />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
+                <AreaSelect province={tempArea.province} ward={tempArea.ward} onChange={setTempArea} className="overview-area-select" />
               </div>
 
               {/* Price Sort / Khoảng giá */}
@@ -643,23 +546,23 @@ const OverviewDashboard = ({
           {totalPages > 1 && (
             <div className="pagination-container">
               <button
-                disabled={currentPage === 1}
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={safePage === 1}
+                onClick={() => setCurrentPage(Math.max(safePage - 1, 1))}
               >
                 Trước
               </button>
               {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
                 <button
                   key={page}
-                  className={currentPage === page ? 'active' : ''}
+                  className={safePage === page ? 'active' : ''}
                   onClick={() => setCurrentPage(page)}
                 >
                   {page}
                 </button>
               ))}
               <button
-                disabled={currentPage === totalPages}
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={safePage === totalPages}
+                onClick={() => setCurrentPage(Math.min(safePage + 1, totalPages))}
               >
                 Sau
               </button>
@@ -703,70 +606,6 @@ const OverviewDashboard = ({
         />
       )}
 
-      {/* Ward List Checklist Modal (Sub-Modal) */}
-      {showWardListModal && (
-        <div className="modal-backdrop sub-modal-backdrop" onClick={handleCancelWardList}>
-          <div className="ward-list-modal-content" onClick={(e) => e.stopPropagation()}>
-            <button className="modal-close-btn" onClick={handleCancelWardList}>
-              <X size={24} />
-            </button>
-            <h3>Chọn Phường từ danh sách</h3>
-
-            <div className="region-tabs">
-              {Object.keys(WARDS_BY_REGION).map((region) => (
-                <button
-                  key={region}
-                  type="button"
-                  className={`region-tab-btn ${activeRegionTab === region ? 'active' : ''}`}
-                  onClick={() => {
-                    setActiveRegionTab(region);
-                    setListModalSearchQuery('');
-                  }}
-                >
-                  {region}
-                </button>
-              ))}
-            </div>
-
-            <div className="list-search-container">
-              <input
-                type="text"
-                placeholder="Tìm phường..."
-                value={listModalSearchQuery}
-                onChange={(e) => setListModalSearchQuery(e.target.value)}
-              />
-            </div>
-
-            <div className="ward-checklist-container">
-              {filteredListWards.length === 0 ? (
-                <div className="empty-checklist">Không tìm thấy phường phù hợp.</div>
-              ) : (
-                <div className="ward-checklist-grid">
-                  {filteredListWards.map((ward) => {
-                    const isChecked = subTempSelectedWards.includes(ward);
-                    return (
-                      <label key={ward} className="ward-checkbox-label">
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => handleToggleSubTempWard(ward)}
-                        />
-                        <span className="custom-checkbox"></span>
-                        <span className="ward-name-text">{ward}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            <div className="filter-actions">
-              <button type="button" className="btn-secondary" onClick={handleCancelWardList}>Hủy</button>
-              <button type="button" className="btn-primary" onClick={handleSaveWardList}>Lưu</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

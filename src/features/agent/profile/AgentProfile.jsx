@@ -1,11 +1,12 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   MapPin, Bed, Bath, Maximize, Shield, ShieldCheck, ShieldAlert,
-  Mail, Phone, Plus, SlidersHorizontal, X, Edit3, Trash2,
+  Mail, Phone, Plus, SlidersHorizontal, Edit3, Trash2,
   ExternalLink, MessageSquare, Star, Award, Compass, Heart,
   FileText, Lock, TrendingUp, RefreshCw, ThumbsUp, CheckCircle, Upload, AlertCircle,
   Check, ArrowRight, Grid, Info, Sun, Smile, Camera, ArrowLeft, CheckCircle2, Loader2
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../../../config';
 import { apiFetch } from '../../../auth/apiClient';
 import Avatar from '../../../components/Avatar';
@@ -16,7 +17,8 @@ import TrustScoreBonusModal from './TrustScoreBonusModal';
 import KycCameraModal from './KycCameraModal';
 import './AgentProfile.css';
 
-import { WARDS_BY_REGION, ALL_WARDS, normalizeWard } from '../../../services/administrativeService';
+import AreaSelect from '../../location/AreaSelect';
+import { sameProvince, sameWard } from '../../location/adminAreas';
 
 const maskIdNumber = (id) => {
   if (!id || typeof id !== 'string') return '---';
@@ -38,6 +40,7 @@ const AgentProfile = ({
   hideHeader = false
 }) => {
   const { updateUser } = useAuth();
+  const navigate = useNavigate();
   const [selectedProfileTab, setSelectedProfileTab] = useState(initialTab);
   const [isBonusModalOpen, setIsBonusModalOpen] = useState(false);
 
@@ -109,14 +112,9 @@ const AgentProfile = ({
     }
   };
 
-  // Ward Filtering states (same as buyer page)
-  const [selectedWards, setSelectedWards] = useState([]);
-  const [tempSelectedWards, setTempSelectedWards] = useState([]);
-  const [wardSearchQuery, setWardSearchQuery] = useState('');
-  const [showWardListModal, setShowWardListModal] = useState(false);
-  const [listModalSearchQuery, setListModalSearchQuery] = useState('');
-  const [activeRegionTab, setActiveRegionTab] = useState('TP.HCM');
-  const [subTempSelectedWards, setSubTempSelectedWards] = useState([]);
+  // Khu vực (đơn vị hành chính mới)
+  const [tempArea, setTempArea] = useState({ province: '', ward: '' });
+  const [appliedArea, setAppliedArea] = useState({ province: '', ward: '' });
 
   // Price & Type states
   const [filterPriceSort, setFilterPriceSort] = useState('ALL'); // ALL, low-high, high-low
@@ -694,6 +692,21 @@ const AgentProfile = ({
         throw new Error(result.error || result.message || 'Khuôn mặt không khớp với ảnh CCCD, vui lòng chụp lại.');
       }
 
+      if (result.pendingAdminReview) {
+        // Tên trên CCCD lệch tên đã khai, hoặc dịch vụ so khớp khuôn mặt đang lỗi: chờ quản trị viên duyệt tay.
+        setKycWizardStep(0);
+        setKycStatus(prev => ({
+          ...prev,
+          verificationStatus: 'PENDING',
+          latestVerificationStatus: 'PENDING',
+          hasPendingVerification: true,
+          awaitingAdminReview: true,
+          reviewReason: result.reviewReason || 'NAME_MISMATCH'
+        }));
+        updateUser({ verification_status: 'PENDING' });
+        return;
+      }
+
       setKycWizardStep(4);
       setKycStatus(prev => ({
         ...prev,
@@ -754,76 +767,23 @@ const AgentProfile = ({
     return (sum / reviews.length).toFixed(1);
   }, [reviews]);
 
-  // Ward suggestions logic
-  const suggestedWards = useMemo(() => {
-    if (!wardSearchQuery.trim()) return [];
-    const query = wardSearchQuery.toLowerCase();
-    return ALL_WARDS.filter(ward =>
-      ward.toLowerCase().includes(query) &&
-      !tempSelectedWards.some(selected => normalizeWard(selected) === normalizeWard(ward))
-    ).slice(0, 5);
-  }, [wardSearchQuery, tempSelectedWards]);
-
-  const filteredListWards = useMemo(() => {
-    const wardsInRegion = WARDS_BY_REGION[activeRegionTab] || [];
-    if (!listModalSearchQuery.trim()) return wardsInRegion;
-    const query = listModalSearchQuery.toLowerCase();
-    return wardsInRegion.filter(ward => ward.toLowerCase().includes(query));
-  }, [activeRegionTab, listModalSearchQuery]);
-
-  const handleSelectWard = (ward) => {
-    if (!tempSelectedWards.includes(ward)) {
-      setTempSelectedWards([...tempSelectedWards, ward]);
-    }
-    setWardSearchQuery('');
-  };
-
-  const handleRemoveTempWard = (ward) => {
-    setTempSelectedWards(tempSelectedWards.filter(w => w !== ward));
-  };
-
-  const handleOpenWardListModal = () => {
-    setSubTempSelectedWards([...tempSelectedWards]);
-    setListModalSearchQuery('');
-    setShowWardListModal(true);
-  };
-
-  const handleSaveWardList = () => {
-    setTempSelectedWards(subTempSelectedWards);
-    setShowWardListModal(false);
-  };
-
-  const handleCancelWardList = () => {
-    setShowWardListModal(false);
-  };
-
-  const handleToggleSubTempWard = (ward) => {
-    if (subTempSelectedWards.includes(ward)) {
-      setSubTempSelectedWards(subTempSelectedWards.filter(w => w !== ward));
-    } else {
-      setSubTempSelectedWards([...subTempSelectedWards, ward]);
-    }
-  };
-
   // Apply filters
-  const [appliedWards, setAppliedWards] = useState([]);
   const [appliedType, setAppliedType] = useState('ALL');
   const [appliedPriceSort, setAppliedPriceSort] = useState('ALL');
 
   const handleApplyFilter = () => {
-    setAppliedWards([...tempSelectedWards]);
+    setAppliedArea(tempArea);
     setAppliedType(filterType);
     setAppliedPriceSort(filterPriceSort);
   };
 
   const handleResetFilter = () => {
-    setTempSelectedWards([]);
-    setAppliedWards([]);
+    setTempArea({ province: '', ward: '' });
+    setAppliedArea({ province: '', ward: '' });
     setFilterType('ALL');
     setAppliedType('ALL');
     setFilterPriceSort('ALL');
     setAppliedPriceSort('ALL');
-    setWardSearchQuery('');
   };
 
   // Filter and sort listings
@@ -835,12 +795,12 @@ const AgentProfile = ({
       result = result.filter(p => p.property_type === appliedType);
     }
 
-    // Filter by Wards
-    if (appliedWards.length > 0) {
-      const normalizedWards = appliedWards.map(w => normalizeWard(w));
+    // Lọc khu vực theo đơn vị mới. admin_area do server quy đổi (tin cũ ghi quận/phường cũ vẫn ra đúng phường mới).
+    if (appliedArea.province) {
       result = result.filter(p => {
-        if (!p.ward) return false;
-        return normalizedWards.includes(normalizeWard(p.ward));
+        const area = p.admin_area || { province: p.city, ward: p.ward };
+        return sameProvince(area.province, appliedArea.province)
+          && (!appliedArea.ward || sameWard(area.ward, appliedArea.ward));
       });
     }
 
@@ -852,7 +812,7 @@ const AgentProfile = ({
     }
 
     return result;
-  }, [data.activeListings, appliedWards, appliedType, appliedPriceSort]);
+  }, [data.activeListings, appliedArea, appliedType, appliedPriceSort]);
 
   const formatPrice = (price) => {
     if (!price || price === 0) return 'Liên hệ';
@@ -993,25 +953,6 @@ const AgentProfile = ({
         </div>
       )}
 
-      {/* 2. SUB NAVIGATION TABS */}
-      {/* Hiding tabs since profile page now only shows identity verification (kyc) */}
-      {false && !hideHeader && (
-        <div className="profile-tabs-nav">
-          <button
-            className={`profile-tab-btn ${selectedProfileTab === 'posts' ? 'active' : ''}`}
-            onClick={() => setSelectedProfileTab('posts')}
-          >
-            Bài đã đăng
-          </button>
-          <button
-            className={`profile-tab-btn ${selectedProfileTab === 'kyc' ? 'active' : ''}`}
-            onClick={() => setSelectedProfileTab('kyc')}
-          >
-            Thông tin định danh
-          </button>
-        </div>
-      )}
-
       {/* 3. TABS CONTENT */}
       <div className="profile-tab-content">
 
@@ -1020,52 +961,10 @@ const AgentProfile = ({
           <div className="posts-tab-container">
             {/* Filter Section */}
             <div className="profile-filter-section">
-              {/* Khu vực (Ward) */}
+              {/* Khu vực: chọn theo đơn vị hành chính mới; tin cũ được server quy đổi sẵn (listing.admin_area). */}
               <div className="filter-column ward-column">
-                <span className="filter-label">Khu vực</span>
-                <div className="ward-search-input-group">
-                  <div className="ward-search-input-wrapper">
-                    <input
-                      type="text"
-                      placeholder="Tìm phường..."
-                      value={wardSearchQuery}
-                      onChange={(e) => setWardSearchQuery(e.target.value)}
-                    />
-                    {wardSearchQuery && (
-                      <button className="clear-search-btn" onClick={() => setWardSearchQuery('')}>
-                        <X size={14} />
-                      </button>
-                    )}
-                  </div>
-                  <button className="btn-select-ward-list" onClick={handleOpenWardListModal}>
-                    Chọn từ danh sách
-                  </button>
-                </div>
-
-                {/* Suggestions List */}
-                {suggestedWards.length > 0 && (
-                  <ul className="ward-dropdown-suggestions">
-                    {suggestedWards.map((ward) => (
-                      <li key={ward} onClick={() => handleSelectWard(ward)}>
-                        {ward}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-
-                {/* Selected Ward Badges */}
-                {tempSelectedWards.length > 0 && (
-                  <div className="filter-ward-badges">
-                    {tempSelectedWards.map((ward) => (
-                      <span key={ward} className="ward-badge">
-                        {ward}
-                        <button onClick={() => handleRemoveTempWard(ward)}>
-                          <X size={10} />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
+                <label className="filter-label">Khu vực</label>
+                <AreaSelect province={tempArea.province} ward={tempArea.ward} onChange={setTempArea} />
               </div>
 
               {/* Khoảng giá (Price Sort) */}
@@ -1554,10 +1453,10 @@ const AgentProfile = ({
                       </div>
 
                       <div className="s4-footer-actions">
-                        <button type="button" className="btn-s4-home" onClick={() => window.location.href = '/'}>
+                        <button type="button" className="btn-s4-home" onClick={() => navigate('/')}>
                           Về Trang Chủ <ArrowRight size={16} />
                         </button>
-                        <button type="button" className="btn-s4-manage" onClick={() => setSelectedProfileTab('properties')}>
+                        <button type="button" className="btn-s4-manage" onClick={() => setActiveTab('listings')}>
                           <Grid size={16} /> Quản lý tin đăng
                         </button>
                       </div>
@@ -2029,27 +1928,35 @@ const AgentProfile = ({
                         <ShieldAlert size={36} color={kycStatus?.latestVerificationStatus === 'PENDING' ? '#2563eb' : '#f97316'} />
                       </div>
                       <p className="unverified-text">
-                        {kycStatus?.latestVerificationStatus === 'PENDING' && kycStatus?.hasCardUploaded
+                        {kycStatus?.awaitingAdminReview && kycStatus?.reviewReason === 'FACE_CHECK_UNAVAILABLE'
+                          ? 'Hệ thống so khớp khuôn mặt tự động đang gặp sự cố nên hồ sơ của bạn đã được chuyển cho quản trị viên duyệt. Bạn không cần làm gì thêm.'
+                          : kycStatus?.awaitingAdminReview
+                          ? 'Ảnh khuôn mặt đã khớp, nhưng tên trên CCCD khác tên bạn đã khai. Hồ sơ đang chờ quản trị viên xác nhận. Nếu khai nhầm tên, bạn có thể gửi lại hồ sơ.'
+                          : kycStatus?.latestVerificationStatus === 'PENDING' && kycStatus?.hasCardUploaded
                           ? 'Bạn đã tải lên ảnh CCCD 2 mặt thành công. Vui lòng tiếp tục bước chụp ảnh chân dung để hoàn tất xác thực.'
                           : 'Để bảo vệ cộng đồng Swipe Nest và trải nghiệm đầy đủ các tính năng độc quyền, vui lòng hoàn tất xác thực danh tính.'}
                       </p>
-                      <button 
-                        className="btn-trigger-kyc" 
+                      <button
+                        className="btn-trigger-kyc"
                         onClick={() => {
-                          if (kycStatus?.latestVerificationStatus === 'PENDING' && kycStatus?.hasCardUploaded) {
+                          if (!kycStatus?.awaitingAdminReview && kycStatus?.latestVerificationStatus === 'PENDING' && kycStatus?.hasCardUploaded) {
                             setKycWizardStep(3);
                           } else {
                             handleStartKyc();
                           }
                         }}
                       >
-                        {kycStatus?.latestVerificationStatus === 'PENDING' && kycStatus?.hasCardUploaded
+                        {kycStatus?.awaitingAdminReview
+                          ? 'Gửi lại hồ sơ'
+                          : kycStatus?.latestVerificationStatus === 'PENDING' && kycStatus?.hasCardUploaded
                           ? 'Tiếp tục chụp ảnh khuôn mặt'
                           : 'Xác thực ngay'}
                       </button>
                       <span className="kyc-secure-note">🛡️ Xác thực an toàn theo chuẩn AES-256</span>
                       <h4 className="unverified-status-title">
-                        {kycStatus?.latestVerificationStatus === 'PENDING' ? 'Hồ sơ đang chờ xác thực khuôn mặt' : 'Tài khoản chưa được xác minh'}
+                        {kycStatus?.awaitingAdminReview
+                          ? 'Hồ sơ đang chờ quản trị viên xác nhận'
+                          : kycStatus?.latestVerificationStatus === 'PENDING' ? 'Hồ sơ đang chờ xác thực khuôn mặt' : 'Tài khoản chưa được xác minh'}
                       </h4>
                     </div>
                   </div>
@@ -2122,80 +2029,13 @@ const AgentProfile = ({
         />
       )}
 
-      {/* Ward List Checklist Modal (Sub-Modal) */}
-      {showWardListModal && (
-        <div className="modal-backdrop sub-modal-backdrop" onClick={handleCancelWardList}>
-          <div className="ward-list-modal-content" onClick={(e) => e.stopPropagation()}>
-            <button className="modal-close-btn" onClick={handleCancelWardList}>
-              <X size={24} />
-            </button>
-            <h3>Chọn Phường từ danh sách</h3>
-
-            <div className="region-tabs">
-              {Object.keys(WARDS_BY_REGION).map((region) => (
-                <button
-                  key={region}
-                  type="button"
-                  className={`region-tab-btn ${activeRegionTab === region ? 'active' : ''}`}
-                  onClick={() => {
-                    setActiveRegionTab(region);
-                    setListModalSearchQuery('');
-                  }}
-                >
-                  {region}
-                </button>
-              ))}
-            </div>
-
-            <div className="list-search-container">
-              <input
-                type="text"
-                placeholder="Tìm phường..."
-                value={listModalSearchQuery}
-                onChange={(e) => setListModalSearchQuery(e.target.value)}
-              />
-            </div>
-
-            <div className="ward-checklist-container">
-              {filteredListWards.length === 0 ? (
-                <div className="empty-checklist">Không tìm thấy phường phù hợp.</div>
-              ) : (
-                <div className="ward-checklist-grid">
-                  {filteredListWards.map((ward) => {
-                    const isChecked = subTempSelectedWards.includes(ward);
-                    return (
-                      <label key={ward} className="ward-checkbox-label">
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => handleToggleSubTempWard(ward)}
-                        />
-                        <span className="custom-checkbox"></span>
-                        <span className="ward-name-text">{ward}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            <div className="filter-actions">
-              <button type="button" className="btn-secondary" onClick={handleCancelWardList}>Hủy</button>
-              <button type="button" className="btn-primary" onClick={handleSaveWardList}>Lưu</button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Feature 50: Trust Score Bonus Tasks Modal */}
       <TrustScoreBonusModal
         isOpen={isBonusModalOpen}
         onClose={() => setIsBonusModalOpen(false)}
         currentUser={currentUser}
         onScoreUpdated={(newScore) => {
-          if (currentUser) {
-            currentUser.trust_score = newScore;
-          }
+          updateUser({ trust_score: newScore });
         }}
         onNavigateToKyc={() => {
           setSelectedProfileTab('kyc');

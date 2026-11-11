@@ -41,12 +41,21 @@ const signKycImage = async (value) => {
   return data.signedUrl;
 };
 
+// Ký từng ảnh riêng: một ảnh hỏng (đường dẫn không hợp lệ, file đã bị xóa) không được làm hỏng cả hồ sơ.
+// Ảnh không ký được trả về null và được liệt kê trong image_errors để giao diện admin báo "chưa có ảnh".
 const signVerificationImages = async (verification) => {
   const signed = { ...verification };
+  const imageErrors = [];
   for (const key of ['id_card_front_url', 'id_card_back_url', 'selfie_url']) {
-    signed[key] = await signKycImage(verification[key]);
+    try {
+      signed[key] = await signKycImage(verification[key]);
+    } catch {
+      signed[key] = null;
+      imageErrors.push(key);
+    }
   }
   signed.image_urls_expire_in = SIGNED_URL_TTL_SECONDS;
+  if (imageErrors.length) signed.image_errors = imageErrors;
   return signed;
 };
 

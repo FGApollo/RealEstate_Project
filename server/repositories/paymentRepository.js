@@ -17,12 +17,21 @@ function result({ data, error }) {
 }
 const rpc = async (name, args) => result(await supabase.rpc(name, args));
 module.exports = {
+  result,
   async plans() {
     const catalog = await rpc('agent_service_catalog', {});
     return assertTierCatalog(catalog.plans);
   },
+  // Hạng của kỳ đang chạy (null nếu không có kỳ nào còn hiệu lực).
+  async currentTier(userId) {
+    const now = new Date().toISOString().replace('Z', '');
+    const rows = result(await supabase.from('seller_subscriptions').select('support_tier, start_date')
+      .eq('user_id', userId).eq('status', 'ACTIVE').lte('start_date', now).gt('end_date', now)
+      .order('start_date', { ascending: false }).limit(1));
+    return rows?.[0]?.support_tier || null;
+  },
   async find(id, userId) {
-    let query = supabase.from('agent_payment_orders').select('*').eq('id', id);
+    let query = supabase.from('agent_payment_orders').select('*').eq('id', id).eq('audience', 'AGENT');
     if (userId !== undefined) query = query.eq('user_id', userId);
     return result(await query.maybeSingle());
   },
@@ -31,7 +40,7 @@ module.exports = {
   },
   async list(userId, page, limit) {
     const response = await supabase.from('agent_payment_orders').select('*', { count: 'exact' }).eq('user_id', userId)
-      .order('created_at', { ascending: false }).order('id').range((page - 1) * limit, page * limit - 1);
+      .eq('audience', 'AGENT').order('created_at', { ascending: false }).order('id').range((page - 1) * limit, page * limit - 1);
     return { items: result(response), total: response.count, page, limit };
   },
   reserve: (userId, planCode, requestId, version) => rpc('reserve_agent_payment', {

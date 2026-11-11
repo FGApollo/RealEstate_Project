@@ -1,5 +1,15 @@
 import { CheckCircle2 } from 'lucide-react';
-import { billingMoney } from './billingApi';
+import { billingMoney, billingDay, lastPeriodEnd } from './billingApi';
+
+// Nhãn nút theo loại giao dịch server tính sẵn (purchase_action): mua mới, gia hạn, nâng cấp, hạ cấp.
+const actionLabel = (plan, subscription) => {
+  switch (plan.purchase_action) {
+    case 'UPGRADE': return 'Nâng cấp ngay';
+    case 'DOWNGRADE': return `Hạ cấp từ ${billingDay(lastPeriodEnd(subscription))}`;
+    case 'RENEW': return 'Gia hạn bằng payOS';
+    default: return 'Thanh toán bằng payOS';
+  }
+};
 
 export default function ServicePlanCards({ plans, subscription, checkoutAvailable = false, busy = false, onSubscribe, preview = false }) {
   return <div className="pricing-grid">{plans.map(plan => {
@@ -17,7 +27,7 @@ export default function ServicePlanCards({ plans, subscription, checkoutAvailabl
         'Thanh toán xác thực qua payOS', 'Không tự động trừ tiền'
       ].map(feature => <li key={feature}><CheckCircle2 size={18} /><span>{feature}</span></li>)}</ul>
       <div className="plan-action">{paid ? <button className="btn-plan-action" disabled={preview || busy || !plan.active || !checkoutAvailable} onClick={() => onSubscribe?.(plan)}>
-          {!plan.active ? 'Tạm ngừng đăng ký mới' : busy ? 'Đang xử lý…' : subscription?.effective_status === 'ACTIVE' && subscription.plan_name === plan.code ? 'Gia hạn bằng payOS' : 'Thanh toán bằng payOS'}</button>
+          {!plan.active ? 'Tạm ngừng đăng ký mới' : busy ? 'Đang xử lý…' : actionLabel(plan, subscription)}</button>
           : plan.contact_url && !preview ? <a className="btn-plan-contact" href={plan.contact_url}>Liên hệ tư vấn</a>
             : <p className="plan-desc">Kênh tư vấn đang được cập nhật.</p>}</div>
     </article>;

@@ -44,3 +44,19 @@ public/*selfie*
 public/*portrait*
 public/anh-chan-dung-ro-net.jpg
 
+
+# Cache dữ liệu ngôn ngữ của tesseract.js (tự tải lại khi chạy OCR)
+*.traineddata
+
+# Script thử nghiệm cá nhân
+scratch/
+
+# Ảnh upload cũ trên ổ đĩa. Hai ảnh đã có trong git vẫn được giữ vì bình luận trên production còn dùng.
+server/public/uploads/*
+!server/public/uploads/1d44e4b3-49f6-4d55-8b7e-7b7148774703.png
+!server/public/uploads/349f43f3-6c24-4c52-9887-3f202f5d59fc.png
+
+
+# File mẫu biến môi trường (không chứa giá trị thật)
+!.env.example
+!server/.env.example

@@ -1,8 +1,17 @@
+const sharp = require('sharp');
 const { supabase } = require('../config/supabase');
 const ocrService = require('./ocrService');
 const faceCompareService = require('./faceCompareService');
-const trustScoreService = require('./trustScoreService');
 const { KYC_BUCKET, getKycImageBuffer, getKycStoragePath } = require('./kycStorage');
+const { isNameMismatch } = require('./kycNamePolicy');
+
+const SELFIE_LIMIT_REASON = 'Bạn đã thử xác minh khuôn mặt quá 5 lần. Vui lòng thực hiện lại từ bước CCCD.';
+const NAME_REVIEW_MESSAGE = 'Hồ sơ cần quản trị viên xác nhận vì tên trên CCCD khác tên đã khai.';
+const FACE_REVIEW_MESSAGE = 'Hệ thống so khớp khuôn mặt đang gặp sự cố. Hồ sơ của bạn đã được chuyển cho quản trị viên duyệt.';
+// Hồ sơ PENDING đã có selfie chỉ còn chờ quản trị viên: tên lệch, hoặc dịch vụ so khớp khuôn mặt lỗi.
+// Chưa so được khuôn mặt là lý do nặng hơn (danh tính chưa được máy xác nhận) nên được ưu tiên khi báo người dùng.
+const reviewReasonOf = (verification) => (verification?.face_check_unavailable ? 'FACE_CHECK_UNAVAILABLE' : 'NAME_MISMATCH');
+const reviewMessageOf = (reason) => (reason === 'NAME_MISMATCH' ? NAME_REVIEW_MESSAGE : FACE_REVIEW_MESSAGE);
 
 const VERIFIED_STATUS = 'VERIFIED';
 const PENDING_STATUS = 'PENDING';
@@ -26,6 +35,13 @@ const buildFaceCompareDebug = (faceResult = {}) => {
   });
 
   return Object.keys(debug).length ? debug : null;
+};
+
+// Chi tiết so khớp chỉ phục vụ gỡ lỗi; không trả cho client ở production.
+const debugField = (faceResult) => {
+  if (process.env.NODE_ENV === 'production') return {};
+  const debug = buildFaceCompareDebug(faceResult);
+  return debug ? { debug } : {};
 };
 
 const ensureUserCanUseKyc = async (userId) => {
@@ -150,6 +166,12 @@ const getKycStatus = async (userId) => {
     }
   }
 
+  // Hồ sơ PENDING đã lưu selfie = chờ quản trị viên duyệt tay (tên lệch, hoặc không so khớp khuôn mặt tự động được).
+  const awaitingAdminReview = Boolean(
+    latestVerificationStatus === PENDING_STATUS
+    && latestVerification?.selfie_url
+  );
+
   const hasCardUploaded = Boolean(
     latestVerificationStatus === PENDING_STATUS &&
     latestVerification?.id_card_front_url &&
@@ -162,6 +184,9 @@ const getKycStatus = async (userId) => {
     rejectReason: latestVerificationStatus === REJECTED_STATUS ? latestVerification?.reject_reason : null,
     hasPendingVerification: latestVerificationStatus === PENDING_STATUS,
     hasCardUploaded,
+    awaitingAdminReview,
+    reviewReason: awaitingAdminReview ? reviewReasonOf(latestVerification) : null,
+    nameMismatch: latestVerificationStatus === PENDING_STATUS ? Boolean(latestVerification?.name_mismatch) : false,
     pendingStep: (latestVerificationStatus === PENDING_STATUS && hasCardUploaded) ? 3 : 1,
     canStartKyc: user.verification_status !== VERIFIED_STATUS,
     selfieAttemptsUsed: attemptsUsed,
@@ -175,6 +200,28 @@ const getKycStatus = async (userId) => {
 const buildStoragePath = (userId, suffix, mimetype) => {
   const extension = mimetype === 'image/png' ? 'png' : mimetype === 'image/webp' ? 'webp' : 'jpg';
   return `kyc/${userId}/${Date.now()}-${suffix}.${extension}`;
+};
+
+// Ảnh giấy tờ / selfie chỉ cần đủ nét để người duyệt đọc và so khuôn mặt: lưu JPEG tối đa 1600px thay vì
+// ảnh gốc (PNG chụp màn hình có thể 3–5MB). Nhỏ hơn ~10 lần nên tải lên nhanh hơn hẳn; OCR vẫn đọc ảnh gốc.
+const KYC_STORED_MAX_SIDE = 1600;
+const compressForStorage = async (buffer) => {
+  try {
+    return await sharp(buffer)
+      .rotate()
+      .resize({ width: KYC_STORED_MAX_SIDE, height: KYC_STORED_MAX_SIDE, fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 85, mozjpeg: true })
+      .toBuffer();
+  } catch {
+    return null;
+  }
+};
+
+const storeKycImage = async (userId, suffix, image) => {
+  const compressed = await compressForStorage(image.buffer);
+  const buffer = compressed || image.buffer;
+  const mimetype = compressed ? 'image/jpeg' : image.mimetype;
+  return uploadKycFile(buffer, buildStoragePath(userId, suffix, mimetype), mimetype);
 };
 
 const uploadKycFile = async (buffer, filePath, mimetype) => {
@@ -202,7 +249,9 @@ const createOrUpdatePendingVerification = async ({
   frontImageUrl,
   backImageUrl,
   ocrData,
-  idNumber
+  idNumber,
+  declaredName,
+  nameMismatch
 }) => {
   const existingPending = await getLatestPendingVerification(userId);
   const now = new Date().toISOString();
@@ -214,6 +263,11 @@ const createOrUpdatePendingVerification = async ({
     status: PENDING_STATUS,
     ocr_data: ocrData || null,
     id_number: idNumber || null,
+    declared_name: declaredName || null,
+    name_mismatch: Boolean(nameMismatch),
+    // Gửi lại CCCD là bắt đầu lại từ đầu: bỏ cờ "chưa so khớp khuôn mặt" của lần trước.
+    face_check_unavailable: false,
+    selfie_url: null,
     reject_reason: null,
     selfie_attempts: 0,
     updated_at: now
@@ -300,22 +354,28 @@ const uploadCard = async ({ userId, fullName, phone, frontImage, backImage }) =>
     }
   }
 
-  const frontPath = buildStoragePath(userId, 'front', frontImage.mimetype);
-  const backPath = buildStoragePath(userId, 'back', backImage.mimetype);
+  const [uploadedFront, uploadedBack] = await Promise.all([
+    storeKycImage(userId, 'front', frontImage),
+    storeKycImage(userId, 'back', backImage)
+  ]);
 
-  const uploadedFront = await uploadKycFile(frontImage.buffer, frontPath, frontImage.mimetype);
-  const uploadedBack = await uploadKycFile(backImage.buffer, backPath, backImage.mimetype);
+  // Tên pháp lý là tên đọc được trên CCCD; tên tự khai lưu riêng để quản trị viên đối chiếu.
+  const ocrName = (ocrData.fullName || '').trim();
+  const declaredName = (fullName || '').trim();
+  const nameMismatch = isNameMismatch(ocrName, declaredName);
 
   const mergedOcrData = {
     ...ocrData,
-    fullName: ocrData.fullName || fullName || null,
+    fullName: ocrName || declaredName || null,
     phone: phone || null,
     ocrPassed: Boolean(ocrResult.isValid)
   };
 
   const verification = await createOrUpdatePendingVerification({
     userId,
-    fullName: fullName || ocrResult.data?.fullName,
+    fullName: ocrName || declaredName,
+    declaredName,
+    nameMismatch,
     phone,
     frontImageUrl: uploadedFront.url,
     backImageUrl: uploadedBack.url,
@@ -329,7 +389,11 @@ const uploadCard = async ({ userId, fullName, phone, frontImage, backImage }) =>
     success: true,
     nextStep: 'SELFIE',
     data: mergedOcrData,
-    warnings: ocrResult.warnings || [],
+    nameMismatch,
+    warnings: [
+      ...(ocrResult.warnings || []),
+      ...(nameMismatch ? ['Tên trên CCCD khác tên bạn đã khai; hồ sơ sẽ cần quản trị viên xác nhận.'] : [])
+    ],
     verification: { id: verification.id, status: verification.status }
   };
 };
@@ -370,7 +434,7 @@ const rejectVerification = async (userId, verificationId, rejectReason) => {
 };
 
 const approveVerification = async (userId, verification, selfieUrl) => {
-  const currentUser = await getUserVerificationStatus(userId);
+  await getUserVerificationStatus(userId);
   const now = new Date().toISOString();
 
   const { data: approvedVerification, error: verificationError } = await supabase
@@ -398,12 +462,34 @@ const approveVerification = async (userId, verification, selfieUrl) => {
   // Note: Trust score bonus (+20đ) is claimed manually by the user, not granted automatically
 };
 
+// Lưu selfie của lần thử cuối để quản trị viên có ảnh đối chiếu khi xem hồ sơ bị từ chối.
+const saveSelfieForReview = async (userId, verificationId, selfieImage, extraFields = {}) => {
+  try {
+    const uploaded = await storeKycImage(userId, 'selfie', selfieImage);
+    const { error } = await supabase
+      .from('identity_verifications')
+      .update({ selfie_url: uploaded.url, updated_at: new Date().toISOString(), ...extraFields })
+      .eq('id', verificationId)
+      .eq('user_id', userId);
+    if (error) throw new Error(error.message);
+    return uploaded.url;
+  } catch (error) {
+    console.error('Could not store KYC selfie for review:', error.message);
+    return null;
+  }
+};
+
 const uploadSelfie = async ({ userId, selfieImage }) => {
   await ensureUserCanUseKyc(userId);
 
   const verification = await getLatestPendingVerification(userId);
   if (!verification) {
     throw new Error('No pending KYC verification found');
+  }
+
+  if (verification.selfie_url) {
+    const reviewReason = reviewReasonOf(verification);
+    return { success: true, pendingAdminReview: true, reviewReason, verificationStatus: PENDING_STATUS, message: reviewMessageOf(reviewReason) };
   }
 
   // Atomic DB reservation bounds provider calls across concurrent requests,
@@ -413,7 +499,8 @@ const uploadSelfie = async ({ userId, selfieImage }) => {
   });
   if (attemptError) throw new Error('Failed to reserve KYC verification attempt');
   if (!Number.isInteger(attemptsUsed) || attemptsUsed < 1 || attemptsUsed > MAX_SELFIE_ATTEMPTS) {
-    await rejectVerification(userId, verification.id, 'Ban da thu xac minh khuon mat qua 5 lan. Vui long thuc hien lai tu buoc CCCD.');
+    await saveSelfieForReview(userId, verification.id, selfieImage);
+    await rejectVerification(userId, verification.id, SELFIE_LIMIT_REASON);
     return { success: false, canRetrySelfie: false, attemptsUsed: MAX_SELFIE_ATTEMPTS, attemptsLeft: 0, error: 'Vui lòng thực hiện lại từ bước CCCD.' };
   }
 
@@ -423,7 +510,7 @@ const uploadSelfie = async ({ userId, selfieImage }) => {
     cardFrontImageBuffer = await getKycImageBuffer(verification.id_card_front_url);
   } catch (error) {
     console.error('Failed to read stored KYC card front image:', error);
-    throw new Error('Khong the doc anh CCCD da luu, vui long thu lai');
+    throw new Error('Không thể đọc ảnh CCCD đã lưu, vui lòng thử lại', { cause: error });
   }
 
   const faceResult = await faceCompareService.compareFaces(
@@ -431,58 +518,71 @@ const uploadSelfie = async ({ userId, selfieImage }) => {
     selfieImage.buffer
   );
 
+  // Dịch vụ so khớp khuôn mặt lỗi / chưa cấu hình: không bắt người dùng thử lại hay từ chối hồ sơ,
+  // mà lưu selfie và chuyển hồ sơ cho quản trị viên duyệt tay.
+  if (!faceResult.isMatch && faceResult.errorCode === faceCompareService.FACE_VERIFY_UNAVAILABLE) {
+    const storedSelfie = await saveSelfieForReview(userId, verification.id, selfieImage, { face_check_unavailable: true });
+    if (!storedSelfie) throw new Error('Không thể lưu ảnh selfie, vui lòng thử lại');
+    return {
+      success: true,
+      pendingAdminReview: true,
+      reviewReason: 'FACE_CHECK_UNAVAILABLE',
+      verificationStatus: PENDING_STATUS,
+      message: FACE_REVIEW_MESSAGE,
+      ...debugField(faceResult)
+    };
+  }
+
   if (!faceResult.isMatch) {
-    const faceDebug = buildFaceCompareDebug(faceResult);
-
-    if (faceResult.errorMessage === 'Khong the xac minh khuon mat, vui long thu lai' && attemptsUsed < MAX_SELFIE_ATTEMPTS) {
-      return {
-        success: false,
-        error: faceResult.errorMessage,
-        canRetrySelfie: true,
-        attemptsUsed,
-        attemptsLeft: MAX_SELFIE_ATTEMPTS - attemptsUsed,
-        debug: faceDebug
-      };
-    }
-
-    const attemptsLeft = Math.max(0, MAX_SELFIE_ATTEMPTS - attemptsUsed);
-
     if (attemptsUsed < MAX_SELFIE_ATTEMPTS) {
       return {
         success: false,
         canRetrySelfie: true,
         nextStep: 'SELFIE',
+        message: 'Khuôn mặt không khớp với CCCD, vui lòng chụp lại.',
         attemptsUsed,
-        attemptsLeft,
-        message: 'Khuon mat khong khop voi CCCD, vui long chup lai.',
-        error: faceResult.errorMessage || 'Khuon mat khong khop voi CCCD',
-        debug: faceDebug
+        attemptsLeft: MAX_SELFIE_ATTEMPTS - attemptsUsed,
+        error: faceResult.errorMessage || 'Khuôn mặt không khớp với CCCD',
+        ...debugField(faceResult)
       };
     }
 
-    const reason = 'Ban da thu xac minh khuon mat qua 5 lan. Vui long thuc hien lai tu buoc CCCD.';
-    await rejectVerification(userId, verification.id, reason);
+    await saveSelfieForReview(userId, verification.id, selfieImage);
+    await rejectVerification(userId, verification.id, SELFIE_LIMIT_REASON);
 
     return {
       success: false,
       canRetrySelfie: false,
       attemptsUsed: MAX_SELFIE_ATTEMPTS,
       attemptsLeft: 0,
-      message: reason,
-      error: reason,
-      debug: faceDebug
+      message: SELFIE_LIMIT_REASON,
+      error: SELFIE_LIMIT_REASON,
+      ...debugField(faceResult)
     };
   }
 
-  const selfiePath = buildStoragePath(userId, 'selfie', selfieImage.mimetype);
-  const uploadedSelfie = await uploadKycFile(selfieImage.buffer, selfiePath, selfieImage.mimetype);
+  if (verification.name_mismatch) {
+    // Khuôn mặt khớp nhưng tên lệch: giữ PENDING, lưu selfie và chuyển cho quản trị viên duyệt tay.
+    const storedSelfie = await saveSelfieForReview(userId, verification.id, selfieImage);
+    if (!storedSelfie) throw new Error('Không thể lưu ảnh selfie, vui lòng thử lại');
+    return {
+      success: true,
+      pendingAdminReview: true,
+      reviewReason: 'NAME_MISMATCH',
+      verificationStatus: PENDING_STATUS,
+      message: NAME_REVIEW_MESSAGE,
+      ...debugField(faceResult)
+    };
+  }
+
+  const uploadedSelfie = await storeKycImage(userId, 'selfie', selfieImage);
 
   await approveVerification(userId, verification, uploadedSelfie.url);
 
   return {
     success: true,
     verificationStatus: VERIFIED_STATUS,
-    debug: buildFaceCompareDebug(faceResult)
+    ...debugField(faceResult)
   };
 };
 

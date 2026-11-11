@@ -6,6 +6,7 @@ const { rateLimiters } = require('../middleware/rateLimiters');
 
 router.use(authenticate);
 
+router.get('/realtime', rateLimiters.read, chatController.getRealtimeTopic);
 router.get('/messages', rateLimiters.read, chatController.getMessages);
 router.post('/messages', rateLimiters.message, chatController.sendMessage);
 router.post('/read', rateLimiters.write, chatController.markMessagesAsRead);

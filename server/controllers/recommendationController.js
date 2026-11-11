@@ -11,7 +11,11 @@ const getRecommendations = async (req, res) => {
       feedToken: req.query.feedToken,
       filters: parseSearchFilters(req.query.filters)
     });
-    return res.status(200).json({ properties: properties.map(toPublicProperty), pagination });
+    // feed_section: "for_you" (hợp gu) hoặc "popular" (phần nối tiếp khi đã hết tin hợp gu).
+    return res.status(200).json({
+      properties: properties.map((property) => ({ ...toPublicProperty(property), feed_section: property.feed_section || 'for_you' })),
+      pagination
+    });
   } catch (error) {
     console.error('getRecommendations error:', error);
     return res.status(error.statusCode || 500).json({

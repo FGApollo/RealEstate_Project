@@ -10,6 +10,9 @@ const { assertListingCapacity } = require('../services/listingEntitlements');
 const isAgentOwner = (property, user) => String(user?.role || '').toUpperCase() === 'AGENT'
   && String(property?.owner_id) === String(user?.id);
 
+// Xem theo id: tin đang hiển thị, hoặc tin đã bán/đã cho thuê (ví dụ mở lại từ danh sách Yêu thích).
+const VIEWABLE_STATUSES = ['AVAILABLE', 'SOLD', 'RENTED'];
+
 const MAX_PROPERTY_IMAGE_COUNT = 6;
 const MAX_PROPERTY_IMAGE_BYTES = 5 * 1024 * 1024;
 
@@ -49,7 +52,10 @@ const getProperties = async (req, res) => {
       && !/[%*]/.test(requestedPropertyType)
       ? requestedPropertyType
       : null;
-    const properties = await propertyService.getProperties(limit, propertyType, parseSearchFilters(req.query.filters));
+    // Trang kết quả tìm kiếm tải thêm theo offset (0–1000).
+    const requestedOffset = Number.parseInt(req.query.offset, 10);
+    const offset = Number.isInteger(requestedOffset) ? Math.max(0, Math.min(1000 - limit, requestedOffset)) : 0;
+    const properties = await propertyService.getProperties(limit, propertyType, parseSearchFilters(req.query.filters), offset);
     res.status(200).json({ properties: properties.map((property) => (
       isAgentOwner(property, req.user) ? property : toPublicProperty(property)
     )) });
@@ -74,9 +80,9 @@ const createProperty = async (req, res) => {
 const getPropertyById = async (req, res) => {
   try {
     const { id } = req.params;
-    const property = await propertyService.getPropertyById(id, { publicRead: true, viewerId: req.user?.id });
+    const property = await propertyService.getPropertyById(id, { publicRead: true, viewerId: req.user?.id, allowClosed: true });
     if (!property || (!isAgentOwner(property, req.user)
-      && (property.is_hidden === true || property.status !== 'AVAILABLE'
+      && (property.is_hidden === true || !VIEWABLE_STATUSES.includes(property.status)
         || Number(property.owner?.trust_score ?? 50) <= 30))) {
       return res.status(404).json({ error: 'Property not found' });
     }
@@ -92,7 +98,8 @@ const getContactAgent = async (req, res) => {
     const agentId = await propertyService.getContactAgentId(req.params.id, req.user.id);
     return res.status(200).json({ agentId });
   } catch (error) {
-    return res.status(error.statusCode || 500).json({ error: safeErrorMessage(error, 'Could not open this conversation.') });
+    return res.status(error.statusCode || 500).json({ error: safeErrorMessage(error, 'Could not open this conversation.'),
+      ...(error.code === 'PLUS_REQUIRED' ? { code: error.code } : {}) });
   }
 };
 
@@ -123,9 +130,9 @@ const deleteProperty = async (req, res) => {
 const getPropertyReviews = async (req, res) => {
   try {
     const { id } = req.params;
-    const property = await propertyService.getPropertyById(id, { publicRead: true, viewerId: req.user?.id });
+    const property = await propertyService.getPropertyById(id, { publicRead: true, viewerId: req.user?.id, allowClosed: true });
     if (!property || (!isAgentOwner(property, req.user)
-      && (property.is_hidden === true || property.status !== 'AVAILABLE'
+      && (property.is_hidden === true || !VIEWABLE_STATUSES.includes(property.status)
         || Number(property.owner?.trust_score ?? 50) <= 30))) {
       return res.status(404).json({ error: 'Property not found' });
     }
@@ -186,8 +193,8 @@ const checkBeforeSave = async (req, res) => {
       geminiReason
     });
   } catch (error) {
-    console.error('Error in checkBeforeSave:', error);
-    res.status(500).json({ error: safeErrorMessage(error, 'Internal server error') });
+    if (!error.statusCode || error.statusCode >= 500) console.error('Error in checkBeforeSave:', error);
+    res.status(error.statusCode || 500).json({ error: safeErrorMessage(error, 'Internal server error') });
   }
 };
 

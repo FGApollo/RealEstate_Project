@@ -3,16 +3,25 @@ import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { 
   ChevronLeft, Send, MessageSquare, User, 
   MapPin, Phone, MessageCircle, Home, Compass, Heart, Map, X, Plus, Search, Building2,
-  Paperclip, Image as ImageIcon, Loader2, Sparkles
+  Paperclip, Image as ImageIcon, Loader2, Sparkles, BadgeCheck
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import { apiFetch } from '../auth/apiClient';
 import { useAuth } from '../auth/useAuth';
-import { supabaseClient, isSupabaseRealtimeConfigured } from '../services/supabaseClient';
+import { startChatRealtime, startAdaptivePolling, mergeServerMessages } from '../services/chatRealtime';
 import PropertyDetailModal from '../components/PropertyDetailModal';
 import SwipeHeader from '../features/swipe/SwipeHeader';
 import ImageLoadingSkeleton from '../components/ImageLoadingSkeleton';
 import './Chat.css';
+
+// Dấu bên cạnh tên người chat: tài khoản Swipe Nest có nhãn riêng; người đã xác thực danh tính có icon tích xanh.
+const PartnerMark = ({ partner }) => {
+  if (partner?.is_official) return <span className="agent-badge official">Swipe Nest</span>;
+  if (partner?.verification_status === 'VERIFIED') {
+    return <BadgeCheck size={15} className="partner-verified-icon" aria-label="Đã xác thực danh tính" role="img"><title>Đã xác thực danh tính</title></BadgeCheck>;
+  }
+  return null;
+};
 
 const FUNNEL_STAGES = [
   { key: 'AWARENESS', label: 'Nhận biết', color: '#6366f1', bg: '#eef2ff' },
@@ -61,6 +70,8 @@ const Chat = () => {
 
   const activePartnerId = activeConversation?.partner?.id;
   const activePartnerIdRef = useRef(activePartnerId);
+  const realtimeRef = useRef(null);
+  const refreshMessagesRef = useRef(null);
   useEffect(() => {
     activePartnerIdRef.current = activePartnerId;
   }, [activePartnerId]);
@@ -182,123 +193,19 @@ const Chat = () => {
 
     initConversations();
 
-    // Background polling for conversation list (fallback every 7s)
-    const convPollInterval = setInterval(() => {
+    // Tín hiệu realtime (Supabase Broadcast): có tin mới hoặc tin vừa được xem → tải lại qua API.
+    const realtime = startChatRealtime(() => {
       fetchConversationsList(false);
-    }, 7000);
-
-    // Global Inbox Realtime subscription for currentUser (receives messages from ANY partner)
-    let channel = null;
-    if (isSupabaseRealtimeConfigured) {
-      channel = supabaseClient
-        .channel(`user_inbox_${currentUser.id}`)
-        .on('postgres_changes', {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages'
-        }, (payload) => {
-          const newMsg = payload.new;
-          if (!newMsg) return;
-
-          const isRecipient = Number(newMsg.receiver_id) === Number(currentUser.id);
-          const isSender = Number(newMsg.sender_id) === Number(currentUser.id);
-          if (!isRecipient && !isSender) return;
-
-          const partnerId = isSender ? Number(newMsg.receiver_id) : Number(newMsg.sender_id);
-          const currentActivePartnerId = Number(activePartnerIdRef.current);
-          const isCurrentlyActive = currentActivePartnerId === partnerId;
-
-          // A. If belongs to currently open chat, update messages list immediately
-          if (isCurrentlyActive) {
-            setMessages((prev) => {
-              const existingTemp = prev.find(m => 
-                m.id === newMsg.id || 
-                (m.is_optimistic && m.sender_id === newMsg.sender_id && (Number(m.property_id) === Number(newMsg.property_id) || m.message === newMsg.message))
-              );
-              const propertyObj = existingTemp?.property || null;
-              const merged = { ...newMsg, property: newMsg.property || propertyObj };
-
-              if (existingTemp) {
-                return prev.map(m => m.id === existingTemp.id ? merged : m);
-              }
-              if (prev.some(m => m.id === newMsg.id)) {
-                return prev.map(m => m.id === newMsg.id ? { ...m, ...merged } : m);
-              }
-              return [...prev, merged];
-            });
-
-            if (newMsg.property_id) {
-              apiFetch(`${API_BASE_URL}/api/properties/${newMsg.property_id}`)
-                .then(r => r.ok ? r.json() : null)
-                .then(pData => {
-                  if (pData?.property) {
-                    setMessages(prev => prev.map(m => 
-                      (m.id === newMsg.id || Number(m.property_id) === Number(newMsg.property_id))
-                        ? { ...m, property: pData.property }
-                        : m
-                    ));
-                  }
-                })
-                .catch(() => {});
-            }
-
-            if (isRecipient) {
-              apiFetch(`${API_BASE_URL}/api/chat/read`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ partnerId })
-              }).catch(() => {});
-            }
-          }
-
-          // B. ALWAYS update the sidebar conversations list & push to top!
-          setConversations((prev) => {
-            const existingIdx = prev.findIndex(c => Number(c.partner?.id) === partnerId);
-            const displayMsg = (newMsg.message && !newMsg.message.startsWith('[Bất động sản]')) 
-              ? newMsg.message 
-              : (newMsg.attachments?.length ? '[Hình ảnh]' : (newMsg.property_id ? '[Bất động sản]' : newMsg.message));
-
-            if (existingIdx !== -1) {
-              const existingConv = prev[existingIdx];
-              const updatedConv = {
-                ...existingConv,
-                lastMessage: displayMsg,
-                lastMessageTime: newMsg.created_at,
-                lastSenderId: newMsg.sender_id,
-                unreadCount: isCurrentlyActive 
-                  ? 0 
-                  : (isRecipient ? (Number(existingConv.unreadCount) || 0) + 1 : (existingConv.unreadCount || 0))
-              };
-              const rest = prev.filter((_, idx) => idx !== existingIdx);
-              return [updatedConv, ...rest];
-            } else {
-              // Partner not in list yet: trigger fetch to get their profile & add to top
-              fetchConversationsList(false);
-              return prev;
-            }
-          });
-        })
-        .on('postgres_changes', {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'messages'
-        }, (payload) => {
-          const updatedMsg = payload.new;
-          if (!updatedMsg) return;
-          setMessages((prev) => prev.map(m => m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m));
-          setConversations((prev) => prev.map(c => {
-            if (Number(c.partner?.id) === Number(updatedMsg.receiver_id) || Number(c.partner?.id) === Number(updatedMsg.sender_id)) {
-              return { ...c, isRead: updatedMsg.is_read };
-            }
-            return c;
-          }));
-        })
-        .subscribe();
-    }
+      refreshMessagesRef.current?.();
+    });
+    realtimeRef.current = realtime;
+    // Polling dự phòng cho danh sách hội thoại (thưa khi realtime đang kết nối).
+    const stopConversationPolling = startAdaptivePolling(() => fetchConversationsList(false), realtime.isConnected);
 
     return () => {
-      clearInterval(convPollInterval);
-      if (channel) supabaseClient.removeChannel(channel);
+      stopConversationPolling();
+      realtime.stop();
+      realtimeRef.current = null;
     };
   }, [currentUser?.id, targetAgentId, targetPropertyId]);
 
@@ -320,14 +227,15 @@ const Chat = () => {
         if (res.ok && isCurrent) {
           const data = await res.json();
           const incoming = data.messages || [];
-          setMessages(prev => {
-            if (prev.length === incoming.length && 
-                (prev.length === 0 || prev[prev.length - 1]?.id === incoming[incoming.length - 1]?.id) &&
-                prev.every((m, i) => m.is_read === incoming[i]?.is_read && m.id === incoming[i]?.id)) {
-              return prev;
-            }
-            return incoming;
-          });
+          setMessages(prev => mergeServerMessages(prev, incoming));
+          // Có tin mới của đối phương trong cuộc trò chuyện đang mở: đánh dấu đã xem.
+          if (!isInitial && incoming.some((m) => Number(m.receiver_id) === Number(currentUser.id) && !m.is_read)) {
+            apiFetch(`${API_BASE_URL}/api/chat/read`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ partnerId: activePartnerId })
+            }).catch(() => {});
+          }
         }
       } catch (err) {
         if (isCurrent) console.error('Error fetching messages:', err);
@@ -345,14 +253,14 @@ const Chat = () => {
       body: JSON.stringify({ partnerId: activePartnerId })
     }).catch(() => {});
 
-    // Polling fallback specifically for active chat thread
-    const interval = setInterval(() => {
-      fetchMessages(false);
-    }, isSupabaseRealtimeConfigured ? 10000 : 3000);
+    // Tải lại ngay khi có tín hiệu realtime; polling chỉ là dự phòng.
+    refreshMessagesRef.current = () => fetchMessages(false);
+    const stopPolling = startAdaptivePolling(() => fetchMessages(false), () => Boolean(realtimeRef.current?.isConnected()));
 
     return () => {
       isCurrent = false;
-      clearInterval(interval);
+      refreshMessagesRef.current = null;
+      stopPolling();
     };
   }, [currentUser?.id, activePartnerId]);
 
@@ -604,7 +512,7 @@ const Chat = () => {
       {/* Header */}
       <SwipeHeader 
         activeView="chat" 
-        onSearch={() => navigate('/swipe/Tất cả')} 
+        onSearch={() => navigate('/search')} 
       />
 
       {/* Main Container */}
@@ -669,12 +577,12 @@ const Chat = () => {
                       ) : (
                         <div className="avatar-placeholder">{initials}</div>
                       )}
-                      <span className={`status-dot online`} />
                     </div>
                     <div className="conv-info">
                       <div className="conv-name-row">
-                        <h4>{conv.partner?.name || 'Môi giới'}</h4>
-                        {conv.partner?.role === 'AGENT' && <span className="agent-badge">Môi giới</span>}
+                        {/* Không ghi vai trò (người đăng có thể là môi giới hay chủ nhà): chỉ tên + icon xác thực. */}
+                        <h4>{conv.partner?.name || 'Người đăng tin'}</h4>
+                        <PartnerMark partner={conv.partner} />
                         {currentUser?.role === 'AGENT' && conv.funnelStage && (
                           <span 
                             className="funnel-badge"
@@ -740,8 +648,8 @@ const Chat = () => {
                     )}
                   </div>
                   <div>
-                    <h4>{activeConversation.partner?.name || 'Môi giới'}</h4>
-                    <p className="partner-status">Đang hoạt động</p>
+                    {/* Bỏ dòng "Đang hoạt động" cố định: hệ thống không theo dõi trạng thái trực tuyến. */}
+                    <h4 className="partner-name-row">{activeConversation.partner?.name || 'Người đăng tin'} <PartnerMark partner={activeConversation.partner} /></h4>
                   </div>
                 </div>
 

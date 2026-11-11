@@ -11,11 +11,16 @@ const RegisterAgent = lazy(() => import('./pages/RegisterAgent'))
 const VerifyEmail = lazy(() => import('./pages/VerifyEmail'))
 const ResendVerification = lazy(() => import('./pages/ResendVerification'))
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'))
+const ResetPassword = lazy(() => import('./pages/ResetPassword'))
 const NotFound = lazy(() => import('./pages/NotFound'))
 const Home = lazy(() => import('./pages/Home'))
+const SearchResults = lazy(() => import('./pages/SearchResults'))
+const SwipeHistory = lazy(() => import('./pages/SwipeHistory'))
 const Swipe = lazy(() => import('./pages/Swipe'))
 const AgentOverview = lazy(() => import('./pages/AgentOverview'))
 const AgentPayment = lazy(() => import('./pages/AgentPayment'))
+const Plus = lazy(() => import('./pages/Plus'))
+const PlusPayment = lazy(() => import('./pages/PlusPayment'))
 const Chat = lazy(() => import('./pages/Chat'))
 const AdminPage = lazy(() => import('./pages/AdminPage'))
 const UserProfile = lazy(() => import('./pages/UserProfile'))
@@ -40,13 +45,18 @@ function App() {
       <Route path="/verify-email" element={<VerifyEmail />} />
       <Route path="/resend-verification" element={<ResendVerification />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route element={<SessionRoute />}>
         <Route path="/" element={<Home />} />
+        <Route path="/search" element={<SearchResults />} />
       </Route>
       <Route element={<ProtectedRoute allowedRoles={['USER']} />}>
         <Route path="/onboarding" element={<LifestyleOnboarding />} />
+        <Route path="/plus" element={<Plus />} />
+        <Route path="/plus/payment/:orderId" element={<PlusPayment />} />
         <Route path="/swipe/:categoryName" element={<Swipe />} />
         <Route path="/profile" element={<UserProfile />} />
+        <Route path="/history" element={<SwipeHistory />} />
       </Route>
       <Route element={<ProtectedRoute allowedRoles={['USER', 'AGENT']} />}>
         <Route path="/chat" element={<Chat />} />

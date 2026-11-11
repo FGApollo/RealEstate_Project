@@ -176,7 +176,10 @@ const AgentViolations = ({ currentUser }) => {
   const totalViolations = violations.length;
   const hiddenPropertiesCount = violations.filter(v => v.property?.is_hidden).length;
   const pendingAppealsCount = violations.filter(v => v.appeal?.status === 'PENDING').length;
-  const approvedAppealsCount = violations.filter(v => v.appeal?.status === 'APPROVED').length;
+  // Điểm thật sự đang bị trừ (đã trừ đi phần được hoàn sau kháng cáo).
+  const netPenalty = (v) => Math.max(0, (v.penalty_points || 0) - (v.refunded_points || 0));
+  const penalizedReports = violations.filter(v => netPenalty(v) > 0);
+  const totalPenaltyPoints = penalizedReports.reduce((sum, v) => sum + netPenalty(v), 0);
 
   return (
     <div className="agent-violations-container">
@@ -205,6 +208,19 @@ const AgentViolations = ({ currentUser }) => {
         </div>
 
         <div className="v-stat-card">
+          <div className="v-stat-icon-wrapper" style={{ backgroundColor: '#fff7ed', color: '#ea580c' }}>
+            <ShieldAlert size={20} />
+          </div>
+          <div className="v-stat-info">
+            <span className="v-stat-label">Báo cáo bị trừ điểm</span>
+            <span className="v-stat-value" style={{ color: '#ea580c' }}>
+              {penalizedReports.length}
+              {totalPenaltyPoints > 0 && <small className="v-stat-sub"> · −{totalPenaltyPoints} điểm</small>}
+            </span>
+          </div>
+        </div>
+
+        <div className="v-stat-card">
           <div className="v-stat-icon-wrapper" style={{ backgroundColor: '#fef2f2', color: '#ef4444' }}>
             <AlertTriangle size={20} />
           </div>
@@ -221,16 +237,6 @@ const AgentViolations = ({ currentUser }) => {
           <div className="v-stat-info">
             <span className="v-stat-label">Khiếu nại chờ duyệt</span>
             <span className="v-stat-value" style={{ color: '#d97706' }}>{pendingAppealsCount}</span>
-          </div>
-        </div>
-
-        <div className="v-stat-card">
-          <div className="v-stat-icon-wrapper" style={{ backgroundColor: '#f0fdf4', color: '#16a34a' }}>
-            <CheckCircle size={20} />
-          </div>
-          <div className="v-stat-info">
-            <span className="v-stat-label">Kháng cáo thành công</span>
-            <span className="v-stat-value" style={{ color: '#16a34a' }}>{approvedAppealsCount}</span>
           </div>
         </div>
       </div>
@@ -253,6 +259,8 @@ const AgentViolations = ({ currentUser }) => {
               const reasonInfo = REASON_LABELS[rep.reason] || { label: rep.reason, penalty: 0, color: '#64748b', bg: '#f1f5f9' };
               const appeal = rep.appeal;
               const isResolved = rep.status === 'RESOLVED';
+              const penalty = netPenalty(rep);
+              const fullyRefunded = (rep.penalty_points || 0) > 0 && penalty === 0;
 
               return (
                 <div key={rep.id} className="violation-item-card">
@@ -269,8 +277,16 @@ const AgentViolations = ({ currentUser }) => {
                       <h4 className="v-property-title">{rep.property?.title || 'Bài đăng không xác định'}</h4>
                       <div className="v-badges-row">
                         <span className="v-reason-badge" style={{ color: reasonInfo.color, backgroundColor: reasonInfo.bg }}>
-                          {reasonInfo.label} ({reasonInfo.penalty}đ)
+                          {reasonInfo.label}
                         </span>
+
+                        {/* Chỉ hiện điểm khi thật sự bị trừ (báo cáo đang chờ hoặc bị bác bỏ thì không bị trừ). */}
+                        {penalty > 0 && (
+                          <span className="v-status-badge v-status-hidden">−{penalty} điểm uy tín</span>
+                        )}
+                        {fullyRefunded && (
+                          <span className="v-status-badge v-status-visible">Đã hoàn {rep.penalty_points} điểm</span>
+                        )}
 
                         {rep.property?.is_hidden ? (
                           <span className="v-status-badge v-status-hidden">
@@ -298,25 +314,36 @@ const AgentViolations = ({ currentUser }) => {
                   {/* Appeal Status Section */}
                   <div className="v-appeal-section">
                     {!appeal ? (
-                      <div className="v-appeal-action-box">
-                        <div className="v-appeal-note">
-                          <span>Bạn bị trừ điểm hoặc ẩn bài đăng oan? Bạn có thể gửi giải trình kèm bằng chứng để Admin xem xét lại.</span>
-                        </div>
-                        {isResolved ? (
+                      isResolved ? (
+                        // Chỉ báo cáo đã bị Admin xác nhận (đã xử phạt) mới kháng cáo được.
+                        <div className="v-appeal-action-box">
+                          <div className="v-appeal-note">
+                            <span>
+                              Admin đã xác nhận vi phạm
+                              {penalty > 0 ? `, bạn bị trừ ${penalty} điểm uy tín` : ''}
+                              {rep.property?.is_hidden ? ' và tin đăng bị ẩn' : ''}.
+                              {' '}Nếu xử phạt chưa đúng, hãy gửi giải trình kèm bằng chứng để Admin xem xét lại.
+                            </span>
+                          </div>
                           <button
                             className="v-btn-appeal"
                             onClick={() => handleOpenAppealModal(rep)}
                           >
                             <Scale size={16} /> Gửi Khiếu Nại / Kháng Cáo
                           </button>
-                        ) : rep.status === 'REJECTED' ? (
-                          <span className="v-status-badge v-status-visible">
-                            ✓ Tố cáo không chính xác (Admin đã bác bỏ, bạn không bị phạt)
-                          </span>
-                        ) : (
-                          <span className="v-pending-badge">Báo cáo đang chờ Admin xử lý</span>
-                        )}
-                      </div>
+                        </div>
+                      ) : rep.status === 'REJECTED' && penalty > 0 ? (
+                        // Dữ liệu cũ: báo cáo từng bị xử phạt rồi mới đổi sang bác bỏ, điểm chưa được hoàn.
+                        <span className="v-pending-badge">
+                          Admin đã bác bỏ báo cáo này nhưng {penalty} điểm bị trừ trước đó chưa được hoàn. Vui lòng liên hệ Admin để được hoàn điểm.
+                        </span>
+                      ) : rep.status === 'REJECTED' ? (
+                        <span className="v-status-badge v-status-visible">
+                          ✓ Admin đã bác bỏ báo cáo này, bạn không bị trừ điểm
+                        </span>
+                      ) : (
+                        <span className="v-pending-badge">Báo cáo đang chờ Admin xử lý, bạn chưa bị trừ điểm</span>
+                      )
                     ) : appeal.status === 'PENDING' ? (
                       <div className="v-appeal-status-box status-pending">
                         <div className="v-status-header">

@@ -165,20 +165,6 @@
   gap: 1rem;
 }
 
-.match-score-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  background-color: #f0fdf4;
-  color: #16a34a;
-  font-size: 0.75rem;
-  font-weight: 750;
-  padding: 0.4rem 0.85rem;
-  border-radius: 30px;
-  border: 1px solid #bbf7d0;
-  letter-spacing: 0.5px;
-}
-
 .detail-rating {
   display: flex;
   align-items: center;
@@ -1435,3 +1421,19 @@
   from { transform: scale(0.95); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
 }
+
+/* Nhãn tin đã bán / đã cho thuê và form báo cáo tin đăng */
+.detail-closed-badge { display: inline-block; margin: 6px 0; padding: 4px 12px; border-radius: 999px; background: #fee2e2; color: #b91c1c; font-size: 0.85rem; font-weight: 700; }
+.report-modal-content { max-width: 440px; }
+.report-modal-hint { margin: 4px 0 12px; color: #64748b; font-size: 0.9rem; }
+.report-reason-list { display: grid; gap: 8px; margin-bottom: 12px; }
+.report-reason-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 10px; cursor: pointer; font-size: 0.92rem; color: #1e293b; }
+.report-reason-item.selected { border-color: #dc2626; background: #fef2f2; }
+.report-description { width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 10px; font: inherit; resize: vertical; }
+.report-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+.report-cancel-btn, .report-submit-btn { padding: 9px 16px; border-radius: 10px; border: 1px solid #e2e8f0; background: #fff; font-weight: 600; cursor: pointer; }
+.report-submit-btn { background: #dc2626; border-color: #dc2626; color: #fff; }
+.report-submit-btn:disabled, .report-cancel-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* Icon tích xanh "đã xác thực danh tính" cạnh tên người đăng tin. */
+.owner-verified-icon { color: #1d4ed8; flex: none; }

@@ -11,9 +11,6 @@
     "test:auth-flow": "node --test src/auth/*.test.js",
     "test:analytics": "node --test server/tests/analytics.test.js",
     "preview": "vite preview",
-    "db:check-prod": "node .local/dump-prod-schema.cjs",
-    "db:diff": "node .local/compare-schemas.cjs",
-    "db:migration:new": "node .local/create-migration.cjs",
     "test:security": "npm run test:auth-flow && npm --prefix server test"
   },
   "dependencies": {

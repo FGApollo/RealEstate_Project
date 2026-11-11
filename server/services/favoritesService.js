@@ -24,10 +24,11 @@ const getFavorites = async (userId) => {
       property_features(feature_name),
       property_images(image_url),
       lifestyle_tags(tag_name),
-      owner:users!owner_id(name, role, avatar, trust_score, created_at)
+      owner:users!owner_id(name, role, avatar, trust_score, created_at, verification_status, is_official)
     `)
     .in('id', propertyIds)
-    .eq('status', 'AVAILABLE')
+    // Tin đã bán/đã cho thuê vẫn hiện (kèm nhãn ở giao diện); tin đã gỡ hoặc bị ẩn thì không.
+    .in('status', ['AVAILABLE', 'SOLD', 'RENTED'])
     .or('is_hidden.is.null,is_hidden.eq.false');
 
   if (propsError) {

@@ -23,8 +23,9 @@ const DEFAULT_FACEPP_TIMEOUT_MS = 60000;
 const CARD_FACE_MIN_SKIN_RATIO = 0.006;
 const DEFAULT_FACEPP_API_URL = 'https://api-us.faceplusplus.com/facepp/v3/compare';
 const DEFAULT_FACEPP_CONFIDENCE_THRESHOLD = 75;
-const CLEAR_FACE_ERROR_MESSAGE = 'Khong tim thay khuon mat ro rang, vui long chup lai';
-const FACE_VERIFY_ERROR_MESSAGE = 'Khong the xac minh khuon mat, vui long thu lai';
+const CLEAR_FACE_ERROR_MESSAGE = 'Không tìm thấy khuôn mặt rõ ràng, vui lòng chụp lại';
+const FACE_VERIFY_UNAVAILABLE = 'FACE_VERIFY_UNAVAILABLE';
+const FACE_VERIFY_ERROR_MESSAGE = 'Không thể xác minh khuôn mặt, vui lòng thử lại';
 
 const clampRegion = ({ left, top, width, height }, imageWidth, imageHeight) => {
   const safeLeft = Math.max(0, Math.min(imageWidth - 1, Math.round(left)));
@@ -297,7 +298,7 @@ const compareFacesWithFacePlusPlus = async (cardFrontImageBuffer, selfieImageBuf
   if (!cardFrontImageBuffer || !selfieImageBuffer) {
     return {
       isMatch: false,
-      errorMessage: 'Thieu anh CCCD hoac anh selfie',
+      errorMessage: 'Thiếu ảnh CCCD hoặc ảnh selfie',
       provider: 'facepp'
     };
   }
@@ -305,7 +306,7 @@ const compareFacesWithFacePlusPlus = async (cardFrontImageBuffer, selfieImageBuf
   if (cardFrontImageBuffer.length < MIN_IMAGE_BYTES || selfieImageBuffer.length < MIN_IMAGE_BYTES) {
     return {
       isMatch: false,
-      errorMessage: 'Anh selfie hoac anh CCCD khong hop le',
+      errorMessage: 'Ảnh selfie hoặc ảnh CCCD không hợp lệ',
       provider: 'facepp'
     };
   }
@@ -354,7 +355,7 @@ const compareFacesWithFacePlusPlus = async (cardFrontImageBuffer, selfieImageBuf
 
     return {
       isMatch,
-      errorMessage: isMatch ? null : 'Khuon mat khong khop voi CCCD',
+      errorMessage: isMatch ? null : 'Khuôn mặt không khớp với CCCD',
       provider: 'facepp',
       confidence,
       threshold,
@@ -375,7 +376,7 @@ const compareFacesWithFacePlusPlus = async (cardFrontImageBuffer, selfieImageBuf
 
     return {
       isMatch: false,
-      errorMessage: FACE_VERIFY_ERROR_MESSAGE,
+      errorMessage: FACE_VERIFY_ERROR_MESSAGE, errorCode: FACE_VERIFY_UNAVAILABLE,
       provider: 'facepp'
     };
   }
@@ -386,7 +387,7 @@ const compareFacesWithDemo = async (cardFrontImageBuffer, selfieImageBuffer) => 
   if (forcedResult !== null) {
     return {
       isMatch: forcedResult,
-      errorMessage: forcedResult ? null : 'Khuon mat khong khop voi CCCD',
+      errorMessage: forcedResult ? null : 'Khuôn mặt không khớp với CCCD',
       provider: 'demo'
     };
   }
@@ -394,7 +395,7 @@ const compareFacesWithDemo = async (cardFrontImageBuffer, selfieImageBuffer) => 
   if (!cardFrontImageBuffer || !selfieImageBuffer) {
     return {
       isMatch: false,
-      errorMessage: 'Thieu anh CCCD hoac anh selfie',
+      errorMessage: 'Thiếu ảnh CCCD hoặc ảnh selfie',
       provider: 'demo'
     };
   }
@@ -402,7 +403,7 @@ const compareFacesWithDemo = async (cardFrontImageBuffer, selfieImageBuffer) => 
   if (cardFrontImageBuffer.length < MIN_IMAGE_BYTES || selfieImageBuffer.length < MIN_IMAGE_BYTES) {
     return {
       isMatch: false,
-      errorMessage: 'Anh selfie hoac anh CCCD khong hop le',
+      errorMessage: 'Ảnh selfie hoặc ảnh CCCD không hợp lệ',
       provider: 'demo'
     };
   }
@@ -421,7 +422,7 @@ const compareFacesWithDemo = async (cardFrontImageBuffer, selfieImageBuffer) => 
     if (selfieProfile.skinRatio < MIN_SELFIE_SKIN_RATIO) {
       return {
         isMatch: false,
-        errorMessage: 'Anh selfie khong ro khuon mat',
+        errorMessage: 'Ảnh selfie không rõ khuôn mặt',
         provider: 'demo'
       };
     }
@@ -438,7 +439,7 @@ const compareFacesWithDemo = async (cardFrontImageBuffer, selfieImageBuffer) => 
     if (!usableCardProfiles.length) {
       return {
         isMatch: false,
-        errorMessage: 'Khong tim thay khuon mat tren anh CCCD',
+        errorMessage: 'Không tìm thấy khuôn mặt trên ảnh CCCD',
         provider: 'demo'
       };
     }
@@ -450,7 +451,7 @@ const compareFacesWithDemo = async (cardFrontImageBuffer, selfieImageBuffer) => 
     if (bestScore < minMatchScore) {
       return {
         isMatch: false,
-        errorMessage: 'Khuon mat khong khop voi CCCD',
+        errorMessage: 'Khuôn mặt không khớp với CCCD',
         provider: 'demo',
         matchScore: roundedScore,
         threshold: minMatchScore
@@ -469,7 +470,7 @@ const compareFacesWithDemo = async (cardFrontImageBuffer, selfieImageBuffer) => 
 
     return {
       isMatch: false,
-      errorMessage: FACE_VERIFY_ERROR_MESSAGE,
+      errorMessage: FACE_VERIFY_ERROR_MESSAGE, errorCode: FACE_VERIFY_UNAVAILABLE,
       provider: 'demo'
     };
   }
@@ -480,15 +481,16 @@ const compareFaces = async (cardFrontImageBuffer, selfieImageBuffer) => {
     if (hasFacePlusPlusConfig()) {
       return compareFacesWithFacePlusPlus(cardFrontImageBuffer, selfieImageBuffer);
     }
-    return { isMatch: false, errorMessage: FACE_VERIFY_ERROR_MESSAGE, provider: 'facepp' };
+    return { isMatch: false, errorMessage: FACE_VERIFY_ERROR_MESSAGE, errorCode: FACE_VERIFY_UNAVAILABLE, provider: 'facepp' };
   }
   if (isKycDemoAllowed() && (process.env.KYC_FACE_MATCH_PROVIDER || '').toLowerCase() === 'demo') {
     return compareFacesWithDemo(cardFrontImageBuffer, selfieImageBuffer);
   }
-  return { isMatch: false, errorMessage: FACE_VERIFY_ERROR_MESSAGE, provider: 'unconfigured' };
+  return { isMatch: false, errorMessage: FACE_VERIFY_ERROR_MESSAGE, errorCode: FACE_VERIFY_UNAVAILABLE, provider: 'unconfigured' };
 };
 
 module.exports = {
+  FACE_VERIFY_UNAVAILABLE,
   compareFaces,
   getFacePlusPlusApiUrl
 };

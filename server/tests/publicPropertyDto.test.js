@@ -44,7 +44,12 @@ test('public property DTO exposes browsing fields and strips owner contact/inter
   assert.equal(result.address, 'Tân Phú, Quận 7, Hồ Chí Minh');
   assert.equal(result.description.includes('0901234567'), false);
   assert.equal(result.description.includes('owner@example.com'), false);
-  assert.deepEqual(result.owner, { name: 'Môi giới', role: 'AGENT', avatar: '/agent.jpg' });
+  assert.deepEqual(result.owner, { name: 'Môi giới', role: 'AGENT', avatar: '/agent.jpg', verification_status: 'VERIFIED' });
+  // Trạng thái khác VERIFIED (đang chờ, bị từ chối) không bao giờ được trả ra.
+  for (const status of ['PENDING', 'REJECTED', 'UNVERIFIED']) {
+    const hidden = toPublicProperty({ owner: { name: 'A', role: 'AGENT', verification_status: status } });
+    assert.equal(Object.hasOwn(hidden.owner, 'verification_status'), false);
+  }
   for (const field of ['owner_id', 'contact_phone', 'address_detail', 'latitude', 'longitude', 'is_hidden']) {
     assert.equal(Object.hasOwn(result, field), false, `${field} must not be returned publicly`);
   }

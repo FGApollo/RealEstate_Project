@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Menu, X, Search, Bell, ChevronDown, User, LogOut, 
-  Home as HomeIcon, Compass, Heart, MessageCircle, ShieldCheck, BriefcaseBusiness
+  Home as HomeIcon, Compass, Heart, MessageCircle, ShieldCheck, BriefcaseBusiness, Crown
 } from 'lucide-react';
 import { useAuth } from '../auth/useAuth';
 import { useRequireAuth } from '../auth/useRequireAuth';
@@ -41,7 +41,8 @@ export default function Header({
       { key: 'home', label: 'Trang chủ', path: '/', Icon: HomeIcon },
       { key: 'swipe', label: 'Khám phá', path: '/swipe/Tất cả', Icon: Compass },
       { key: 'saved', label: 'Yêu thích', path: '/swipe/Tất cả', state: { activeView: 'saved' }, Icon: Heart },
-      { key: 'chat', label: 'Chat', path: '/chat', Icon: MessageCircle }
+      { key: 'chat', label: 'Chat', path: '/chat', Icon: MessageCircle },
+      { key: 'plus', label: 'Plus', path: '/plus', Icon: Crown }
     ];
   const logout = onLogoutProp || auth?.logout;
   const requireAuth = useRequireAuth();
