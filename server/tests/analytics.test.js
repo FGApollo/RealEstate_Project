@@ -241,7 +241,8 @@ async function tokenFor(id, role = 'ADMIN', active = true) {
 }
 
 test('HTTP authentication: guest 401, USER/AGENT 403, active ADMIN 200 with real JWT/session/SQL', async () => {
-  for (const path of ['/analytics/overview', '/analytics/transactions', '/analytics/subscriptions/agents']) {
+  // Mốc chốt cố định: dữ liệu mẫu có ngày hết hạn cố định nên không được phụ thuộc đồng hồ thật.
+  for (const path of ['/analytics/overview', '/analytics/transactions', '/analytics/subscriptions/agents?at=2026-10-16T12:00:00Z']) {
     assert.equal((await fetch(`${base}${path}`)).status, 401);
     for (const id of [1, 9]) {
       const token = await tokenFor(id, id === 1 ? 'USER' : 'AGENT');
@@ -256,7 +257,7 @@ test('HTTP authentication: guest 401, USER/AGENT 403, active ADMIN 200 with real
       assert.equal(body.users.total, 13);
       assert.equal(body.revenue.available, false);
       for (const forbidden of ['email', 'password', 'phone', 'accessToken', 'refresh_token_hash']) assert.ok(!Object.hasOwn(body, forbidden));
-    } else if (path.endsWith('/agents')) {
+    } else if (path.includes('/agents')) {
       assert.equal(body.total, 2);
       assert.equal(body.items.length, 2);
     } else assert.equal(body.total, null);

@@ -2,20 +2,47 @@ const { safeErrorMessage } = require('../services/httpError');
 const { supabase } = require('../config/supabase');
 const { listingDatabaseError } = require('../services/listingEntitlements');
 
+const REVIEW_STATUSES = ['APPROVED', 'PENDING', 'HIDDEN', 'REJECTED'];
+
+// GET /api/admin/reviews?status=ALL|APPROVED|PENDING|HIDDEN|REJECTED&page=&limit=
+// Phân trang ở database; counts là tổng theo từng trạng thái để hiển thị trên bộ lọc.
 const getAllReviews = async (req, res) => {
   try {
-    const { data: reviews, error } = await supabase
+    const status = String(req.query.status || 'ALL').toUpperCase();
+    const page = req.query.page === undefined ? 1 : Number(req.query.page);
+    const limit = req.query.limit === undefined ? 20 : Number(req.query.limit);
+    if ((status !== 'ALL' && !REVIEW_STATUSES.includes(status))
+      || !Number.isInteger(page) || page < 1 || page > 10000
+      || !Number.isInteger(limit) || limit < 1 || limit > 50) {
+      return res.status(400).json({ error: 'Tham số danh sách đánh giá không hợp lệ.' });
+    }
+
+    let query = supabase
       .from('property_reviews')
       .select(`
         *,
         user:users!user_id(id, name, avatar, role),
         property:properties!property_id(id, title, address, price, property_type),
         images:property_review_images(id, image_url)
-      `)
-      .order('created_at', { ascending: false });
+      `, { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .range((page - 1) * limit, page * limit - 1);
+    if (status !== 'ALL') query = query.eq('status', status);
 
-    if (error) return res.status(500).json({ error: safeErrorMessage(error) });
-    return res.status(200).json(reviews || []);
+    const countFor = (value) => {
+      let counter = supabase.from('property_reviews').select('id', { count: 'exact', head: true });
+      if (value) counter = counter.eq('status', value);
+      return counter;
+    };
+    const [list, total, ...byStatus] = await Promise.all([query, countFor(null), ...REVIEW_STATUSES.map(countFor)]);
+
+    const failed = [list, total, ...byStatus].find((result) => result.error);
+    if (failed) return res.status(500).json({ error: safeErrorMessage(failed.error) });
+
+    const counts = { total: total.count || 0 };
+    REVIEW_STATUSES.forEach((value, index) => { counts[value.toLowerCase()] = byStatus[index].count || 0; });
+    return res.status(200).json({ items: list.data || [], total: list.count || 0, page, limit, status, counts });
   } catch (error) {
     console.error('Error in getAllReviews:', error);
     return res.status(500).json({ error: safeErrorMessage(error, 'Internal server error') });

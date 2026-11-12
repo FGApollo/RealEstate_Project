@@ -14,6 +14,8 @@ import './AdminPage.css';
 
 const AdminAnalyticsPage = lazy(() => import('../features/admin/analytics/AdminAnalyticsPage'));
 const ServicePlansPage = lazy(() => import('../features/admin/service-plans/ServicePlansPage'));
+const PlusAdminPage = lazy(() => import('../features/admin/plus/PlusAdminPage'));
+const PlanGrantsPage = lazy(() => import('../features/admin/grants/PlanGrantsPage'));
 
 const REASON_LABELS = {
   'WRONG_PRICE': { label: 'Sai giá', penalty: -5, color: '#f59e0b', bg: '#fef3c7' },
@@ -49,6 +51,10 @@ const AdminPage = () => {
   const [selectedKycId, setSelectedKycId] = useState(null);
   const [kycDetail, setKycDetail] = useState(null);
   const [loadingKyc, setLoadingKyc] = useState(false);
+  const [kycStatusTab, setKycStatusTab] = useState('PENDING'); // PENDING | REJECTED
+  const [kycPage, setKycPage] = useState(1);
+  const [kycTotal, setKycTotal] = useState(0);
+  const KYC_PAGE_SIZE = 20;
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
@@ -66,6 +72,10 @@ const AdminPage = () => {
   const [reviewsList, setReviewsList] = useState([]);
   const [selectedReviewId, setSelectedReviewId] = useState(null);
   const [loadingReviews, setLoadingReviews] = useState(false);
+  const [reviewPage, setReviewPage] = useState(1);
+  const [reviewTotal, setReviewTotal] = useState(0);
+  const [reviewCounts, setReviewCounts] = useState({ total: 0, approved: 0, pending: 0, hidden: 0, rejected: 0 });
+  const REVIEW_PAGE_SIZE = 20;
   const [reviewStatusFilter, setReviewStatusFilter] = useState('ALL'); // ALL | APPROVED | PENDING | HIDDEN | REJECTED
   const [reviewActionLoading, setReviewActionLoading] = useState(false);
 
@@ -112,24 +122,41 @@ const AdminPage = () => {
     }
   };
 
-  // 1. Fetch Rejected KYC List
-  const fetchRejectedKyc = async () => {
+  // 1. Tải danh sách hồ sơ KYC theo trạng thái (chờ duyệt / bị từ chối), có phân trang
+  const fetchRejectedKyc = async (status = kycStatusTab, page = kycPage) => {
     setLoadingKyc(true);
     try {
-      const res = await apiFetch(`${API_BASE_URL}/api/admin/kyc/rejected`);
+      const params = new URLSearchParams({ status, page: String(page), limit: String(KYC_PAGE_SIZE) });
+      const res = await apiFetch(`${API_BASE_URL}/api/admin/kyc?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
-        const list = Array.isArray(data) ? data : (data.verifications || data.data || []);
+        const list = data.verifications || [];
         setRejectedList(list);
-        if (list.length > 0 && !selectedKycId) {
-          setSelectedKycId(list[0].id);
+        setKycTotal(Number(data.total || 0));
+        if (!list.some((item) => item.id === selectedKycId)) {
+          setSelectedKycId(list.length > 0 ? list[0].id : null);
+          if (list.length === 0) setKycDetail(null);
         }
       }
     } catch (err) {
-      console.error('Lỗi khi tải danh sách KYC bị từ chối:', err);
+      console.error('Lỗi khi tải danh sách hồ sơ KYC:', err);
     } finally {
       setLoadingKyc(false);
     }
+  };
+
+  const switchKycStatusTab = (status) => {
+    if (status === kycStatusTab) return;
+    setKycStatusTab(status);
+    setKycPage(1);
+    setSelectedKycId(null);
+    setKycDetail(null);
+    fetchRejectedKyc(status, 1);
+  };
+
+  const goToKycPage = (page) => {
+    setKycPage(page);
+    fetchRejectedKyc(kycStatusTab, page);
   };
 
   // 2. Fetch KYC Detail
@@ -178,18 +205,19 @@ const AdminPage = () => {
   };
 
   // 4. Fetch Reviews (Kiểm duyệt đánh giá)
-  const fetchAdminReviews = async () => {
+  const fetchAdminReviews = async (status = reviewStatusFilter, page = reviewPage, keepSelection = false) => {
     setLoadingReviews(true);
     try {
-      const res = await apiFetch(`${API_BASE_URL}/api/admin/reviews`);
+      const params = new URLSearchParams({ status, page: String(page), limit: String(REVIEW_PAGE_SIZE) });
+      const res = await apiFetch(`${API_BASE_URL}/api/admin/reviews?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
-        const list = Array.isArray(data) ? data : [];
+        const list = data.items || [];
         setReviewsList(list);
-        if (list.length > 0) {
-          setSelectedReviewId(list[0].id);
-        } else {
-          setSelectedReviewId(null);
+        setReviewTotal(Number(data.total || 0));
+        if (data.counts) setReviewCounts(data.counts);
+        if (!(keepSelection && list.some((item) => item.id === selectedReviewId))) {
+          setSelectedReviewId(list.length > 0 ? list[0].id : null);
         }
       }
     } catch (err) {
@@ -223,6 +251,7 @@ const AdminPage = () => {
       if (res.ok) {
         alert(data.message || `Đã cập nhật trạng thái thành ${newStatus}`);
         setReviewsList(prev => prev.map(r => r.id === reviewId ? { ...r, status: newStatus } : r));
+        fetchAdminReviews(reviewStatusFilter, reviewPage, true);
       } else {
         alert(data.error || 'Cập nhật trạng thái đánh giá thất bại');
       }
@@ -456,7 +485,7 @@ const AdminPage = () => {
   // Handle Approve KYC
   const handleApproveKyc = async () => {
     if (!selectedKycId) return;
-    if (!window.confirm('Bạn có chắc chắn muốn duyệt hồ sơ KYC này? Hệ thống sẽ cập nhật trạng thái VERIFIED và cộng +20 trust score (nếu là lần duyệt đầu tiên).')) {
+    if (!window.confirm('Duyệt hồ sơ? Tài khoản sẽ chuyển sang Đã xác minh; môi giới có thể tự nhận +20 điểm uy tín trong mục nhiệm vụ.')) {
       return;
     }
 
@@ -469,7 +498,7 @@ const AdminPage = () => {
       });
       const result = await res.json();
       if (res.ok) {
-        alert(result.message || 'Duyệt hồ sơ thành công!');
+        alert('Duyệt hồ sơ thành công!');
         setRejectedList(prev => prev.filter(item => item.id !== selectedKycId));
         setKycDetail(null);
         setSelectedKycId(null);
@@ -504,10 +533,10 @@ const AdminPage = () => {
       });
       const result = await res.json();
       if (res.ok) {
-        alert(result.message || 'Từ chối hồ sơ thành công!');
+        alert('Từ chối hồ sơ thành công!');
         setShowRejectModal(false);
         setRejectReasonInput('');
-        fetchKycDetail(selectedKycId);
+        if (kycStatusTab === 'REJECTED') fetchKycDetail(selectedKycId);
         fetchRejectedKyc();
       } else {
         alert(result.error || 'Từ chối hồ sơ thất bại');
@@ -629,12 +658,18 @@ const AdminPage = () => {
     return propTitle.toLowerCase().includes(q) || propAddr.toLowerCase().includes(q) || reporterName.toLowerCase().includes(q) || reasonStr.toLowerCase().includes(q);
   });
 
-  const reviewStats = {
-    total: (Array.isArray(reviewsList) ? reviewsList : []).length,
-    approved: (Array.isArray(reviewsList) ? reviewsList : []).filter(r => r.status === 'APPROVED').length,
-    pending: (Array.isArray(reviewsList) ? reviewsList : []).filter(r => r.status === 'PENDING').length,
-    hidden: (Array.isArray(reviewsList) ? reviewsList : []).filter(r => r.status === 'HIDDEN').length,
-    rejected: (Array.isArray(reviewsList) ? reviewsList : []).filter(r => r.status === 'REJECTED').length
+  // Tổng theo trạng thái do server trả về (danh sách đã phân trang nên không đếm ở client được).
+  const reviewStats = reviewCounts;
+
+  const changeReviewStatusFilter = (status) => {
+    setReviewStatusFilter(status);
+    setReviewPage(1);
+    fetchAdminReviews(status, 1);
+  };
+
+  const goToReviewPage = (page) => {
+    setReviewPage(page);
+    fetchAdminReviews(reviewStatusFilter, page);
   };
 
   const filteredReviewsList = (Array.isArray(reviewsList) ? reviewsList : []).filter(item => {
@@ -698,14 +733,14 @@ const AdminPage = () => {
   const selectedReasonInfo = selectedReport ? (REASON_LABELS[selectedReport.reason] || { label: selectedReport.reason, penalty: 0, color: '#64748b', bg: '#f1f5f9' }) : null;
 
   return (
-    <div className={`admin-dashboard ${['analytics','service-plans'].includes(activeTab) ? 'analytics-active' : ''} ${activeTab === 'service-plans' ? 'service-page-active' : ''}`}>
+    <div className={`admin-dashboard ${['analytics','service-plans','plus-admin','plan-grants'].includes(activeTab) ? 'analytics-active' : ''} ${activeTab === 'service-plans' ? 'service-page-active' : ''}`}>
       <AdminSidebar activeTab={activeTab} onNavigate={tab => { setActiveTab(tab); setSearchQuery(''); }} onLogout={handleLogout} />
 
       {/* MAIN AREA */}
       <main className="admin-main">
         {/* TOPBAR */}
         <header className="admin-topbar">
-          {['analytics','service-plans'].includes(activeTab) ? <span className="admin-analytics-topbar-label">{activeTab === 'analytics' ? 'Thống kê & Báo cáo' : 'Admin › Quản lý gói dịch vụ'}</span> : <div className="admin-search-wrapper">
+          {['analytics','service-plans','plus-admin','plan-grants'].includes(activeTab) ? <span className="admin-analytics-topbar-label">{activeTab === 'analytics' ? 'Thống kê & Báo cáo' : activeTab === 'plus-admin' ? 'Admin › Nguồn hàng Swipe Nest' : activeTab === 'plan-grants' ? 'Admin › Cấp / hủy gói' : 'Admin › Quản lý gói dịch vụ'}</span> : <div className="admin-search-wrapper">
             <Search size={18} color="#94a3b8" />
             <input
               type="text"
@@ -742,7 +777,7 @@ const AdminPage = () => {
 
         {/* CONTENT AREA */}
         <div className="admin-content-area">
-          {!['analytics','service-plans'].includes(activeTab) && <div className="admin-header-banner">
+          {!['analytics','service-plans','plus-admin','plan-grants'].includes(activeTab) && <div className="admin-header-banner">
             <div className="admin-header-title">
               <h1>Admin</h1>
               <p>Xác minh và kiểm duyệt thủ công, đảm bảo sự công bằng và minh bạch</p>
@@ -779,18 +814,28 @@ const AdminPage = () => {
 
           {activeTab === 'analytics' && <Suspense fallback={<div className="admin-empty-state" role="status">Đang mở thống kê…</div>}><AdminAnalyticsPage /></Suspense>}
           {activeTab === 'service-plans' && <Suspense fallback={<div className="admin-empty-state" role="status">Đang mở quản lý gói dịch vụ…</div>}><ServicePlansPage /></Suspense>}
+          {activeTab === 'plus-admin' && <Suspense fallback={<div className="admin-empty-state" role="status">Đang mở nguồn hàng Swipe Nest…</div>}><PlusAdminPage /></Suspense>}
+          {activeTab === 'plan-grants' && <Suspense fallback={<div className="admin-empty-state" role="status">Đang mở cấp / hủy gói…</div>}><PlanGrantsPage /></Suspense>}
 
           {/* TAB 1: KIỂM DUYỆT TÀI KHOẢN (KYC) */}
           {activeTab === 'account-verification' && (
             <div className="admin-grid-container">
-              {/* LEFT COLUMN: REJECTED KYC LIST */}
+              {/* LEFT COLUMN: KYC LIST (CHỜ DUYỆT / BỊ TỪ CHỐI) */}
               <div className="admin-list-column">
+                <div className="admin-kyc-subtabs" role="tablist" aria-label="Trạng thái hồ sơ KYC">
+                  <button type="button" role="tab" aria-selected={kycStatusTab === 'PENDING'}
+                    className={`admin-kyc-subtab ${kycStatusTab === 'PENDING' ? 'active' : ''}`}
+                    onClick={() => switchKycStatusTab('PENDING')}>Chờ duyệt</button>
+                  <button type="button" role="tab" aria-selected={kycStatusTab === 'REJECTED'}
+                    className={`admin-kyc-subtab ${kycStatusTab === 'REJECTED' ? 'active' : ''}`}
+                    onClick={() => switchKycStatusTab('REJECTED')}>Bị từ chối</button>
+                </div>
                 {loadingKyc ? (
                   <div className="admin-empty-state">Đang tải danh sách hồ sơ...</div>
                 ) : filteredRejectedList.length === 0 ? (
                   <div className="admin-empty-state">
                     <CheckCircle size={40} />
-                    <h4>Không có hồ sơ KYC nào bị từ chối</h4>
+                    <h4>{kycStatusTab === 'PENDING' ? 'Không có hồ sơ KYC nào đang chờ duyệt' : 'Không có hồ sơ KYC nào bị từ chối'}</h4>
                     <p>Tất cả tài khoản đều đã được xử lý hoặc hợp lệ.</p>
                   </div>
                 ) : (
@@ -819,13 +864,36 @@ const AdminPage = () => {
                           </div>
                         </div>
 
-                        <div className="admin-card-badge admin-badge-rejected">
-                          <XCircle size={14} />
-                          <span>Xác thực thất bại</span>
-                        </div>
+                        {item.status === 'PENDING' ? (
+                          <div className="admin-card-badge admin-badge-pending">
+                            <Clock size={14} />
+                            <span>Chờ duyệt</span>
+                          </div>
+                        ) : (
+                          <div className="admin-card-badge admin-badge-rejected">
+                            <XCircle size={14} />
+                            <span>Xác thực thất bại</span>
+                          </div>
+                        )}
+                        {(item.name_mismatch || item.face_check_unavailable || (item.status === 'PENDING' && !item.has_selfie)) && (
+                          <div className="admin-kyc-flags">
+                            {item.face_check_unavailable && <span className="admin-kyc-flag admin-kyc-flag-warn">Chưa so khớp khuôn mặt</span>}
+                            {item.name_mismatch && <span className="admin-kyc-flag admin-kyc-flag-warn">Lệch tên</span>}
+                            {item.status === 'PENDING' && !item.has_selfie && (
+                              <span className="admin-kyc-flag">{Number(item.selfie_attempts || 0) === 0 ? 'Chưa làm selfie' : 'Selfie chưa khớp'}</span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     );
                   })
+                )}
+                {!loadingKyc && kycTotal > KYC_PAGE_SIZE && (
+                  <div className="admin-kyc-pagination">
+                    <button type="button" className="admin-btn" disabled={kycPage <= 1} onClick={() => goToKycPage(kycPage - 1)}>Trước</button>
+                    <span>Trang {kycPage} / {Math.ceil(kycTotal / KYC_PAGE_SIZE)}</span>
+                    <button type="button" className="admin-btn" disabled={kycPage >= Math.ceil(kycTotal / KYC_PAGE_SIZE)} onClick={() => goToKycPage(kycPage + 1)}>Sau</button>
+                  </div>
                 )}
               </div>
 
@@ -843,15 +911,26 @@ const AdminPage = () => {
                   <>
                     <div className="admin-detail-header">
                       <h3>HỒ SƠ XÁC MINH DANH TÍNH #{kycDetail.id}</h3>
-                      <div className={`admin-card-badge ${kycDetail.status === 'APPROVED' ? 'admin-badge-approved' : 'admin-badge-rejected'}`}>
-                        {kycDetail.status === 'APPROVED' ? 'Đã xác minh' : 'Xác thực thất bại'}
+                      <div className={`admin-card-badge ${kycDetail.status === 'APPROVED' ? 'admin-badge-approved' : kycDetail.status === 'PENDING' ? 'admin-badge-pending' : 'admin-badge-rejected'}`}>
+                        {kycDetail.status === 'APPROVED' ? 'Đã xác minh' : kycDetail.status === 'PENDING' ? 'Chờ duyệt' : 'Xác thực thất bại'}
                       </div>
                     </div>
 
                     <div className="admin-info-grid">
                       <div className="admin-info-item">
-                        <span className="admin-info-label">Họ và tên</span>
-                        <span className="admin-info-value">{kycDetail.user?.name || kycDetail.full_name || 'Chưa cập nhật'}</span>
+                        <span className="admin-info-label">Tên trên CCCD (OCR)</span>
+                        <span className="admin-info-value">{kycDetail.ocr_data?.fullName || kycDetail.full_name || 'Không đọc được'}</span>
+                      </div>
+                      <div className="admin-info-item">
+                        <span className="admin-info-label">Tên đã khai</span>
+                        <span className="admin-info-value">
+                          {kycDetail.declared_name || kycDetail.user?.name || 'Chưa cập nhật'}
+                          {kycDetail.name_mismatch && <span className="admin-kyc-flag admin-kyc-flag-warn" style={{ marginLeft: 8 }}>Lệch tên</span>}
+                        </span>
+                      </div>
+                      <div className="admin-info-item">
+                        <span className="admin-info-label">Tên tài khoản</span>
+                        <span className="admin-info-value">{kycDetail.user?.name || 'Chưa cập nhật'}</span>
                       </div>
                       <div className="admin-info-item">
                         <span className="admin-info-label">Số CCCD / ID Hồ sơ</span>
@@ -875,6 +954,30 @@ const AdminPage = () => {
                       </div>
                     </div>
 
+                    {kycDetail.face_check_unavailable && (
+                      <div className="admin-reject-alert">
+                        <div className="admin-reject-icon">
+                          <AlertTriangle size={24} />
+                        </div>
+                        <div className="admin-reject-content">
+                          <h4>Chưa so khớp khuôn mặt tự động</h4>
+                          <p>Dịch vụ so khớp khuôn mặt bị lỗi khi người dùng gửi selfie. Hãy đối chiếu ảnh selfie với ảnh trên CCCD trước khi duyệt.</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {kycDetail.name_mismatch && (
+                      <div className="admin-reject-alert">
+                        <div className="admin-reject-icon">
+                          <AlertTriangle size={24} />
+                        </div>
+                        <div className="admin-reject-content">
+                          <h4>Tên trên CCCD khác tên đã khai</h4>
+                          <p>Hãy đối chiếu ảnh CCCD và ảnh selfie trước khi duyệt. Hồ sơ này không được duyệt tự động.</p>
+                        </div>
+                      </div>
+                    )}
+
                     {kycDetail.reject_reason && !kycDetail.reject_reason.startsWith('{') && (
                       <div className="admin-reject-alert">
                         <div className="admin-reject-icon">
@@ -894,6 +997,11 @@ const AdminPage = () => {
 
                     <div className="admin-docs-section">
                       <h4 className="admin-docs-title">Tài liệu xác minh danh tính</h4>
+                      {Boolean(kycDetail.image_errors?.length) && (
+                        <p className="admin-kyc-image-warning" role="status">
+                          Có {kycDetail.image_errors.length} ảnh không tải được (đường dẫn không hợp lệ hoặc file đã bị xóa). Hãy cân nhắc yêu cầu môi giới gửi lại hồ sơ.
+                        </p>
+                      )}
                       
                       <div className="admin-cards-grid">
                         <div className="admin-doc-card">
@@ -1229,34 +1337,34 @@ const AdminPage = () => {
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <button
                     className={`report-filter-btn ${reviewStatusFilter === 'ALL' ? 'active' : ''}`}
-                    onClick={() => setReviewStatusFilter('ALL')}
+                    onClick={() => changeReviewStatusFilter('ALL')}
                   >
                     Tất cả ({reviewStats.total})
                   </button>
                   <button
                     className={`report-filter-btn ${reviewStatusFilter === 'APPROVED' ? 'active' : ''}`}
-                    onClick={() => setReviewStatusFilter('APPROVED')}
+                    onClick={() => changeReviewStatusFilter('APPROVED')}
                     style={{ color: reviewStatusFilter === 'APPROVED' ? '#ffffff' : '#059669' }}
                   >
                     Đang hiển thị ({reviewStats.approved})
                   </button>
                   <button
                     className={`report-filter-btn ${reviewStatusFilter === 'PENDING' ? 'active' : ''}`}
-                    onClick={() => setReviewStatusFilter('PENDING')}
+                    onClick={() => changeReviewStatusFilter('PENDING')}
                     style={{ color: reviewStatusFilter === 'PENDING' ? '#ffffff' : '#d97706' }}
                   >
                     Chờ duyệt ({reviewStats.pending})
                   </button>
                   <button
                     className={`report-filter-btn ${reviewStatusFilter === 'HIDDEN' ? 'active' : ''}`}
-                    onClick={() => setReviewStatusFilter('HIDDEN')}
+                    onClick={() => changeReviewStatusFilter('HIDDEN')}
                     style={{ color: reviewStatusFilter === 'HIDDEN' ? '#ffffff' : '#dc2626' }}
                   >
                     Đã ẩn vi phạm ({reviewStats.hidden})
                   </button>
                   <button
                     className={`report-filter-btn ${reviewStatusFilter === 'REJECTED' ? 'active' : ''}`}
-                    onClick={() => setReviewStatusFilter('REJECTED')}
+                    onClick={() => changeReviewStatusFilter('REJECTED')}
                     style={{ color: reviewStatusFilter === 'REJECTED' ? '#ffffff' : '#991b1b' }}
                   >
                     Đã từ chối ({reviewStats.rejected})
@@ -1354,6 +1462,13 @@ const AdminPage = () => {
                         </div>
                       );
                     })
+                  )}
+                  {!loadingReviews && reviewTotal > REVIEW_PAGE_SIZE && (
+                    <div className="admin-kyc-pagination">
+                      <button type="button" className="admin-btn" disabled={reviewPage <= 1} onClick={() => goToReviewPage(reviewPage - 1)}>Trước</button>
+                      <span>Trang {reviewPage} / {Math.ceil(reviewTotal / REVIEW_PAGE_SIZE)}</span>
+                      <button type="button" className="admin-btn" disabled={reviewPage >= Math.ceil(reviewTotal / REVIEW_PAGE_SIZE)} onClick={() => goToReviewPage(reviewPage + 1)}>Sau</button>
+                    </div>
                   )}
                 </div>
 
@@ -1484,7 +1599,7 @@ const AdminPage = () => {
                                   src={img.image_url.startsWith('http') ? img.image_url : `${API_BASE_URL}${img.image_url}`}
                                   alt="Review image"
                                   style={{ width: 100, height: 100, objectFit: 'cover', borderRadius: 8, cursor: 'pointer', border: '1px solid #e2e8f0' }}
-                                  onClick={() => window.open(img.image_url.startsWith('http') ? img.image_url : `${API_BASE_URL}${img.image_url}`, '_blank')}
+                                  onClick={() => window.open(img.image_url.startsWith('http') ? img.image_url : `${API_BASE_URL}${img.image_url}`, '_blank', 'noopener,noreferrer')}
                                   title="Nhấp để xem kích thước đầy đủ"
                                 />
                               ))}

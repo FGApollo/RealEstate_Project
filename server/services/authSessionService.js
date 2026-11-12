@@ -80,11 +80,13 @@ const verifyAccessToken = (token) => {
 };
 
 const getUserById = async (userId) => {
-  const { data: user, error } = await supabase
-    .from('users')
-    .select(USER_COLUMNS)
-    .eq('id', userId)
-    .maybeSingle();
+  const read = (columns) => supabase.from('users').select(columns).eq('id', userId).maybeSingle();
+  // Database chưa có cột is_official (chưa chạy migration 026): đăng nhập vẫn phải hoạt động,
+  // nên mọi lỗi của truy vấn mở rộng đều được thử lại với bộ cột gốc.
+  let user;
+  let error;
+  try { ({ data: user, error } = await read(`${USER_COLUMNS}, is_official`)); } catch (thrown) { error = thrown; }
+  if (error) ({ data: user, error } = await read(USER_COLUMNS));
 
   if (error) throw new Error(error.message);
   return user ? { ...user, role: normalizeAccountRole(user.role) } : null;
@@ -95,18 +97,21 @@ const isLiveSession = (session) => Boolean(session && !session.revoked_at
 
 const getAuthenticatedUser = async (token) => {
   const payload = verifyAccessToken(token);
-  const { data: session, error } = await supabase
-    .from('auth_sessions')
-    .select('id, user_id, expires_at, revoked_at')
-    .eq('id', payload.sid)
-    .maybeSingle();
+  // Mỗi request API đều qua đây: đọc phiên và tài khoản song song (một vòng mạng thay vì hai, ~250ms mỗi vòng tới
+  // Supabase). User id lấy từ token đã ký; vẫn chỉ trả về tài khoản khi phiên còn sống và đúng của user đó.
+  const [{ data: session, error }, user] = await Promise.all([
+    supabase.from('auth_sessions')
+      .select('id, user_id, expires_at, revoked_at')
+      .eq('id', payload.sid)
+      .maybeSingle(),
+    getUserById(payload.sub)
+  ]);
 
   if (error) throw new Error(error.message);
   if (!isLiveSession(session) || String(session.user_id) !== payload.sub) {
     return null;
   }
 
-  const user = await getUserById(session.user_id);
   if (!user) return null;
   assertAccountCanAuthenticate(user);
   return user;

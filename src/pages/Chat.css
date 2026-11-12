@@ -1162,3 +1162,7 @@
 }
 
 
+
+/* Icon tích xanh "đã xác thực danh tính" cạnh tên người chat. */
+.partner-verified-icon { color: #1d4ed8; flex: none; }
+.partner-name-row { display: inline-flex; align-items: center; gap: 6px; }

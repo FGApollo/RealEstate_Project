@@ -12,7 +12,7 @@ const action = (fn) => async (req, res) => {
   }
 };
 module.exports = {
-  catalog: action(() => service.catalog()),
+  catalog: action((req) => service.catalog(req.user.id)),
   list: action((req) => service.list(req.user.id, req.query)),
   create: action((req) => service.create(req.user.id, req.body)),
   get: action((req) => service.get(req.user.id, req.params.id)),

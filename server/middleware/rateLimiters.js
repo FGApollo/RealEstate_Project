@@ -35,7 +35,9 @@ const rateLimitHandler = (policy) => (req, res) => {
   }));
 
   return res.status(429).json({
-    error: 'Too many requests. Please try again later.',
+    error: retryAfterSeconds
+      ? `Bạn thao tác quá nhanh. Vui lòng thử lại sau ${Math.ceil(retryAfterSeconds / 60)} phút.`
+      : 'Bạn thao tác quá nhanh. Vui lòng thử lại sau ít phút.',
     code: 'RATE_LIMITED',
     policy,
     ...(retryAfterSeconds ? { retryAfterSeconds } : {})
@@ -151,6 +153,13 @@ const createRateLimiters = (overrides = {}) => {
       config.authWindowMs,
       config.verificationVerifyLimit
     ),
+    // Quên mật khẩu dùng chung hạn mức với gửi email xác minh nhưng đếm riêng.
+    passwordResetSendIp: byIp('password-reset-send-ip', config.verificationSendWindowMs, config.verificationSendIpLimit),
+    passwordResetSendCooldown: byIpAndEmail('password-reset-send-cooldown', config.verificationSendCooldownMs,
+      config.verificationSendCooldownLimit),
+    passwordResetSendIpEmail: byIpAndEmail('password-reset-send-ip-email', config.verificationSendWindowMs,
+      config.verificationSendEmailLimit),
+    passwordResetVerifyIp: byIp('password-reset-verify-ip', config.authWindowMs, config.verificationVerifyLimit),
     googleIp: byIp('google-login-ip', config.authWindowMs, config.googleLimit),
     sessionIp: byIp('auth-session-ip', config.authWindowMs, config.sessionLimit),
     write: byUser('authenticated-write', config.writeWindowMs, config.writeLimit),

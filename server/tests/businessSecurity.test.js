@@ -174,11 +174,33 @@ test('chat message reads constrain both participants and cap latest-message page
 
 test('chat rejects attaching another conversation property before inserting any message', async (t) => {
   const calls = mockQueries(t, [
-    { table: 'users', result: { data: { id: 11, is_active: true } } },
+    { table: 'users', result: { data: { id: 11, role: 'AGENT', is_active: true } } },
     { table: 'properties', result: { data: { id: 3, owner_id: 12, status: 'AVAILABLE', is_hidden: false } } }
   ]);
   await assert.rejects(chatService.sendMessage(10, 11, 3, 'hello'), { statusCode: 404 });
   assert.equal(calls.some((call) => call.table === 'messages'), false);
+});
+
+test('chat cannot open a new conversation with a non-agent who never wrote first', async (t) => {
+  const calls = mockQueries(t, [
+    { table: 'users', result: { data: { id: 11, role: 'ADMIN', is_active: true } } },
+    { table: 'messages', result: { data: [] } }
+  ]);
+  await assert.rejects(chatService.sendMessage(10, 11, null, 'hello'), { statusCode: 403 });
+  // Only the prior-contact lookup touched messages: nothing was inserted.
+  assert.equal(calls.filter((call) => call.table === 'messages').length, 1);
+  assert.equal(calls.some((call) => call.methods.some(([method]) => method === 'insert')), false);
+});
+
+test('chat lets a non-agent reply to someone who wrote first', async (t) => {
+  mockQueries(t, [
+    { table: 'users', result: { data: { id: 11, role: 'USER', is_active: true } } },
+    { table: 'messages', result: { data: [{ id: 1 }] } },
+    { table: 'messages', result: { data: { id: 8, sender_id: 10, receiver_id: 11, message: 'reply' } } },
+    { table: 'users', result: { data: [] } }
+  ]);
+  const message = await chatService.sendMessage(10, 11, null, 'reply');
+  assert.equal(message.id, 8);
 });
 
 test('chat hides database error details from the HTTP response', async (t) => {
@@ -193,7 +215,7 @@ test('merged chat supports image-only messages using validated storage and expli
   const sharp = require('sharp');
   const image = await sharp({ create: { width: 2, height: 2, channels: 3, background: 'blue' } }).png().toBuffer();
   const calls = mockQueries(t, [
-    { table: 'users', result: { data: { id: 11, is_active: true } } },
+    { table: 'users', result: { data: { id: 11, role: 'AGENT', is_active: true } } },
     { table: 'messages', result: { data: { id: 7, message: '' } } },
     { table: 'users', result: { data: [] } }
   ]);
@@ -226,7 +248,7 @@ test('merged chat rejects malformed attachments, unsafe IDs and empty messages b
 });
 
 test('merged chat rejects corrupt image data without storing a message', async (t) => {
-  const calls = mockQueries(t, [{ table: 'users', result: { data: { id: 11, is_active: true } } }]);
+  const calls = mockQueries(t, [{ table: 'users', result: { data: { id: 11, role: 'AGENT', is_active: true } } }]);
   await assert.rejects(chatService.sendMessage(10, 11, null, '', [{ url: 'data:image/png;base64,bm90LWEtcG5n' }]), { statusCode: 400 });
   assert.equal(calls.length, 1);
 });
@@ -256,9 +278,12 @@ test('agents cannot discover the identity of users who reported their listings',
   mockQueries(t, [
     { table: 'properties', result: { data: [{ id: 4, owner_id: 9 }] } },
     { table: 'property_reports', result: { data: [{ id: 3, property_id: 4, reporter_id: 50, reporter: { email: 'reporter@example.test' } }] } },
-    { table: 'property_report_appeals', result: { data: [] } }
+    { table: 'property_report_appeals', result: { data: [] } },
+    { table: 'trust_score_logs', result: { data: [{ related_report_id: 3, point_change: -5 }, { related_report_id: 3, point_change: 2 }] } }
   ]);
   const { violations } = await appealService.getAgentViolations(9);
+  assert.equal(violations[0].penalty_points, 5);
+  assert.equal(violations[0].refunded_points, 2);
   assert.equal(violations[0].reporter_id, undefined);
   assert.equal(violations[0].reporter, undefined);
 });

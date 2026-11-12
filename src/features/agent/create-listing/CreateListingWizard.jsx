@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import './CreateListingWizard.css';
 import useListingForm from './useListingForm';
+import AreaSelect from '../../location/AreaSelect';
 
 const propertyTypesList = ['Căn Hộ', 'Chung Cư', 'Nhà Ở', 'Mặt Bằng', 'Văn Phòng', 'Phòng Trọ'];
 const lifestyleTagsList = ['Gần trường học', 'Gần đại học', 'Gần trung tâm', 'Gần phòng gym', 'Khu yên tĩnh', 'Khu an ninh', 'Gần trạm xe buýt', 'Khu nhiều tiện ích'];
@@ -34,10 +35,6 @@ const CreateListingWizard = ({ setActiveTab, setData, currentUser }) => {
     listing, setListing,
     currentStep, setCurrentStep,
     submittedProperty,
-    provinces, districts, wards,
-    selectedProvinceCode, setSelectedProvinceCode,
-    selectedDistrictCode, setSelectedDistrictCode,
-    loadDistricts, loadWards,
     handleAutoLocation, handleSearchAddressOnMap, geocodeAddress,
     handleImageFileChange, handleDragOver, handleDrop,
     toggleSelectImage, setFeaturedImage, deleteSelectedImages,
@@ -87,7 +84,7 @@ const CreateListingWizard = ({ setActiveTab, setData, currentUser }) => {
   }
 
   // Guard: If KYC verification status is not VERIFIED, block listing creation (F28)
-  if (currentUser?.verification_status !== 'VERIFIED') {
+  if (currentUser?.verification_status !== 'VERIFIED' && currentUser?.is_official !== true) {
     return (
       <div className="create-flow-container">
         <div className="agent-low-score-blocked-card" style={{ borderColor: '#f59e0b' }}>
@@ -233,64 +230,25 @@ const CreateListingWizard = ({ setActiveTab, setData, currentUser }) => {
                 <h2 className="card-title">Địa chỉ</h2>
                 <button type="button" className="text-action-btn" onClick={handleAutoLocation}>Tự động lấy vị trí</button>
               </div>
-              <div className="form-row-3">
-                <div className="input-group">
-                  <label>Thành phố / Tỉnh</label>
-                  <select value={listing.city} onChange={(e) => {
-                    const cityName = e.target.value;
-                    setListing(prev => ({ ...prev, city: cityName, district: '', ward: '' }));
-                    const match = provinces.find(p => p.name === cityName);
-                    if (match) { setSelectedProvinceCode(match.code); loadDistricts(match.code); }
-                    else { setSelectedProvinceCode(''); }
-                  }}>
-                    <option value="">Chọn Tỉnh / Thành Phố</option>
-                    {provinces.map(p => <option key={p.code} value={p.name}>{p.name}</option>)}
-                  </select>
-                </div>
-                <div className="input-group">
-                  <label>Quận / Huyện</label>
-                  <select value={listing.district} disabled={!selectedProvinceCode} onChange={(e) => {
-                    const distName = e.target.value;
-                    setListing(prev => ({ ...prev, district: distName, ward: '' }));
-                    const match = districts.find(d => d.name === distName);
-                    if (match) { setSelectedDistrictCode(match.code); loadWards(match.code); }
-                    else setSelectedDistrictCode('');
-                  }}>
-                    <option value="">Chọn Quận / Huyện</option>
-                    {districts.map(d => <option key={d.code} value={d.name}>{d.name}</option>)}
-                  </select>
-                </div>
-                <div className="input-group">
-                  <label>Phường / Xã</label>
-                  <select 
-                    value={listing.ward} 
-                    disabled={!selectedDistrictCode} 
-                    onChange={(e) => {
-                      const wardName = e.target.value;
-                      setListing(prev => ({ ...prev, ward: wardName }));
-                      if (wardName) {
-                        geocodeAddress({
-                          address_detail: listing.address_detail,
-                          ward: wardName,
-                          district: listing.district,
-                          city: listing.city
-                        }).then(res => {
-                          if (res) {
-                            setListing(prev => ({
-                              ...prev,
-                              latitude: res.lat,
-                              longitude: res.lon,
-                              address: res.display_name || prev.address
-                            }));
-                          }
-                        });
-                      }
-                    }}
-                  >
-                    <option value="">Chọn Phường / Xã</option>
-                    {wards.map(w => <option key={w.code} value={w.name}>{w.name}</option>)}
-                  </select>
-                </div>
+              <div className="input-group">
+                <label>Tỉnh / Thành phố · Phường / Xã <small>(đơn vị hành chính mới, từ 1/7/2025)</small></label>
+                <AreaSelect
+                  required
+                  allLabel="Chọn"
+                  province={listing.city}
+                  ward={listing.ward}
+                  onChange={({ province, ward }) => {
+                    setListing(prev => ({ ...prev, city: province, ward, district: '' }));
+                    if (province && ward) {
+                      geocodeAddress({ address_detail: listing.address_detail, ward, district: '', city: province }).then(res => {
+                        if (res) setListing(prev => ({ ...prev, latitude: res.lat, longitude: res.lon, address: res.display_name || prev.address }));
+                      });
+                    }
+                  }}
+                />
+                {listing.district && (
+                  <small className="legacy-area-note">Tin này đang ghi theo địa chỉ cũ ({listing.district}). Hãy chọn lại phường/xã mới.</small>
+                )}
               </div>
               <div className="input-group">
                 <label>Số nhà, tên đường</label>
@@ -431,7 +389,7 @@ const CreateListingWizard = ({ setActiveTab, setData, currentUser }) => {
             <h2 className="card-title">Xem trước tin đăng</h2>
             <div className="live-preview-card">
               <div className="preview-image-wrap">
-                <img src={listing.thumbnail || (listing.images.find(img => img.isFeatured)?.url || 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80')} alt="Listing Preview" />
+                <img src={listing.thumbnail || (listing.images.find(img => img.isFeatured)?.url || '/listing-placeholder.svg')} alt="Listing Preview" />
                 <span className="verified-overlay-badge">ĐÃ XÁC THỰC</span>
                 <div className="preview-bottom-gradient">
                   <h3>{listing.title || 'Tiêu đề tin đăng của bạn'}</h3>
@@ -468,7 +426,7 @@ const CreateListingWizard = ({ setActiveTab, setData, currentUser }) => {
 
           <div className="success-preview-listing">
             <div className="property-card horizontal-listing">
-              <img src={submittedProperty?.thumbnail || 'https://via.placeholder.com/150'} alt="Listing" />
+              <img src={submittedProperty?.thumbnail || '/listing-placeholder.svg'} alt="Listing" />
               <div className="listing-info">
                 <h3>{submittedProperty?.title}</h3>
                 <p className="card-address"><MapPin size={14} /><span>{submittedProperty?.address || submittedProperty?.district}</span></p>

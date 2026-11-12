@@ -855,3 +855,6 @@
   object-fit: cover;
 }
 
+
+/* Tổng điểm đang bị trừ, hiện nhỏ cạnh số báo cáo bị trừ điểm. */
+.v-stat-sub { font-size: .8rem; font-weight: 600; color: #9a3412; }

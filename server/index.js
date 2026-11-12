@@ -61,6 +61,7 @@ app.use('/api/properties', express.json({ limit: '50mb' }));
 // Up to five 5MB chat images encoded as base64, plus bounded message metadata.
 app.use('/api/chat/messages', express.json({ limit: '36mb' }));
 app.use('/api/payments', express.json({ limit: '32kb' }));
+app.use('/api/plus', express.json({ limit: '32kb' }));
 app.use(express.json({ limit: '256kb' }));
 app.use(express.urlencoded({ limit: '32kb', extended: false, parameterLimit: 100 }));
 
@@ -87,6 +88,7 @@ app.use('/api/trust-score', trustScoreRoutes);
 app.use('/api/users', userProfileRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/payments', require('./routes/paymentRoutes'));
+app.use('/api/plus', require('./routes/plusRoutes'));
 app.use('/api/appeals', appealRoutes);
 app.use('/api/me', preferenceRoutes);
 app.use('/api/recommendations', recommendationRoutes);

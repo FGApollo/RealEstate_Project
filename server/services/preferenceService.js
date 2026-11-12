@@ -4,7 +4,8 @@ const {
   PROPERTY_TYPES,
   normalizeKey,
   propertyTypeKey,
-  locationKey
+  locationKey,
+  canonicalLocationKey
 } = require('./recommendationKeys');
 
 const fail = (message, statusCode = 400) => {
@@ -47,6 +48,8 @@ const savePreferences = async (userId, body) => {
   if (locations.some((key) => !/^[a-z0-9_]+\|[a-z0-9_]+$/.test(key))) {
     throw fail('A preferred location is invalid.');
   }
+  // Lưu dạng chuẩn (bỏ tiền tố TP./Tỉnh…) và bỏ trùng.
+  const canonicalLocations = [...new Set(locations.map(canonicalLocationKey).filter(Boolean))];
 
   const minPrice = optionalNumber(body.min_price, 'min_price', 1000000000000);
   const maxPrice = optionalNumber(body.max_price, 'max_price', 1000000000000);
@@ -61,7 +64,7 @@ const savePreferences = async (userId, body) => {
   return preferenceRepository.upsertForUser(userId, {
     listing_type: body.listing_type,
     preferred_property_types: propertyTypes,
-    preferred_location_keys: locations,
+    preferred_location_keys: canonicalLocations,
     min_price: minPrice,
     max_price: maxPrice,
     min_bedrooms: minBedrooms,

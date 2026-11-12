@@ -7,7 +7,7 @@ const assert = require('node:assert/strict');
 const recommendationService = require('../services/recommendationService');
 const preferenceService = require('../services/preferenceService');
 const propertyRepository = require('../repositories/propertyRepository');
-const { locationKey, normalizeKey, propertyTypeKey } = require('../services/recommendationKeys');
+const { locationKey, canonicalLocationKey, normalizeKey, propertyTypeKey } = require('../services/recommendationKeys');
 const preferenceController = require('../controllers/preferenceController');
 const preferenceRoutes = require('../routes/preferenceRoutes');
 const { authenticate } = require('../middleware/authenticate');
@@ -54,7 +54,13 @@ test('recommendation keys normalize property, location and feature labels', () =
   assert.equal(propertyTypeKey('Nhà trọ'), 'PHONG_TRO');
   assert.equal(propertyTypeKey('PHONG_TRO'), 'PHONG_TRO');
   assert.equal(normalizeKey('Ban công'), 'ban_cong');
-  assert.equal(locationKey({ city: 'TP. Hồ Chí Minh', district: 'Quận 7' }), 'tp_ho_chi_minh|quan_7');
+  assert.equal(locationKey({ city: 'TP. Hồ Chí Minh', district: 'Quận 7' }), 'ho_chi_minh|quan_7');
+  // Cùng một nơi dù ghi "TP.", "Thành phố" hay không ghi; khóa cũ đã lưu cũng được chuẩn hóa.
+  assert.equal(locationKey({ city: 'Thành phố Hồ Chí Minh', district: 'Quận 7' }), 'ho_chi_minh|quan_7');
+  assert.equal(locationKey({ city: 'Hồ Chí Minh', district: 'Quận 7' }), 'ho_chi_minh|quan_7');
+  assert.equal(locationKey({ city: 'TP. Hồ Chí Minh', district: 'TP. Thủ Đức' }), 'ho_chi_minh|thu_duc');
+  assert.equal(locationKey({ city: 'Tỉnh Bình Dương', district: 'Thành phố Dĩ An' }), 'binh_duong|di_an');
+  assert.equal(canonicalLocationKey('tp_ho_chi_minh|quan_1'), 'ho_chi_minh|quan_1');
 });
 
 test('a full preference match scores above an unrelated listing', () => {
@@ -105,12 +111,13 @@ test('unfavorite is the latest signal for a property and tempers its earlier lik
   assert.ok(result.profile.propertyTypes.get('CAN_HO') < 0);
 });
 
-test('recommendation feed excludes recent dislikes and current favorites, keeping legacy listings as fallback', async (t) => {
+test('recommendation feed puts recent dislikes and other listing types after the personal picks, never favorites', async (t) => {
   const originals = {
     getPreferences: preferenceService.getPreferences,
     fetchRecommendationCandidates: propertyRepository.fetchRecommendationCandidates,
     fetchPropertiesByIds: propertyRepository.fetchPropertiesByIds,
     fetchFavoriteIds: propertyRepository.fetchFavoriteIds,
+    fetchFavoriteCounts: propertyRepository.fetchFavoriteCounts,
     fetchRecentEvents: propertyRepository.fetchRecentEvents,
     fetchEventProperties: propertyRepository.fetchEventProperties
   };
@@ -119,6 +126,7 @@ test('recommendation feed excludes recent dislikes and current favorites, keepin
     fetchRecommendationCandidates: originals.fetchRecommendationCandidates,
     fetchPropertiesByIds: originals.fetchPropertiesByIds,
     fetchFavoriteIds: originals.fetchFavoriteIds,
+    fetchFavoriteCounts: originals.fetchFavoriteCounts,
     fetchRecentEvents: originals.fetchRecentEvents,
     fetchEventProperties: originals.fetchEventProperties
   }));
@@ -138,6 +146,7 @@ test('recommendation feed excludes recent dislikes and current favorites, keepin
     assert.equal(userId, 17);
     return [3];
   };
+  propertyRepository.fetchFavoriteCounts = async () => new Map();
   propertyRepository.fetchRecentEvents = async () => [
     { property_id: 2, action: 'DISLIKE', created_at: new Date().toISOString() }
   ];
@@ -145,6 +154,7 @@ test('recommendation feed excludes recent dislikes and current favorites, keepin
 
   const result = await recommendationService.getRecommendations(17, { limit: 1, offset: 0 });
   assert.deepEqual(result.properties.map((property) => property.id), [1]);
+  assert.equal(result.properties[0].feed_section, 'for_you');
   assert.equal(result.hasMore, true);
   assert.ok(result.properties[0].recommendation_debug.reasons.includes('property type match'));
 
@@ -161,11 +171,16 @@ test('recommendation feed excludes recent dislikes and current favorites, keepin
     feedToken: result.feedToken
   });
   assert.deepEqual(nextPage.properties.map((property) => property.id), [4]);
+  assert.equal(nextPage.properties[0].feed_section, 'for_you');
   await assert.rejects(
     recommendationService.getRecommendations(17, { limit: 1, offset: 1, feedToken: result.feedToken, filters: { district: 'Thủ Đức' } }),
     error => error.code === 'INVALID_RECOMMENDATION_FEED'
   );
-  assert.equal(nextPage.hasMore, false);
+  // Hết tin hợp gu: phần "Phổ biến" gồm tin khác loại thuê/bán (5) rồi tới tin vừa bỏ qua (2); tin đã thích (3) không lặp lại.
+  assert.equal(nextPage.hasMore, true);
+  const tail = await recommendationService.getRecommendations(17, { limit: 5, offset: nextPage.nextOffset, feedToken: result.feedToken });
+  assert.deepEqual(tail.properties.map((property) => [property.id, property.feed_section]), [[5, 'popular'], [2, 'popular']]);
+  assert.equal(tail.hasMore, false);
   await assert.rejects(
     recommendationService.getRecommendations(99, { limit: 1, offset: 1, feedToken: result.feedToken }),
     (error) => error.code === 'INVALID_RECOMMENDATION_FEED'
@@ -216,13 +231,17 @@ test('room survey preferences rank rooms first and room discovery excludes house
     matchingProperty(14, { property_type: 'Nhà trọ' })
   ];
   propertyRepository.fetchFavoriteIds = async () => [];
+  propertyRepository.fetchFavoriteCounts = async () => new Map();
   propertyRepository.fetchRecentEvents = async () => [];
   propertyRepository.fetchEventProperties = async () => [];
 
   const ranked = await recommendationService.getRecommendations(17);
   assert.equal(propertyTypeKey(ranked.properties[0].property_type), 'PHONG_TRO');
   const rooms = await recommendationService.getRecommendations(17, { category: 'Phòng Trọ' });
-  assert.deepEqual(rooms.properties.map((property) => property.id).sort(), [11, 14]);
+  const forYou = rooms.properties.filter((property) => property.feed_section === 'for_you');
+  assert.deepEqual(forYou.map((property) => property.id).sort(), [11, 14]);
+  // Phòng trọ để bán không hợp khảo sát (thuê) nên chỉ xuất hiện ở phần "Phổ biến" phía sau.
+  assert.deepEqual(rooms.properties.filter((property) => property.feed_section === 'popular').map((property) => property.id), [13]);
   assert.ok(rooms.properties.every((property) => propertyTypeKey(property.property_type) === 'PHONG_TRO'));
 });
 
@@ -235,7 +254,8 @@ test('unfinished or skipped onboarding can browse a fallback feed of rentals', a
   });
   preferenceService.getPreferences = async () => null;
   propertyRepository.fetchRecommendationCandidates = async (listingType) => {
-    assert.equal(listingType, 'RENT');
+    // Lần gọi thứ hai (listingType null) lấy nguồn cho phần "Phổ biến".
+    assert.ok(listingType === 'RENT' || listingType === null);
     return [
       matchingProperty(11, { property_type: 'Phòng Trọ' }),
       matchingProperty(12, { property_type: 'Nhà Ở' }),
@@ -243,8 +263,32 @@ test('unfinished or skipped onboarding can browse a fallback feed of rentals', a
     ];
   };
   propertyRepository.fetchFavoriteIds = async () => [];
+  propertyRepository.fetchFavoriteCounts = async () => new Map();
   propertyRepository.fetchRecentEvents = async () => [];
   propertyRepository.fetchEventProperties = async () => [];
   const result = await recommendationService.getRecommendations(17);
-  assert.deepEqual(result.properties.map((property) => property.id).sort(), [11, 12]);
+  assert.deepEqual(result.properties.filter((property) => property.feed_section === 'for_you').map((property) => property.id).sort(), [11, 12]);
+  assert.deepEqual(result.properties.filter((property) => property.feed_section === 'popular').map((property) => property.id), [13]);
+});
+
+test('saved location keys with an administrative prefix still match the listing location', () => {
+  const emptyBehavior = { propertyTypes: new Map(), locations: new Map(), features: new Map() };
+  const legacy = { ...preference, preferred_location_keys: ['tp_ho_chi_minh|quan_7'] };
+  const result = recommendationService.scoreProperty(matchingProperty(21), legacy, emptyBehavior);
+  assert.ok(result.reasons.includes('location match'));
+});
+
+test('recommendation API returns properties through the public DTO', async (t) => {
+  const recommendationController = require('../controllers/recommendationController');
+  const original = recommendationService.getRecommendations;
+  t.after(() => { recommendationService.getRecommendations = original; });
+  recommendationService.getRecommendations = async () => ({
+    properties: [{ ...matchingProperty(41), owner: { name: 'A', verification_status: 'VERIFIED', email: 'x@y.z' } }],
+    offset: 0, nextOffset: 1, hasMore: false, feedToken: 'token'
+  });
+  const res = makeResponse();
+  await recommendationController.getRecommendations({ user: { id: 1 }, query: {} }, res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.properties[0].owner.verification_status, 'VERIFIED');
+  assert.equal(Object.hasOwn(res.body.properties[0].owner, 'email'), false);
 });

@@ -1,0 +1,14 @@
+/* Huy hiệu dùng chung: tài khoản chính thức Swipe Nest và tin đã được đội Swipe Nest kiểm tra. */
+.sn-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 999px; font-size: .75rem; font-weight: 700; line-height: 1.4; white-space: nowrap; }
+.sn-badge-official { background: #1d4ed8; color: #fff; }
+
+/* Khối mời nâng cấp khi liên hệ tin của tài khoản chính thức. */
+.plus-upsell { display: grid; gap: 8px; margin-top: 12px; padding: 12px 14px; border: 1px solid #fde68a; border-radius: 12px; background: #fffbeb; color: #78350f; font-size: .9rem; }
+.plus-upsell a { justify-self: start; display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 10px; background: #b45309; color: #fff; font-weight: 700; text-decoration: none; }
+.sn-badges { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.detail-sn-badges { margin: 6px 0; }
+
+/* Khối mời nâng cấp Plus trong thẻ người đăng: xuống hàng riêng, rộng hết thẻ */
+.poster-card > .plus-upsell { flex: 1 1 100%; margin-top: 0; grid-template-columns: 1fr auto; align-items: center; }
+.poster-card > .plus-upsell span { min-width: 0; }
+@media (max-width: 640px) { .poster-card > .plus-upsell { grid-template-columns: 1fr; } }

@@ -1,0 +1,22 @@
+.plan-grants-page { display: grid; gap: 20px; padding: 4px 0 32px; }
+.plan-grants-heading h1 { margin: 6px 0 4px; font-size: 1.5rem; color: #0f172a; }
+.plan-grants-heading p { margin: 0; color: #64748b; }
+.plan-grants-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; }
+.plan-grants-column { display: grid; gap: 10px; min-width: 0; }
+.plan-grants-audience { margin: 0; font-size: 1rem; color: #0f172a; display: flex; align-items: baseline; gap: 8px; }
+.plan-grants-audience small { font-size: .82rem; font-weight: 500; color: #64748b; }
+/* Hai thẻ cao bằng nhau về khung, không bị margin thừa của trang gốc. */
+.plan-grants-column > .agent-plan-manager, .plan-grants-column > .plus-admin-card { margin: 0; }
+@media (max-width: 1100px) { .plan-grants-grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* Nút tra cứu không bị bóp khi thẻ hẹp; nút cấp / gỡ Plus cùng cỡ, cùng hàng. */
+.plan-grants-page .agent-plan-search button, .plan-grants-page .plus-admin-search button { flex: 0 0 auto; white-space: nowrap; }
+.plan-grants-page .plus-admin-form button { flex: 0 0 auto; min-width: 104px; padding: 9px 14px; }
+.plan-grants-page .agent-plan-audit-more { margin-top: 8px; border: 0; background: none; color: #1d4ed8; font-weight: 600; cursor: pointer; padding: 4px 0; }
+
+/* Nút tra cứu môi giới: kiểu gốc chỉ áp trong trang "Gói dịch vụ", nên khai báo lại ở đây. */
+.plan-grants-page .agent-plan-search .service-primary { display: inline-flex; align-items: center; gap: 6px; padding: 9px 16px;
+  border: 1px solid #2861eb; border-radius: 10px; font: inherit; font-weight: 600; cursor: pointer; }
+.plan-grants-page .agent-plan-search .service-primary:disabled { opacity: .6; cursor: not-allowed; }
+/* Form Plus: lý do chiếm cả một dòng, hai nút Cấp / Gỡ nằm chung hàng bên dưới. */
+.plan-grants-page .plus-admin-form input { flex: 1 1 100%; }

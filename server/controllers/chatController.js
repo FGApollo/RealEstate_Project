@@ -1,5 +1,6 @@
 const { safeErrorMessage } = require('../services/httpError');
 const chatService = require('../services/chatService');
+const chatRealtime = require('../services/chatRealtimeService');
 const MAX_MESSAGE_LENGTH = 2000;
 
 const getMessages = async (req, res) => {
@@ -38,11 +39,21 @@ const sendMessage = async (req, res) => {
       msgText,
       attachments || []
     );
+    // Báo cho người nhận (và các tab khác của người gửi) rằng có tin mới; không chờ, không làm hỏng request nếu lỗi.
+    chatRealtime.notifyUsers([data.receiver_id, data.sender_id], 'new_message', {
+      partnerIds: [data.sender_id, data.receiver_id], messageId: data.id, propertyId: data.property_id ?? null
+    });
     res.status(201).json({ success: true, message: data });
   } catch (error) {
     console.error('Error in sendMessage:', error);
-    res.status(error.statusCode || 500).json({ error: error.statusCode ? error.message : 'Could not send message.' });
+    res.status(error.statusCode || 500).json({ error: error.statusCode ? error.message : 'Could not send message.', ...(error.code === 'PLUS_REQUIRED' ? { code: error.code } : {}) });
   }
+};
+
+// Tên kênh Realtime riêng của người đang đăng nhập (xem services/chatRealtimeService.js).
+const getRealtimeTopic = (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.status(200).json({ topic: chatRealtime.topicForUser(req.user.id) });
 };
 
 const markMessagesAsRead = async (req, res) => {
@@ -52,6 +63,10 @@ const markMessagesAsRead = async (req, res) => {
       return res.status(400).json({ error: 'partnerId is required' });
     }
     const result = await chatService.markMessagesAsRead(req.user.id, partnerId);
+    if (result.updatedCount > 0) {
+      // Người gửi gốc thấy nhãn "đã xem" ngay.
+      chatRealtime.notifyUsers([partnerId], 'messages_read', { partnerIds: [req.user.id, Number(partnerId)], readAt: result.readAt });
+    }
     res.status(200).json({ success: true, ...result });
   } catch (error) {
     console.error('Error in markMessagesAsRead:', error);
@@ -95,6 +110,7 @@ const getFunnelStats = async (req, res) => {
 };
 
 module.exports = {
+  getRealtimeTopic,
   MAX_MESSAGE_LENGTH,
   getMessages,
   sendMessage,

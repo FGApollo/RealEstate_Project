@@ -9,7 +9,7 @@ const { createTierDatabase } = require('./helpers/tierDatabase');
 const { connectBillingDatabase } = require('./helpers/billingDatabase');
 const { supabase } = require('../config/supabase');
 const admin = require('../services/adminPlanService');
-const { getSubscription, startFreeTrial } = require('../services/subscriptionService');
+const { getSubscription } = require('../services/subscriptionService');
 const { parseSearchFilters } = require('../services/propertySearchFilters');
 const { assertListingCapacity, listingDatabaseError } = require('../services/listingEntitlements');
 let db;
@@ -36,7 +36,6 @@ test('three real DB plans have exact prices, quotas, priority and support; rerun
   assert.equal((await rpc('agent_service_catalog')).plans[0].amount_vnd,359000);
   await assert.rejects(reserve('PAID'),/Plan unavailable/);
   await assert.rejects(rpc('start_agent_free_trial',[9]),/retired/);
-  await assert.rejects(startFreeTrial(9,'FREE_TRIAL'),error=>error.statusCode===409);
 });
 
 test('migration preserves a legacy paid subscription and an already issued Premium invoice',async()=>{
@@ -177,15 +176,15 @@ test('personalized recommendations use plan priority first within the explicit r
   await db.exec('UPDATE properties SET price=1000000 WHERE owner_id=9');
   const repo=require('../repositories/propertyRepository');const preferences=require('../services/preferenceService');
   const recommendation=require('../services/recommendationService');
-  const original={ favorites:repo.fetchFavoriteIds, events:repo.fetchRecentEvents, preference:preferences.getPreferences };
+  const original={ favorites:repo.fetchFavoriteIds, counts:repo.fetchFavoriteCounts, events:repo.fetchRecentEvents, preference:preferences.getPreferences };
   const restore=connectBillingDatabase(supabase,db);
-  repo.fetchFavoriteIds=async()=>[];repo.fetchRecentEvents=async()=>[];
+  repo.fetchFavoriteIds=async()=>[];repo.fetchFavoriteCounts=async()=>new Map();repo.fetchRecentEvents=async()=>[];
   preferences.getPreferences=async()=>({...recommendation.DEFAULT_PREFERENCES,onboarding_completed:true,min_price:500000,max_price:1500000,updated_at:null});
   try {
     const result=await recommendation.getRecommendations(12,{category:'Phòng Trọ',filters:{district:'Thủ Đức'},limit:3});
     assert.deepEqual(result.properties.map(p=>p.owner_id),[11,10,9]);
     assert.ok(result.properties.every(p=>p.property_type==='Phòng Trọ'));
-  } finally { restore();repo.fetchFavoriteIds=original.favorites;repo.fetchRecentEvents=original.events;preferences.getPreferences=original.preference; }
+  } finally { restore();repo.fetchFavoriteIds=original.favorites;repo.fetchFavoriteCounts=original.counts;repo.fetchRecentEvents=original.events;preferences.getPreferences=original.preference; }
 });
 
 test('an older Pro listing is not lost behind the newest 500 lower-priority candidates',async()=>{

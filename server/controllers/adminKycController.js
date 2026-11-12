@@ -9,19 +9,20 @@ const ERROR_STATUS_CODES = {
   'Missing verificationId': 400,
   'Invalid verificationId': 400,
   'Missing rejectReason': 400,
-  'Only rejected or pending verifications can be approved': 400
+  'Only rejected or pending verifications can be approved': 400,
+  'Invalid KYC list query': 400
 };
 
 const getStatusCode = (error) => ERROR_STATUS_CODES[error.message] || 500;
 const getSafeError = (error) => ERROR_STATUS_CODES[error.message] ? error.message : 'Internal server error';
 
-const getRejectedVerifications = async (req, res) => {
+const listVerifications = async (req, res) => {
   try {
-    const verifications = await adminKycService.getRejectedVerifications(req.user.id);
+    const result = await adminKycService.listVerifications(req.user.id, req.query);
 
     res.status(200).json({
       success: true,
-      verifications
+      ...result
     });
   } catch (error) {
     res.status(getStatusCode(error)).json({ error: getSafeError(error) });
@@ -78,7 +79,7 @@ const rejectVerification = async (req, res) => {
 };
 
 module.exports = {
-  getRejectedVerifications,
+  listVerifications,
   getVerificationDetail,
   approveVerification,
   rejectVerification

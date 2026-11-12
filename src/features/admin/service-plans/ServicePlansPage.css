@@ -99,3 +99,15 @@
 @media (min-width: 1450px) { .service-workspace { grid-template-columns: minmax(0,1.5fr) minmax(420px,1fr); } .service-plan-item { min-height: 248px; } }
 @media (max-width: 1150px) { .service-workspace { grid-template-columns: minmax(0,1fr); } .service-page-heading { flex-direction: column; gap: 12px; } .service-plan-list { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); } .service-plan-item > div:first-child { flex-wrap: wrap; } .service-plans-page .service-plan-item { min-height: 240px; } .service-plan-price strong { font-size: 20px; } }
 @media (max-width: 760px) { .service-summary { grid-template-columns: 1fr; gap: 9px; } .service-summary article { padding: 15px; } .service-plan-list { display: flex; } .service-plans-page .service-plan-item { min-height: 195px; } .service-plan-link { margin-bottom: 24px; } .service-panel-head, .service-editor-body { padding: 18px; } .service-count { display: none; } .service-form-row { grid-template-columns: 1fr; } .service-heading-actions { gap: 7px; } .service-heading-actions button { font-size: 11px; padding: 9px; } .service-form-actions { flex-wrap: wrap; } .service-confirm-values { flex-direction: column; align-items: flex-start; } .service-pagination { justify-content: center; font-size: 11px; gap: 8px; } }
+
+/* Gói của từng môi giới */
+.agent-plan-manager { margin-top: 20px; }
+.agent-plan-manager h2 { display: flex; align-items: center; gap: 8px; }
+.agent-plan-search { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.agent-plan-search input { flex: 1 1 220px; min-width: 0; padding: 9px 12px; border: 1px solid #e2e8f0; border-radius: 10px; font: inherit; }
+.agent-plan-summary { display: grid; gap: 10px; padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px; background: #f8fafc; }
+.agent-plan-summary small { display: block; color: #64748b; margin-top: 2px; }
+.agent-plan-actions { justify-content: flex-start; flex-wrap: wrap; margin-top: 12px; }
+.agent-plan-danger { background: #dc2626 !important; border-color: #dc2626 !important; color: #fff !important; }
+.agent-plan-danger:disabled { opacity: 0.55; }
+.agent-plan-audit-title { margin: 18px 0 8px; font-size: 1rem; }

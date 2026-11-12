@@ -162,6 +162,20 @@ const getAgentViolations = async (agentId) => {
 
   const appealMap = new Map((appeals || []).map(a => [a.report_id, a]));
 
+  // Điểm thật sự bị trừ / được hoàn cho từng báo cáo (theo nhật ký điểm uy tín), không suy ra từ lý do báo cáo.
+  const { data: scoreLogs, error: logErr } = await supabase
+    .from('trust_score_logs')
+    .select('related_report_id, point_change')
+    .in('related_report_id', reportIds);
+  if (logErr) throw new Error(logErr.message);
+  const pointsByReport = new Map();
+  (scoreLogs || []).forEach((log) => {
+    const change = Number(log.point_change) || 0;
+    const entry = pointsByReport.get(log.related_report_id) || { penalty: 0, refunded: 0 };
+    if (change < 0) entry.penalty += -change; else entry.refunded += change;
+    pointsByReport.set(log.related_report_id, entry);
+  });
+
   const { signEvidenceUrls } = require('./evidenceStorage');
   const violations = await Promise.all(reports.map(async (rep) => {
     // Reporting identity is visible only to moderators, never the accused agent.
@@ -175,6 +189,8 @@ const getAgentViolations = async (agentId) => {
     return {
       ...safeReport,
       property: propMap.get(rep.property_id) || null,
+      penalty_points: pointsByReport.get(rep.id)?.penalty || 0,
+      refunded_points: pointsByReport.get(rep.id)?.refunded || 0,
       appeal
     };
   }));

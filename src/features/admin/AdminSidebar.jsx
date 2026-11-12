@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Activity, BarChart3, Check, CreditCard, Info, LogOut, Menu, X, ShieldCheck, TriangleAlert, UsersRound } from 'lucide-react';
+import { Activity, BarChart3, Check, Crown, CreditCard, Gift, Info, LogOut, Menu, X, ShieldCheck, TriangleAlert, UsersRound } from 'lucide-react';
 import PlanDialog from '../agent/pricing/PlanDialog';
 import { useMobileMenu } from '../../hooks/useMobileMenu';
 
@@ -10,6 +10,8 @@ const navigation = [
   { id: 'review-moderation', label: 'Kiểm duyệt đánh giá', icon: Check },
   { id: 'appeal-moderation', label: 'Xử lý khiếu nại', icon: TriangleAlert },
   { id: 'service-plans', label: 'Gói dịch vụ & Giá bán', icon: CreditCard },
+  { id: 'plan-grants', label: 'Cấp / hủy gói', icon: Gift },
+  { id: 'plus-admin', label: 'Nguồn hàng Swipe Nest', icon: Crown },
   { id: 'audit-logs', label: 'Nhật ký điểm uy tín', icon: Activity }
 ];
 
@@ -35,6 +37,8 @@ export default function AdminSidebar({ activeTab, onNavigate, onLogout }) {
       <li><strong>Thống kê & Báo cáo:</strong> theo dõi người dùng, gói dịch vụ và giao dịch đã ghi nhận.</li>
       <li><strong>Kiểm duyệt:</strong> xem hồ sơ, báo cáo, đánh giá và xử lý khiếu nại.</li>
       <li><strong>Gói dịch vụ & Giá bán:</strong> cập nhật giá, lên lịch và xem lịch sử thay đổi. Đơn thanh toán đã tạo giữ nguyên mức giá đã chốt.</li>
+      <li><strong>Cấp / hủy gói:</strong> cấp tặng, đổi hạng hoặc gỡ gói của môi giới và gói Plus của người dùng.</li>
+      <li><strong>Nguồn hàng Swipe Nest:</strong> chọn tài khoản chính thức; tin của tài khoản này là nguồn hàng Swipe Nest dành cho thành viên Plus.</li>
       <li><strong>Nhật ký điểm uy tín:</strong> tra cứu thay đổi điểm và các điều chỉnh quản trị.</li>
     </ul></PlanDialog>}
   </aside>;

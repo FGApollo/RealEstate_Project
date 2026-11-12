@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { MessageSquare, Send, Phone, Shield, User, Sparkles, MessageCircle, Image as ImageIcon, X, Loader2, Building2, ArrowLeft } from 'lucide-react';
 import { API_BASE_URL } from '../../../config';
 import { apiFetch } from '../../../auth/apiClient';
-import { supabaseClient, isSupabaseRealtimeConfigured } from '../../../services/supabaseClient';
+import { startChatRealtime, startAdaptivePolling, mergeServerMessages } from '../../../services/chatRealtime';
 import ImageLoadingSkeleton from '../../../components/ImageLoadingSkeleton';
 import PropertyDetailModal from '../../../components/PropertyDetailModal';
 import './AgentChat.css';
@@ -108,6 +108,8 @@ const AgentChat = ({ currentUser }) => {
   };
 
   const activePartnerId = activeConversation?.partner?.id;
+  const realtimeRef = useRef(null);
+  const refreshMessagesRef = useRef(null);
   const activePartnerIdRef = useRef(activePartnerId);
   useEffect(() => {
     activePartnerIdRef.current = activePartnerId;
@@ -147,124 +149,20 @@ const AgentChat = ({ currentUser }) => {
     };
     init();
 
-    // Fallback polling for conversation list (every 7s)
-    const pollInterval = setInterval(() => {
+    // Tín hiệu realtime (Supabase Broadcast): có tin mới hoặc tin vừa được xem → tải lại qua API.
+    const realtime = startChatRealtime(() => {
       fetchConversations();
-    }, 7000);
-
-    // Global Agent Inbox Realtime channel (receives messages from ANY customer)
-    let channel = null;
-    if (isSupabaseRealtimeConfigured) {
-      channel = supabaseClient
-        .channel(`agent_inbox_${currentUser.id}`)
-        .on('postgres_changes', {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages'
-        }, (payload) => {
-          const newMsg = payload.new;
-          if (!newMsg) return;
-
-          const isRecipient = Number(newMsg.receiver_id) === Number(currentUser.id);
-          const isSender = Number(newMsg.sender_id) === Number(currentUser.id);
-          if (!isRecipient && !isSender) return;
-
-          const partnerId = isSender ? Number(newMsg.receiver_id) : Number(newMsg.sender_id);
-          const currentActivePartnerId = Number(activePartnerIdRef.current);
-          const isCurrentlyActive = currentActivePartnerId === partnerId;
-
-          // A. If belongs to currently open customer chat, update messages thread
-          if (isCurrentlyActive) {
-            setMessages((prev) => {
-              const existingTemp = prev.find(m => 
-                m.id === newMsg.id || 
-                (m.is_optimistic && m.sender_id === newMsg.sender_id && (Number(m.property_id) === Number(newMsg.property_id) || m.message === newMsg.message))
-              );
-              const propertyObj = existingTemp?.property || null;
-              const merged = { ...newMsg, property: newMsg.property || propertyObj };
-
-              if (existingTemp) {
-                return prev.map(m => m.id === existingTemp.id ? merged : m);
-              }
-              if (prev.some(m => m.id === newMsg.id)) {
-                return prev.map(m => m.id === newMsg.id ? { ...m, ...merged } : m);
-              }
-              return [...prev, merged];
-            });
-
-            if (newMsg.property_id) {
-              apiFetch(`${API_BASE_URL}/api/properties/${newMsg.property_id}`)
-                .then(r => r.ok ? r.json() : null)
-                .then(pData => {
-                  if (pData?.property) {
-                    setMessages(prev => prev.map(m => 
-                      (m.id === newMsg.id || Number(m.property_id) === Number(newMsg.property_id))
-                        ? { ...m, property: pData.property }
-                        : m
-                    ));
-                  }
-                })
-                .catch(() => {});
-            }
-
-            if (isRecipient) {
-              apiFetch(`${API_BASE_URL}/api/chat/read`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ partnerId })
-              }).catch(() => {});
-            }
-          }
-
-          // B. ALWAYS update conversation list in sidebar & bring sender to TOP!
-          setConversations((prev) => {
-            const existingIdx = prev.findIndex(c => Number(c.partner?.id) === partnerId);
-            const displayMsg = (newMsg.message && !newMsg.message.startsWith('[Bất động sản]')) 
-              ? newMsg.message 
-              : (newMsg.attachments?.length ? '[Hình ảnh]' : (newMsg.property_id ? '[Bất động sản]' : newMsg.message));
-
-            if (existingIdx !== -1) {
-              const existingConv = prev[existingIdx];
-              const updatedConv = {
-                ...existingConv,
-                lastMessage: displayMsg,
-                lastMessageTime: newMsg.created_at,
-                lastSenderId: newMsg.sender_id,
-                unreadCount: isCurrentlyActive 
-                  ? 0 
-                  : (isRecipient ? (Number(existingConv.unreadCount) || 0) + 1 : (existingConv.unreadCount || 0))
-              };
-              const rest = prev.filter((_, idx) => idx !== existingIdx);
-              return [updatedConv, ...rest];
-            } else {
-              // New customer: refresh conversation list from server
-              fetchConversations();
-              return prev;
-            }
-          });
-        })
-        .on('postgres_changes', {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'messages'
-        }, (payload) => {
-          const updatedMsg = payload.new;
-          if (!updatedMsg) return;
-          setMessages((prev) => prev.map(m => m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m));
-          setConversations((prev) => prev.map(c => {
-            if (Number(c.partner?.id) === Number(updatedMsg.receiver_id) || Number(c.partner?.id) === Number(updatedMsg.sender_id)) {
-              return { ...c, isRead: updatedMsg.is_read };
-            }
-            return c;
-          }));
-        })
-        .subscribe();
-    }
+      refreshMessagesRef.current?.();
+    });
+    realtimeRef.current = realtime;
+    // Polling dự phòng cho danh sách hội thoại (thưa khi realtime đang kết nối).
+    const stopConversationPolling = startAdaptivePolling(() => fetchConversations(), realtime.isConnected);
 
     return () => {
       isMounted = false;
-      clearInterval(pollInterval);
-      if (channel) supabaseClient.removeChannel(channel);
+      stopConversationPolling();
+      realtime.stop();
+      realtimeRef.current = null;
     };
   }, [currentUser?.id]);
 
@@ -312,7 +210,16 @@ const AgentChat = ({ currentUser }) => {
         const res = await apiFetch(`${API_BASE_URL}/api/chat/messages?otherId=${activePartnerId}&limit=50`);
         if (res.ok && isCurrent) {
           const data = await res.json();
-          setMessages(data.messages || []);
+          const incoming = data.messages || [];
+          setMessages(prev => mergeServerMessages(prev, incoming));
+          // Có tin mới của đối phương trong cuộc trò chuyện đang mở: đánh dấu đã xem.
+          if (!isInitial && incoming.some((m) => Number(m.receiver_id) === Number(currentUser.id) && !m.is_read)) {
+            apiFetch(`${API_BASE_URL}/api/chat/read`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ partnerId: activePartnerId })
+            }).catch(() => {});
+          }
         }
       } catch (err) {
         if (isCurrent) console.error('Error fetching messages:', err);
@@ -330,11 +237,13 @@ const AgentChat = ({ currentUser }) => {
       body: JSON.stringify({ partnerId: activePartnerId })
     }).catch(() => {});
 
-    // Active thread polling fallback
-    const interval = setInterval(() => fetchMessages(false), isSupabaseRealtimeConfigured ? 10000 : 3000);
+    // Tải lại ngay khi có tín hiệu realtime; polling chỉ là dự phòng.
+    refreshMessagesRef.current = () => fetchMessages(false);
+    const stopPolling = startAdaptivePolling(() => fetchMessages(false), () => Boolean(realtimeRef.current?.isConnected()));
     return () => {
       isCurrent = false;
-      clearInterval(interval);
+      refreshMessagesRef.current = null;
+      stopPolling();
     };
   }, [currentUser?.id, activePartnerId]);
 
@@ -593,11 +502,12 @@ const AgentChat = ({ currentUser }) => {
                 </div>
                 <div>
                   <h4>{activeConversation.partner?.name || 'Khách hàng'}</h4>
-                  <p className="partner-meta">{activeConversation.partner?.email || 'Chưa cập nhật email'}</p>
+                  <p className="partner-meta">{activeConversation.partner?.role === 'AGENT' ? 'Môi giới' : 'Khách hàng'}</p>
                 </div>
               </div>
 
-              {/* Funnel controls */}
+              {/* Funnel controls — chỉ với khách hàng; môi giới khác không nằm trong phễu. */}
+              {activeConversation.funnelStage && (
               <div className="funnel-actions-row">
                 <span className="funnel-title"><Sparkles size={14} /> Gán nhãn phễu:</span>
                 <div className="funnel-buttons">
@@ -620,6 +530,7 @@ const AgentChat = ({ currentUser }) => {
                   })}
                 </div>
               </div>
+              )}
             </header>
 
             {/* F33: Contextual Property Banner */}

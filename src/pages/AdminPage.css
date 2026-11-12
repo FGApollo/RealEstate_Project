@@ -1692,4 +1692,12 @@
   max-width: 60%;
 }
 
-
+/* KYC: thẻ con Chờ duyệt / Bị từ chối, nhãn cảnh báo, phân trang */
+.admin-kyc-subtabs { display: flex; gap: 8px; margin-bottom: 12px; }
+.admin-kyc-subtab { flex: 1; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; color: #475569; font-weight: 600; cursor: pointer; }
+.admin-kyc-subtab.active { background: #0f172a; border-color: #0f172a; color: #fff; }
+.admin-kyc-flags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.admin-kyc-flag { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #f1f5f9; color: #475569; font-size: 0.75rem; font-weight: 600; }
+.admin-kyc-flag-warn { background: #fef2f2; color: #b91c1c; }
+.admin-kyc-pagination { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 12px; font-size: 0.85rem; color: #475569; }
+.admin-kyc-image-warning { margin: 0 0 12px; padding: 10px 12px; border-radius: 10px; background: #fffbeb; color: #92400e; font-size: 0.85rem; }

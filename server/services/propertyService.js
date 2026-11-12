@@ -1,3 +1,4 @@
+const plusService = require('./plusService');
 const { supabase } = require('../config/supabase');
 const { positiveId, propertyInput } = require('./businessValidation');
 const { listingDatabaseError, assertListingCapacity } = require('./listingEntitlements');
@@ -15,8 +16,8 @@ const syncRelatedRows = async (table, idField, propertyId, rows) => {
   }
 };
 
-const getProperties = (limit = 24, propertyType = null, filters = {}) =>
-  propertyRepository.fetchPublicProperties({ limit, category: propertyType, filters });
+const getProperties = (limit = 24, propertyType = null, filters = {}, offset = 0) =>
+  propertyRepository.fetchPublicProperties({ limit, category: propertyType, filters, offset });
 
 const createProperty = async (propertyData) => {
   propertyInput(propertyData);
@@ -55,12 +56,11 @@ const createProperty = async (propertyData) => {
     throw error;
   }
 
-  console.log('createProperty service called. Title:', title);
   
   // Verify owner is an AGENT with adequate trust score (> 30) and verified KYC (F28)
   const { data: ownerUser, error: ownerError } = await supabase
     .from('users')
-    .select('role, trust_score, verification_status')
+    .select('role, trust_score, verification_status, is_official')
     .eq('id', owner_id)
     .single();
 
@@ -70,7 +70,8 @@ const createProperty = async (propertyData) => {
     throw err;
   }
 
-  if (ownerUser.verification_status !== 'VERIFIED') {
+  // Tài khoản chính thức của Swipe Nest không cần KYC.
+  if (ownerUser.verification_status !== 'VERIFIED' && ownerUser.is_official !== true) {
     const err = new Error('Tài khoản chưa hoàn tất xác minh danh tính (KYC). Vui lòng hoàn tất KYC để đăng tin.');
     err.statusCode = 403;
     throw err;
@@ -108,11 +109,9 @@ const createProperty = async (propertyData) => {
   const similarityResult = await checkSimilarity(propertyData);
   const duplicatePenalty = similarityResult.similarOwn ? -50 : 0;
 
-  console.log('thumbnail input length:', thumbnail ? thumbnail.length : 'empty');
   
   // Save thumbnail locally/storage if base64
   const savedThumbnail = await saveBase64Image(thumbnail, owner_id);
-  console.log('savedThumbnail output length:', savedThumbnail ? savedThumbnail.length : 'empty');
 
   // Insert into properties table
   const { data: property, error: propertyError } = await supabase
@@ -204,7 +203,18 @@ const createProperty = async (propertyData) => {
   return property;
 };
 
-const getPropertyById = async (id, { publicRead = false, viewerId } = {}) => {
+// Tin đã bán/đã cho thuê không còn trong danh sách công khai, nhưng người đã lưu tin vẫn xem lại và nhắn môi giới được.
+const CLOSED_STATUSES = ['SOLD', 'RENTED'];
+const isClosedListingViewable = async (property) => {
+  if (!property || !CLOSED_STATUSES.includes(property.status) || property.is_hidden === true || property.is_public === false) return false;
+  const { data: owner, error } = await supabase.from('users')
+    .select('id, role, is_active, verification_status, is_official, trust_score').eq('id', property.owner_id).maybeSingle();
+  if (error) throw new Error('Không thể kiểm tra tin đăng.');
+  return Boolean(owner && owner.role === 'AGENT' && owner.is_active === true
+    && (owner.verification_status === 'VERIFIED' || owner.is_official === true) && Number(owner.trust_score ?? 50) > 30);
+};
+
+const getPropertyById = async (id, { publicRead = false, viewerId, allowClosed = false } = {}) => {
   id = positiveId(id);
   const { data, error } = await supabase
     .from('properties')
@@ -213,7 +223,7 @@ const getPropertyById = async (id, { publicRead = false, viewerId } = {}) => {
       property_features(feature_name),
       property_images(image_url),
       lifestyle_tags(tag_name),
-      owner:users!owner_id(name, role, avatar, trust_score)
+      owner:users!owner_id(name, role, avatar, trust_score, verification_status, is_official)
     `)
     .eq('id', id)
     .single();
@@ -223,6 +233,9 @@ const getPropertyById = async (id, { publicRead = false, viewerId } = {}) => {
     throw new Error(error.message);
   }
   if (publicRead && String(data?.owner_id) !== String(viewerId)) {
+    if (allowClosed && CLOSED_STATUSES.includes(data?.status)) {
+      return (await isClosedListingViewable(data)) ? data : null;
+    }
     const visible = await supabase.from('ranked_properties').select('id').eq('id', id).maybeSingle();
     if (visible.error) throw new Error('Không thể kiểm tra tin đăng.');
     if (!visible.data) return null;
@@ -232,13 +245,20 @@ const getPropertyById = async (id, { publicRead = false, viewerId } = {}) => {
 
 const getContactAgentId = async (id, requesterId) => {
   id = positiveId(id);
-  const { data: property, error: propertyError } = await supabase
+  let { data: property, error: propertyError } = await supabase
     .from('ranked_properties')
     .select('id, owner_id, status, is_hidden')
     .eq('id', id)
     .maybeSingle();
   if (propertyError) throw new Error(propertyError.message);
-  if (!property || property.status !== 'AVAILABLE' || property.is_hidden === true) {
+  if (!property) {
+    // Không còn công khai: chỉ chấp nhận tin đã bán/đã cho thuê của môi giới còn đủ điều kiện.
+    const closed = await supabase.from('properties')
+      .select('id, owner_id, status, is_hidden, is_public').eq('id', id).maybeSingle();
+    if (closed.error) throw new Error(closed.error.message);
+    if (await isClosedListingViewable(closed.data)) property = closed.data;
+  }
+  if (!property || !['AVAILABLE', ...CLOSED_STATUSES].includes(property.status) || property.is_hidden === true) {
     const error = new Error('Không tìm thấy tin đăng đang hoạt động.');
     error.statusCode = 404;
     throw error;
@@ -251,10 +271,12 @@ const getContactAgentId = async (id, requesterId) => {
 
   const { data: agent, error: agentError } = await supabase
     .from('users')
-    .select('id, role, is_active, trust_score')
+    .select('id, role, is_active, trust_score, is_official')
     .eq('id', property.owner_id)
     .maybeSingle();
   if (agentError) throw new Error(agentError.message);
+  // Tin của tài khoản chính thức Swipe Nest: chỉ người có gói Plus mới liên hệ được.
+  if (agent?.is_official === true) await plusService.assertPlusForOfficialContact(requesterId);
   if (!agent || String(agent.role).toUpperCase() !== 'AGENT' || agent.is_active !== true
     || Number(agent.trust_score ?? 50) <= 30) {
     const error = new Error('Tin đăng không có môi giới để liên hệ.');
@@ -292,11 +314,12 @@ const updateProperty = async (id, actorId, propertyData) => {
   // 1. Get the current property to check existing ownership
   const { data: existingProp, error: getPropError } = await supabase
     .from('properties')
-    .select('owner_id')
+    .select('owner_id, status')
     .eq('id', id)
     .single();
 
-  if (getPropError || !existingProp) {
+  // Tin đã gỡ là trạng thái cuối: không sửa, không tự khôi phục bằng cách đặt lại status.
+  if (getPropError || !existingProp || existingProp.status === 'DELETED') {
     const error = new Error('Không tìm thấy tin đăng.');
     error.statusCode = 404;
     throw error;

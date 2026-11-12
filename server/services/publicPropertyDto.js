@@ -50,14 +50,17 @@ const toPublicProperty = (property = {}) => {
     features: propertyFeatures.map((feature) => feature.feature_name),
     lifestyle_tags: lifestyleTags,
     virtual_tour_url: property.virtual_tour_url,
-    is_highlighted: Boolean(property.is_highlighted),
     created_at: property.created_at,
     average_rating: property.average_rating,
     review_count: property.review_count,
     owner: property.owner ? {
       name: property.owner.name,
       role: property.owner.role,
-      avatar: property.owner.avatar
+      avatar: property.owner.avatar,
+      // Huy hiệu "Đã xác thực" là thông tin công khai; chỉ trả khi đã xác minh, không lộ trạng thái khác.
+      ...(property.owner.verification_status === 'VERIFIED' ? { verification_status: 'VERIFIED' } : {}),
+      // Tài khoản chính thức của Swipe Nest (đăng lại nguồn hàng / đăng hộ môi giới ngoài nền tảng).
+      ...(property.owner.is_official === true ? { is_official: true } : {})
     } : null
   };
 };

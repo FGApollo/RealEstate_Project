@@ -219,14 +219,17 @@ const rejectReport = async (reportId, adminId) => {
       handled_at: handledAt
     })
     .eq('id', reportId)
+    .eq('status', 'PENDING')
     .select()
-    .single();
+    .maybeSingle();
 
-  if (error) {
-    if (error.code === 'PGRST116') {
-      throw createServiceError('Báo cáo không tồn tại', 404);
-    }
-    throw new Error(error.message);
+  if (error) throw new Error(error.message);
+  if (!report) {
+    const { data: existing } = await supabase.from('property_reports').select('status').eq('id', reportId).maybeSingle();
+    if (!existing) throw createServiceError('Báo cáo không tồn tại', 404);
+    throw createServiceError(existing.status === 'RESOLVED'
+      ? 'Báo cáo đã được xử phạt. Muốn hoàn điểm cho môi giới, hãy xử lý qua đơn khiếu nại.'
+      : 'Báo cáo này đã được xử lý trước đó.', 409);
   }
 
   return {

@@ -13,6 +13,11 @@ router.post('/auth/resend-verification', requireTrustedOrigin, rateLimiters.auth
   authController.resendVerification);
 router.post('/auth/verify-email', requireTrustedOrigin, rateLimiters.authIp,
   rateLimiters.verificationVerifyIp, authController.verifyEmail);
+router.post('/auth/forgot-password', requireTrustedOrigin, rateLimiters.authIp,
+  rateLimiters.passwordResetSendIp, rateLimiters.passwordResetSendCooldown,
+  rateLimiters.passwordResetSendIpEmail, authController.forgotPassword);
+router.post('/auth/reset-password', requireTrustedOrigin, rateLimiters.authIp,
+  rateLimiters.passwordResetVerifyIp, authController.resetPassword);
 router.post('/login', requireTrustedOrigin, rateLimiters.authIp, rateLimiters.loginIpEmail,
   authController.login);
 router.post('/google-login', requireTrustedOrigin, rateLimiters.authIp, rateLimiters.googleIp,

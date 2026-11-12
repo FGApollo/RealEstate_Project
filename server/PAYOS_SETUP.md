@@ -1,16 +1,21 @@
-# Thanh toán Agent qua payOS
+# Thanh toán qua payOS (gói môi giới và gói Plus của người dùng)
 
 ## Chức năng đã triển khai
 
-- Gói Premium: **1.000.000 VND / một tháng lịch**, giá lấy từ `agent_billing_plans`.
+- Ba gói Lite / Plus / Pro, giá và hạn mức lấy từ `agent_billing_plans` (admin chỉnh trong tab Gói dịch vụ). Gói Premium cũ đã ngừng bán.
 - Agent tạo đơn, chuyển tới trang payOS, xem trạng thái, hủy đơn chưa thanh toán và xem lịch sử phân trang.
 - Backend xác thực Agent và quyền sở hữu đơn; frontend không gửi giá, thời hạn hay user ID để quyết định thanh toán.
 - SDK chính thức `@payos/node` xác minh chữ ký phản hồi và webhook. Backend còn đọc lại đơn từ payOS trước khi kích hoạt.
 - Giao dịch `PAID`, đúng mã đơn, mã liên kết và đủ đúng số tiền mới được ghi sổ và cấp hạn dùng trong cùng một transaction SQL.
 - Webhook trùng / polling đồng thời chỉ cấp gói một lần. Mỗi Agent có một đơn mở; lỗi mạng được thử lại với cùng mã đơn.
 - Đơn có hạn 30 phút. Trở về từ payOS hoặc thêm `status=PAID` vào URL không kích hoạt gói.
-- Nâng cấp có hiệu lực ngay. Nếu gói còn hạn, thêm một tháng vào hạn cũ; nếu hết hạn, tính từ lúc backend xác nhận. Ngày cuối tháng được PostgreSQL chặn về ngày cuối tháng kế tiếp. Không có tự động trừ tiền.
-- Giữ một bản ghi gói hiện tại để tương thích hệ thống cũ; từng lần thanh toán và hạn dùng sau thanh toán được giữ trong sổ đơn. Các bản ghi gói cũ bị chồng lấn được kết thúc khi gộp vào gói đã gia hạn.
+- Quy tắc khi thanh toán được xác minh (migration `023`, hàm `agent_apply_period`), so theo hạng Lite < Plus < Pro:
+  - Chưa có gói đang chạy: kỳ mới bắt đầu ngay.
+  - **Nâng cấp** (hạng cao hơn gói đang chạy): trả đủ giá gói mới, kỳ mới bắt đầu **ngay**; kỳ đang chạy kết thúc ngay và phần còn lại không được hoàn hay cộng ngày. Các kỳ đã thanh toán đang chờ được dời ra sau kỳ mới, giữ nguyên độ dài.
+  - **Gia hạn** (cùng hạng) và **hạ cấp** (hạng thấp hơn): kỳ mới xếp sau kỳ cuối cùng, có hiệu lực khi các kỳ trước hết hạn.
+- Môi giới có thể **hủy các kỳ đang chờ** (`POST /api/subscriptions/cancel`); kỳ đang chạy giữ đến hết hạn, không hoàn tiền trong hệ thống.
+- Admin có thể **cấp gói miễn phí**, **đổi hạng kỳ đang chạy** (có hiệu lực ngay, giữ ngày hết hạn) và **gỡ gói** trong tab Gói dịch vụ → "Gói của từng môi giới". Mọi thao tác ghi vào `agent_subscription_audit`.
+- Ngày cuối tháng được PostgreSQL chặn về ngày cuối tháng kế tiếp. Không có tự động trừ tiền. Mỗi kỳ là một dòng `seller_subscriptions`; từng lần thanh toán được giữ trong sổ đơn `agent_payment_orders`.
 - Admin có doanh thu gộp, biểu đồ đường, phân bổ theo gói và bảng giao dịch. Chỉ số tiền thanh toán đã xác minh được tính; giá gói cũ không được chuyển thành doanh thu.
 
 ## 1. Tạo tài khoản và kênh nhận tiền
@@ -46,6 +51,8 @@ select has_function_privilege('service_role',
   'public.reserve_agent_payment(integer,text,uuid)', 'execute');
 -- true
 ```
+
+Gói Plus của người dùng cần thêm migration `026-user-plus-and-official-listings.sql` (sau 020–025). Migration này cho đơn của người dùng dùng chung bảng `agent_payment_orders` và hàm `settle_agent_payment`, nên webhook payOS không cần cấu hình thêm.
 
 Không chạy lại các migration cũ chỉ để bật payOS. Nếu project có dữ liệu tùy biến, sao lưu trước thay đổi schema như quy trình vận hành hiện tại.
 
@@ -108,14 +115,23 @@ Kiểm tra các bước:
 
 | Endpoint | Quyền | Chức năng |
 | --- | --- | --- |
-| `GET /api/payments/catalog` | AGENT | Giá từ DB và trạng thái sẵn sàng |
-| `POST /api/payments` | AGENT | Body chỉ có `planCode: "PAID"`, `requestId: UUID` |
+| `GET /api/payments/catalog` | AGENT | Giá từ DB, trạng thái sẵn sàng, `purchase_action` (`NEW`/`RENEW`/`UPGRADE`/`DOWNGRADE`) của từng gói |
+| `POST /api/payments` | AGENT | Body: `planCode` (`LITE`/`PLUS`/`PRO`), `requestId: UUID`, `planVersion` |
+| `POST /api/subscriptions/cancel` | AGENT | Hủy các kỳ đang chờ, body `reason`; kỳ đang chạy giữ nguyên |
+| `GET /api/admin/agents/subscription?email=` hoặc `?id=` | ADMIN | Gói, kỳ đang chờ và nhật ký của một môi giới |
+| `POST /api/admin/agents/:id/subscription/grant` \| `change` \| `remove` | ADMIN | Cấp gói / đổi hạng kỳ đang chạy / gỡ gói, body có `requestId`, `reason` |
 | `GET /api/payments?page=1&limit=10` | AGENT | Lịch sử của chính Agent |
 | `GET /api/payments/:id` | AGENT sở hữu | Đồng bộ trạng thái đã xác minh |
 | `POST /api/payments/:id/cancel` | AGENT sở hữu | Hủy trên cổng, không hoàn tiền |
 | `POST /api/payments/payos/webhook` | Chữ ký payOS | Xác minh, ghi sổ và kích hoạt |
 | `GET /api/admin/analytics/overview` | ADMIN | Thống kê gồm doanh thu thật |
 | `GET /api/admin/analytics/transactions` | ADMIN | Phân trang, cùng bộ lọc thời gian |
+| `GET /api/plus/catalog` · `GET /api/plus/status` | USER | Gói Swipe Nest Plus (20.000đ/tháng, bảng `user_billing_plans`) và trạng thái Plus của chính người dùng |
+| `POST /api/plus/payments` | USER | Body: `planCode: "USER_PLUS"`, `requestId: UUID`, `planVersion`. Đơn nằm chung bảng `agent_payment_orders` (`audience = USER`), dùng chung webhook và thống kê doanh thu |
+| `GET /api/plus/payments` · `GET /api/plus/payments/:id` · `POST /api/plus/payments/:id/cancel` | USER sở hữu | Lịch sử / đồng bộ / hủy đơn Plus. payOS chuyển về `/plus/payment/:id` |
+| `GET /api/plus/checked-listings` | USER có Plus | Mục "Swipe Nest đã kiểm tra" ở trang chủ |
+| `GET /api/admin/users/plus?email=` · `POST /api/admin/users/:id/plus/grant` | `remove` | ADMIN | Tra cứu, cấp thêm tháng (cộng dồn), gỡ Plus; body có `requestId`, `reason` |
+| `PUT /api/admin/agents/:id/official` · `PUT /api/admin/properties/:id/check` | ADMIN | Tài khoản chính thức Swipe Nest; nhãn "Swipe Nest đã kiểm tra" |
 
 Tham số ngày hỗ trợ như Analytics hiện có: `preset`, `start`, `end`, `bucket`; phân trang `page`, `limit` tối đa 50. Không nhận user ID để xác định người gọi.
 
@@ -130,3 +146,22 @@ node server/tests/payments.browser.cjs
 ```
 
 Các kiểm thử dùng database bộ nhớ, không thay dữ liệu Supabase và không chuyển tiền thật. Báo cáo giao diện/screenshot cục bộ được lưu ở `.local/payos-verification/`.
+
+## Môi trường dev (database cá nhân)
+
+Có hai cách để môi giới trên dev có gói dịch vụ:
+
+1. **Không cần payOS:** đăng nhập admin → tab Gói dịch vụ → "Gói của từng môi giới" → tra cứu email môi giới → **Cấp gói**. Gói được ghi `source = 'ADMIN'`, giá 0, không tạo đơn thanh toán. Đây là cách nhanh nhất để demo đăng tin.
+2. **Thanh toán thật với giá nhỏ:** payOS không có sandbox (xem mục 4), mọi giao dịch đều là chuyển tiền thật. Trên database dev của bạn, admin hạ giá gói xuống mức tối thiểu (2.000đ) trong tab Gói dịch vụ, rồi điền khóa của kênh payOS bạn quản lý vào `server/.env` (không commit):
+
+   ```dotenv
+   PAYOS_ENABLED=true
+   PAYOS_CLIENT_ID=...
+   PAYOS_API_KEY=...
+   PAYOS_CHECKSUM_KEY=...
+   FRONTEND_URL=http://localhost:5173
+   ```
+
+   Webhook của payOS không gọi được tới `localhost`. Trên máy dev, trạng thái đơn vẫn được cập nhật khi môi giới mở lại trang chi tiết đơn (backend tự đối soát với payOS), hoặc dùng một đường hầm (ví dụ `cloudflared tunnel`) trỏ tới `http://localhost:3000/api/payments/payos/webhook` nếu cần thử webhook.
+
+Database dev cần đủ migration tới `023` (xem `server/db-migration/README.md`).

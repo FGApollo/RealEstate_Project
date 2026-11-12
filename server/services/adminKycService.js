@@ -4,14 +4,11 @@ const { supabase } = require('../config/supabase');
 const { signVerificationImages } = require('./kycStorage');
 
 const ADMIN_ROLE = 'ADMIN';
-const VERIFIED_STATUS = 'VERIFIED';
 const PENDING_STATUS = 'PENDING';
 const REJECTED_STATUS = 'REJECTED';
-const APPROVED_STATUS = 'APPROVED';
 const TRUST_ACTION_KYC_APPROVED = 'KYC_APPROVED';
 const TRUST_ACTION_KYC_REVOKED = 'KYC_REVOKED';
 const TRUST_BONUS_KYC_APPROVED = 20;
-const TRUST_BONUS_REASON = 'KYC/ID card verification approved by admin';
 
 const trustScoreServicePath = path.join(__dirname, 'trustScoreService.js');
 const trustScoreService = fs.existsSync(trustScoreServicePath)
@@ -30,39 +27,6 @@ const parseRequiredId = (value, fieldName) => {
 
   return parsed;
 };
-
-const getTime = (value) => {
-  if (!value) {
-    return null;
-  }
-
-  const time = new Date(value).getTime();
-  return Number.isNaN(time) ? null : time;
-};
-
-const compareLatestVerification = (a, b) => {
-  const aPrimaryTime = getTime(a.updated_at) ?? getTime(a.created_at) ?? 0;
-  const bPrimaryTime = getTime(b.updated_at) ?? getTime(b.created_at) ?? 0;
-
-  if (aPrimaryTime !== bPrimaryTime) {
-    return bPrimaryTime - aPrimaryTime;
-  }
-
-  const aCreatedTime = getTime(a.created_at) ?? 0;
-  const bCreatedTime = getTime(b.created_at) ?? 0;
-
-  if (aCreatedTime !== bCreatedTime) {
-    return bCreatedTime - aCreatedTime;
-  }
-
-  return Number(b.id) - Number(a.id);
-};
-
-const isMissingTableError = (error) => (
-  error?.code === '42P01'
-  || error?.code === 'PGRST205'
-  || /trust_score_logs/i.test(error?.message || '')
-);
 
 const ensureAdmin = async (adminId) => {
   const parsedAdminId = parseRequiredId(adminId, 'adminId');
@@ -136,36 +100,38 @@ const attachUsers = async (verifications) => {
   }));
 };
 
-const getRejectedVerifications = async (adminId) => {
-  await ensureAdmin(adminId);
+const parseListQuery = (query = {}) => {
+  const status = String(query.status || PENDING_STATUS).toUpperCase();
+  const page = query.page === undefined ? 1 : Number(query.page);
+  const limit = query.limit === undefined ? 20 : Number(query.limit);
+  if (![PENDING_STATUS, REJECTED_STATUS].includes(status)
+    || !Number.isInteger(page) || page < 1 || page > 10000
+    || !Number.isInteger(limit) || limit < 1 || limit > 50) {
+    throw new Error('Invalid KYC list query');
+  }
+  return { status, page, limit };
+};
 
-  const { data: verifications, error } = await supabase
-    .from('identity_verifications')
-    .select('*')
-    .order('updated_at', { ascending: false, nullsFirst: false })
-    .order('created_at', { ascending: false, nullsFirst: false })
-    .order('id', { ascending: false });
+// Hồ sơ mới nhất của mỗi tài khoản theo trạng thái (PENDING hoặc REJECTED), phân trang ở database.
+const listVerifications = async (adminId, query) => {
+  await ensureAdmin(adminId);
+  const { status, page, limit } = parseListQuery(query);
+
+  const { data, error } = await supabase.rpc('admin_kyc_list', {
+    p_status: status, p_page: page, p_limit: limit
+  });
 
   if (error) {
     throw new Error(error.message || 'Failed to fetch verifications');
   }
 
-  const latestByUser = new Map();
-
-  [...(verifications || [])]
-    .sort(compareLatestVerification)
-    .forEach((verification) => {
-      if (!latestByUser.has(verification.user_id)) {
-        latestByUser.set(verification.user_id, verification);
-      }
-    });
-
-  const rejectedLatestVerifications = [...latestByUser.values()]
-    .filter((verification) => verification.status === REJECTED_STATUS)
-    .sort(compareLatestVerification);
-
-  const rows = await attachUsers(rejectedLatestVerifications);
-  return rows.map(({ id_card_front_url, id_card_back_url, selfie_url, ...row }) => row);
+  return {
+    status,
+    verifications: data?.items || [],
+    total: Number(data?.total || 0),
+    page,
+    limit
+  };
 };
 
 const getVerificationDetail = async (adminId, verificationId) => {
@@ -177,163 +143,27 @@ const getVerificationDetail = async (adminId, verificationId) => {
   return signVerificationImages(verificationWithUser);
 };
 
-const applyTrustScoreWithExistingService = async (userId) => {
-  if (typeof trustScoreService?.applyOneTimeBonus !== 'function') {
-    return null;
-  }
-
-  const result = await trustScoreService.applyOneTimeBonus(
-    userId,
-    TRUST_ACTION_KYC_APPROVED,
-    TRUST_BONUS_KYC_APPROVED,
-    TRUST_BONUS_REASON
-  );
-
-  return {
-    applied: result?.applied !== false,
-    action: TRUST_ACTION_KYC_APPROVED,
-    result
-  };
-};
-
-const applyTrustScoreDirectly = async (userId) => {
-  const { data: existingLog, error: existingLogError } = await supabase
-    .from('trust_score_logs')
-    .select('id')
-    .eq('user_id', userId)
-    .eq('action', TRUST_ACTION_KYC_APPROVED)
-    .limit(1)
-    .maybeSingle();
-
-  if (existingLogError) {
-    if (isMissingTableError(existingLogError)) {
-      return {
-        applied: false,
-        action: TRUST_ACTION_KYC_APPROVED,
-        skipped: true,
-        reason: 'trust_score_logs table is not available'
-      };
-    }
-
-    throw new Error(existingLogError.message || 'Failed to check trust score logs');
-  }
-
-  if (existingLog) {
-    return {
-      applied: false,
-      action: TRUST_ACTION_KYC_APPROVED,
-      reason: 'KYC_APPROVED bonus already applied'
-    };
-  }
-
-  const { data: user, error: userError } = await supabase
-    .from('users')
-    .select('id, trust_score')
-    .eq('id', userId)
-    .single();
-
-  if (userError) {
-    throw new Error(userError.message || 'Failed to fetch user trust score');
-  }
-
-  const oldScore = Number(user.trust_score ?? 50);
-  const newScore = Math.max(0, Math.min(100, oldScore + TRUST_BONUS_KYC_APPROVED));
-
-  const { error: updateUserError } = await supabase
-    .from('users')
-    .update({
-      trust_score: newScore,
-      updated_at: new Date().toISOString()
-    })
-    .eq('id', userId);
-
-  if (updateUserError) {
-    throw new Error(updateUserError.message || 'Failed to update trust score');
-  }
-
-  const { error: insertLogError } = await supabase
-    .from('trust_score_logs')
-    .insert({
-      user_id: userId,
-      action: TRUST_ACTION_KYC_APPROVED,
-      point_change: TRUST_BONUS_KYC_APPROVED,
-      old_score: oldScore,
-      new_score: newScore,
-      reason: TRUST_BONUS_REASON,
-      related_property_id: null,
-      related_report_id: null
-    });
-
-  if (insertLogError) {
-    throw new Error(insertLogError.message || 'Failed to create trust score log');
-  }
-
-  return {
-    applied: true,
-    action: TRUST_ACTION_KYC_APPROVED,
-    pointChange: TRUST_BONUS_KYC_APPROVED,
-    oldScore,
-    newScore
-  };
-};
-
-const applyKycApprovedTrustScore = async (userId) => {
-  // Check net KYC balance: approved count vs revoked count
-  const { data: approvedLogs } = await supabase
-    .from('trust_score_logs')
-    .select('id')
-    .eq('user_id', userId)
-    .eq('action', TRUST_ACTION_KYC_APPROVED);
-
-  const { data: revokedLogs } = await supabase
-    .from('trust_score_logs')
-    .select('id')
-    .eq('user_id', userId)
-    .eq('action', TRUST_ACTION_KYC_REVOKED);
-
-  const approvedCount = approvedLogs ? approvedLogs.length : 0;
-  const revokedCount = revokedLogs ? revokedLogs.length : 0;
-
-  // If bonus is currently active (approved > revoked), do not duplicate bonus
-  if (approvedCount > revokedCount) {
-    return {
-      applied: false,
-      action: TRUST_ACTION_KYC_APPROVED,
-      reason: 'KYC_APPROVED bonus already active'
-    };
-  }
-
-  // User currently has no active KYC bonus (either first time or re-approved after revocation)
-  if (typeof trustScoreService?.updateTrustScore === 'function') {
-    const newScore = await trustScoreService.updateTrustScore(
-      userId,
-      TRUST_ACTION_KYC_APPROVED,
-      TRUST_BONUS_KYC_APPROVED,
-      TRUST_BONUS_REASON
-    );
-    return {
-      applied: true,
-      action: TRUST_ACTION_KYC_APPROVED,
-      pointChange: TRUST_BONUS_KYC_APPROVED,
-      newScore
-    };
-  }
-
-  return applyTrustScoreDirectly(userId);
-};
-
 const approveVerification = async (adminId, verificationId) => {
   const admin = await ensureAdmin(adminId);
-  const verification = await fetchVerificationById(verificationId);
+  const parsedVerificationId = parseRequiredId(verificationId, 'verificationId');
 
-  if (verification.status === APPROVED_STATUS) {
+  // Một transaction trong database: hồ sơ và trạng thái tài khoản cùng đổi hoặc cùng giữ nguyên.
+  const { data, error } = await supabase.rpc('admin_approve_kyc', {
+    p_verification_id: parsedVerificationId, p_admin_id: admin.id
+  });
+
+  if (error) {
+    const known = ['Verification not found', 'Permission denied', 'Only rejected or pending verifications can be approved']
+      .find((message) => (error.message || '').includes(message));
+    throw new Error(known || 'Failed to approve verification');
+  }
+
+  const verification = { id: data.id, status: data.status, user_id: data.user_id };
+
+  if (!data.applied) {
     return {
       message: 'KYC verification is already approved',
-      verification: {
-        id: verification.id,
-        status: verification.status,
-        user_id: verification.user_id
-      },
+      verification,
       trustScore: {
         applied: false,
         action: TRUST_ACTION_KYC_APPROVED,
@@ -343,51 +173,15 @@ const approveVerification = async (adminId, verificationId) => {
     };
   }
 
-  if (![REJECTED_STATUS, PENDING_STATUS].includes(verification.status)) {
-    throw new Error('Only rejected or pending verifications can be approved');
-  }
-
-  const now = new Date().toISOString();
-  const { data: updatedVerification, error: verificationError } = await supabase
-    .from('identity_verifications')
-    .update({
-      status: APPROVED_STATUS,
-      reject_reason: null,
-      reviewed_by: admin.id,
-      reviewed_at: now,
-      updated_at: now
-    })
-    .eq('id', verification.id)
-    .select('id, status, user_id')
-    .single();
-
-  if (verificationError) {
-    throw new Error(verificationError.message || 'Failed to approve verification');
-  }
-
-  const { error: userError } = await supabase
-    .from('users')
-    .update({
-      verification_status: VERIFIED_STATUS,
-      updated_at: now
-    })
-    .eq('id', verification.user_id);
-
-  if (userError) {
-    throw new Error(userError.message || 'Failed to update user verification status');
-  }
-
-  // Note: Trust score bonus (+20đ) is claimed manually by the user, not granted automatically
-  const trustScore = {
-    applied: false,
-    action: TRUST_ACTION_KYC_APPROVED,
-    reason: 'Manual claim required'
-  };
-
+  // Điểm thưởng KYC (+20) do môi giới tự nhận trong mục nhiệm vụ, không cộng tự động.
   return {
     message: 'KYC verification approved successfully',
-    verification: updatedVerification,
-    trustScore,
+    verification,
+    trustScore: {
+      applied: false,
+      action: TRUST_ACTION_KYC_APPROVED,
+      reason: 'Manual claim required'
+    },
     applied: true
   };
 };
@@ -479,7 +273,7 @@ const rejectVerification = async (adminId, verificationId, rejectReason) => {
 
 module.exports = {
   ensureAdmin,
-  getRejectedVerifications,
+  listVerifications,
   getVerificationDetail,
   approveVerification,
   rejectVerification

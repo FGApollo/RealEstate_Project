@@ -1,4 +1,5 @@
 const { supabase } = require('../config/supabase');
+const { resolveNewArea } = require('./adminAreas');
 
 const getOverview = async (userId) => {
   // 1. Get agent profile from users table
@@ -25,14 +26,17 @@ const getOverview = async (userId) => {
 
   if (propertiesError) throw new Error(propertiesError.message);
 
-  const totalProperties = properties.length;
+  // Chỉ đếm tin còn đang rao; tin đã bán / đã cho thuê / đã gỡ không tính.
+  const totalProperties = properties.filter(p => p.status === 'AVAILABLE').length;
   const totalViews = properties.reduce((sum, p) => sum + (p.views || 0), 0);
 
   // 3. Get favorites for these properties
   const propertyIds = properties.map(p => p.id);
   
   let totalFavorites = 0;
-  let activeListings = properties.map(p => ({ ...p, favoritesCount: 0 }));
+  // admin_area: khu vực theo đơn vị hành chính mới (tin cũ được quy đổi) để lọc bằng danh sách chọn ở giao diện.
+  // (Không dùng tên "area": trường đó là diện tích m² của tin.)
+  let activeListings = properties.map(p => ({ ...p, admin_area: resolveNewArea(p), favoritesCount: 0 }));
 
   if (propertyIds.length > 0) {
     const { data: favorites, error: favoritesError } = await supabase

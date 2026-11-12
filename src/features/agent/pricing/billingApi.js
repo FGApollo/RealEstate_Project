@@ -13,6 +13,7 @@ export async function billingRequest(path, options = {}) {
 }
 export const billingMoney = (value) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
 export const billingDate = (value) => value ? new Date(value).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : '—';
+export const billingDay = (value) => value ? new Date(value).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : '—';
 export const paymentStatus = (status) => ({ CREATING: 'Đang tạo liên kết', PENDING: 'Chờ thanh toán', PAID: 'Đã thanh toán', CANCELLED: 'Đã hủy', EXPIRED: 'Đã hết hạn', FAILED: 'Không thành công' })[status] || 'Chưa xác định';
 export function openCheckout(value) {
   const url = new URL(value);
@@ -20,3 +21,8 @@ export function openCheckout(value) {
     || url.username || url.password || url.search || url.hash) throw new Error('Liên kết thanh toán không hợp lệ.');
   window.location.assign(url.href);
 }
+
+// Hạ cấp và gia hạn xếp sau kỳ cuối cùng (kể cả các kỳ đã trả tiền đang chờ), không phải sau kỳ hiện tại.
+export const lastPeriodEnd = (subscription) => [subscription?.end_date, ...(subscription?.upcoming || []).map((item) => item.end_date)]
+  .filter(Boolean)
+  .reduce((latest, value) => (!latest || new Date(value) > new Date(latest) ? value : latest), null);

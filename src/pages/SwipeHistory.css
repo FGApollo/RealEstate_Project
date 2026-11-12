@@ -1,0 +1,31 @@
+.history-page { min-height: 100vh; background: #f8fafc; color: #0f172a; }
+.history-main { max-width: 760px; margin: 0 auto; padding: 20px 16px 48px; }
+.history-heading { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.history-heading h1 { margin: 0; font-size: 1.35rem; }
+.history-heading p { margin: 2px 0 0; color: #64748b; }
+.history-back { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fff; cursor: pointer; color: #334155; }
+.history-page-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.history-item { display: grid; grid-template-columns: 72px minmax(0, 1fr) 30px; align-items: center; gap: 12px; width: 100%; padding: 8px; border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; text-align: left; cursor: pointer; font: inherit; color: inherit; }
+.history-item:hover:not(:disabled) { border-color: #bfdbfe; box-shadow: 0 4px 14px rgba(15, 23, 42, .06); }
+.history-item:disabled { cursor: default; opacity: .6; }
+.history-item img, .history-thumb-empty { width: 72px; height: 56px; border-radius: 9px; object-fit: cover; background: #e2e8f0; display: block; }
+.history-item-copy { display: grid; gap: 2px; min-width: 0; }
+.history-item-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.history-item-copy small { display: flex; align-items: center; gap: 4px; color: #64748b; font-size: .82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.history-result { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; background: #f1f5f9; color: #64748b; }
+.history-result.liked { background: #ffe4e6; color: #e11d48; }
+.history-footer { display: flex; justify-content: center; padding: 16px 0; color: #475569; min-height: 24px; }
+.history-footer span { display: inline-flex; align-items: center; gap: 6px; }
+.history-footer button, .history-empty button { padding: 9px 16px; border: 1px solid #1d4ed8; border-radius: 10px; background: #fff; color: #1d4ed8; font-weight: 600; cursor: pointer; }
+.history-empty { padding: 32px 16px; text-align: center; background: #fff; border: 1px dashed #cbd5e1; border-radius: 14px; color: #475569; }
+.history-error { padding: 10px 14px; border-radius: 10px; background: #fef2f2; color: #b91c1c; }
+
+/* Mỗi tin một hàng ngang rộng hết màn hình; tiêu đề tối đa 2 dòng để không bị cắt mất nội dung. */
+.history-page-list { grid-template-columns: minmax(0, 1fr); }
+.history-item-copy strong { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.35; }
+@media (max-width: 640px) {
+  .history-main { padding: 14px 12px 40px; }
+  .history-item { grid-template-columns: 84px minmax(0, 1fr) 28px; gap: 10px; padding: 8px; }
+  .history-item img, .history-thumb-empty { width: 84px; height: 64px; }
+  .history-item-copy small { white-space: normal; }
+}

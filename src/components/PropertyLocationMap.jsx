@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { MapPin, Navigation, ExternalLink, AlertCircle } from 'lucide-react';
 import './PropertyLocationMap.css';
 import { API_BASE_URL } from '../config';
@@ -55,37 +55,41 @@ const PropertyLocationMap = ({ property }) => {
       return;
     }
 
-    // Attempt geocoding from address if latitude/longitude is missing
-    if (property.address) {
-      setIsGeocoding(true);
-      const query = encodeURIComponent(property.address);
-      publicApiFetch(`${API_BASE_URL}/api/geocode/search?q=${query}&limit=1`)
-        .then(res => res.json())
-        .then(data => {
-          if (data && data.length > 0) {
-            setCoords({
-              lat: parseFloat(data[0].lat),
-              lng: parseFloat(data[0].lon),
-              isExact: false
-            });
-          } else {
-            setCoords({ ...DEFAULT_CENTER, isExact: false, isDefault: true });
-          }
-        })
-        .catch(() => {
-          setCoords({ ...DEFAULT_CENTER, isExact: false, isDefault: true });
-        })
-        .finally(() => {
-          setIsGeocoding(false);
-        });
-    } else {
+    // Tin chưa có tọa độ: tra vị trí GẦN ĐÚNG theo khu vực, từ chi tiết tới tổng quát (phường -> quận -> tỉnh).
+    // Không bao giờ cắm ghim như vị trí thật; không tra được thì báo "chưa có vị trí" thay vì đặt ghim giữa TP.HCM.
+    const queries = [
+      [property.ward, property.district, property.city],
+      [property.district, property.city],
+      [property.city]
+    ].map((parts) => parts.filter(Boolean).join(', ')).filter((query, index, list) => query && list.indexOf(query) === index);
+    if (!queries.length && property.address) queries.push(property.address);
+    if (!queries.length) {
       setCoords({ ...DEFAULT_CENTER, isExact: false, isDefault: true });
+      return;
     }
+    let cancelled = false;
+    setIsGeocoding(true);
+    (async () => {
+      for (const [level, query] of queries.entries()) {
+        try {
+          const res = await publicApiFetch(`${API_BASE_URL}/api/geocode/search?q=${encodeURIComponent(query)}&limit=1`);
+          const data = await res.json();
+          if (cancelled) return;
+          if (Array.isArray(data) && data.length > 0) {
+            // level 0 = phường, 1 = quận/huyện, 2 = tỉnh: càng tổng quát vòng khu vực càng lớn.
+            setCoords({ lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon), isExact: false, approxRadius: [1200, 3000, 12000][level] || 3000 });
+            return;
+          }
+        } catch { /* thử mức tổng quát hơn */ }
+      }
+      if (!cancelled) setCoords({ ...DEFAULT_CENTER, isExact: false, isDefault: true });
+    })().finally(() => { if (!cancelled) setIsGeocoding(false); });
+    return () => { cancelled = true; };
   }, [property?.id, property?.latitude, property?.longitude, property?.address]);
 
   // Setup Leaflet map when ready
   useEffect(() => {
-    if (!mapLoaded || !window.L || !coords || !mapContainerRef.current) return;
+    if (!mapLoaded || !window.L || !coords || coords.isDefault || !mapContainerRef.current) return;
 
     const L = window.L;
     const { lat, lng } = coords;
@@ -125,41 +129,64 @@ const PropertyLocationMap = ({ property }) => {
       popupAnchor: [0, -36]
     });
 
-    const marker = L.marker([lat, lng], { icon: customIcon }).addTo(map);
+    // Chỉ cắm ghim khi tin có tọa độ thật; vị trí tra theo khu vực chỉ khoanh vùng.
+    const marker = coords.isExact ? L.marker([lat, lng], { icon: customIcon }).addTo(map) : null;
 
-    // Formatted popup
-    const popupContent = `
-      <div class="map-popup-card">
-        ${property.thumbnail ? `<img src="${property.thumbnail}" alt="${property.title || 'BĐS'}" class="popup-thumb" />` : ''}
-        <div class="popup-info">
-          <h4 class="popup-title">${property.title || 'Vị trí bất động sản'}</h4>
-          <p class="popup-address">${property.address || ''}</p>
-          <p class="popup-price">${property.price ? property.price.toLocaleString('vi-VN') + ' VNĐ/tháng' : 'Liên hệ'}</p>
-        </div>
-      </div>
-    `;
-    marker.bindPopup(popupContent, { maxWidth: 260 }).openPopup();
+    // Popup dựng bằng phần tử DOM + textContent: tiêu đề / địa chỉ do môi giới nhập không bao giờ được hiểu là HTML
+    // (trước đây chèn chuỗi vào innerHTML, tiêu đề chứa thẻ <img onerror> sẽ chạy mã trên trình duyệt người xem).
+    const element = (tag, className, text) => {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      if (text !== undefined) node.textContent = text;
+      return node;
+    };
+    const popupContent = element('div', 'map-popup-card');
+    if (property.thumbnail) {
+      const thumb = element('img', 'popup-thumb');
+      thumb.src = property.thumbnail;
+      thumb.alt = property.title || 'BĐS';
+      popupContent.appendChild(thumb);
+    }
+    const info = element('div', 'popup-info');
+    const price = Number(property.price);
+    info.append(
+      element('h4', 'popup-title', property.title || 'Vị trí bất động sản'),
+      element('p', 'popup-address', property.address || ''),
+      element('p', 'popup-price', price > 0
+        ? `${price.toLocaleString('vi-VN')} VNĐ${property.listing_type === 'SALE' ? '' : '/tháng'}`
+        : 'Liên hệ')
+    );
+    popupContent.appendChild(info);
+    if (marker) marker.bindPopup(popupContent, { maxWidth: 260 }).openPopup();
 
-    // 500m radius circle showing walkable area
+    // Tọa độ thật: vòng 500m đi bộ quanh căn. Vị trí gần đúng: vòng khu vực (nét đứt), phóng vừa khu vực.
     const circle = L.circle([lat, lng], {
-      color: '#3b82f6',
-      fillColor: '#60a5fa',
-      fillOpacity: 0.12,
+      color: coords.isExact ? '#3b82f6' : '#d97706',
+      fillColor: coords.isExact ? '#60a5fa' : '#fbbf24',
+      fillOpacity: coords.isExact ? 0.12 : 0.1,
       weight: 1.5,
-      radius: 500
+      dashArray: coords.isExact ? null : '6 6',
+      radius: coords.isExact ? 500 : coords.approxRadius || 1500
     }).addTo(map);
+    if (!coords.isExact) map.fitBounds(circle.getBounds(), { padding: [12, 12] });
 
     mapInstanceRef.current = map;
     markerRef.current = marker;
     circleRef.current = circle;
 
-    // Trigger resize after small delay to fix container sizing in modal
-    setTimeout(() => {
-      map.invalidateSize();
+    // Trigger resize after small delay to fix container sizing in modal.
+    // The timer must be cleared on unmount: closing the modal within 250ms would otherwise
+    // call invalidateSize on a removed map (Leaflet throws "_leaflet_pos" of undefined).
+    const resizeTimer = setTimeout(() => {
+      if (mapInstanceRef.current === map) map.invalidateSize({ pan: false });
     }, 250);
 
     return () => {
+      clearTimeout(resizeTimer);
       if (mapInstanceRef.current) {
+        // Stop pending pan/zoom animations (popup autoPan) before tearing the map down.
+        mapInstanceRef.current.stop();
+        mapInstanceRef.current.off();
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
       }
@@ -167,8 +194,10 @@ const PropertyLocationMap = ({ property }) => {
   }, [mapLoaded, coords]);
 
   const openGoogleMaps = () => {
-    if (!coords) return;
-    const url = `https://www.google.com/maps/search/?api=1&query=${coords.lat},${coords.lng}`;
+    // Không có tọa độ thật thì tìm theo địa chỉ khu vực, tránh chỉ đường tới một điểm đoán.
+    const query = coords?.isExact ? `${coords.lat},${coords.lng}` : (property?.address || '');
+    if (!query) return;
+    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
@@ -221,16 +250,24 @@ const PropertyLocationMap = ({ property }) => {
 
         <div ref={mapContainerRef} className="map-leaflet-box" />
 
-        {coords?.isDefault && (
+        {coords?.isDefault && !isGeocoding && (
+          <div className="map-loading-overlay">
+            <MapPin size={22} />
+            <span>Người đăng chưa ghim vị trí và chưa xác định được khu vực trên bản đồ.</span>
+          </div>
+        )}
+        {coords && !coords.isExact && !coords.isDefault && (
           <div className="map-approx-notice">
             <MapPin size={12} />
-            <span>Vị trí hiển thị mang tính ước lượng theo khu vực</span>
+            <span>Vị trí gần đúng theo khu vực — người đăng chưa ghim vị trí chính xác</span>
           </div>
         )}
       </div>
 
       <div className="location-footer-note">
-        <span>Bán kính vòng tròn màu xanh biểu thị phạm vi đi bộ 500m xung quanh bất động sản.</span>
+        <span>{coords?.isExact
+          ? 'Bán kính vòng tròn màu xanh biểu thị phạm vi đi bộ 500m xung quanh bất động sản.'
+          : 'Vùng nét đứt là khu vực của tin đăng, không phải vị trí chính xác của căn.'}</span>
       </div>
     </div>
   );

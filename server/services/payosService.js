@@ -46,7 +46,8 @@ function createPayosService(env = process.env, options = {}) {
     },
     async create(order) {
       if (!this.availability().available) throw paymentError(503, 'Thanh toán payOS chưa sẵn sàng.', 'PAYMENT_NOT_CONFIGURED');
-      const resultUrl = `${frontendOrigin(env)}/sale/payment/${order.id}`;
+      // Đơn gói Plus của người dùng quay về trang kết quả riêng; đơn của môi giới giữ đường dẫn cũ.
+      const resultUrl = `${frontendOrigin(env)}${order.audience === 'USER' ? '/plus/payment' : '/sale/payment'}/${order.id}`;
       return getClient().paymentRequests.create({
         orderCode: Number(order.order_code), amount: order.amount_vnd,
         description: `SN${String(order.order_code).slice(-7)}`,

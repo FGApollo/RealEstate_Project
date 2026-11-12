@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { AlertCircle, Clock } from 'lucide-react';
 import ServicePlanCards from './ServicePlanCards';
 import PlanDialog from './PlanDialog';
-import { billingRequest, billingDate, billingMoney, paymentStatus, openCheckout } from './billingApi';
+import { billingRequest, billingDate, billingMoney, paymentStatus, openCheckout, lastPeriodEnd } from './billingApi';
 import './AgentPricing.css';
 
 export default function AgentPricing({ currentUser }) {
@@ -15,12 +15,14 @@ export default function AgentPricing({ currentUser }) {
   const [page, setPage] = useState(1);
   const requestId = useRef(null);
   const fetchBilling = useCallback(async (signal) => {
-    const [subscription, catalog, history] = await Promise.all([
+    const [subscription, catalog, history, trial] = await Promise.all([
       billingRequest('/api/subscriptions', { signal }),
       billingRequest('/api/payments/catalog', { signal }),
-      billingRequest(`/api/payments?page=${page}&limit=10`, { signal })
+      billingRequest(`/api/payments?page=${page}&limit=10`, { signal }),
+      // Không chặn cả trang nếu chỉ phần dùng thử lỗi.
+      billingRequest('/api/subscriptions/trial', { signal }).catch(() => ({ available: false }))
     ]);
-    return { subscription, catalog, history };
+    return { subscription, catalog, history, trial };
   }, [page]);
   const load = async () => { setData(await fetchBilling()); setError(''); };
   useEffect(() => {
@@ -53,8 +55,35 @@ export default function AgentPricing({ currentUser }) {
     } else if (order.status === 'PENDING' && order.checkoutUrl) openCheckout(order.checkoutUrl);
     else { requestId.current = null; await load(); setMessage(`Đơn #${order.orderCode}: ${paymentStatus(order.status)}.`); }
   });
+  const [confirmTrial, setConfirmTrial] = useState(false);
+  const startTrial = () => act(async () => {
+    await billingRequest('/api/subscriptions/trial', { method: 'POST', body: {} });
+    setConfirmTrial(false);
+    await load();
+    setMessage('Đã kích hoạt dùng thử gói Lite miễn phí 1 tháng.');
+  });
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const cancelQueued = () => act(async () => {
+    const result = await billingRequest('/api/subscriptions/cancel', { method: 'POST', body: { reason: cancelReason.trim() } });
+    setConfirmCancel(false);
+    setCancelReason('');
+    await load();
+    setMessage(result.cancelled ? `Đã hủy ${result.cancelled} kỳ đang chờ.` : 'Không có kỳ nào đang chờ để hủy.');
+  });
+  // Mô tả thời điểm gói mới có hiệu lực, khớp với quy tắc phía server (migration 023).
+  const confirmTiming = (selected) => {
+    switch (selected?.purchase_action) {
+      case 'UPGRADE': return 'Nâng cấp có hiệu lực ngay khi thanh toán được xác minh. Gói hiện tại kết thúc ngay; phần thời gian còn lại của gói hiện tại sẽ không được hoàn tiền hay cộng ngày. Các kỳ đã thanh toán đang chờ sẽ được dời ra sau gói mới.';
+      case 'DOWNGRADE': return `Hạ cấp có hiệu lực khi các kỳ hiện có kết thúc, từ ${billingDate(lastPeriodEnd(data?.subscription))}.`;
+      case 'RENEW': return `Kỳ gia hạn bắt đầu ngay sau kỳ cuối cùng đã thanh toán, từ ${billingDate(lastPeriodEnd(data?.subscription))}.`;
+      default: return 'Gói bắt đầu ngay khi thanh toán được xác minh.';
+    }
+  };
   const plan = data?.catalog.plans.find((item) => item.code === data?.subscription?.plan_name);
   const subscription = data?.subscription;
+  const lite = data?.catalog.plans.find((item) => item.code === 'LITE');
+  const liteBenefits = lite ? `${lite.listing_limit} tin công khai · ${lite.priority_points} điểm ưu tiên · Support ${lite.support_tier}.` : '';
   const active = subscription?.effective_status === 'ACTIVE';
   return <div className="pricing-panel-container">
     <div className="pricing-header"><h1>Gói dịch vụ & thanh toán</h1><p className="subtitle">Chọn gói phù hợp, thanh toán an toàn qua payOS và theo dõi lịch sử của bạn.</p></div>
@@ -63,14 +92,26 @@ export default function AgentPricing({ currentUser }) {
       : !data || data.history.page !== page ? <p role="status">Đang tải gói dịch vụ và giao dịch…</p> : <>
         <div className="current-subscription-card">
           <div className="status-header"><Clock size={20} /><h3>Gói hiện tại</h3></div>
-          {subscription ? <div className="subscription-details"><p><strong>{subscription.plan_name === 'FREE_TRIAL' ? 'Dùng thử miễn phí' : subscription.plan_name === plan?.code ? plan.name : subscription.plan_name}</strong></p>
+          {subscription ? <div className="subscription-details"><p><strong>{subscription.plan_name === 'FREE_TRIAL' ? 'Dùng thử Lite (miễn phí)' : subscription.plan_name === plan?.code ? plan.name : subscription.plan_name}</strong></p>
             <p>Hạn dùng: <strong>{billingDate(subscription.end_date)}</strong></p><span className={active ? 'badge-active' : 'badge-inactive'}>{active ? 'ĐANG HOẠT ĐỘNG' : 'ĐÃ HẾT HẠN / NGỪNG'}</span></div>
             : <p>Bạn chưa đăng ký gói dịch vụ.</p>}
           {!active && <p>Tin đã công khai và đủ điều kiện vẫn được hiển thị. Khi chưa có gói còn hiệu lực, tin không được cộng điểm ưu tiên từ gói; đăng thêm tin công khai cần gói còn hiệu lực.</p>}
           {active && <div className="subscription-benefits"><p><strong>{subscription.visible_listing_count} / {subscription.listing_limit}</strong> tin đang hiển thị · <strong>{subscription.priority_points}</strong> điểm ưu tiên hiển thị</p><p>Support {subscription.support_tier} · Tin đã ẩn hoặc kết thúc không chiếm chỗ.</p>
             {subscription.public_listing_count > subscription.listing_limit && <p role="status">Có {subscription.public_listing_count} tin bật công khai. Gói hiện tại chỉ hiển thị {subscription.listing_limit} tin mới nhất; tin còn lại được giữ trong danh mục. Hãy ẩn/kết thúc bớt tin để chọn lại các tin muốn hiển thị.</p>}</div>}
-          {Boolean(subscription?.upcoming?.length) && <div className="subscription-upcoming"><h4>Gói đã thanh toán, chờ đến kỳ</h4><ul>{subscription.upcoming.map(item => <li key={item.id}><strong>{item.plan_name}</strong> · {billingDate(item.start_date)} → {billingDate(item.end_date)} · {item.listing_limit} tin · {item.priority_points} điểm</li>)}</ul></div>}
+          {Boolean(subscription?.upcoming?.length) && <div className="subscription-upcoming"><h4>Gói đã thanh toán, chờ đến kỳ</h4><ul>{subscription.upcoming.map(item => <li key={item.id}><strong>{item.plan_name}</strong> · {billingDate(item.start_date)} → {billingDate(item.end_date)} · {item.listing_limit} tin · {item.priority_points} điểm</li>)}</ul>
+            <button className="btn-cancel-queued" disabled={busy} onClick={() => setConfirmCancel(true)}>Hủy các kỳ đã xếp</button></div>}
         </div>
+        {data.trial?.available && <div className="trial-offer-card">
+          <div><h3>Dùng thử gói Lite miễn phí 1 tháng</h3>
+            <p>{liteBenefits} Không cần thanh toán, không tự động gia hạn. Mỗi tài khoản được dùng thử một lần.</p></div>
+          <button className="btn-plan-action" disabled={busy} onClick={() => setConfirmTrial(true)}>Dùng thử miễn phí</button>
+        </div>}
+        {confirmTrial && <PlanDialog title="Kích hoạt dùng thử" locked={busy} onClose={() => setConfirmTrial(false)}>
+          <p><strong>Gói Lite</strong> · 1 tháng · <strong>Miễn phí</strong></p>
+          <p>{liteBenefits} Gói bắt đầu ngay và hết hạn sau 1 tháng; hết hạn thì bạn có thể mua gói để tiếp tục.</p>
+          <p>Mỗi tài khoản chỉ được dùng thử một lần.</p>
+          <div className="billing-actions"><button disabled={busy} onClick={() => setConfirmTrial(false)}>Quay lại</button><button className="btn-plan-action" disabled={busy} onClick={startTrial}>{busy ? 'Đang kích hoạt…' : 'Bắt đầu dùng thử'}</button></div>
+        </PlanDialog>}
         {!data.catalog.checkout.available && <div className="pricing-message-banner" role="status"><AlertCircle size={18} />{data.catalog.checkout.reason}</div>}
         <ServicePlanCards plans={data.catalog.plans} subscription={subscription} checkoutAvailable={data.catalog.checkout.available}
           busy={busy} onSubscribe={selectedPlan => { if (confirmOrder?.code !== selectedPlan.code) requestId.current = null; setConfirmOrder(selectedPlan); }} />
@@ -78,9 +119,17 @@ export default function AgentPricing({ currentUser }) {
           <p><strong>{confirmOrder.name}</strong> · {confirmOrder.duration_months} tháng</p>
           <p>Số tiền: <strong>{billingMoney(confirmOrder.amount_vnd)}</strong></p>
           <p>{confirmOrder.listing_limit} tin công khai · {confirmOrder.priority_points} điểm ưu tiên · Support {confirmOrder.support_tier}.</p>
-          <p>Gói mới bắt đầu sau tất cả kỳ đã thanh toán còn hạn. Nếu chưa có gói còn hạn, gói bắt đầu khi thanh toán được xác minh. Không tự động trừ tiền.</p>
+          <p>{confirmTiming(confirmOrder)} Không tự động trừ tiền.</p>
           <p>Đơn đang chờ trước đó giữ nguyên gói và giá đã chốt; bạn sẽ được đưa đến trang kiểm tra nếu khác lựa chọn này.</p>
           <div className="billing-actions"><button disabled={busy} onClick={() => setConfirmOrder(null)}>Quay lại</button><button className="btn-plan-action" disabled={busy} onClick={subscribe}>{busy ? 'Đang tạo đơn…' : 'Xác nhận và tiếp tục'}</button></div>
+        </PlanDialog>}
+        {confirmCancel && <PlanDialog title="Hủy các kỳ đang chờ" locked={busy} onClose={() => setConfirmCancel(false)}>
+          <p>Các kỳ đã thanh toán nhưng chưa bắt đầu sẽ bị hủy. Gói đang dùng vẫn giữ đến {billingDate(subscription?.end_date)}.</p>
+          <p><strong>Hệ thống không tự hoàn tiền</strong> cho các kỳ bị hủy; liên hệ quản trị viên nếu cần hỗ trợ.</p>
+          <label className="cancel-reason-label">Lý do (5–500 ký tự)
+            <textarea value={cancelReason} maxLength={500} rows={3} onChange={(event) => setCancelReason(event.target.value)} /></label>
+          <div className="billing-actions"><button disabled={busy} onClick={() => setConfirmCancel(false)}>Quay lại</button>
+            <button className="btn-plan-action" disabled={busy || cancelReason.trim().length < 5} onClick={cancelQueued}>{busy ? 'Đang hủy…' : 'Xác nhận hủy'}</button></div>
         </PlanDialog>}
         <section className="billing-history current-subscription-card" aria-labelledby="billing-history-title"><div className="billing-heading"><h2 id="billing-history-title">Lịch sử thanh toán</h2><button disabled={busy} onClick={() => act(load)}>Làm mới</button></div>
           {!data.history.items.length ? <p>Chưa có đơn thanh toán.</p> : <div className="billing-table-wrap"><table><thead><tr><th>Mã đơn / ngày tạo</th><th>Gói</th><th>Số tiền</th><th>Trạng thái</th><th>Chi tiết</th></tr></thead><tbody>{data.history.items.map((order) => <tr key={order.id}><td>#{order.orderCode}<small>{billingDate(order.createdAt)}</small></td><td>{order.planName}</td><td>{billingMoney(order.amount)}</td><td>{paymentStatus(order.status)}</td><td><Link to={`/sale/payment/${order.id}`}>{['CREATING', 'PENDING'].includes(order.status) ? 'Tiếp tục / kiểm tra' : 'Xem giao dịch'}</Link></td></tr>)}</tbody></table></div>}

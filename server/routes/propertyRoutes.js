@@ -8,7 +8,8 @@ router.get('/', rateLimiters.read, optionalAuthenticate, propertyController.getP
 router.post('/check-before-save', authenticate, requireRole('AGENT'), rateLimiters.expensive,
   propertyController.checkBeforeSave);
 router.post('/', authenticate, requireRole('AGENT'), rateLimiters.write, propertyController.createProperty);
-router.get('/:id/similar', rateLimiters.expensive, propertyController.getSimilarProperties);
+// Đọc nhẹ (tra property_links + tối đa 500 tin công khai), gọi mỗi lần mở chi tiết: dùng giới hạn đọc thông thường.
+router.get('/:id/similar', rateLimiters.read, propertyController.getSimilarProperties);
 router.get('/:id/contact-agent', authenticate, rateLimiters.read, propertyController.getContactAgent);
 router.get('/:id', rateLimiters.read, optionalAuthenticate, propertyController.getPropertyById);
 router.put('/:id', authenticate, requireRole('AGENT'), rateLimiters.write, propertyController.updateProperty);

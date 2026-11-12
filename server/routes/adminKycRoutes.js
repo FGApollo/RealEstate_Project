@@ -6,7 +6,8 @@ const { rateLimiters } = require('../middleware/rateLimiters');
 
 router.use(authenticate, requireRole('ADMIN'));
 
-router.get('/rejected', rateLimiters.read, adminKycController.getRejectedVerifications);
+// GET /api/admin/kyc?status=PENDING|REJECTED&page=&limit=
+router.get('/', rateLimiters.read, adminKycController.listVerifications);
 router.get('/:verificationId', rateLimiters.read, adminKycController.getVerificationDetail);
 router.post('/:verificationId/approve', rateLimiters.write, adminKycController.approveVerification);
 router.post('/:verificationId/reject', rateLimiters.write, adminKycController.rejectVerification);

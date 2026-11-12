@@ -1,4 +1,5 @@
 const crypto = require('node:crypto');
+const { isDevConsoleDeliveryEnabled, devFrontendOrigin, maskEmail } = require('./devDeliveryPolicy');
 
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const GMAIL_SEND_URL = 'https://gmail.googleapis.com/gmail/v1/users/me/messages/send';
@@ -50,7 +51,7 @@ const configurationError = () => {
 };
 
 const assertConfigured = () => {
-  if (!readConfig()) throw configurationError();
+  if (!readConfig() && !isDevConsoleDeliveryEnabled()) throw configurationError();
 };
 
 let cachedAccessToken;
@@ -155,28 +156,14 @@ const buildRawMessage = ({ from, to, subject, text, html }) => {
   return toBase64Url(message);
 };
 
-const sendVerificationEmail = async ({ email, token }) => {
-  const config = readConfig();
-  if (!config) throw configurationError();
-  if (!isMailboxAddress(email)) {
+// Gửi một email qua Gmail API. Không bao giờ ghi token, người nhận hay phản hồi gốc của Google vào log.
+const sendGmail = async (config, { to, subject, text, html, purpose }) => {
+  if (!isMailboxAddress(to)) {
     const error = new Error('Recipient email address is invalid');
     error.code = 'EMAIL_RECIPIENT_INVALID';
     throw error;
   }
-
-  const verificationUrl = new URL('/verify-email', config.frontendOrigin);
-  verificationUrl.hash = `token=${encodeURIComponent(token)}`;
-  const link = verificationUrl.toString();
-  const text = `Mở liên kết để xác minh email Swipe Nest của bạn: ${link}\nLiên kết hết hạn sau 24 giờ. Nếu bạn không tạo tài khoản này, hãy bỏ qua email.`;
-  const html = `<p>Hãy xác minh địa chỉ email cho tài khoản Swipe Nest.</p><p><a href="${link}">Xác minh email</a></p><p>Liên kết hết hạn sau 24 giờ. Nếu bạn không tạo tài khoản này, hãy bỏ qua email.</p>`;
-  const raw = buildRawMessage({
-    from: config.senderEmail,
-    to: email,
-    subject: 'Xác minh email Swipe Nest',
-    text,
-    html
-  });
-
+  const raw = buildRawMessage({ from: config.senderEmail, to, subject, text, html });
   const accessToken = await getAccessToken(config);
   let response;
   try {
@@ -196,10 +183,56 @@ const sendVerificationEmail = async ({ email, token }) => {
   }
 
   if (!response.ok) {
-    const error = new Error('Gmail API rejected the verification email');
+    const error = new Error(`Gmail API rejected the ${purpose} email`);
     error.code = 'GMAIL_API_SEND_REJECTED';
     throw error;
   }
 };
 
-module.exports = { assertConfigured, readConfig, sendVerificationEmail };
+// Liên kết mang token trong phần # để token không bị gửi lên server hay ghi vào log truy cập.
+const tokenLink = (origin, pathname, token) => {
+  const url = new URL(pathname, origin);
+  url.hash = `token=${encodeURIComponent(token)}`;
+  return url.toString();
+};
+
+const sendVerificationEmail = async ({ email, token }) => {
+  const config = readConfig();
+  if (!config && isDevConsoleDeliveryEnabled()) {
+    // Máy dev không có Gmail: in liên kết ra terminal (xem services/devDeliveryPolicy.js).
+    console.info(`[DEV] Liên kết xác minh email cho ${maskEmail(email)}: ${tokenLink(devFrontendOrigin(), '/verify-email', token)}`);
+    return { devConsole: true };
+  }
+  if (!config) throw configurationError();
+
+  const link = tokenLink(config.frontendOrigin, '/verify-email', token);
+  await sendGmail(config, {
+    to: email,
+    subject: 'Xác minh email Swipe Nest',
+    text: `Mở liên kết để xác minh email Swipe Nest của bạn: ${link}
+Liên kết hết hạn sau 24 giờ. Nếu bạn không tạo tài khoản này, hãy bỏ qua email.`,
+    html: `<p>Hãy xác minh địa chỉ email cho tài khoản Swipe Nest.</p><p><a href="${link}">Xác minh email</a></p><p>Liên kết hết hạn sau 24 giờ. Nếu bạn không tạo tài khoản này, hãy bỏ qua email.</p>`,
+    purpose: 'verification'
+  });
+};
+
+const sendPasswordResetEmail = async ({ email, token, ttlMinutes }) => {
+  const config = readConfig();
+  if (!config && isDevConsoleDeliveryEnabled()) {
+    console.info(`[DEV] Liên kết đặt lại mật khẩu cho ${maskEmail(email)}: ${tokenLink(devFrontendOrigin(), '/reset-password', token)}`);
+    return { devConsole: true };
+  }
+  if (!config) throw configurationError();
+
+  const link = tokenLink(config.frontendOrigin, '/reset-password', token);
+  await sendGmail(config, {
+    to: email,
+    subject: 'Đặt lại mật khẩu Swipe Nest',
+    text: `Mở liên kết để đặt mật khẩu mới cho tài khoản Swipe Nest: ${link}
+Liên kết dùng một lần và hết hạn sau ${ttlMinutes} phút. Nếu bạn không yêu cầu đặt lại mật khẩu, hãy bỏ qua email này; mật khẩu hiện tại vẫn giữ nguyên.`,
+    html: `<p>Bạn (hoặc ai đó) vừa yêu cầu đặt lại mật khẩu cho tài khoản Swipe Nest.</p><p><a href="${link}">Đặt mật khẩu mới</a></p><p>Liên kết dùng một lần và hết hạn sau ${ttlMinutes} phút. Nếu bạn không yêu cầu, hãy bỏ qua email này; mật khẩu hiện tại vẫn giữ nguyên.</p>`,
+    purpose: 'password reset'
+  });
+};
+
+module.exports = { assertConfigured, readConfig, sendVerificationEmail, sendPasswordResetEmail };

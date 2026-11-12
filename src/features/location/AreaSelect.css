@@ -1,0 +1,14 @@
+/* Dropdown Tỉnh/TP -> Phường/xã dùng chung (trang chủ, tìm kiếm, bộ lọc khám phá, form đăng tin). */
+.area-select { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.area-select select { flex: 1 1 180px; min-width: 0; height: 40px; padding: 0 10px; border: 1px solid #cbd5e1; border-radius: 10px; background: #fff; font: inherit; color: #0f172a; }
+.area-select select:disabled { background: #f1f5f9; color: #94a3b8; }
+/* Trong ô "Khu vực" của thanh tìm kiếm trang chủ: gọn, không viền. */
+.home-area-select { flex-wrap: nowrap; gap: 4px; }
+.home-area-select select { height: 26px; padding: 0 4px; border: 0; background: transparent; font-size: .9rem; }
+.home-area-select select:first-child { border-right: 1px solid #e2e8f0; }
+
+/* Ghi chú tin ghi theo địa chỉ cũ trong form đăng / sửa tin */
+.legacy-area-note { display: block; margin-top: 6px; color: #b45309; font-size: .82rem; }
+
+/* Ghi chú tin ghi theo địa chỉ cũ trong form đăng / sửa tin */
+.legacy-area-note { display: block; margin-top: 6px; color: #b45309; font-size: .82rem; }

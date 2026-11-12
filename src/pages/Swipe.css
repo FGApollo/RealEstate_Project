@@ -2783,8 +2783,6 @@
   }
 }
 
-
-
-
-
-
+/* Tin yêu thích đã bán / đã cho thuê: vẫn hiện, ảnh mờ và có nhãn */
+.saved-property-card.is-closed .saved-card-img { filter: grayscale(0.7); opacity: 0.6; }
+.saved-card-badge.closed { background: #b91c1c; color: #fff; }

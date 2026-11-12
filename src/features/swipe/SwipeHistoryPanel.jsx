@@ -1,10 +1,13 @@
 import { ArrowRight, History, Heart, Home, MapPin, X } from 'lucide-react';
 
-const SwipeHistoryPanel = ({ history, favorites, onSelect, onExplore }) => (
+const SwipeHistoryPanel = ({ history, favorites, onSelect, onExplore, onViewAll }) => (
   <aside className="swipe-experience-panel swipe-history-panel">
     <div className="swipe-panel-heading">
       <span className="swipe-panel-icon history-icon"><History size={21} /></span>
       <h2>Lịch sử vuốt</h2>
+      {history.length > 0 && onViewAll && (
+        <button type="button" className="swipe-history-view-all" onClick={onViewAll}>Xem tất cả <ArrowRight size={14} /></button>
+      )}
     </div>
 
     {history.length === 0 ? (
@@ -23,9 +26,11 @@ const SwipeHistoryPanel = ({ history, favorites, onSelect, onExplore }) => (
     ) : (
       <div className="swipe-history-list">
         {history.map((item) => {
-          const isFavorite = favorites.some((favorite) => favorite.id === item.id);
+          // Biểu tượng theo đúng lượt vuốt (phải = thích, trái = bỏ qua); tin cũ chưa có thông tin vuốt thì dựa vào Yêu thích.
+          const isFavorite = item.swipeType ? item.swipeType === 'right' : favorites.some((favorite) => favorite.id === item.id);
           return (
-            <button type="button" className="swipe-history-item" key={item.id} onClick={() => onSelect(item)}>
+            <button type="button" className="swipe-history-item" key={item.id} onClick={() => onSelect(item)}
+              disabled={item.available === false} title={item.available === false ? 'Tin không còn hiển thị' : undefined}>
               <img src={item.thumbnail} alt="" loading="lazy" />
               <span className="swipe-history-item-copy">
                 <strong>{item.title}</strong>

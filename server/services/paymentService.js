@@ -10,7 +10,8 @@ function dto(order) {
     checkoutUrl: order.checkout_url ? checkoutUrl(order.checkout_url) : null,
     createdAt: order.created_at, expiresAt: order.expires_at, paidAt: order.paid_at,
     subscriptionStart: order.grant_start, subscriptionEnd: order.grant_end,
-    listingLimit: order.listing_limit, priorityPoints: order.priority_points, supportTier: order.support_tier };
+    listingLimit: order.listing_limit, priorityPoints: order.priority_points, supportTier: order.support_tier,
+    audience: order.audience || 'AGENT' };
 }
 
 // payOS bank timestamps without an offset are Vietnam local time.
@@ -19,6 +20,14 @@ function transactionTime(value) {
   const text = value.replace(' ', 'T');
   const date = new Date(/(Z|[+-]\d{2}:\d{2})$/.test(text) ? text : `${text}+07:00`);
   return Number.isFinite(date.getTime()) ? date.toISOString() : null;
+}
+
+const TIER_RANK = { LITE: 1, PLUS: 2, PRO: 3 };
+// Mua gói này lúc này sẽ là: mua mới, gia hạn (xếp sau), nâng cấp (hiệu lực ngay) hay hạ cấp (chờ hết kỳ).
+function purchaseAction(planTier, currentTier) {
+  if (!currentTier) return 'NEW';
+  const difference = (TIER_RANK[planTier] || 0) - (TIER_RANK[currentTier] || 0);
+  return difference > 0 ? 'UPGRADE' : difference < 0 ? 'DOWNGRADE' : 'RENEW';
 }
 
 function createPaymentService(repo = repository, provider = createPayosService()) {
@@ -59,7 +68,15 @@ function createPaymentService(repo = repository, provider = createPayosService()
     return applyProvider(order, await provider.get(order.order_code));
   };
   return {
-    async catalog() { return { plans: await repo.plans(), checkout: provider.availability() }; },
+    async catalog(userId) {
+      const plans = await repo.plans();
+      const currentTier = userId && repo.currentTier ? await repo.currentTier(userId) : null;
+      return {
+        plans: plans.map((plan) => ({ ...plan, purchase_action: purchaseAction(plan.support_tier, currentTier) })),
+        currentTier,
+        checkout: provider.availability()
+      };
+    },
     async list(userId, query) {
       const { page, limit } = parsePagination(query);
       const data = await repo.list(userId, page, limit);
@@ -67,7 +84,7 @@ function createPaymentService(repo = repository, provider = createPayosService()
     },
     async create(userId, body) {
       if (!body || Array.isArray(body) || Object.keys(body).some((key) => !['planCode', 'requestId', 'planVersion'].includes(key))
-        || !['LITE','PLUS','PRO','PAID'].includes(body.planCode) || typeof body.requestId !== 'string' || !UUID.test(body.requestId)
+        || !(repo.planCodes || ['LITE','PLUS','PRO','PAID']).includes(body.planCode) || typeof body.requestId !== 'string' || !UUID.test(body.requestId)
         || !Number.isSafeInteger(body.planVersion) || body.planVersion < 1 || body.planVersion > 2147483647) {
         throw paymentError(400, 'Thông tin tạo đơn không hợp lệ.', 'INVALID_PAYMENT_REQUEST');
       }
@@ -106,4 +123,4 @@ function createPaymentService(repo = repository, provider = createPayosService()
     }
   };
 }
-module.exports = { ...createPaymentService(), createPaymentService, transactionTime, dto };
+module.exports = { ...createPaymentService(), createPaymentService, transactionTime, dto, purchaseAction };

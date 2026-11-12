@@ -4,6 +4,7 @@ const adminController = require('../controllers/adminController');
 const analyticsController = require('../controllers/analyticsController');
 const adminPlanController = require('../controllers/adminPlanController');
 const trustScoreController = require('../controllers/trustScoreController');
+const plusController = require('../controllers/plusController');
 const { authenticate, requireRole } = require('../middleware/authenticate');
 const { rateLimiters } = require('../middleware/rateLimiters');
 
@@ -12,6 +13,19 @@ router.use(authenticate, requireRole('ADMIN'));
 router.get('/service-plans', rateLimiters.read, adminPlanController.catalog);
 router.get('/service-plans/history', rateLimiters.read, adminPlanController.history);
 router.post('/service-plans/paid', rateLimiters.write, adminPlanController.change);
+// Gói của một môi giới cụ thể: tra cứu (?id= hoặc ?email=), cấp, đổi hạng kỳ đang chạy, gỡ.
+router.get('/agents/subscription', rateLimiters.read, adminPlanController.agentSubscription);
+router.post('/agents/:agentId/subscription/grant', rateLimiters.write, adminPlanController.grantAgentPlan);
+router.post('/agents/:agentId/subscription/change', rateLimiters.write, adminPlanController.changeAgentPeriod);
+router.post('/agents/:agentId/subscription/remove', rateLimiters.write, adminPlanController.removeAgentPlan);
+router.put('/agents/:agentId/official', rateLimiters.write, plusController.admin.setOfficial);
+
+// Gói Swipe Nest Plus của người dùng: tra cứu (?id= hoặc ?email=), cấp thêm tháng, gỡ.
+router.get('/users/plus', rateLimiters.read, plusController.admin.lookup);
+router.post('/users/:userId/plus/grant', rateLimiters.write, plusController.admin.grant);
+router.post('/users/:userId/plus/remove', rateLimiters.write, plusController.admin.remove);
+
+// Nhãn "Swipe Nest đã kiểm tra" cho tin đăng.
 
 // Authentication re-reads users from the DB. A disabled/unknown-status account
 // cannot read business analytics even if its session still has time remaining.

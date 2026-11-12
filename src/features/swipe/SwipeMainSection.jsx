@@ -1,16 +1,16 @@
 import { motion } from 'framer-motion';
 import {
-  BadgeCheck, Bed, Bath, ChevronLeft, ChevronRight, Compass, Heart, Info, MapPin,
-  Maximize, RefreshCw, SlidersHorizontal, X
+  Bed, Bath, ChevronLeft, ChevronRight, Compass, Heart, History, Info, MapPin,
+  Maximize, RefreshCw, X
 } from 'lucide-react';
+import { SwipeNestBadges } from '../plus/SwipeNestBadges';
 
 const SwipeMainSection = ({
-  discoveryTitle, currentProperty, isAlreadyFavorite, formatPrice, onOpenFilters, activeFiltersCount,
-  onPrevious, onNext, onToggleFavorite, onShowDetails, onRestart, onAdjustPreferences, isLoading, hasError,
+  discoveryTitle, currentProperty, formatPrice, onOpenHistory,
+  onPrevious, onNext, onShowDetails, onRestart, onAdjustPreferences, isLoading, hasError,
   cardMotion, cardController, handleDragEnd, currentIndex, propertyCount, isSwiping
 }) => {
   const location = currentProperty?.address || [currentProperty?.ward, currentProperty?.district, currentProperty?.city].filter(Boolean).join(', ');
-  const verified = currentProperty?.owner?.verification_status === 'VERIFIED';
   const pageCount = Math.max(1, Math.min(propertyCount || 1, 5));
   const activeDot = propertyCount ? currentIndex % pageCount : 0;
 
@@ -26,10 +26,12 @@ const SwipeMainSection = ({
               <p>Khám phá tin đăng và vuốt để Swipe Nest dần hiểu lựa chọn của bạn</p>
             </div>
           </div>
-          <button type="button" className={`swipe-filter-pill ${activeFiltersCount ? 'has-filters' : ''}`} onClick={onOpenFilters}>
-            <SlidersHorizontal size={18} /><span>Lọc</span>
-            {activeFiltersCount > 0 && <b>{activeFiltersCount}</b>}
-          </button>
+          <div className="swipe-heading-actions">
+            {/* Lịch sử vuốt ẩn mặc định, bấm mới mở ngăn kéo bên trái. */}
+            <button type="button" className="swipe-filter-pill" onClick={onOpenHistory} aria-haspopup="dialog" aria-label="Lịch sử vuốt">
+              <History size={18} /><span>Lịch sử</span>
+            </button>
+          </div>
         </header>
 
         <div className="swipe-experience-deck">
@@ -54,10 +56,8 @@ const SwipeMainSection = ({
             >
               {currentProperty.thumbnail ? <img className="swipe-property-image" src={currentProperty.thumbnail} alt={currentProperty.title} draggable="false" /> : <div className="swipe-property-image-placeholder" />}
               <div className="swipe-property-image-shade" />
-              {verified && <span className="swipe-verified-badge"><BadgeCheck size={17} fill="currentColor" />ĐÃ XÁC THỰC</span>}
-              <button type="button" className={`swipe-property-favorite ${isAlreadyFavorite ? 'active' : ''}`} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); onToggleFavorite(); }} aria-label={isAlreadyFavorite ? 'Bỏ yêu thích' : 'Thêm yêu thích'}>
-                <Heart size={24} fill={isAlreadyFavorite ? 'currentColor' : 'none'} />
-              </button>
+              {/* Chỉ còn nhãn Swipe Nest; chủ tin đã KYC thì xem ở chi tiết tin và trong chat. */}
+              <SwipeNestBadges property={currentProperty} className="swipe-sn-badges" />
 
               <div className="swipe-property-overlay">
                 <div className="swipe-property-heading">
@@ -93,7 +93,8 @@ const SwipeMainSection = ({
             <div className="swipe-experience-actions">
               <button type="button" className="swipe-action-button dislike" onClick={onPrevious} disabled={isSwiping} aria-label="Bỏ qua"><X size={30} /></button>
               <button type="button" className="swipe-action-button details" onClick={onShowDetails} aria-label="Xem thông tin chi tiết"><Info size={24} /></button>
-              <button type="button" className={`swipe-action-button like ${isAlreadyFavorite ? 'active' : ''}`} onClick={onToggleFavorite} disabled={isSwiping} aria-label="Thêm yêu thích"><Heart size={29} fill={isAlreadyFavorite ? 'currentColor' : 'none'} /></button>
+              {/* Nút tim = quẹt phải: cùng một cơ chế (ghi lượt thích, lưu Yêu thích, chuyển sang thẻ kế tiếp). */}
+              <button type="button" className="swipe-action-button like" onClick={onNext} disabled={isSwiping} aria-label="Thích (quẹt phải)"><Heart size={29} /></button>
             </div>
             <div className="swipe-discover-hint"><span>Vuốt để khám phá thêm</span></div>
             <div className="swipe-pagination" aria-label={`Bất động sản ${currentIndex + 1} trên ${propertyCount}`}>

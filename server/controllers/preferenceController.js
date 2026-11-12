@@ -56,4 +56,13 @@ const recordEvent = async (req, res) => {
   }
 };
 
-module.exports = { getPreferences, savePreferences, getOptions, recordEvent };
+const getSwipeHistory = async (req, res) => {
+  try {
+    res.set('Cache-Control', 'no-store');
+    return res.status(200).json(await propertyEventService.getSwipeHistory(req.user.id, req.query));
+  } catch (error) {
+    return sendError(res, error, 'Could not load swipe history.');
+  }
+};
+
+module.exports = { getPreferences, savePreferences, getOptions, recordEvent, getSwipeHistory };
