@@ -1,4 +1,5 @@
 process.env.SUPABASE_URL = 'https://chat-realtime.example.test';
+process.env.SUPABASE_SECRET_KEY = 'isolated-chat-realtime-key';
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'isolated-chat-realtime-key';
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'chat-realtime-test-secret-with-at-least-32-bytes';
 

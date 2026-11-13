@@ -14,12 +14,22 @@ const Plus = () => {
 
   useEffect(() => {
     const controller = new AbortController();
-    Promise.all([fetchPlusCatalog({ signal: controller.signal }), fetchPlusPayments({ signal: controller.signal })])
-      .then(([catalogData, payments]) => {
-        setCatalog(catalogData);
-        setHistory(payments.items || []);
+    fetchPlusCatalog({ signal: controller.signal })
+      .then((catalogData) => {
+        if (!controller.signal.aborted) setCatalog(catalogData);
       })
-      .catch((err) => { if (!controller.signal.aborted) setError(err.message); });
+      .catch((err) => {
+        if (!controller.signal.aborted) setError(err.message);
+      });
+
+    fetchPlusPayments({ signal: controller.signal })
+      .then((payments) => {
+        if (!controller.signal.aborted) setHistory(payments?.items || []);
+      })
+      .catch((err) => {
+        console.warn('Chưa thể tải lịch sử thanh toán:', err);
+      });
+
     return () => controller.abort();
   }, []);
 
