@@ -4,23 +4,53 @@ const agentRepository = require('./paymentRepository');
 const { result } = agentRepository;
 const rpc = async (name, args) => result(await supabase.rpc(name, args));
 
+const DEFAULT_PLANS = [
+  { code: 'USER_PLUS', name: 'Swipe Nest Plus', amount_vnd: 20000, duration_months: 1, version: 1, active: true }
+];
+
 // Đơn mua gói Plus của người dùng: cùng bảng agent_payment_orders (audience = 'USER'), cùng hàm đồng bộ / xác nhận
 // với payOS. Chỉ khác danh mục gói và hàm giữ chỗ đơn.
 module.exports = {
   planCodes: ['USER_PLUS'],
+  DEFAULT_PLANS,
   async plans() {
-    return result(await supabase.from('user_billing_plans')
-      .select('code, name, amount_vnd, duration_months, version').eq('active', true).order('amount_vnd'));
+    try {
+      const response = await supabase.from('user_billing_plans')
+        .select('code, name, amount_vnd, duration_months, version').eq('active', true).order('amount_vnd');
+      if (response.error && ['PGRST205', '42P01', '42703'].includes(response.error.code)) {
+        return DEFAULT_PLANS;
+      }
+      return result(response);
+    } catch (err) {
+      if (['PAYMENT_MIGRATION_REQUIRED', 'PGRST205', '42P01'].includes(err.code)
+        || err.message?.includes('user_billing_plans')) {
+        return DEFAULT_PLANS;
+      }
+      throw err;
+    }
   },
   async find(id, userId) {
     let query = supabase.from('agent_payment_orders').select('*').eq('id', id).eq('audience', 'USER');
     if (userId !== undefined) query = query.eq('user_id', userId);
-    return result(await query.maybeSingle());
+    let resp = await query.maybeSingle();
+    if (resp.error && (resp.error.code === '42703' || resp.error.message?.includes('audience'))) {
+      let fallback = supabase.from('agent_payment_orders').select('*').eq('id', id).eq('plan_code', 'USER_PLUS');
+      if (userId !== undefined) fallback = fallback.eq('user_id', userId);
+      resp = await fallback.maybeSingle();
+    }
+    return result(resp);
   },
   findByCode: agentRepository.findByCode,
   async list(userId, page, limit) {
-    const response = await supabase.from('agent_payment_orders').select('*', { count: 'exact' }).eq('user_id', userId)
+    let response = await supabase.from('agent_payment_orders').select('*', { count: 'exact' }).eq('user_id', userId)
       .eq('audience', 'USER').order('created_at', { ascending: false }).order('id').range((page - 1) * limit, page * limit - 1);
+    if (response.error && (response.error.code === '42703' || response.error.message?.includes('audience'))) {
+      response = await supabase.from('agent_payment_orders').select('*', { count: 'exact' }).eq('user_id', userId)
+        .eq('plan_code', 'USER_PLUS').order('created_at', { ascending: false }).order('id').range((page - 1) * limit, page * limit - 1);
+    }
+    if (response.error && ['PGRST205', '42P01'].includes(response.error.code)) {
+      return { items: [], total: 0, page, limit };
+    }
     return { items: result(response), total: response.count, page, limit };
   },
   reserve: (userId, planCode, requestId, version) => rpc('reserve_user_payment', {

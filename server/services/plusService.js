@@ -6,25 +6,35 @@ const PLUS_REQUIRED_MESSAGE = 'Tin này do đội Swipe Nest đăng. Nâng cấp
 const serviceError = (message, statusCode, code) => Object.assign(new Error(message), { statusCode, ...(code ? { code } : {}) });
 
 const getPlusState = async (userId) => {
-  const { data, error } = await supabase.rpc('user_plus_state', { p_user_id: userId });
-  if (error) {
-    if (['PGRST202', '42883'].includes(error.code)) throw serviceError('Gói Plus chưa được cấu hình trong database.', 503, 'PLUS_MIGRATION_REQUIRED');
-    throw serviceError('Chưa thể kiểm tra gói Plus. Vui lòng thử lại.', 503, 'PLUS_UNAVAILABLE');
+  try {
+    const { data, error } = await supabase.rpc('user_plus_state', { p_user_id: userId });
+    if (error) {
+      if (['PGRST202', '42883', 'PGRST205', '42P01'].includes(error.code)
+        || error.message?.includes('user_plus_state')) {
+        return { active: false, currentEnd: null, periods: [] };
+      }
+      return { active: false, currentEnd: null, periods: [] };
+    }
+    return {
+      active: data?.active === true,
+      currentEnd: data?.current_end || null,
+      periods: Array.isArray(data?.periods) ? data.periods.map((period) => ({
+        startDate: period.start_date, endDate: period.end_date, source: period.source
+      })) : []
+    };
+  } catch (err) {
+    return { active: false, currentEnd: null, periods: [] };
   }
-  return {
-    active: data?.active === true,
-    currentEnd: data?.current_end || null,
-    periods: Array.isArray(data?.periods) ? data.periods.map((period) => ({
-      startDate: period.start_date, endDate: period.end_date, source: period.source
-    })) : []
-  };
 };
 
 const isPlusActive = async (userId) => (await getPlusState(userId)).active;
 
 const isOfficialUser = async (userId) => {
   const { data, error } = await supabase.from('users').select('is_official').eq('id', userId).maybeSingle();
-  if (error) throw serviceError('Chưa thể kiểm tra tài khoản.', 503);
+  if (error) {
+    if (error.code === '42703' || error.message?.includes('is_official')) return false;
+    throw serviceError('Chưa thể kiểm tra tài khoản.', 503);
+  }
   return data?.is_official === true;
 };
 

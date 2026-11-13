@@ -17,19 +17,27 @@ const getFavorites = async (userId) => {
 
   const propertyIds = favorites.map(f => f.property_id);
 
-  const { data: properties, error: propsError } = await supabase
+  const selectProperties = (withOfficial = true) => supabase
     .from('properties')
     .select(`
       *,
       property_features(feature_name),
       property_images(image_url),
       lifestyle_tags(tag_name),
-      owner:users!owner_id(name, role, avatar, trust_score, created_at, verification_status, is_official)
+      owner:users!owner_id(name, role, avatar, trust_score, created_at, verification_status${withOfficial ? ', is_official' : ''})
     `)
     .in('id', propertyIds)
     // Tin đã bán/đã cho thuê vẫn hiện (kèm nhãn ở giao diện); tin đã gỡ hoặc bị ẩn thì không.
     .in('status', ['AVAILABLE', 'SOLD', 'RENTED'])
     .or('is_hidden.is.null,is_hidden.eq.false');
+
+  let { data: properties, error: propsError } = await selectProperties(true);
+  if (propsError && (propsError.code === '42703' || propsError.message?.includes('is_official'))) {
+    ({ data: properties, error: propsError } = await selectProperties(false));
+    if (Array.isArray(properties)) {
+      properties.forEach(p => { if (p.owner) p.owner.is_official = false; });
+    }
+  }
 
   if (propsError) {
     throw new Error(propsError.message);

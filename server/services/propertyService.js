@@ -58,11 +58,20 @@ const createProperty = async (propertyData) => {
 
   
   // Verify owner is an AGENT with adequate trust score (> 30) and verified KYC (F28)
-  const { data: ownerUser, error: ownerError } = await supabase
+  let { data: ownerUser, error: ownerError } = await supabase
     .from('users')
     .select('role, trust_score, verification_status, is_official')
     .eq('id', owner_id)
     .single();
+
+  if (ownerError && (ownerError.code === '42703' || ownerError.message?.includes('is_official'))) {
+    ({ data: ownerUser, error: ownerError } = await supabase
+      .from('users')
+      .select('role, trust_score, verification_status')
+      .eq('id', owner_id)
+      .single());
+    if (ownerUser) ownerUser.is_official = false;
+  }
 
   if (ownerError || !ownerUser || ownerUser.role !== 'AGENT') {
     const err = new Error('Chỉ tài khoản có vai trò Môi giới (AGENT) mới có quyền đăng tin.');
@@ -207,8 +216,13 @@ const createProperty = async (propertyData) => {
 const CLOSED_STATUSES = ['SOLD', 'RENTED'];
 const isClosedListingViewable = async (property) => {
   if (!property || !CLOSED_STATUSES.includes(property.status) || property.is_hidden === true || property.is_public === false) return false;
-  const { data: owner, error } = await supabase.from('users')
+  let { data: owner, error } = await supabase.from('users')
     .select('id, role, is_active, verification_status, is_official, trust_score').eq('id', property.owner_id).maybeSingle();
+  if (error && (error.code === '42703' || error.message?.includes('is_official'))) {
+    ({ data: owner, error } = await supabase.from('users')
+      .select('id, role, is_active, verification_status, trust_score').eq('id', property.owner_id).maybeSingle());
+    if (owner) owner.is_official = false;
+  }
   if (error) throw new Error('Không thể kiểm tra tin đăng.');
   return Boolean(owner && owner.role === 'AGENT' && owner.is_active === true
     && (owner.verification_status === 'VERIFIED' || owner.is_official === true) && Number(owner.trust_score ?? 50) > 30);
@@ -216,21 +230,30 @@ const isClosedListingViewable = async (property) => {
 
 const getPropertyById = async (id, { publicRead = false, viewerId, allowClosed = false } = {}) => {
   id = positiveId(id);
-  const { data, error } = await supabase
+  const selectProperty = (withOfficial = true) => supabase
     .from('properties')
     .select(`
       *,
       property_features(feature_name),
       property_images(image_url),
       lifestyle_tags(tag_name),
-      owner:users!owner_id(name, role, avatar, trust_score, verification_status, is_official)
+      owner:users!owner_id(name, role, avatar, trust_score, verification_status${withOfficial ? ', is_official' : ''})
     `)
     .eq('id', id)
     .single();
 
+  let { data, error } = await selectProperty(true);
+  if (error && (error.code === '42703' || error.message?.includes('is_official'))) {
+    ({ data, error } = await selectProperty(false));
+    if (data?.owner) data.owner.is_official = false;
+  }
+
   if (error?.code === 'PGRST116') return null;
   if (error) {
     throw new Error(error.message);
+  }
+  if (data?.owner && data.owner.is_official === undefined) {
+    data.owner.is_official = false;
   }
   if (publicRead && String(data?.owner_id) !== String(viewerId)) {
     if (allowClosed && CLOSED_STATUSES.includes(data?.status)) {
@@ -269,11 +292,19 @@ const getContactAgentId = async (id, requesterId) => {
     throw error;
   }
 
-  const { data: agent, error: agentError } = await supabase
+  let { data: agent, error: agentError } = await supabase
     .from('users')
     .select('id, role, is_active, trust_score, is_official')
     .eq('id', property.owner_id)
     .maybeSingle();
+  if (agentError && (agentError.code === '42703' || agentError.message?.includes('is_official'))) {
+    ({ data: agent, error: agentError } = await supabase
+      .from('users')
+      .select('id, role, is_active, trust_score')
+      .eq('id', property.owner_id)
+      .maybeSingle());
+    if (agent) agent.is_official = false;
+  }
   if (agentError) throw new Error(agentError.message);
   // Tin của tài khoản chính thức Swipe Nest: chỉ người có gói Plus mới liên hệ được.
   if (agent?.is_official === true) await plusService.assertPlusForOfficialContact(requesterId);
@@ -283,6 +314,7 @@ const getContactAgentId = async (id, requesterId) => {
     error.statusCode = 404;
     throw error;
   }
+  return agent.id;
   return agent.id;
 };
 
