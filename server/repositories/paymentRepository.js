@@ -25,22 +25,51 @@ module.exports = {
   // Hạng của kỳ đang chạy (null nếu không có kỳ nào còn hiệu lực).
   async currentTier(userId) {
     const now = new Date().toISOString().replace('Z', '');
-    const rows = result(await supabase.from('seller_subscriptions').select('support_tier, start_date')
-      .eq('user_id', userId).eq('status', 'ACTIVE').lte('start_date', now).gt('end_date', now)
-      .order('start_date', { ascending: false }).limit(1));
-    return rows?.[0]?.support_tier || null;
+    try {
+      const resp = await supabase.from('seller_subscriptions').select('support_tier, start_date')
+        .eq('user_id', userId).eq('status', 'ACTIVE').lte('start_date', now).gt('end_date', now)
+        .order('start_date', { ascending: false }).limit(1);
+      if (resp.error && ['PGRST205', '42P01', '42703'].includes(resp.error.code)) return null;
+      const rows = result(resp);
+      return rows?.[0]?.support_tier || null;
+    } catch (err) {
+      if (['PAYMENT_MIGRATION_REQUIRED', 'PGRST205', '42P01'].includes(err.code)) return null;
+      throw err;
+    }
   },
   async find(id, userId) {
     let query = supabase.from('agent_payment_orders').select('*').eq('id', id).eq('audience', 'AGENT');
     if (userId !== undefined) query = query.eq('user_id', userId);
-    return result(await query.maybeSingle());
+    let resp = await query.maybeSingle();
+    if (resp.error && (resp.error.code === '42703' || resp.error.message?.includes('audience'))) {
+      let fallback = supabase.from('agent_payment_orders').select('*').eq('id', id).neq('plan_code', 'USER_PLUS');
+      if (userId !== undefined) fallback = fallback.eq('user_id', userId);
+      resp = await fallback.maybeSingle();
+      if (resp.error && (resp.error.code === '42703' || resp.error.message?.includes('plan_code'))) {
+        let plain = supabase.from('agent_payment_orders').select('*').eq('id', id);
+        if (userId !== undefined) plain = plain.eq('user_id', userId);
+        resp = await plain.maybeSingle();
+      }
+    }
+    return result(resp);
   },
   async findByCode(code) {
     return result(await supabase.from('agent_payment_orders').select('*').eq('order_code', code).maybeSingle());
   },
   async list(userId, page, limit) {
-    const response = await supabase.from('agent_payment_orders').select('*', { count: 'exact' }).eq('user_id', userId)
+    let response = await supabase.from('agent_payment_orders').select('*', { count: 'exact' }).eq('user_id', userId)
       .eq('audience', 'AGENT').order('created_at', { ascending: false }).order('id').range((page - 1) * limit, page * limit - 1);
+    if (response.error && (response.error.code === '42703' || response.error.message?.includes('audience'))) {
+      response = await supabase.from('agent_payment_orders').select('*', { count: 'exact' }).eq('user_id', userId)
+        .neq('plan_code', 'USER_PLUS').order('created_at', { ascending: false }).order('id').range((page - 1) * limit, page * limit - 1);
+      if (response.error && (response.error.code === '42703' || response.error.message?.includes('plan_code'))) {
+        response = await supabase.from('agent_payment_orders').select('*', { count: 'exact' }).eq('user_id', userId)
+          .order('created_at', { ascending: false }).order('id').range((page - 1) * limit, page * limit - 1);
+      }
+    }
+    if (response.error && ['PGRST205', '42P01'].includes(response.error.code)) {
+      return { items: [], total: 0, page, limit };
+    }
     return { items: result(response), total: response.count, page, limit };
   },
   reserve: (userId, planCode, requestId, version) => rpc('reserve_agent_payment', {

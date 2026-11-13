@@ -40,8 +40,13 @@ const sendMessage = async (senderId, receiverId, propertyId, message, rawAttachm
     return { url: attachment.url, name: text(attachment.name, 'attachment name', 255) };
   });
   if (senderId === receiverId) throw badRequest('Bạn không thể tự gửi tin nhắn cho chính mình');
-  const { data: receiver, error: receiverError } = await supabase.from('users')
+  let { data: receiver, error: receiverError } = await supabase.from('users')
     .select('id, role, is_active, is_official').eq('id', receiverId).maybeSingle();
+  if (receiverError && (receiverError.code === '42703' || receiverError.message?.includes('is_official'))) {
+    ({ data: receiver, error: receiverError } = await supabase.from('users')
+      .select('id, role, is_active').eq('id', receiverId).maybeSingle());
+    if (receiver) receiver.is_official = false;
+  }
   if (receiverError) throw new Error(receiverError.message);
   if (!receiver || receiver.is_active !== true) {
     throw Object.assign(badRequest('Không tìm thấy người nhận đang hoạt động.'), { statusCode: 404 });
@@ -200,11 +205,25 @@ const getConversations = async (userId) => {
   // 3. Concurrently fetch partner profiles and only the active property headers
   const activePropertyIds = Array.from(new Set(Array.from(partnerPropertyIdMap.values()))).filter(Boolean);
 
-  const [partnersResult, propertiesResult, funnelsResult] = await Promise.all([
-    supabase
+  const fetchPartners = async () => {
+    let result = await supabase
       .from('users')
       .select('id, name, avatar, role, phone, verification_status, is_official')
-      .in('id', partnerIds),
+      .in('id', partnerIds);
+    if (result.error && (result.error.code === '42703' || result.error.message?.includes('is_official'))) {
+      result = await supabase
+        .from('users')
+        .select('id, name, avatar, role, phone, verification_status')
+        .in('id', partnerIds);
+      if (Array.isArray(result.data)) {
+        result.data.forEach((p) => { p.is_official = false; });
+      }
+    }
+    return result;
+  };
+
+  const [partnersResult, propertiesResult, funnelsResult] = await Promise.all([
+    fetchPartners(),
     activePropertyIds.length > 0
       ? supabase
           .from('properties')

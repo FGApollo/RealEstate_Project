@@ -1,5 +1,11 @@
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '.env') });
+
+if (process.env.LOCAL_DEV_DB === 'true' || process.env.SUPABASE_SECRET_KEY === 'sb_secret_dev_local') {
+  const { supabase } = require('./config/supabase');
+  const { attachLocalSupabase } = require('./dev/localSupabaseAdapter');
+  attachLocalSupabase(supabase).catch((err) => console.error('Failed to attach local dev database:', err));
+}
 const express = require('express');
 const cors = require('cors');
 const authRoutes = require('./routes/authRoutes');

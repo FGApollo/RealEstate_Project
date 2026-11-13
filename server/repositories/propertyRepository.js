@@ -4,6 +4,7 @@ const { matchesArea } = require('../services/adminAreas');
 
 
 const SEARCH_POOL_LIMIT = 1000;
+const MAX_CANDIDATE_SEARCH = 10000;
 
 // Tìm theo địa điểm dạng chữ (đã chuẩn hóa ở propertySearchFilters): khớp nguyên từ trên phường + quận + thành phố,
 // không phân biệt dấu. "quan 1" khớp "Quận 1" nhưng không khớp "Quận 10". Không so địa chỉ đường:
@@ -14,22 +15,64 @@ const matchesLocation = (property, location) => {
   return ` ${haystack} `.includes(` ${location} `);
 };
 
-// Lọc địa điểm và phân trang làm ở đây (không cần đổi hàm SQL): lấy tối đa 1000 tin đã xếp hạng rồi cắt trang.
+// Lọc địa điểm và phân trang làm ở đây: khi có bộ lọc client-side (location/province/ward/official),
+// lấy ứng viên theo từng đợt để không bỏ sót tin phù hợp đứng sau 1.000 ứng viên đầu tiên.
 // province / ward: đơn vị hành chính mới chọn từ dropdown, khớp cả tin ghi theo đơn vị cũ (services/adminAreas).
 const fetchPublicProperties = async ({ filters = {}, listingType = null, category = null, limit = 24, ids = null, offset = 0 } = {}) => {
   // official: chỉ tin của tài khoản chính thức Swipe Nest (nguồn hàng của Plus), lọc ở đây vì RPC không có bộ lọc này.
   const { location, province, ward, official, ...rpcFilters } = filters;
   const filterHere = Boolean(location || province || ward || official);
-  const rpcLimit = filterHere ? SEARCH_POOL_LIMIT : Math.min(SEARCH_POOL_LIMIT, offset + limit);
-  const { data, error } = await supabase.rpc('search_ranked_properties', {
-    p_filters: rpcFilters, p_listing_type: listingType, p_category: category === 'ALL' ? null : category,
-    p_limit: rpcLimit, p_ids: ids
-  });
-  if (error) throw new Error('Không thể tải danh sách bất động sản.');
-  const rows = (data || []).filter((property) => (!official || property.owner?.is_official === true)
+
+  const isMatch = (property) => (!official || property.owner?.is_official === true)
     && (!location || matchesLocation(property, location))
-    && (!(province || ward) || matchesArea(property, { province, ward })));
-  return rows.slice(offset, offset + limit);
+    && (!(province || ward) || matchesArea(property, { province, ward }));
+
+  if (!filterHere) {
+    const rpcLimit = Math.min(SEARCH_POOL_LIMIT, offset + limit);
+    const { data, error } = await supabase.rpc('search_ranked_properties', {
+      p_filters: rpcFilters, p_listing_type: listingType, p_category: category === 'ALL' ? null : category,
+      p_limit: rpcLimit, p_ids: ids
+    });
+    if (error) throw new Error('Không thể tải danh sách bất động sản.');
+    return (data || []).slice(offset, offset + limit);
+  }
+
+  let matchingRows = [];
+  let currentOffset = 0;
+
+  while (currentOffset < MAX_CANDIDATE_SEARCH) {
+    const rpcArgs = {
+      p_filters: rpcFilters,
+      p_listing_type: listingType,
+      p_category: category === 'ALL' ? null : category,
+      p_limit: SEARCH_POOL_LIMIT,
+      p_ids: ids
+    };
+    if (currentOffset > 0) {
+      rpcArgs.p_offset = currentOffset;
+    }
+
+    let { data, error } = await supabase.rpc('search_ranked_properties', rpcArgs);
+    if (error && currentOffset > 0 && ['PGRST202', '42883', '42725'].includes(error.code)) {
+      break;
+    }
+    if (error) throw new Error('Không thể tải danh sách bất động sản.');
+
+    const batch = data || [];
+    for (const property of batch) {
+      if (isMatch(property)) {
+        matchingRows.push(property);
+      }
+    }
+
+    if (matchingRows.length >= offset + limit || batch.length < SEARCH_POOL_LIMIT) {
+      break;
+    }
+
+    currentOffset += SEARCH_POOL_LIMIT;
+  }
+
+  return matchingRows.slice(offset, offset + limit);
 };
 const fetchRecommendationCandidates = (listingType, limit, filters = {}, category) => fetchPublicProperties({ listingType, limit, filters, category });
 const fetchPreferenceOptions = listingType => fetchPublicProperties({ listingType, limit: 1000 });
