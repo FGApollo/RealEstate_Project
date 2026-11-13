@@ -2,7 +2,7 @@
 // ghi theo tỉnh - quận/huyện - phường/xã trước sáp nhập, dựa trên bảng ánh xạ của provinces.open-api.vn
 // (server/data/vn-admin-legacy.json, có cho TP.HCM, Đà Nẵng, Hà Nội — nơi đang có tin đăng).
 const legacyData = require('../data/vn-admin-legacy.json');
-const { normalizeLocation } = require('./propertySearchFilters');
+const { normalizeLocation } = require('./locationText');
 
 const key = (value) => (value ? normalizeLocation(String(value)) : '');
 

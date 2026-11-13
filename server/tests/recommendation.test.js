@@ -7,7 +7,7 @@ const assert = require('node:assert/strict');
 const recommendationService = require('../services/recommendationService');
 const preferenceService = require('../services/preferenceService');
 const propertyRepository = require('../repositories/propertyRepository');
-const { locationKey, canonicalLocationKey, normalizeKey, propertyTypeKey } = require('../services/recommendationKeys');
+const { locationKey, locationLabel, canonicalLocationKey, normalizeKey, propertyTypeKey } = require('../services/recommendationKeys');
 const preferenceController = require('../controllers/preferenceController');
 const preferenceRoutes = require('../routes/preferenceRoutes');
 const { authenticate } = require('../middleware/authenticate');
@@ -61,6 +61,21 @@ test('recommendation keys normalize property, location and feature labels', () =
   assert.equal(locationKey({ city: 'TP. Hồ Chí Minh', district: 'TP. Thủ Đức' }), 'ho_chi_minh|thu_duc');
   assert.equal(locationKey({ city: 'Tỉnh Bình Dương', district: 'Thành phố Dĩ An' }), 'binh_duong|di_an');
   assert.equal(canonicalLocationKey('tp_ho_chi_minh|quan_1'), 'ho_chi_minh|quan_1');
+  // Hệ thống hành chính mới 2025 (2 cấp: Tỉnh/TP -> Phường/Xã) ghép đúng giữa tin mới và tin cũ đủ phường/quận.
+  assert.equal(locationKey({ city: 'Thành phố Hồ Chí Minh', district: '', ward: 'Phường Sài Gòn' }), 'ho_chi_minh|phuong_sai_gon');
+  assert.equal(locationKey({ city: 'TP. Hồ Chí Minh', district: 'Quận 1', ward: 'Phường Bến Nghé' }), 'ho_chi_minh|phuong_sai_gon');
+  assert.equal(locationLabel({ city: 'TP. Hồ Chí Minh', district: 'Quận 1', ward: 'Phường Bến Nghé' }), 'Phường Sài Gòn, Thành phố Hồ Chí Minh');
+});
+
+test('preference options merge 2025 ward listings and legacy listings into clean ward labels', async (t) => {
+  const originalFetch = propertyRepository.fetchPreferenceOptions;
+  t.after(() => { propertyRepository.fetchPreferenceOptions = originalFetch; });
+  propertyRepository.fetchPreferenceOptions = async () => [
+    matchingProperty(1, { city: 'Thành phố Hồ Chí Minh', district: '', ward: 'Phường Sài Gòn' }),
+    matchingProperty(2, { city: 'TP. Hồ Chí Minh', district: 'Quận 1', ward: 'Phường Bến Nghé' })
+  ];
+  const options = await preferenceService.getPreferenceOptions('RENT');
+  assert.deepEqual(options.locations, [{ key: 'ho_chi_minh|phuong_sai_gon', label: 'Phường Sài Gòn, Thành phố Hồ Chí Minh' }]);
 });
 
 test('a full preference match scores above an unrelated listing', () => {

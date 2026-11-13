@@ -68,3 +68,23 @@ export const sameWard = (a, b) => {
   const left = fold(stripWardUnit(a)); const right = fold(stripWardUnit(b));
   return Boolean(left) && left === right;
 };
+
+// Định dạng khu vực theo hệ thống hành chính mới 2025 (Phường/Xã, Tỉnh/TP; vẫn giữ district nếu là tin cũ chưa chuyển đổi).
+export const formatPropertyArea = (property) => {
+  if (!property) return '';
+  if (property.admin_area?.ward || property.admin_area?.province) {
+    return [property.admin_area.ward, property.admin_area.province].filter(Boolean).join(', ');
+  }
+  return [property.ward, property.district, property.city]
+    .map((part) => String(part || '').trim())
+    .filter(Boolean)
+    .join(', ');
+};
+
+export const formatPropertyAddressLine = (property, fallback = '') => {
+  if (!property) return fallback;
+  const parts = [property.address_detail, property.ward, property.district, property.city]
+    .map((part) => String(part || '').trim())
+    .filter(Boolean);
+  return parts.length ? parts.join(', ') : (property.address || formatPropertyArea(property) || fallback);
+};

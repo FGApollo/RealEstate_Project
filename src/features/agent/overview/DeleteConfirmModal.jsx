@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Trash2, X, AlertTriangle } from 'lucide-react';
+import { formatPropertyArea } from '../../location/adminAreas';
 import './DeleteConfirmModal.css';
 
 const DeleteConfirmModal = ({ property, onConfirm, onCancel }) => {
@@ -33,7 +34,7 @@ const DeleteConfirmModal = ({ property, onConfirm, onCancel }) => {
             />
             <div className="preview-info">
               <h4>{property.title}</h4>
-              <p className="preview-address">{property.address || `${property.district}, ${property.city}`}</p>
+              <p className="preview-address">{property.address || formatPropertyArea(property)}</p>
               <p className="preview-price">
                 {(property.price || 0).toLocaleString('vi-VN')} VND/tháng
               </p>

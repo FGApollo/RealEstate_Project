@@ -10,7 +10,7 @@ import PropertyStatusModal from './PropertyStatusModal';
 import './OverviewDashboard.css';
 
 import AreaSelect from '../../location/AreaSelect';
-import { sameProvince, sameWard } from '../../location/adminAreas';
+import { sameProvince, sameWard, formatPropertyArea } from '../../location/adminAreas';
 
 // ponytail: extract overview and listings tab components into a single dashboard component
 // Nhãn trạng thái cho từng tin (tin bị admin ẩn thì báo "Đang bị ẩn" dù trạng thái vẫn là đang bán).
@@ -524,7 +524,7 @@ const OverviewDashboard = ({
                   <h3 className="property-card-title">{listing.title}</h3>
                   <p className="property-card-address">
                     <MapPin size={12} />
-                    <span>{listing.district ? `${listing.district}, ${listing.city}` : (listing.address || 'Địa chỉ bất động sản')}</span>
+                    <span>{formatPropertyArea(listing) || listing.address || 'Địa chỉ bất động sản'}</span>
                   </p>
                   <div className="property-card-bottom">
                     <div className="property-card-price">

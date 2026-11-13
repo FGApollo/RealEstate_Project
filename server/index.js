@@ -24,7 +24,6 @@ const subscriptionRoutes = require('./routes/subscriptionRoutes');
 const appealRoutes = require('./routes/appealRoutes');
 const preferenceRoutes = require('./routes/preferenceRoutes');
 const recommendationRoutes = require('./routes/recommendationRoutes');
-const geocodeRoutes = require('./routes/geocodeRoutes');
 const { getJwtConfig, getCookieOptions } = require('./services/authSessionService');
 const { corsOptions } = require('./middleware/trustedOrigin');
 const { rateLimiters } = require('./middleware/rateLimiters');
@@ -98,7 +97,6 @@ app.use('/api/plus', require('./routes/plusRoutes'));
 app.use('/api/appeals', appealRoutes);
 app.use('/api/me', preferenceRoutes);
 app.use('/api/recommendations', recommendationRoutes);
-app.use('/api/geocode', geocodeRoutes);
 
 // Error handler middleware (must be registered after all routes)
 app.use(apiErrorHandler);

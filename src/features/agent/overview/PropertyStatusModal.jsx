@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, CheckCircle2, Home, Key, BadgeCheck, Loader2 } from 'lucide-react';
+import { formatPropertyArea } from '../../location/adminAreas';
 import './PropertyStatusModal.css';
 
 const STATUS_OPTIONS = [
@@ -76,7 +77,7 @@ const PropertyStatusModal = ({ property, onClose, onConfirm }) => {
           />
           <div className="status-preview-info">
             <h4>{property.title}</h4>
-            <p className="status-preview-address">{property.address || `${property.district}, ${property.city}`}</p>
+            <p className="status-preview-address">{property.address || formatPropertyArea(property)}</p>
             <p className="status-preview-price">
               {(property.price || 0).toLocaleString('vi-VN')} VND{property.listing_type === 'SALE' ? '' : '/tháng'}
             </p>

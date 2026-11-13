@@ -5,6 +5,7 @@ import { apiFetch } from '../../../auth/apiClient';
 import { startChatRealtime, startAdaptivePolling, mergeServerMessages } from '../../../services/chatRealtime';
 import ImageLoadingSkeleton from '../../../components/ImageLoadingSkeleton';
 import PropertyDetailModal from '../../../components/PropertyDetailModal';
+import { formatPropertyArea } from '../../location/adminAreas';
 import './AgentChat.css';
 
 const FUNNEL_STAGES = [
@@ -553,7 +554,7 @@ const AgentChat = ({ currentUser }) => {
                     <h5 style={{ margin: 0, fontSize: '13px', fontWeight: '700', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{activeConversation.property.title}</h5>
                   </div>
                   <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#64748b' }}>
-                    {(activeConversation.property.price || 0).toLocaleString('vi-VN')} VND • {activeConversation.property.district}, {activeConversation.property.city}
+                    {(activeConversation.property.price || 0).toLocaleString('vi-VN')} VND{formatPropertyArea(activeConversation.property) ? ` • ${formatPropertyArea(activeConversation.property)}` : ''}
                   </p>
                 </div>
               </div>

@@ -103,3 +103,29 @@ test('each listing (old or new address) resolves to the new unit it is found und
   // Tỉnh chưa có bảng ánh xạ: giữ nguyên tên đang ghi trong tin.
   assert.deepEqual(resolveNewArea({ city: 'Cần Thơ', ward: 'Ninh Kiều' }), { province: 'Cần Thơ', ward: 'Ninh Kiều' });
 });
+
+test('2025 Đặc khu normalization and geocoder removal checks', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const { matchesArea } = require('../services/adminAreas');
+
+  assert.equal(normalizeLocation('Đặc khu Côn Đảo'), 'con dao');
+  assert.equal(normalizeLocation('Đặc khu Phú Quốc'), 'phu quoc');
+
+  assert.equal(matchesArea(
+    { city: 'Thành phố Hồ Chí Minh', district: '', ward: 'Đặc khu Côn Đảo' },
+    { province: 'Thành phố Hồ Chí Minh', ward: 'Đặc khu Côn Đảo' }
+  ), true);
+  assert.equal(matchesArea(
+    { city: 'An Giang', district: '', ward: 'Phú Quốc' },
+    { province: 'Tỉnh An Giang', ward: 'Đặc khu Phú Quốc' }
+  ), true);
+
+  const serverRoot = path.resolve(__dirname, '..');
+  assert.equal(fs.existsSync(path.join(serverRoot, 'routes', 'geocodeRoutes.js')), false);
+  assert.equal(fs.existsSync(path.join(serverRoot, 'controllers', 'geocodeController.js')), false);
+  assert.equal(fs.existsSync(path.join(serverRoot, 'scripts', 'backfill-coordinates.cjs')), false);
+  const indexSource = fs.readFileSync(path.join(serverRoot, 'index.js'), 'utf8');
+  assert.equal(indexSource.includes('/api/geocode'), false);
+});
+

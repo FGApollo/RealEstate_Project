@@ -14,6 +14,7 @@ import { openPropertyChat } from '../auth/openPropertyChat';
 import PropertyLocationMap from './PropertyLocationMap';
 import ImageLoadingSkeleton from './ImageLoadingSkeleton';
 import { SwipeNestBadges, PlusUpsell } from '../features/plus/SwipeNestBadges';
+import { formatPropertyArea } from '../features/location/adminAreas';
 
 // Lý do báo cáo: mã phải khớp ràng buộc property_reports.reason trong database.
 const REPORT_REASONS = [
@@ -718,7 +719,7 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
                       <div style={{ padding: '12px' }}>
                         <h4 style={{ fontSize: '13px', fontWeight: '600', color: '#1e293b', margin: '0 0 4px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sim.title}</h4>
                         <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 8px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          <MapPin size={10} style={{ marginRight: '2px', verticalAlign: 'middle' }} /> {sim.district}, {sim.city}
+                          <MapPin size={10} style={{ marginRight: '2px', verticalAlign: 'middle' }} /> {formatPropertyArea(sim) || sim.address || 'Chưa cập nhật khu vực'}
                         </p>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span style={{ fontSize: '13px', fontWeight: '700', color: '#2563eb' }}>

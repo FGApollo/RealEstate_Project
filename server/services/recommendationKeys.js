@@ -1,3 +1,5 @@
+const { resolveNewArea } = require('./adminAreas');
+
 const PROPERTY_TYPES = [
   { key: 'CAN_HO', label: 'Căn hộ' },
   { key: 'CHUNG_CU', label: 'Chung cư' },
@@ -38,16 +40,41 @@ const canonicalPlace = (value) => normalizeKey(value).replace(ADMIN_PREFIX, '');
 
 // Chuẩn hóa cả khóa đã lưu từ trước (ví dụ "tp_ho_chi_minh|quan_1") để so khớp với khóa mới.
 const canonicalLocationKey = (key) => {
-  const [city, district] = String(key || '').split('|');
+  const [city, area] = String(key || '').split('|');
   const cityKey = canonicalPlace(city);
-  const districtKey = canonicalPlace(district);
-  return cityKey && districtKey ? `${cityKey}|${districtKey}` : '';
+  const areaKey = canonicalPlace(area);
+  return cityKey && areaKey ? `${cityKey}|${areaKey}` : '';
 };
 
-const locationKey = ({ city, district } = {}) => {
-  const cityKey = canonicalPlace(city);
-  const districtKey = canonicalPlace(district);
-  return cityKey && districtKey ? `${cityKey}|${districtKey}` : '';
+// Đơn vị hành chính mới (2025: Tỉnh/TP -> Phường/Xã).
+// Khi tin có phường/xã, quy về đơn vị mới qua resolveNewArea để ghép đúng cả tin cũ lẫn tin mới;
+// nếu chỉ có { city, district } (không có ward), giữ tương thích ngược với khóa theo quận/huyện.
+const resolveLocationParts = (property = {}) => {
+  const rawCity = String(property?.city || '').trim();
+  const rawDistrict = String(property?.district || '').trim();
+  const rawWard = String(property?.ward || '').trim();
+  if (!rawCity) return null;
+
+  if (rawWard) {
+    const resolved = resolveNewArea({ city: rawCity, district: rawDistrict, ward: rawWard });
+    if (resolved.ward) return { area: resolved.ward, province: resolved.province || rawCity };
+    return { area: rawDistrict || rawWard, province: rawCity };
+  }
+
+  return rawDistrict ? { area: rawDistrict, province: rawCity } : null;
+};
+
+const locationKey = (property = {}) => {
+  const parts = resolveLocationParts(property);
+  if (!parts) return '';
+  const cityKey = canonicalPlace(parts.province);
+  const areaKey = canonicalPlace(parts.area);
+  return cityKey && areaKey ? `${cityKey}|${areaKey}` : '';
+};
+
+const locationLabel = (property = {}) => {
+  const parts = resolveLocationParts(property);
+  return parts ? `${parts.area}, ${parts.province}` : '';
 };
 
 const propertyFeatureKeys = (property) => [
@@ -55,4 +82,12 @@ const propertyFeatureKeys = (property) => [
   ...(property?.lifestyle_tags || []).map((tag) => typeof tag === 'string' ? tag : tag?.tag_name)
 ].map(normalizeKey).filter(Boolean);
 
-module.exports = { PROPERTY_TYPES, normalizeKey, propertyTypeKey, locationKey, canonicalLocationKey, propertyFeatureKeys };
+module.exports = {
+  PROPERTY_TYPES,
+  normalizeKey,
+  propertyTypeKey,
+  locationKey,
+  locationLabel,
+  canonicalLocationKey,
+  propertyFeatureKeys
+};

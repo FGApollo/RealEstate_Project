@@ -12,6 +12,7 @@ import { startChatRealtime, startAdaptivePolling, mergeServerMessages } from '..
 import PropertyDetailModal from '../components/PropertyDetailModal';
 import SwipeHeader from '../features/swipe/SwipeHeader';
 import ImageLoadingSkeleton from '../components/ImageLoadingSkeleton';
+import { formatPropertyArea } from '../features/location/adminAreas';
 import './Chat.css';
 
 // Dấu bên cạnh tên người chat: tài khoản Swipe Nest có nhãn riêng; người đã xác thực danh tính có icon tích xanh.
@@ -488,6 +489,7 @@ const Chat = () => {
     const q = propertySearchQuery.toLowerCase();
     return (
       (p.title && p.title.toLowerCase().includes(q)) ||
+      (p.ward && p.ward.toLowerCase().includes(q)) ||
       (p.district && p.district.toLowerCase().includes(q)) ||
       (p.city && p.city.toLowerCase().includes(q))
     );
@@ -863,7 +865,7 @@ const Chat = () => {
                     <p className="ribbon-price-address">
                       <span className="price">{formatPrice(activeProperty.price)}/tháng</span>
                       <span className="dot">•</span>
-                      <span className="address"><MapPin size={12} /> {activeProperty.district}, {activeProperty.city}</span>
+                      <span className="address"><MapPin size={12} /> {formatPropertyArea(activeProperty) || activeProperty.address || 'Chưa rõ khu vực'}</span>
                     </p>
                   </div>
                   <div className="ribbon-actions">
@@ -1041,7 +1043,7 @@ const Chat = () => {
                         <h4>{p.title}</h4>
                         <p className="property-modal-price">{formatPrice(p.price)}/tháng • {p.area || 0} m²</p>
                         <p className="property-modal-addr">
-                          <MapPin size={11} /> {p.district}, {p.city}
+                          <MapPin size={11} /> {formatPropertyArea(p) || p.address || 'Chưa rõ khu vực'}
                         </p>
                       </div>
                       <div className="property-modal-actions">

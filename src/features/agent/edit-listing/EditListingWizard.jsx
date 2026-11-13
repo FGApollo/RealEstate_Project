@@ -7,7 +7,8 @@ import {
 } from 'lucide-react';
 import '../create-listing/CreateListingWizard.css'; // Reuse CSS from create-listing
 import useListingForm from '../create-listing/useListingForm';
-import AreaSelect from '../../location/AreaSelect';
+import ListingLocationCard from '../create-listing/ListingLocationCard';
+import { formatPropertyAddressLine } from '../../location/adminAreas';
 
 const propertyTypesList = ['Căn Hộ', 'Chung Cư', 'Nhà Ở', 'Mặt Bằng', 'Văn Phòng', 'Phòng Trọ'];
 const lifestyleTagsList = ['Gần trường học', 'Gần đại học', 'Gần trung tâm', 'Gần phòng gym', 'Khu yên tĩnh', 'Khu an ninh', 'Gần trạm xe buýt', 'Khu nhiều tiện ích'];
@@ -32,7 +33,7 @@ const EditListingWizard = ({ propertyId, setActiveTab, setData, currentUser }) =
     listing, setListing,
     currentStep, setCurrentStep,
     submittedProperty,
-    handleAutoLocation, handleSearchAddressOnMap, geocodeAddress,
+    handleClearMapPin, handleNextStep,
     handleImageFileChange, handleDragOver, handleDrop,
     toggleSelectImage, setFeaturedImage, deleteSelectedImages,
     toggleAmenity, toggleLifestyleTag, toggleChannel,
@@ -186,46 +187,7 @@ const EditListingWizard = ({ propertyId, setActiveTab, setData, currentUser }) =
               )}
             </div>
 
-            <div className="form-card">
-              <div className="card-title-header">
-                <h2 className="card-title">Địa chỉ</h2>
-                <button type="button" className="text-action-btn" onClick={handleAutoLocation}>Tự động lấy vị trí</button>
-              </div>
-              <div className="input-group">
-                <label>Tỉnh / Thành phố · Phường / Xã <small>(đơn vị hành chính mới, từ 1/7/2025)</small></label>
-                <AreaSelect
-                  required
-                  allLabel="Chọn"
-                  province={listing.city}
-                  ward={listing.ward}
-                  onChange={({ province, ward }) => {
-                    setListing(prev => ({ ...prev, city: province, ward, district: '' }));
-                    if (province && ward) {
-                      geocodeAddress({ address_detail: listing.address_detail, ward, district: '', city: province }).then(res => {
-                        if (res) setListing(prev => ({ ...prev, latitude: res.lat, longitude: res.lon, address: res.display_name || prev.address }));
-                      });
-                    }
-                  }}
-                />
-                {listing.district && (
-                  <small className="legacy-area-note">Tin này đang ghi theo địa chỉ cũ ({listing.district}). Hãy chọn lại phường/xã mới.</small>
-                )}
-              </div>
-              <div className="input-group">
-                <label>Số nhà, tên đường</label>
-                <div className="map-search-row">
-                  <input type="text" placeholder="Nhập số nhà, tên đường" value={listing.address_detail} onChange={(e) => setListing(prev => ({ ...prev, address_detail: e.target.value }))} />
-                  <button type="button" className="map-search-btn" onClick={handleSearchAddressOnMap}>Tìm trên bản đồ</button>
-                </div>
-              </div>
-              <div className="map-container-wrapper">
-                <div id="listing-map"></div>
-                <div className="map-coordinates-badge">
-                  <MapPin size={14} />
-                  <span>Toạ độ: {listing.latitude ? `${parseFloat(listing.latitude).toFixed(5)}, ${parseFloat(listing.longitude).toFixed(5)}` : 'Chưa chọn'}</span>
-                </div>
-              </div>
-            </div>
+            <ListingLocationCard listing={listing} setListing={setListing} onClearMapPin={handleClearMapPin} />
           </div>
 
           <div className="form-column">
@@ -354,7 +316,7 @@ const EditListingWizard = ({ propertyId, setActiveTab, setData, currentUser }) =
                 <span className="verified-overlay-badge">ĐÃ XÁC THỰC</span>
                 <div className="preview-bottom-gradient">
                   <h3>{listing.title || 'Tiêu đề tin đăng của bạn'}</h3>
-                  <p className="preview-address"><MapPin size={12} /><span>{listing.address_detail ? `${listing.address_detail}, ${listing.ward}, ${listing.district}` : 'Địa chỉ bất động sản'}</span></p>
+                  <p className="preview-address"><MapPin size={12} /><span>{listing.address_detail || listing.ward || listing.city ? formatPropertyAddressLine(listing, 'Địa chỉ bất động sản') : 'Địa chỉ bất động sản'}</span></p>
                   <div className="preview-specs-chips">
                     <div className="chip"><Bed size={12} /><span>{listing.bedrooms || 0} Giường</span></div>
                     <div className="chip"><Bath size={12} /><span>{listing.bathrooms || 0} Tắm</span></div>
@@ -390,7 +352,7 @@ const EditListingWizard = ({ propertyId, setActiveTab, setData, currentUser }) =
               <img src={submittedProperty?.thumbnail || '/listing-placeholder.svg'} alt="Listing" />
               <div className="listing-info">
                 <h3>{submittedProperty?.title}</h3>
-                <p className="card-address"><MapPin size={14} /><span>{submittedProperty?.address || submittedProperty?.district}</span></p>
+                <p className="card-address"><MapPin size={14} /><span>{submittedProperty?.address || formatPropertyAddressLine(submittedProperty)}</span></p>
                 <p className="price">{(submittedProperty?.price || 0).toLocaleString('vi-VN')} VND</p>
               </div>
             </div>
@@ -427,7 +389,7 @@ const EditListingWizard = ({ propertyId, setActiveTab, setData, currentUser }) =
             <button 
               type="button" 
               className="nav-primary-btn" 
-              onClick={() => setCurrentStep(prev => prev + 1)}
+              onClick={handleNextStep}
               disabled={currentStep === 2 && listing.images.length === 0}
             >
               <span>Tiếp theo</span><ArrowRight size={16} />

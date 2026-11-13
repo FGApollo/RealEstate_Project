@@ -92,7 +92,7 @@ const fetchRecentEvents = async (userId, since, limit) => {
 const fetchEventProperties = async (propertyIds) => {
   if (!propertyIds.length) return [];
   const { data, error } = await supabase.from('properties')
-    .select('id, property_type, city, district, property_features(feature_name), lifestyle_tags(tag_name)')
+    .select('id, property_type, city, district, ward, property_features(feature_name), lifestyle_tags(tag_name)')
     .in('id', propertyIds);
   if (error) throw new Error(error.message);
   return data || [];

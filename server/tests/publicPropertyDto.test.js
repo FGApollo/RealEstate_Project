@@ -50,9 +50,17 @@ test('public property DTO exposes browsing fields and strips owner contact/inter
     const hidden = toPublicProperty({ owner: { name: 'A', role: 'AGENT', verification_status: status } });
     assert.equal(Object.hasOwn(hidden.owner, 'verification_status'), false);
   }
-  for (const field of ['owner_id', 'contact_phone', 'address_detail', 'latitude', 'longitude', 'is_hidden']) {
+  assert.equal(result.latitude, 10.7);
+  assert.equal(result.longitude, 106.7);
+  for (const field of ['owner_id', 'contact_phone', 'address_detail', 'is_hidden']) {
     assert.equal(Object.hasOwn(result, field), false, `${field} must not be returned publicly`);
   }
+  const unpinned = toPublicProperty({ id: 13, city: 'Hồ Chí Minh', ward: 'Phường Sài Gòn', latitude: null, longitude: null });
+  assert.equal(unpinned.latitude, null);
+  assert.equal(unpinned.longitude, null);
+  const zeroCoords = toPublicProperty({ id: 14, city: 'Hồ Chí Minh', ward: 'Phường Sài Gòn', latitude: 0, longitude: 0 });
+  assert.equal(zeroCoords.latitude, null);
+  assert.equal(zeroCoords.longitude, null);
   assert.deepEqual(result.property_images, [{ image_url: '/home.jpg' }]);
 });
 
@@ -82,4 +90,15 @@ test('public property list controller applies the safe DTO to service rows', asy
   assert.equal(Object.hasOwn(response.body.properties[0], 'contact_phone'), false);
   assert.equal(Object.hasOwn(response.body.properties[0], 'owner_id'), false);
   assert.deepEqual(response.body.properties[0].owner, { name: 'Agent', role: undefined, avatar: undefined });
+});
+
+test('public property DTO formats 2025 two-tier addresses cleanly when district is empty', () => {
+  const result = toPublicProperty({
+    id: 33,
+    city: 'Thành phố Hồ Chí Minh',
+    district: '',
+    ward: 'Phường Thủ Đức'
+  });
+  assert.equal(result.address, 'Phường Thủ Đức, Thành phố Hồ Chí Minh');
+  assert.equal(result.public_location, 'Phường Thủ Đức, Thành phố Hồ Chí Minh');
 });

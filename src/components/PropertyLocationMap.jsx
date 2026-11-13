@@ -1,10 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { MapPin, Navigation, ExternalLink, AlertCircle } from 'lucide-react';
 import './PropertyLocationMap.css';
-import { API_BASE_URL } from '../config';
-import { publicApiFetch } from '../auth/apiClient';
-
-const DEFAULT_CENTER = { lat: 10.7769, lng: 106.7009 }; // TP. Hồ Chí Minh
+import { parsePinnedCoords, useLeafletCdn } from '../features/location/leaflet';
 
 const PropertyLocationMap = ({ property }) => {
   const mapContainerRef = useRef(null);
@@ -12,84 +9,23 @@ const PropertyLocationMap = ({ property }) => {
   const markerRef = useRef(null);
   const circleRef = useRef(null);
 
-  const [mapLoaded, setMapLoaded] = useState(false);
-  const [mapLoadError, setMapLoadError] = useState(false);
-  const [coords, setCoords] = useState(null);
-  const [isGeocoding, setIsGeocoding] = useState(false);
+  const coords = useMemo(
+    () => (property ? parsePinnedCoords(property.latitude, property.longitude) : null),
+    [property]
+  );
 
-  // Load Leaflet once from CDN with error handling
+  // Chỉ tải Leaflet khi tin đã được chấm tọa độ ghim.
+  const { mapLoaded, mapLoadError } = useLeafletCdn(Boolean(coords));
+
+  const propertyThumbnail = property?.thumbnail;
+  const propertyTitle = property?.title;
+  const propertyAddress = property?.address;
+  const propertyPrice = property?.price;
+  const propertyListingType = property?.listing_type;
+
+  // Setup Leaflet map when pinned coords exist and Leaflet is ready
   useEffect(() => {
-    if (window.L) {
-      setMapLoaded(true);
-      return;
-    }
-
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-    document.head.appendChild(link);
-
-    const script = document.createElement('script');
-    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-    script.async = true;
-    script.onload = () => {
-      setMapLoaded(true);
-      setMapLoadError(false);
-    };
-    script.onerror = () => {
-      console.error('Failed to load Leaflet CDN');
-      setMapLoadError(true);
-    };
-    document.body.appendChild(script);
-  }, []);
-
-  // Determine coordinates: from property or geocoding
-  useEffect(() => {
-    if (!property) return;
-
-    const propLat = parseFloat(property.latitude);
-    const propLng = parseFloat(property.longitude);
-
-    if (!isNaN(propLat) && !isNaN(propLng) && propLat !== 0 && propLng !== 0) {
-      setCoords({ lat: propLat, lng: propLng, isExact: true });
-      return;
-    }
-
-    // Tin chưa có tọa độ: tra vị trí GẦN ĐÚNG theo khu vực, từ chi tiết tới tổng quát (phường -> quận -> tỉnh).
-    // Không bao giờ cắm ghim như vị trí thật; không tra được thì báo "chưa có vị trí" thay vì đặt ghim giữa TP.HCM.
-    const queries = [
-      [property.ward, property.district, property.city],
-      [property.district, property.city],
-      [property.city]
-    ].map((parts) => parts.filter(Boolean).join(', ')).filter((query, index, list) => query && list.indexOf(query) === index);
-    if (!queries.length && property.address) queries.push(property.address);
-    if (!queries.length) {
-      setCoords({ ...DEFAULT_CENTER, isExact: false, isDefault: true });
-      return;
-    }
-    let cancelled = false;
-    setIsGeocoding(true);
-    (async () => {
-      for (const [level, query] of queries.entries()) {
-        try {
-          const res = await publicApiFetch(`${API_BASE_URL}/api/geocode/search?q=${encodeURIComponent(query)}&limit=1`);
-          const data = await res.json();
-          if (cancelled) return;
-          if (Array.isArray(data) && data.length > 0) {
-            // level 0 = phường, 1 = quận/huyện, 2 = tỉnh: càng tổng quát vòng khu vực càng lớn.
-            setCoords({ lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon), isExact: false, approxRadius: [1200, 3000, 12000][level] || 3000 });
-            return;
-          }
-        } catch { /* thử mức tổng quát hơn */ }
-      }
-      if (!cancelled) setCoords({ ...DEFAULT_CENTER, isExact: false, isDefault: true });
-    })().finally(() => { if (!cancelled) setIsGeocoding(false); });
-    return () => { cancelled = true; };
-  }, [property?.id, property?.latitude, property?.longitude, property?.address]);
-
-  // Setup Leaflet map when ready
-  useEffect(() => {
-    if (!mapLoaded || !window.L || !coords || coords.isDefault || !mapContainerRef.current) return;
+    if (!mapLoaded || !window.L || !coords || !mapContainerRef.current) return;
 
     const L = window.L;
     const { lat, lng } = coords;
@@ -129,11 +65,9 @@ const PropertyLocationMap = ({ property }) => {
       popupAnchor: [0, -36]
     });
 
-    // Chỉ cắm ghim khi tin có tọa độ thật; vị trí tra theo khu vực chỉ khoanh vùng.
-    const marker = coords.isExact ? L.marker([lat, lng], { icon: customIcon }).addTo(map) : null;
+    const marker = L.marker([lat, lng], { icon: customIcon }).addTo(map);
 
     // Popup dựng bằng phần tử DOM + textContent: tiêu đề / địa chỉ do môi giới nhập không bao giờ được hiểu là HTML
-    // (trước đây chèn chuỗi vào innerHTML, tiêu đề chứa thẻ <img onerror> sẽ chạy mã trên trình duyệt người xem).
     const element = (tag, className, text) => {
       const node = document.createElement(tag);
       if (className) node.className = className;
@@ -141,42 +75,37 @@ const PropertyLocationMap = ({ property }) => {
       return node;
     };
     const popupContent = element('div', 'map-popup-card');
-    if (property.thumbnail) {
+    if (propertyThumbnail) {
       const thumb = element('img', 'popup-thumb');
-      thumb.src = property.thumbnail;
-      thumb.alt = property.title || 'BĐS';
+      thumb.src = propertyThumbnail;
+      thumb.alt = propertyTitle || 'BĐS';
       popupContent.appendChild(thumb);
     }
     const info = element('div', 'popup-info');
-    const price = Number(property.price);
+    const price = Number(propertyPrice);
     info.append(
-      element('h4', 'popup-title', property.title || 'Vị trí bất động sản'),
-      element('p', 'popup-address', property.address || ''),
+      element('h4', 'popup-title', propertyTitle || 'Vị trí bất động sản'),
+      element('p', 'popup-address', propertyAddress || ''),
       element('p', 'popup-price', price > 0
-        ? `${price.toLocaleString('vi-VN')} VNĐ${property.listing_type === 'SALE' ? '' : '/tháng'}`
+        ? `${price.toLocaleString('vi-VN')} VNĐ${propertyListingType === 'SALE' ? '' : '/tháng'}`
         : 'Liên hệ')
     );
     popupContent.appendChild(info);
-    if (marker) marker.bindPopup(popupContent, { maxWidth: 260 }).openPopup();
+    marker.bindPopup(popupContent, { maxWidth: 260 }).openPopup();
 
-    // Tọa độ thật: vòng 500m đi bộ quanh căn. Vị trí gần đúng: vòng khu vực (nét đứt), phóng vừa khu vực.
+    // Vòng 500m đi bộ xung quanh vị trí ghim của căn.
     const circle = L.circle([lat, lng], {
-      color: coords.isExact ? '#3b82f6' : '#d97706',
-      fillColor: coords.isExact ? '#60a5fa' : '#fbbf24',
-      fillOpacity: coords.isExact ? 0.12 : 0.1,
+      color: '#3b82f6',
+      fillColor: '#60a5fa',
+      fillOpacity: 0.12,
       weight: 1.5,
-      dashArray: coords.isExact ? null : '6 6',
-      radius: coords.isExact ? 500 : coords.approxRadius || 1500
+      radius: 500
     }).addTo(map);
-    if (!coords.isExact) map.fitBounds(circle.getBounds(), { padding: [12, 12] });
 
     mapInstanceRef.current = map;
     markerRef.current = marker;
     circleRef.current = circle;
 
-    // Trigger resize after small delay to fix container sizing in modal.
-    // The timer must be cleared on unmount: closing the modal within 250ms would otherwise
-    // call invalidateSize on a removed map (Leaflet throws "_leaflet_pos" of undefined).
     const resizeTimer = setTimeout(() => {
       if (mapInstanceRef.current === map) map.invalidateSize({ pan: false });
     }, 250);
@@ -184,19 +113,19 @@ const PropertyLocationMap = ({ property }) => {
     return () => {
       clearTimeout(resizeTimer);
       if (mapInstanceRef.current) {
-        // Stop pending pan/zoom animations (popup autoPan) before tearing the map down.
         mapInstanceRef.current.stop();
         mapInstanceRef.current.off();
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
       }
     };
-  }, [mapLoaded, coords]);
+  }, [mapLoaded, coords, propertyThumbnail, propertyTitle, propertyAddress, propertyPrice, propertyListingType]);
+
+  // Ẩn hoàn toàn phần bản đồ khi tin chưa có tọa độ ghim.
+  if (!coords) return null;
 
   const openGoogleMaps = () => {
-    // Không có tọa độ thật thì tìm theo địa chỉ khu vực, tránh chỉ đường tới một điểm đoán.
-    const query = coords?.isExact ? `${coords.lat},${coords.lng}` : (property?.address || '');
-    if (!query) return;
+    const query = `${coords.lat},${coords.lng}`;
     const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
     window.open(url, '_blank', 'noopener,noreferrer');
   };
@@ -216,7 +145,7 @@ const PropertyLocationMap = ({ property }) => {
           </div>
         </div>
 
-        <button 
+        <button
           className="google-maps-btn"
           onClick={openGoogleMaps}
           title="Mở trên Google Maps"
@@ -233,15 +162,15 @@ const PropertyLocationMap = ({ property }) => {
           <div className="map-loading-overlay" style={{ backgroundColor: '#fef2f2', color: '#991b1b' }}>
             <AlertCircle size={24} color="#dc2626" />
             <span>Không thể kết nối dịch vụ bản đồ vệ tinh. Bạn có thể mở trực tiếp trên Google Maps.</span>
-            <button 
-              className="google-maps-btn" 
-              style={{ marginTop: '8px' }} 
+            <button
+              className="google-maps-btn"
+              style={{ marginTop: '8px' }}
               onClick={openGoogleMaps}
             >
               Mở vị trí trên Google Maps
             </button>
           </div>
-        ) : (!mapLoaded || isGeocoding) ? (
+        ) : !mapLoaded ? (
           <div className="map-loading-overlay">
             <div className="map-spinner"></div>
             <span>Đang tải bản đồ tương tác...</span>
@@ -249,30 +178,16 @@ const PropertyLocationMap = ({ property }) => {
         ) : null}
 
         <div ref={mapContainerRef} className="map-leaflet-box" />
-
-        {coords?.isDefault && !isGeocoding && (
-          <div className="map-loading-overlay">
-            <MapPin size={22} />
-            <span>Người đăng chưa ghim vị trí và chưa xác định được khu vực trên bản đồ.</span>
-          </div>
-        )}
-        {coords && !coords.isExact && !coords.isDefault && (
-          <div className="map-approx-notice">
-            <MapPin size={12} />
-            <span>Vị trí gần đúng theo khu vực — người đăng chưa ghim vị trí chính xác</span>
-          </div>
-        )}
       </div>
 
       <div className="location-footer-note">
-        <span>{coords?.isExact
-          ? 'Bán kính vòng tròn màu xanh biểu thị phạm vi đi bộ 500m xung quanh bất động sản.'
-          : 'Vùng nét đứt là khu vực của tin đăng, không phải vị trí chính xác của căn.'}</span>
+        <span>Bán kính vòng tròn màu xanh biểu thị phạm vi đi bộ 500m xung quanh bất động sản.</span>
       </div>
     </div>
   );
 };
 
 export default PropertyLocationMap;
+
 
 

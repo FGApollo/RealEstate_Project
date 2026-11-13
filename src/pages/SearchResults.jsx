@@ -16,6 +16,14 @@ import './SearchResults.css';
 const PAGE_SIZE = 24;
 const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=600&q=80';
 
+const draftFromSearch = (search) => ({
+  province: search.province,
+  ward: search.ward,
+  type: search.types.length === 1 ? search.types[0] : (search.types.length > 1 ? 'CUSTOM' : 'ALL'),
+  price: priceRangeOf(search),
+  listing: search.listing
+});
+
 // Trang kết quả tìm kiếm: thanh tìm kiếm luôn ở trên để tìm tiếp; bấm một tin để mở chi tiết, đóng chi tiết vẫn ở đây.
 const SearchResults = () => {
   const location = useLocation();
@@ -24,11 +32,11 @@ const SearchResults = () => {
   const isCustomer = String(user?.role || '').toUpperCase() === 'USER';
   const search = useMemo(() => readSearch(new URLSearchParams(location.search)), [location.search]);
 
-  // Bản nháp của thanh tìm kiếm; chỉ áp dụng khi bấm Tìm / Enter.
-  const [draft, setDraft] = useState(() => ({
-    province: search.province, ward: search.ward, type: search.types.length === 1 ? search.types[0] : 'ALL',
-    price: priceRangeOf(search), listing: search.listing
-  }));
+  // Bản nháp của thanh tìm kiếm; chỉ áp dụng khi bấm Tìm / Enter, đồng bộ lại nếu URL đổi (chip, Back/Forward, reset).
+  const [draft, setDraft] = useState(() => draftFromSearch(search));
+  useEffect(() => {
+    setDraft(draftFromSearch(search));
+  }, [search]);
   const [result, setResult] = useState({ key: null, items: [], hasMore: false, error: '' });
   const [loadingMore, setLoadingMore] = useState(false);
   const [selected, setSelected] = useState(null);

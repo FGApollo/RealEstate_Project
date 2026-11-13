@@ -24,4 +24,4 @@ Production: chỉ chủ dự án chạy. Coding agent không được ghi vào p
 ## Ghi chú lịch sử
 
 - `005b-…` và `010b-…` trước đây trùng số với `005-…` và `010-…`.
-- `011-DEPLOYMENT.md` mô tả cách triển khai nhóm migration bảo mật 011–013.
+- [docs/archive/011-DEPLOYMENT.md](../../docs/archive/011-DEPLOYMENT.md) mô tả cách triển khai nhóm migration bảo mật 011–013 (lịch sử).

@@ -17,6 +17,12 @@ const mapTag = (tag) => typeof tag === 'string'
   ? { tag_name: tag }
   : (tag?.tag_name ? { tag_name: tag.tag_name } : null);
 
+const toFiniteCoord = (value) => {
+  if (value === null || value === undefined || value === '') return null;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+};
+
 const toPublicProperty = (property = {}) => {
   const publicLocation = [property.ward, property.district, property.city]
     .map((part) => String(part || '').trim())
@@ -25,6 +31,10 @@ const toPublicProperty = (property = {}) => {
   const propertyImages = (property.property_images || property.images || []).map(mapImage).filter(Boolean);
   const propertyFeatures = (property.property_features || property.features || []).map(mapFeature).filter(Boolean);
   const lifestyleTags = (property.lifestyle_tags || []).map(mapTag).filter(Boolean);
+  const lat = toFiniteCoord(property.latitude);
+  const lng = toFiniteCoord(property.longitude);
+  const hasPinnedCoords = lat !== null && lng !== null && lat !== 0 && lng !== 0
+    && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
 
   return {
     id: property.id,
@@ -42,6 +52,8 @@ const toPublicProperty = (property = {}) => {
     ward: property.ward,
     public_location: publicLocation,
     address: publicLocation,
+    latitude: hasPinnedCoords ? lat : null,
+    longitude: hasPinnedCoords ? lng : null,
     floor_range: property.floor_range,
     thumbnail: property.thumbnail || propertyImages[0]?.image_url || null,
     images: propertyImages.map((image) => image.image_url),

@@ -5,6 +5,7 @@ const {
   normalizeKey,
   propertyTypeKey,
   locationKey,
+  locationLabel,
   canonicalLocationKey
 } = require('./recommendationKeys');
 
@@ -90,7 +91,7 @@ const getPreferenceOptions = async (listingType) => {
     const key = locationKey(property);
     if (key) {
       locationCounts.set(key, (locationCounts.get(key) || 0) + 1);
-      locationLabels.set(key, `${property.district}, ${property.city}`);
+      locationLabels.set(key, locationLabel(property));
     }
     [
       ...(property.property_features || []).map((row) => row.feature_name),

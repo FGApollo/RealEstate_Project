@@ -2,9 +2,54 @@ import { useState, useEffect, useRef } from 'react';
 import { API_BASE_URL } from '../../../config';
 import { apiFetch } from '../../../auth/apiClient';
 import { loadAdminAreas, findProvince, findWard } from '../../location/adminAreas';
+import { DEFAULT_MAP_VIEWPORT, parsePinnedCoords, useLeafletCdn } from '../../location/leaflet';
 
 const MAX_LISTING_IMAGES = 6;
 const MAX_LISTING_IMAGE_BYTES = 5 * 1024 * 1024;
+const LEAFLET_IMAGES = 'https://unpkg.com/leaflet@1.9.4/dist/images/';
+
+const createMapPinIcon = (L) => L.icon({
+  iconUrl: `${LEAFLET_IMAGES}marker-icon.png`,
+  iconRetinaUrl: `${LEAFLET_IMAGES}marker-icon-2x.png`,
+  shadowUrl: `${LEAFLET_IMAGES}marker-shadow.png`,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
+
+const buildListingPayload = (listing) => {
+  const pinned = parsePinnedCoords(listing.latitude, listing.longitude);
+  const ward = (listing.ward || '').trim();
+  const city = (listing.city || '').trim();
+  const address_detail = (listing.address_detail || '').trim();
+  return {
+    title: listing.title,
+    description: listing.description,
+    price: parseFloat(listing.price) || 0,
+    listing_type: listing.listing_type,
+    area: parseFloat(listing.area) || 0,
+    bedrooms: parseInt(listing.bedrooms) || 0,
+    bathrooms: parseInt(listing.bathrooms) || 0,
+    property_type: listing.property_type,
+    status: listing.status,
+    is_public: listing.is_public,
+    city,
+    district: '',
+    ward,
+    floor_range: listing.floor_range || '',
+    address_detail,
+    address: [address_detail, ward, city].filter(Boolean).join(', '),
+    thumbnail: listing.thumbnail || (listing.images.find(img => img.isFeatured)?.url || '/listing-placeholder.svg'),
+    virtual_tour_url: listing.virtual_tour_url || null,
+    contact_phone: listing.contact_phone,
+    latitude: pinned ? pinned.lat : null,
+    longitude: pinned ? pinned.lng : null,
+    features: listing.features,
+    images: listing.images.map(img => img.url),
+    lifestyle_tags: listing.lifestyle_tags
+  };
+};
 
 const DEFAULT_LISTING = (currentUser) => ({
   title: '',
@@ -44,63 +89,13 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
   const [isSaving, setIsSaving] = useState(false);
 
   // Map
-  const [mapLoaded, setMapLoaded] = useState(false);
+  const { mapLoaded } = useLeafletCdn(currentStep === 1);
   const mapRef = useRef(null);
   const markerRef = useRef(null);
-
-  // Load Leaflet from CDN once
+  const defaultPhoneRef = useRef(currentUser?.phone || '');
   useEffect(() => {
-    if (window.L) { setMapLoaded(true); return; }
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-    document.head.appendChild(link);
-    const script = document.createElement('script');
-    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-    script.async = true;
-    script.onload = () => setMapLoaded(true);
-    document.body.appendChild(script);
-  }, []);
-
-  // Hierarchical geocoder to resolve Vietnamese addresses reliably with fallback
-  const geocodeAddressHierarchical = async ({ address_detail, ward, district, city }) => {
-    const cleanDetail = (address_detail || '').trim();
-    const cleanWard = (ward || '').trim();
-    const cleanDistrict = (district || '').trim();
-    const cleanCity = (city || '').trim();
-
-    // Đơn vị hành chính mới không còn cấp quận/huyện: chỉ ghép những phần có giá trị (tin cũ vẫn có quận).
-    const area = [cleanWard, cleanDistrict, cleanCity].filter(Boolean);
-    const queries = [];
-    if (cleanDetail && cleanWard && cleanCity) queries.push([cleanDetail, ...area].join(', '));
-    if (cleanDetail.includes(',') && cleanWard && cleanCity) {
-      const afterComma = cleanDetail.split(',').pop().trim();
-      if (afterComma) queries.push([afterComma, ...area].join(', '));
-    }
-    if (cleanWard && cleanCity) queries.push(area.join(', '));
-    if (cleanDistrict && cleanCity) queries.push(`${cleanDistrict}, ${cleanCity}`);
-    if (cleanCity) queries.push(cleanCity);
-
-    for (const q of queries) {
-      try {
-        const res = await apiFetch(`${API_BASE_URL}/api/geocode/search?q=${encodeURIComponent(q)}&limit=1`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data && data.length > 0) {
-            return {
-              lat: parseFloat(data[0].lat),
-              lon: parseFloat(data[0].lon),
-              display_name: data[0].display_name,
-              matchedQuery: q
-            };
-          }
-        }
-      } catch (err) {
-        console.warn(`Geocoding failed for "${q}":`, err);
-      }
-    }
-    return null;
-  };
+    defaultPhoneRef.current = currentUser?.phone || '';
+  }, [currentUser?.phone]);
 
   // Preload data when editing
   useEffect(() => {
@@ -122,26 +117,9 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
         })) || [];
         const lifestyle_tags = prop.lifestyle_tags?.map(t => t.tag_name) || [];
 
-        const lat = parseFloat(prop.latitude);
-        const lng = parseFloat(prop.longitude);
-        const hasValidCoords = !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0;
-
-        let finalLat = hasValidCoords ? lat : '';
-        let finalLng = hasValidCoords ? lng : '';
-
-        // If coordinates missing or zero in DB, auto-geocode from the address fields!
-        if (!hasValidCoords && (prop.city || prop.address_detail || prop.address)) {
-          const geocoded = await geocodeAddressHierarchical({
-            address_detail: prop.address_detail,
-            ward: prop.ward,
-            district: prop.district,
-            city: prop.city
-          });
-          if (geocoded) {
-            finalLat = geocoded.lat;
-            finalLng = geocoded.lon;
-          }
-        }
+        const pinned = parsePinnedCoords(prop.latitude, prop.longitude);
+        const finalLat = pinned ? pinned.lat : '';
+        const finalLng = pinned ? pinned.lng : '';
 
         setListing({
           title: prop.title || '',
@@ -164,23 +142,17 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
           features,
           images,
           lifestyle_tags,
-          contact_phone: prop.contact_phone || currentUser?.phone || '',
+          contact_phone: prop.contact_phone || defaultPhoneRef.current,
           is_public: prop.is_public !== undefined ? prop.is_public : true,
           channels: prop.channels || ['Homepage', 'Social'],
           thumbnail: prop.thumbnail || ''
         });
 
-        // Sync map if already mounted
-        if (finalLat && finalLng && mapRef.current && markerRef.current) {
-          mapRef.current.setView([finalLat, finalLng], 15);
-          markerRef.current.setLatLng([finalLat, finalLng]);
-        }
-
         // Đổi tỉnh / phường của tin cũ sang đơn vị hành chính mới khi khớp được; nếu không, người đăng chọn lại.
         const areas = await loadAdminAreas().catch(() => []);
-        const province = findProvince(areas, prop.city);
+        const province = findProvince(areas, prop.admin_area?.province || prop.city);
         if (province) {
-          const ward = findWard(province, prop.ward);
+          const ward = findWard(province, prop.admin_area?.ward || prop.ward);
           setListing(prev => ({ ...prev, city: province.name, ward: ward ? ward.name : '', district: ward ? '' : prev.district }));
         }
       } catch (err) {
@@ -191,149 +163,69 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
     fetchProperty();
   }, [mode, editingPropertyId]);
 
-  // Điền Tỉnh/TP + Phường/xã (đơn vị mới) từ tên lấy được khi định vị / kéo ghim trên bản đồ.
-  const applyAreaFromNames = async (cityName, wardName) => {
-    const areas = await loadAdminAreas().catch(() => []);
-    const province = findProvince(areas, cityName);
-    if (!province) return;
-    const ward = findWard(province, wardName);
-    setListing(prev => ({ ...prev, city: province.name, ward: ward ? ward.name : '', district: '' }));
+  const attachPinnedMarker = (map, lat, lng) => {
+    if (markerRef.current) {
+      markerRef.current.setLatLng([lat, lng]);
+      return markerRef.current;
+    }
+    const marker = window.L.marker([lat, lng], { draggable: true, icon: createMapPinIcon(window.L) }).addTo(map);
+    marker.on('dragend', () => {
+      const pos = marker.getLatLng();
+      setListing(prev => ({ ...prev, latitude: pos.lat, longitude: pos.lng }));
+    });
+    markerRef.current = marker;
+    return marker;
   };
 
-  // Leaflet map setup
+  // Leaflet map setup: không tự chấm ghim nếu tin chưa có tọa độ; chỉ tạo/cập nhật ghim khi người đăng tự nhấp hoặc kéo thả.
   useEffect(() => {
     if (!mapLoaded || !window.L || currentStep !== 1) return;
-    const lat = parseFloat(listing.latitude) || 16.0544;
-    const lng = parseFloat(listing.longitude) || 108.2022;
     const container = document.getElementById('listing-map');
-    if (!container) return;
+    if (!container || mapRef.current) return;
 
-    if (mapRef.current) {
-      if (listing.latitude && listing.longitude) {
-        mapRef.current.setView([lat, lng], 15);
-        if (markerRef.current) markerRef.current.setLatLng([lat, lng]);
-      }
-      return;
-    }
-
-    const initialZoom = (listing.latitude && listing.longitude) ? 15 : 13;
-    const map = window.L.map('listing-map', { zoomControl: true, scrollWheelZoom: true }).setView([lat, lng], initialZoom);
+    const map = window.L.map('listing-map', { zoomControl: true, scrollWheelZoom: true }).setView(DEFAULT_MAP_VIEWPORT, 12);
     window.L.tileLayer('https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
       attribution: '&copy; Google Maps',
       subdomains: ['0', '1', '2', '3'],
       maxZoom: 20
     }).addTo(map);
-    // Icon ghi rõ URL: Leaflet tự đoán đường dẫn ảnh từ file CSS, nếu CSS chưa tải xong nó tìm
-    // "marker-icon.png" ngay trên localhost và ra ảnh lỗi.
-    const LEAFLET_IMAGES = 'https://unpkg.com/leaflet@1.9.4/dist/images/';
-    const pinIcon = window.L.icon({
-      iconUrl: `${LEAFLET_IMAGES}marker-icon.png`,
-      iconRetinaUrl: `${LEAFLET_IMAGES}marker-icon-2x.png`,
-      shadowUrl: `${LEAFLET_IMAGES}marker-shadow.png`,
-      iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
+
+    map.on('click', (e) => {
+      const { lat, lng } = e.latlng;
+      attachPinnedMarker(map, lat, lng);
+      setListing(prev => ({ ...prev, latitude: lat, longitude: lng }));
     });
-    const marker = window.L.marker([lat, lng], { draggable: true, icon: pinIcon }).addTo(map);
 
-    const updateCoordinates = async (newLat, newLng) => {
-      setListing(prev => ({ ...prev, latitude: newLat, longitude: newLng }));
-      try {
-        const res = await apiFetch(`${API_BASE_URL}/api/geocode/reverse?lat=${newLat}&lon=${newLng}`);
-        if (res.ok) {
-          const data = await res.json();
-          const addr = data.address || {};
-          const cityName = addr.city || addr.town || addr.province || addr.state || '';
-          const districtName = addr.district || addr.suburb || addr.city_district || addr.county || '';
-          const wardName = addr.ward || addr.quarter || addr.subdivision || addr.village || '';
-          const road = addr.road || '';
-          const houseNumber = addr.house_number || '';
-          const address_detail = [houseNumber, road].filter(Boolean).join(' ') || addr.amenity || addr.building || '';
-          setListing(prev => ({ ...prev, address_detail, address: data.display_name || `${address_detail}, ${wardName}, ${districtName}, ${cityName}` }));
-          if (cityName) applyAreaFromNames(cityName, wardName);
-        }
-      } catch (err) { console.error('Reverse geocoding error:', err); }
-    };
-
-    marker.on('dragend', () => { const pos = marker.getLatLng(); updateCoordinates(pos.lat, pos.lng); });
-    map.on('click', (e) => { marker.setLatLng(e.latlng); updateCoordinates(e.latlng.lat, e.latlng.lng); });
     mapRef.current = map;
-    markerRef.current = marker;
     return () => { if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; markerRef.current = null; } };
   }, [mapLoaded, currentStep]);
 
-  // Sync map center and marker whenever coordinates change from outside
+  // Sync marker when coordinates are loaded (edit mode), returning from step 2, or cleared manually
   useEffect(() => {
-    if (!mapRef.current || !markerRef.current) return;
-    const lat = parseFloat(listing.latitude);
-    const lng = parseFloat(listing.longitude);
-    if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
-      const currentPos = markerRef.current.getLatLng();
-      if (Math.abs(currentPos.lat - lat) > 0.0001 || Math.abs(currentPos.lng - lng) > 0.0001) {
-        mapRef.current.setView([lat, lng], 15);
-        markerRef.current.setLatLng([lat, lng]);
+    const map = mapRef.current;
+    if (!map || !window.L || currentStep !== 1) return;
+    const pinned = parsePinnedCoords(listing.latitude, listing.longitude);
+    if (!pinned) {
+      if (markerRef.current) {
+        map.removeLayer(markerRef.current);
+        markerRef.current = null;
       }
-    }
-  }, [listing.latitude, listing.longitude]);
-
-  const handleAutoLocation = () => {
-    if (!navigator.geolocation) { alert('Trình duyệt không hỗ trợ Geolocation API'); return; }
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude: lat, longitude: lon } = position.coords;
-        setListing(prev => ({ ...prev, latitude: lat, longitude: lon }));
-        if (mapRef.current && markerRef.current) { mapRef.current.setView([lat, lon], 15); markerRef.current.setLatLng([lat, lon]); }
-        try {
-          const res = await apiFetch(`${API_BASE_URL}/api/geocode/reverse?lat=${lat}&lon=${lon}`);
-          if (res.ok) {
-            const data = await res.json();
-            const addr = data.address || {};
-            const cityName = addr.city || addr.town || addr.province || addr.state || '';
-            const districtName = addr.district || addr.suburb || addr.city_district || addr.county || '';
-            const wardName = addr.ward || addr.quarter || addr.subdivision || addr.village || '';
-            const road = addr.road || '';
-            const houseNumber = addr.house_number || '';
-            const address_detail = [houseNumber, road].filter(Boolean).join(' ') || addr.amenity || addr.building || '';
-            setListing(prev => ({ ...prev, address_detail, address: data.display_name || `${address_detail}, ${wardName}, ${districtName}, ${cityName}` }));
-            if (cityName) applyAreaFromNames(cityName, wardName);
-          }
-        } catch (err) { console.error('Auto location geocode error:', err); }
-      },
-      (error) => alert('Không thể lấy vị trí tự động: ' + error.message)
-    );
-  };
-
-  const handleSearchAddressOnMap = async () => {
-    if (!listing.city && !listing.district && !listing.ward && !listing.address_detail) {
-      alert('Vui lòng chọn Tỉnh/Thành phố, Phường/Xã hoặc nhập địa chỉ trước khi tìm.');
       return;
     }
+    const { lat, lng } = pinned;
+    const hadMarker = Boolean(markerRef.current);
+    const currentPos = markerRef.current?.getLatLng();
+    const moved = !hadMarker || !currentPos || Math.abs(currentPos.lat - lat) > 0.0001 || Math.abs(currentPos.lng - lng) > 0.0001;
+    attachPinnedMarker(map, lat, lng);
+    if (moved) map.setView([lat, lng], 15);
+  }, [mapLoaded, currentStep, listing.latitude, listing.longitude]);
 
-    try {
-      const geocoded = await geocodeAddressHierarchical({
-        address_detail: listing.address_detail,
-        ward: listing.ward,
-        district: listing.district,
-        city: listing.city
-      });
-
-      if (geocoded) {
-        const lat = geocoded.lat;
-        const lon = geocoded.lon;
-        setListing(prev => ({
-          ...prev,
-          latitude: lat,
-          longitude: lon,
-          address: geocoded.display_name || prev.address
-        }));
-        if (mapRef.current && markerRef.current) {
-          mapRef.current.setView([lat, lon], 15);
-          markerRef.current.setLatLng([lat, lon]);
-        }
-      } else {
-        alert('Không tìm thấy toạ độ cho địa chỉ này. Bạn có thể kéo thả ghim trực tiếp trên bản đồ để chọn vị trí.');
-      }
-    } catch (err) {
-      alert('Lỗi tìm kiếm toạ độ: ' + err.message);
+  const handleClearMapPin = () => {
+    if (markerRef.current && mapRef.current) {
+      mapRef.current.removeLayer(markerRef.current);
+      markerRef.current = null;
     }
+    setListing(prev => ({ ...prev, latitude: '', longitude: '' }));
   };
 
   // Image handlers
@@ -411,32 +303,7 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
     setIsSaving(true);
     setShowWarningsModal(false);
     try {
-      const payload = {
-        title: listing.title,
-        description: listing.description,
-        price: parseFloat(listing.price) || 0,
-        listing_type: listing.listing_type,
-        area: parseFloat(listing.area) || 0,
-        bedrooms: parseInt(listing.bedrooms) || 0,
-        bathrooms: parseInt(listing.bathrooms) || 0,
-        property_type: listing.property_type,
-        status: listing.status,
-        is_public: listing.is_public,
-        city: listing.city,
-        district: listing.district,
-        ward: listing.ward,
-        floor_range: listing.floor_range || '',
-        address_detail: listing.address_detail,
-        address: [listing.address_detail, listing.ward, listing.district, listing.city].filter(Boolean).join(', '),
-        thumbnail: listing.thumbnail || (listing.images.find(img => img.isFeatured)?.url || '/listing-placeholder.svg'),
-        virtual_tour_url: listing.virtual_tour_url || null,
-        contact_phone: listing.contact_phone,
-        latitude: parseFloat(listing.latitude) || null,
-        longitude: parseFloat(listing.longitude) || null,
-        features: listing.features,
-        images: listing.images.map(img => img.url),
-        lifestyle_tags: listing.lifestyle_tags
-      };
+      const payload = buildListingPayload(listing);
 
       const url = mode === 'edit'
         ? `${API_BASE_URL}/api/properties/${editingPropertyId}`
@@ -498,35 +365,17 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
       alert('Vui lòng chọn tin cho thuê hoặc mua bán để Swipe Nest gợi ý đúng nhu cầu.');
       return;
     }
+
+    if (!listing.city || !listing.ward) {
+      alert('Vui lòng chọn Tỉnh/Thành phố và Phường/Xã theo danh sách hành chính mới.');
+      setCurrentStep(1);
+      return;
+    }
+
     setIsCheckingSave(true);
     setWarnings([]);
     try {
-      const payload = {
-        title: listing.title,
-        description: listing.description,
-        price: parseFloat(listing.price) || 0,
-        listing_type: listing.listing_type,
-        area: parseFloat(listing.area) || 0,
-        bedrooms: parseInt(listing.bedrooms) || 0,
-        bathrooms: parseInt(listing.bathrooms) || 0,
-        property_type: listing.property_type,
-        status: listing.status,
-        is_public: listing.is_public,
-        city: listing.city,
-        district: listing.district,
-        ward: listing.ward,
-        floor_range: listing.floor_range || '',
-        address_detail: listing.address_detail,
-        address: [listing.address_detail, listing.ward, listing.district, listing.city].filter(Boolean).join(', '),
-        thumbnail: listing.thumbnail || (listing.images.find(img => img.isFeatured)?.url || '/listing-placeholder.svg'),
-        virtual_tour_url: listing.virtual_tour_url || null,
-        contact_phone: listing.contact_phone,
-        latitude: parseFloat(listing.latitude) || null,
-        longitude: parseFloat(listing.longitude) || null,
-        features: listing.features,
-        images: listing.images.map(img => img.url),
-        lifestyle_tags: listing.lifestyle_tags
-      };
+      const payload = buildListingPayload(listing);
 
       const checkUrl = mode === 'edit'
         ? `${API_BASE_URL}/api/properties/check-before-save?excludeId=${editingPropertyId}`
@@ -581,13 +430,21 @@ const useListingForm = ({ mode, editingPropertyId, currentUser, setData, onSucce
     if (onSuccess) onSuccess();
   };
 
+  const handleNextStep = () => {
+    if (currentStep === 1 && (!listing.city || !listing.ward)) {
+      alert('Vui lòng chọn Tỉnh/Thành phố và Phường/Xã theo danh sách hành chính mới.');
+      return;
+    }
+    setCurrentStep(prev => prev + 1);
+  };
+
   return {
     listing, setListing,
     currentStep, setCurrentStep,
     submittedProperty,
     mapLoaded, mapRef, markerRef,
-    handleAutoLocation, handleSearchAddressOnMap,
-    geocodeAddress: geocodeAddressHierarchical,
+    handleClearMapPin,
+    handleNextStep,
     handleImageFileChange, handleDragOver, handleDrop,
     toggleSelectImage, setFeaturedImage, deleteSelectedImages,
     toggleAmenity, toggleLifestyleTag, toggleChannel,

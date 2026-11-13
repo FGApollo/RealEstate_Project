@@ -18,7 +18,7 @@ import KycCameraModal from './KycCameraModal';
 import './AgentProfile.css';
 
 import AreaSelect from '../../location/AreaSelect';
-import { sameProvince, sameWard } from '../../location/adminAreas';
+import { sameProvince, sameWard, formatPropertyArea } from '../../location/adminAreas';
 
 const maskIdNumber = (id) => {
   if (!id || typeof id !== 'string') return '---';
@@ -1063,7 +1063,7 @@ const AgentProfile = ({
 
                     <div className="property-card-address-row">
                       <MapPin size={12} />
-                      <span>{listing.ward ? `${listing.ward}, ${listing.district || ''}` : (listing.address || 'Hồ Chí Minh City')}</span>
+                      <span>{formatPropertyArea(listing) || listing.address || 'Chưa rõ khu vực'}</span>
                     </div>
 
                     <div className="property-card-footer">
