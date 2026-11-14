@@ -83,8 +83,8 @@ const sendOtpSms = async ({ phone, otp, customContent }) => {
   }
   const apiKey = process.env.ESMS_API_KEY;
   const secretKey = process.env.ESMS_SECRET_KEY;
-  const brandname = process.env.ESMS_BRANDNAME || '';
-  const smsType = process.env.ESMS_SMS_TYPE || '8'; // 8: Tin cố định giá rẻ, 2: CSKH hiển thị Brandname
+  const brandname = process.env.ESMS_BRANDNAME !== undefined ? process.env.ESMS_BRANDNAME : 'Baotrixemay';
+  const smsType = process.env.ESMS_SMS_TYPE || '2'; // 2: Brandname Baotrixemay (mẫu duyệt sẵn), 8: Tin cố định giá rẻ
   const isUnicode = process.env.ESMS_IS_UNICODE || '0'; // 0: không dấu, 1: có dấu
   const sandbox = process.env.ESMS_SANDBOX === '0' ? '0' : '1'; // Mặc định bật Sandbox=1 để an toàn khi thử nghiệm
   const forceMock = process.env.ESMS_MOCK === 'true';
