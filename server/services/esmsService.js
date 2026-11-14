@@ -41,6 +41,35 @@ const maskPhone = (phone) => {
 };
 
 /**
+ * Lựa chọn template chuẩn theo loại hình gửi (SmsType) và Brandname nhằm đảm bảo
+ * nội dung luôn khớp với mẫu tin nhắn đã được duyệt của eSMS và nhà mạng viễn thông:
+ * - SmsType = 8 (Đầu số cố định 10 số giá rẻ): Bắt buộc dùng mẫu chuẩn của eSMS (mặc định: "Ma OTP cua ban la {otp}").
+ * - SmsType = 2 và Brandname = Baotrixemay (Brandname thử nghiệm eSMS): Bắt buộc dùng "{otp} la ma xac minh dang ky Baotrixemay cua ban".
+ * - Brandname riêng đã đăng ký: Dùng ESMS_OTP_TEMPLATE được cấu hình.
+ */
+const resolveOtpTemplate = (smsType, brandname) => {
+  const configured = (process.env.ESMS_OTP_TEMPLATE || '').trim();
+
+  // Loại 8: Đầu số cố định giá rẻ
+  if (String(smsType).trim() === '8') {
+    // Nếu có cấu hình tùy chỉnh nhưng đúng mẫu cú pháp đầu số cố định của nhà mạng
+    if (configured && (configured.toLowerCase().includes('ma otp') || configured.toLowerCase().includes('ma xac nhan') || configured.toLowerCase().includes('ma xac thuc'))) {
+      return configured;
+    }
+    // Mẫu chuẩn cố định mặc định đã được các nhà mạng duyệt cho SmsType 8 của eSMS
+    return 'Ma OTP cua ban la {otp}';
+  }
+
+  // Loại 2 với Brandname thử nghiệm Baotrixemay
+  if (String(smsType).trim() === '2' && String(brandname).trim().toLowerCase() === 'baotrixemay') {
+    return '{otp} la ma xac minh dang ky Baotrixemay cua ban';
+  }
+
+  // Các trường hợp Brandname khác
+  return configured || 'Ma OTP xac thuc cua ban tai SwipeNest la: {otp}. Ma co hieu luc trong 5 phut. Vui long khong chia se ma nay cho bat ky ai.';
+};
+
+/**
  * Gửi tin nhắn SMS OTP qua eSMS.vn
  * @param {Object} options
  * @param {string} options.phone - Số điện thoại nhận tin (VD: "0901234567")
@@ -54,14 +83,14 @@ const sendOtpSms = async ({ phone, otp, customContent }) => {
   }
   const apiKey = process.env.ESMS_API_KEY;
   const secretKey = process.env.ESMS_SECRET_KEY;
-  const brandname = process.env.ESMS_BRANDNAME || 'SwipeNest';
-  const smsType = process.env.ESMS_SMS_TYPE || '2'; // 2: CSKH hiển thị Brandname, 8: Tin cố định giá rẻ
+  const brandname = process.env.ESMS_BRANDNAME || '';
+  const smsType = process.env.ESMS_SMS_TYPE || '8'; // 8: Tin cố định giá rẻ, 2: CSKH hiển thị Brandname
   const isUnicode = process.env.ESMS_IS_UNICODE || '0'; // 0: không dấu, 1: có dấu
   const sandbox = process.env.ESMS_SANDBOX === '0' ? '0' : '1'; // Mặc định bật Sandbox=1 để an toàn khi thử nghiệm
   const forceMock = process.env.ESMS_MOCK === 'true';
 
-  // Cấu hình nội dung tin nhắn theo template (hỗ trợ biến {otp}) hoặc mặc định
-  const template = process.env.ESMS_OTP_TEMPLATE || 'Ma OTP xac thuc cua ban tai SwipeNest la: {otp}. Ma co hieu luc trong 5 phut. Vui long khong chia se ma nay cho bat ky ai.';
+  // Cấu hình nội dung tin nhắn theo template chuẩn của eSMS hoặc template tùy chỉnh
+  const template = customContent ? null : resolveOtpTemplate(smsType, brandname);
   const content = customContent || template.replace(/\{otp\}/gi, otp);
 
   // Fallback Mock Mode: Nếu chưa cấu hình Key hoặc được cấu hình force mock
@@ -87,13 +116,13 @@ const sendOtpSms = async ({ phone, otp, customContent }) => {
     Phone: phone.trim(),
     Content: content,
     SmsType: smsType.trim(),
-    IsUnicode: isUnicode,
+    IsUnicode: smsType.trim() === '8' ? '0' : isUnicode,
     Sandbox: sandbox,
     RequestId: `OTP_${Date.now()}_${Math.floor(Math.random() * 1000)}`
   };
 
   // Nếu dùng loại tin nhắn hiển thị Brandname (SmsType != 8) thì mới gửi Brandname
-  if (smsType !== '8' && brandname) {
+  if (smsType.trim() !== '8' && brandname && brandname.trim() !== '') {
     payload.Brandname = brandname.trim();
   }
 
@@ -149,5 +178,6 @@ const sendOtpSms = async ({ phone, otp, customContent }) => {
 module.exports = {
   sendOtpSms,
   isConfigured,
-  isLiveSmsEnabled
+  isLiveSmsEnabled,
+  resolveOtpTemplate
 };
