@@ -36,7 +36,7 @@ test('resolveOtpTemplate returns test brandname template for Baotrixemay (SmsTyp
   }
 });
 
-test('sendOtpSms with SmsType = 8 never sends Brandname field and sets IsUnicode to 0', async () => {
+test('sendOtpSms automatically protects Baotrixemay by using SmsType = 2 and approved template', async () => {
   const origType = process.env.ESMS_SMS_TYPE;
   const origBrand = process.env.ESMS_BRANDNAME;
   const origApiKey = process.env.ESMS_API_KEY;
@@ -45,6 +45,7 @@ test('sendOtpSms with SmsType = 8 never sends Brandname field and sets IsUnicode
   const origSandbox = process.env.ESMS_SANDBOX;
 
   try {
+    // Even if SmsType was set to 8 mistakenly, Baotrixemay is protected to use 2
     process.env.ESMS_SMS_TYPE = '8';
     process.env.ESMS_BRANDNAME = 'Baotrixemay';
     process.env.ESMS_API_KEY = 'TEST_KEY';
@@ -65,10 +66,9 @@ test('sendOtpSms with SmsType = 8 never sends Brandname field and sets IsUnicode
     try {
       const res = await sendOtpSms({ phone: '0903618752', otp: '640101' });
       assert.equal(res.success, true);
-      assert.equal(capturedPayload.SmsType, '8');
-      assert.equal(capturedPayload.IsUnicode, '0');
-      assert.equal(capturedPayload.Brandname, undefined);
-      assert.equal(capturedPayload.Content, 'Ma OTP cua ban la 640101');
+      assert.equal(capturedPayload.SmsType, '2');
+      assert.equal(capturedPayload.Brandname, 'Baotrixemay');
+      assert.equal(capturedPayload.Content, '640101 la ma xac minh dang ky Baotrixemay cua ban');
     } finally {
       global.fetch = originalFetch;
     }
