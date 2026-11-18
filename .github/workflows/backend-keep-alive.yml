@@ -2,7 +2,8 @@ name: Backend keep-alive
 
 on:
   schedule:
-    # Every five minutes leaves time for one missed run before Render's 15-minute idle cutoff.
+    # Backup only: Supabase Cron is the primary ping scheduler.
+    # GitHub can delay or drop scheduled runs; see docs/backend-keep-alive.md.
     - cron: '2,7,12,17,22,27,32,37,42,47,52,57 * * * *'
   workflow_dispatch:
 
