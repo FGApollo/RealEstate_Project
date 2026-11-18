@@ -95,6 +95,11 @@ const GoogleAuthButton = ({ intent, phone, onError, fullWidth = false }) => {
           locale={fullWidth ? 'vi' : undefined}
         />
       )}
+      {intent !== 'LOGIN' && (
+        <p role="note" style={{ margin: '0.25rem 0 0', maxWidth: '400px', fontSize: '0.8rem', lineHeight: 1.5, textAlign: 'center', color: '#64748b' }}>
+          Với Gmail hoặc Google Workspace, Google xác thực email trực tiếp. Bạn không cần bấm thêm liên kết xác thực trong thư.
+        </p>
+      )}
     </div>
   );
 };

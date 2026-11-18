@@ -128,21 +128,41 @@ const loginUser = async ({ email, password }) => {
   return withVerifiedPassword(toPublicUser(user), user.password);
 };
 
-const markGoogleEmailVerified = async (user, googleEmail) => {
+const markGoogleEmailVerified = async (user, identity) => {
   assertAccountCanAuthenticate(user);
-  if (normalizeEmail(user.email) !== googleEmail || user.email_verified_at) {
+  if (normalizeEmail(user.email) !== identity.email || user.email_verified_at) {
     return toPublicUser(user);
   }
 
+  if (!identity.authoritativeEmail) {
+    throw serviceError('Hãy xác minh email trước khi liên kết tài khoản Google.', 403, 'EMAIL_VERIFICATION_REQUIRED');
+  }
+
   const verifiedAt = new Date().toISOString();
+  // An unverified password registration is only a reservation of this email.
+  // The Google-verified owner must not inherit its submitted name/avatar or a
+  // password potentially chosen by someone else before the owner signed in.
   const { data, error } = await supabase.from('users')
-    .update({ email_verified_at: verifiedAt })
+    .update({
+      email_verified_at: verifiedAt,
+      name: identity.name || identity.email.split('@')[0],
+      avatar: identity.avatar || null,
+      password: null
+    })
     .eq('id', user.id)
     .is('email_verified_at', null)
+    .eq('is_active', true)
     .select('*')
     .maybeSingle();
   if (error) throw new Error(error.message);
-  return toPublicUser(data || { ...user, email_verified_at: verifiedAt });
+  // Another verification can win the conditional update. Re-read its result;
+  // never fabricate a verified profile from the stale registration snapshot.
+  const account = data || await findUserById(user.id);
+  assertAccountCanAuthenticate(account);
+  if (!account.email_verified_at) {
+    throw serviceError('Chưa thể hoàn tất xác thực tài khoản. Vui lòng thử lại.', 409);
+  }
+  return toPublicUser(account);
 };
 
 const googleLogin = async (credential, intent = 'LOGIN', phone = null, linkPassword = null) => {
@@ -155,12 +175,15 @@ const googleLogin = async (credential, intent = 'LOGIN', phone = null, linkPassw
   if (linkedIdentity) {
     const linkedUser = await findUserById(linkedIdentity.user_id);
     if (!linkedUser) throw serviceError('Linked account not found', 409);
-    return markGoogleEmailVerified(linkedUser, identity.email);
+    return markGoogleEmailVerified(linkedUser, identity);
   }
 
   const existingUser = await findUserByEmail(identity.email);
   if (existingUser) {
     assertAccountCanAuthenticate(existingUser);
+    if (!existingUser.email_verified_at && !identity.authoritativeEmail) {
+      throw serviceError('Hãy xác minh email trước khi liên kết tài khoản Google.', 403, 'EMAIL_VERIFICATION_REQUIRED');
+    }
     const otherIdentity = await findGoogleIdentity('user_id', existingUser.id);
     if (otherIdentity && otherIdentity.subject !== identity.subject) {
       throw serviceError('Account is linked to a different Google identity', 409);
@@ -189,7 +212,7 @@ const googleLogin = async (credential, intent = 'LOGIN', phone = null, linkPassw
         }
       }
     }
-    return markGoogleEmailVerified(existingUser, identity.email);
+    return markGoogleEmailVerified(existingUser, identity);
   }
 
   if (intent === 'LOGIN') {
@@ -221,7 +244,7 @@ const googleLogin = async (credential, intent = 'LOGIN', phone = null, linkPassw
 
   const newUser = await findUserById(userId);
   if (!newUser) throw new Error('Provisioned user not found');
-  return markGoogleEmailVerified(newUser, identity.email);
+  return markGoogleEmailVerified(newUser, identity);
 };
 
 const getUserById = async (id) => {

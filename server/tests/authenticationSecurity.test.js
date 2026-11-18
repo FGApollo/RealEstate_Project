@@ -72,23 +72,26 @@ before(async () => {
   originalFrom = supabase.from;
   originalGoogle = googleIdentityService.verifyGoogleIdentity;
   supabase.from = fixtureFrom;
-  googleIdentityService.verifyGoogleIdentity = async () => ({
-    subject: 'verified-google-subject', email: 'admin@example.test',
-    authoritativeEmail: true, name: 'Admin'
-  });
   const app = express();
   app.use(express.json());
   app.use('/api', authRoutes);
   app.get('/private', authenticate, (req, res) => res.json({ user: req.user }));
   app.get('/admin', authenticate, requireRole('ADMIN'), (req, res) => res.json({ ok: true }));
   app.get('/optional', optionalAuthenticate, (req, res) => res.json({ user: req.user || null }));
-  app.use((error, req, res, next) => res.status(error.status || 500).json({ error: 'Request failed' }));
+  app.use((error, req, res, next) => {
+    if (res.headersSent) return next(error);
+    return res.status(error.status || 500).json({ error: 'Request failed' });
+  });
   server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   base = `http://127.0.0.1:${server.address().port}`;
 });
 
 beforeEach(() => {
+  googleIdentityService.verifyGoogleIdentity = async () => ({
+    subject: 'verified-google-subject', email: 'admin@example.test',
+    authoritativeEmail: true, name: 'Admin'
+  });
   tables = {
     users: [{ id: 1, name: 'Admin', email: 'admin@example.test', password: passwordHash,
       role: 'ADMIN', is_active: true, email_verified_at: '2026-01-01T00:00:00Z' }],
@@ -151,6 +154,90 @@ test('HTTP Google login rejects malformed bodies and oversized linking passwords
     assert.equal((await post('/google-login', body)).status, 400);
   }
   assert.equal(requests.length, 0);
+});
+
+test('Google signup completes a pending registration with the verified Google profile, never the reserved password', async () => {
+  Object.assign(tables.users[0], { name: 'Email delivery check', role: 'USER',
+    email_verified_at: null, avatar: 'https://example.test/reserved-avatar.png' });
+  googleIdentityService.verifyGoogleIdentity = async () => ({
+    subject: 'verified-google-subject', email: 'admin@example.test',
+    authoritativeEmail: true, name: 'Google Account Owner', avatar: 'https://example.test/google-avatar.png'
+  });
+  const response = await post('/google-login', { credential: 'verified-token', intent: 'USER_SIGNUP' });
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.user.name, 'Google Account Owner');
+  assert.equal(body.user.avatar, 'https://example.test/google-avatar.png');
+  assert.ok(body.user.email_verified_at);
+  assert.equal(tables.users[0].password, null);
+  assert.equal(tables.google_identities.length, 1);
+  assert.equal((await post('/login', { email: 'admin@example.test', password })).status, 401);
+  assert.equal((await fetch(`${base}/private`, { headers: headersFor(body.accessToken) })).status, 200);
+});
+
+test('Google linking preserves the existing profile and password of an already verified account', async () => {
+  Object.assign(tables.users[0], { name: 'My chosen name', avatar: 'https://example.test/custom.png' });
+  const response = await post('/google-login', { credential: 'verified-token', intent: 'USER_SIGNUP' });
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.user.name, 'My chosen name');
+  assert.equal(body.user.avatar, 'https://example.test/custom.png');
+  assert.equal(tables.users[0].password, passwordHash);
+});
+
+test('an already linked Google identity also replaces an unverified reserved profile', async () => {
+  Object.assign(tables.users[0], { name: 'Email delivery check', email_verified_at: null });
+  tables.google_identities.push({ subject: 'verified-google-subject', user_id: 1 });
+  const response = await post('/google-login', { credential: 'verified-token' });
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).user.name, 'Admin');
+  assert.equal(tables.users[0].password, null);
+  assert.equal(tables.google_identities.length, 1);
+});
+
+test('a concurrent verification is re-read rather than returning stale pending profile data', async () => {
+  Object.assign(tables.users[0], { name: 'Reserved name', email_verified_at: null });
+  const original = supabase.from;
+  supabase.from = (table) => {
+    const builder = fixtureFrom(table);
+    if (table === 'users') {
+      const update = builder.update;
+      builder.update = (value) => {
+        Object.assign(tables.users[0], { name: 'Concurrently verified profile', email_verified_at: '2026-01-01' });
+        return update(value);
+      };
+    }
+    return builder;
+  };
+  try {
+    const authService = require('../services/authService');
+    const account = await authService.googleLogin('verified-token');
+    assert.equal(account.name, 'Concurrently verified profile');
+    assert.equal(tables.users[0].password, passwordHash);
+  } finally { supabase.from = original; }
+});
+
+test('Google cannot activate a pending third-party email using only its reserved password', async () => {
+  tables.users[0].email_verified_at = null;
+  googleIdentityService.verifyGoogleIdentity = async () => ({
+    subject: 'verified-google-subject', email: 'admin@example.test',
+    authoritativeEmail: false, name: 'Not current mailbox proof'
+  });
+  const response = await post('/google-login', { credential: 'verified-token', linkPassword: password });
+  assert.equal(response.status, 403);
+  assert.equal((await response.json()).code, 'EMAIL_VERIFICATION_REQUIRED');
+  assert.equal(tables.users[0].email_verified_at, null);
+  assert.equal(tables.users[0].password, passwordHash);
+  assert.equal(tables.google_identities.length, 0);
+  assert.equal(tables.auth_sessions.length, 0);
+});
+
+test('ordinary email/password login still requires verification even when the password is correct', async () => {
+  tables.users[0].email_verified_at = null;
+  const response = await post('/login', { email: 'admin@example.test', password });
+  assert.equal(response.status, 403);
+  assert.equal((await response.json()).code, 'EMAIL_VERIFICATION_REQUIRED');
+  assert.equal(tables.auth_sessions.length, 0);
 });
 
 test('disabled, unknown-status and unknown-role accounts cannot sign in with password or Google', async () => {
