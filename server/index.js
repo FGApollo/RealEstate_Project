@@ -48,6 +48,12 @@ getCookieOptions();
 app.use(cors(corsOptions));
 // Count API requests before parsing large JSON or multipart payloads.
 app.use('/api', rateLimiters.api);
+
+// Liveness probe for the external keep-alive workflow.
+app.get('/api/health', (_req, res) => {
+  res.set('Cache-Control', 'no-store').status(204).end();
+});
+
 // Authentication DTOs contain no large payloads; cap them separately from listing JSON.
 const authJsonParser = express.json({ limit: '24kb' });
 const authUrlencodedParser = express.urlencoded({ limit: '24kb', extended: true });

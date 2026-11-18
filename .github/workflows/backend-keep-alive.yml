@@ -1,0 +1,27 @@
+name: Backend keep-alive
+
+on:
+  schedule:
+    # Every five minutes leaves time for one missed run before Render's 15-minute idle cutoff.
+    - cron: '3-58/5 * * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      HEALTH_URL: https://realestate-project-2u79.onrender.com/api/health
+    steps:
+      - name: Ping the Render backend
+        shell: bash
+        run: |
+          status=$(curl --fail --silent --show-error --output /dev/null \
+            --connect-timeout 10 --max-time 90 --retry 1 --retry-max-time 100 \
+            --write-out '%{http_code}' "$HEALTH_URL")
+          if [[ "$status" != 204 ]]; then
+            echo "Expected HTTP 204 from the backend, received $status" >&2
+            exit 1
+          fi
