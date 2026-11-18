@@ -1,5 +1,6 @@
 const crypto = require('node:crypto');
 const { isDevConsoleDeliveryEnabled, devFrontendOrigin, maskEmail } = require('./devDeliveryPolicy');
+const { buildVerificationEmail } = require('../emails/verificationEmail');
 
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const GMAIL_SEND_URL = 'https://gmail.googleapis.com/gmail/v1/users/me/messages/send';
@@ -121,7 +122,7 @@ const getAccessToken = async (config) => {
 };
 
 const encodeMimeHeader = (value) => `=?UTF-8?B?${Buffer.from(value, 'utf8').toString('base64')}?=`;
-const encodeMimeBody = (value) => Buffer.from(value, 'utf8').toString('base64')
+const encodeMimeBody = (value) => Buffer.from(value).toString('base64')
   .replace(/.{1,76}/g, '$&\r\n')
   .trimEnd();
 
@@ -130,15 +131,22 @@ const toBase64Url = (value) => Buffer.from(value, 'utf8').toString('base64')
   .replace(/\//g, '_')
   .replace(/=+$/g, '');
 
-const buildRawMessage = ({ from, to, subject, text, html }) => {
+const buildRawMessage = ({ from, to, subject, text, html, inlineAttachments = [] }) => {
   const boundary = `swipenest_${crypto.randomBytes(18).toString('hex')}`;
+  const relatedBoundary = `swipenest_images_${crypto.randomBytes(18).toString('hex')}`;
+  const hasImages = inlineAttachments.length > 0;
   const message = [
     `From: Swipe Nest <${from}>`,
     `To: ${to}`,
     `Subject: ${encodeMimeHeader(subject)}`,
     'MIME-Version: 1.0',
-    `Content-Type: multipart/alternative; boundary="${boundary}"`,
+    `Content-Type: multipart/${hasImages ? 'related' : 'alternative'}; boundary="${hasImages ? relatedBoundary : boundary}"`,
     '',
+    ...(hasImages ? [
+      `--${relatedBoundary}`,
+      `Content-Type: multipart/alternative; boundary="${boundary}"`,
+      ''
+    ] : []),
     `--${boundary}`,
     'Content-Type: text/plain; charset="UTF-8"',
     'Content-Transfer-Encoding: base64',
@@ -150,6 +158,16 @@ const buildRawMessage = ({ from, to, subject, text, html }) => {
     '',
     encodeMimeBody(html),
     `--${boundary}--`,
+    ...inlineAttachments.flatMap((attachment) => [
+      `--${relatedBoundary}`,
+      `Content-Type: ${attachment.contentType}; name="${attachment.filename}"`,
+      'Content-Transfer-Encoding: base64',
+      `Content-ID: <${attachment.contentId}>`,
+      `Content-Disposition: inline; filename="${attachment.filename}"`,
+      '',
+      encodeMimeBody(attachment.content)
+    ]),
+    ...(hasImages ? [`--${relatedBoundary}--`] : []),
     ''
   ].join('\r\n');
 
@@ -157,13 +175,13 @@ const buildRawMessage = ({ from, to, subject, text, html }) => {
 };
 
 // Gửi một email qua Gmail API. Không bao giờ ghi token, người nhận hay phản hồi gốc của Google vào log.
-const sendGmail = async (config, { to, subject, text, html, purpose }) => {
+const sendGmail = async (config, { to, subject, text, html, inlineAttachments, purpose }) => {
   if (!isMailboxAddress(to)) {
     const error = new Error('Recipient email address is invalid');
     error.code = 'EMAIL_RECIPIENT_INVALID';
     throw error;
   }
-  const raw = buildRawMessage({ from: config.senderEmail, to, subject, text, html });
+  const raw = buildRawMessage({ from: config.senderEmail, to, subject, text, html, inlineAttachments });
   const accessToken = await getAccessToken(config);
   let response;
   try {
@@ -209,9 +227,7 @@ const sendVerificationEmail = async ({ email, token }) => {
   await sendGmail(config, {
     to: email,
     subject: 'Xác minh email Swipe Nest',
-    text: `Mở liên kết để xác minh email Swipe Nest của bạn: ${link}
-Liên kết hết hạn sau 24 giờ. Nếu bạn không tạo tài khoản này, hãy bỏ qua email.`,
-    html: `<p>Hãy xác minh địa chỉ email cho tài khoản Swipe Nest.</p><p><a href="${link}">Xác minh email</a></p><p>Liên kết hết hạn sau 24 giờ. Nếu bạn không tạo tài khoản này, hãy bỏ qua email.</p>`,
+    ...buildVerificationEmail({ link }),
     purpose: 'verification'
   });
 };
