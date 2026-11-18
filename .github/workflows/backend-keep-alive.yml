@@ -3,7 +3,7 @@ name: Backend keep-alive
 on:
   schedule:
     # Every five minutes leaves time for one missed run before Render's 15-minute idle cutoff.
-    - cron: '3-58/5 * * * *'
+    - cron: '2,7,12,17,22,27,32,37,42,47,52,57 * * * *'
   workflow_dispatch:
 
 permissions: {}
@@ -18,9 +18,12 @@ jobs:
       - name: Ping the Render backend
         shell: bash
         run: |
+          echo "Ping started at $(date -u +'%Y-%m-%dT%H:%M:%SZ'), event=$GITHUB_EVENT_NAME"
           status=$(curl --fail --silent --show-error --output /dev/null \
             --connect-timeout 10 --max-time 90 --retry 1 --retry-max-time 100 \
-            --write-out '%{http_code}' "$HEALTH_URL")
+            --header 'Cache-Control: no-cache' \
+            --write-out '%{http_code}' "$HEALTH_URL?run=$GITHUB_RUN_ID")
+          echo "Ping finished at $(date -u +'%Y-%m-%dT%H:%M:%SZ'), HTTP=$status"
           if [[ "$status" != 204 ]]; then
             echo "Expected HTTP 204 from the backend, received $status" >&2
             exit 1
