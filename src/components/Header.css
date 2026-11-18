@@ -58,6 +58,7 @@
 }
 
 /* Primary Desktop Navigation */
+.app-header-home-icon { display: none; }
 .app-header-nav {
   align-self: stretch;
   display: flex;

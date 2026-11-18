@@ -9,10 +9,11 @@ import {
   Bed, Bath,
   ChevronDown, ArrowRight, Heart, X, Scan, Tag,
   ChevronRight, Sparkles,
-  Ruler, Zap
+  Ruler, Zap, SlidersHorizontal, Building2, BriefcaseBusiness, Store, BedDouble
 } from 'lucide-react';
 import './Home.css';
 import '../features/home/HomeHero.css';
+import '../features/home/HomeMobile.css';
 import { API_BASE_URL } from '../config';
 import { apiFetch, publicApiFetch } from '../auth/apiClient';
 import { useAuth } from '../auth/useAuth';
@@ -52,6 +53,10 @@ const normalizePropertyType = (value = '') => String(value)
   .trim();
 
 const EXCLUDED_PROPERTY_CATEGORY_KEYS = new Set(['dat nen', 'dat', 'land']);
+const CATEGORY_ICONS = {
+  'Nhà Ở': HomeIcon, 'Chung Cư': Building2, 'Căn Hộ': Building2,
+  'Văn Phòng': BriefcaseBusiness, 'Mặt Bằng': Store, 'Phòng Trọ': BedDouble
+};
 
 const Home = () => {
   const navigate = useNavigate();
@@ -70,6 +75,7 @@ const Home = () => {
   // Search parameters
   // Khu vực chọn từ dropdown (đơn vị hành chính mới).
   const [searchArea, setSearchArea] = useState({ province: '', ward: '' });
+  const [searchQuery, setSearchQuery] = useState('');
   
   // Advanced Filter state
   const [showAdvModal, setShowAdvModal] = useState(false);
@@ -276,6 +282,7 @@ const Home = () => {
   const executeSearch = (e) => {
     if (e) e.preventDefault();
     const query = writeSearch({
+      q: searchQuery,
       province: searchArea.province,
       ward: searchArea.ward,
       types: selectedCategories,
@@ -476,7 +483,7 @@ const Home = () => {
               <h1 id="home-hero-title">Tìm Kiếm Ngôi Nhà<br />Mơ Ước <span>Của Bạn</span></h1>
               <p className="home-hero-description">
                 Khám phá hàng ngàn bất động sản phù hợp với phong cách sống của bạn.<br className="home-hero-description-break" />
-                {' '}Dễ dàng. Nhanh chóng. Cùng <strong>Swipe Nest.</strong>
+                <span className="home-hero-description-extra">{' '}Dễ dàng. Nhanh chóng. Cùng <strong>Swipe Nest.</strong></span>
               </p>
             </div>
 
@@ -492,6 +499,19 @@ const Home = () => {
           </div>
 
           <form className="home-hero-search" aria-label="Tìm kiếm bất động sản" onSubmit={executeSearch}>
+            <div className="home-mobile-search">
+              <Search size={20} aria-hidden="true" />
+              <input aria-label="Tìm theo vị trí, loại bất động sản" placeholder="Tìm theo vị trí, loại BĐS, …"
+                value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} />
+              <button type="button" className="home-mobile-filter" aria-label="Bộ lọc nâng cao" aria-haspopup="dialog"
+                onClick={() => setShowAdvModal(true)}><SlidersHorizontal size={20} /></button>
+              <button type="submit" className="home-mobile-submit">Tìm kiếm <ArrowRight size={18} aria-hidden="true" /></button>
+            </div>
+            <div className="home-hero-filters">
+            <button type="button" className="home-mobile-area" onClick={() => setShowAdvModal(true)} aria-haspopup="dialog">
+              <MapPin size={16} aria-hidden="true" /><span>{searchArea.ward || searchArea.province || 'Toàn thành phố'}</span>
+              <ChevronDown size={14} aria-hidden="true" />
+            </button>
             <div className="home-hero-field home-hero-field-area">
               <MapPin aria-hidden="true" size={20} />
               <div className="home-hero-field-content">
@@ -551,6 +571,7 @@ const Home = () => {
             <button type="submit" className="home-hero-submit">
               <Search aria-hidden="true" size={16} /> Tìm kiếm <ArrowRight aria-hidden="true" size={15} />
             </button>
+            </div>
           </form>
         </div>
       </section>
@@ -565,7 +586,9 @@ const Home = () => {
           <button className="view-all-link" onClick={() => executeSearch()}>Xem tất cả <ArrowRight size={14} /></button>
         </div>
         <div className="categories-grid">
-          {categories.map((category) => (
+          {categories.map((category) => {
+            const CategoryIcon = CATEGORY_ICONS[category.name] || HomeIcon;
+            return (
             <div 
               className="category-card" 
               key={category.name}
@@ -585,13 +608,15 @@ const Home = () => {
                 aria-hidden="true"
                 className="category-img" 
               />
+              <CategoryIcon className="home-mobile-category-icon" aria-hidden="true" size={28} />
               <div className="category-info">
                 <h3>{category.name}</h3>
                 <p>{category.count ? `${category.count}+ tin đăng` : 'Khám phá tin đăng'}</p>
               </div>
               <ChevronRight size={15} className="category-arrow" />
             </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 
@@ -599,6 +624,8 @@ const Home = () => {
       {normalizedRole === 'USER' && (
         <CheckedListingsSection
           formatPrice={formatPrice}
+          favorites={dbFavorites}
+          onToggleFavorite={toggleFavorite}
           onOpen={(property) => { setSelectedProperty(property); setShowDetailModal(true); }}
         />
       )}
