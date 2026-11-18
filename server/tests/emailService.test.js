@@ -65,11 +65,22 @@ test('verification email refreshes Gmail OAuth and sends a MIME message through 
   const mime = Buffer.from(raw, 'base64url').toString('utf8');
   assert.match(mime, /From: Swipe Nest <sender@gmail\.com>/);
   assert.match(mime, /To: recipient@example\.com/);
-  const decodedBodies = [...mime.matchAll(/Content-Transfer-Encoding: base64\r\n\r\n([\s\S]*?)\r\n(?=--)/g)]
+  const decodedBodies = [...mime.matchAll(/Content-Type: text\/(?:plain|html); charset="UTF-8"\r\nContent-Transfer-Encoding: base64\r\n\r\n([\s\S]*?)\r\n(?=--)/g)]
     .map(([, body]) => Buffer.from(body.replace(/\s/g, ''), 'base64').toString('utf8'))
     .join('\n');
   assert.match(decodedBodies, /https:\/\/swipenest\.example\/verify-email#token=A{43}/);
   assert.match(decodedBodies, /Liên kết hết hạn sau 24 giờ/);
+  assert.match(mime, /Content-Type: multipart\/related/);
+  assert.match(mime, /Content-Type: multipart\/alternative/);
+  assert.match(decodedBodies, /Xác thực email ngay/);
+  const referencedImages = [...decodedBodies.matchAll(/src="cid:([^"]+)"/g)].map(([, id]) => id);
+  const embeddedImages = [...mime.matchAll(/Content-Type: image\/png; name="[^"]+"\r\nContent-Transfer-Encoding: base64\r\nContent-ID: <([^>]+)>\r\nContent-Disposition: inline; filename="[^"]+"\r\n\r\n([\s\S]*?)\r\n(?=--)/g)];
+  assert.ok(referencedImages.length > 0);
+  assert.deepEqual(embeddedImages.map(([, id]) => id).sort(), referencedImages.sort());
+  for (const [, , content] of embeddedImages) {
+    const bytes = Buffer.from(content.replace(/\s/g, ''), 'base64');
+    assert.deepEqual(bytes.subarray(0, 8), Buffer.from([137,80,78,71,13,10,26,10]));
+  }
 });
 
 test('sendVerificationEmail fails closed without Gmail API credentials', async (t) => {
