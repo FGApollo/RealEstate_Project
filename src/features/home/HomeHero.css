@@ -278,24 +278,24 @@
 
 @media (min-width: 821px) {
   .home-hero {
-    min-height: clamp(320px, 22vw, 420px);
-    padding: 26px 0;
+    min-height: 0;
+    padding: clamp(17px, 1.45vw, 24px) 0 clamp(13px, 1.1vw, 19px);
     background:
       linear-gradient(90deg, #eff1ff00 8%, #eff1fff0 18%, #eff1ffe6 36%, #eff1ff00 63%),
-      #e4e8f9 url('../../assets/hero-panorama.webp') center 20% / cover no-repeat;
+      #e4e8f9 url('../../assets/hero-panorama.webp') center 22% / cover no-repeat;
   }
 
   .home-hero::before { content: none; }
-  .home-hero-inner { width: min(92%, 1540px); }
-  .home-hero-intro { max-width: 1180px; min-height: clamp(190px, 14vw, 250px); margin-inline: auto; padding: 0 14px 22px; }
-  .home-hero-copy { max-width: 600px; }
+  .home-hero-inner { width: min(73%, 1180px); }
+  .home-hero-intro { min-height: 0; padding: 0 10px 10px; }
+  .home-hero-copy { max-width: min(600px, calc(55% - clamp(100px, 9.6vw, 150px) - 24px)); }
   .home-hero-description { max-width: 480px; font-size: 14px; line-height: 1.5; }
-  .home-hero-mascot { right: 40%; bottom: 12px; }
+  .home-hero-mascot { right: 45%; bottom: 0; }
 
   .home-hero-search {
     min-height: 76px;
     padding: 10px;
-    grid-template-columns: minmax(0, 1.25fr) repeat(3, minmax(0, 1fr)) auto;
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1.15fr) minmax(0, 1fr) minmax(0, 0.9fr) auto;
     background: #fbfbff;
   }
 
@@ -304,16 +304,20 @@
   .home-hero-field-content > span:first-child { font-size: 13px; line-height: 1.4; }
   .home-hero-search select,
   .home-hero-field-value { font-size: 13px; line-height: 1.5; }
+  .home-hero-field-value { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
   .home-hero-search select { height: 27px; }
   .home-hero-submit { height: 48px; gap: 9px; padding-inline: 20px; font-size: 14px; }
   .home-hero-filter-count { font-size: 11px; }
 }
 
 @media (min-width: 821px) and (max-width: 1400px) {
-  .home-hero-intro { padding-left: clamp(14px, 6vw, 84px); }
+  .home-hero-field { gap: 8px; padding-inline: 10px; }
+  .home-hero-advanced { gap: 6px; padding-inline: 8px; }
 }
 
 @media (min-width: 821px) and (max-width: 1100px) {
+  .home-hero-inner { width: 84%; }
+  .home-hero-copy { max-width: 60%; }
   .home-hero-search { grid-template-columns: repeat(3, minmax(0, 1fr)) auto; gap: 8px 0; border-radius: 22px; }
   .home-hero-field-area { grid-column: 1 / 4; }
   .home-hero-submit { grid-column: 4; grid-row: 1 / 3; }
