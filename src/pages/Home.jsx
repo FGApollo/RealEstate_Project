@@ -1,17 +1,18 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Mascot } from 'page-mascot';
-import SwipeNestMark from '../components/SwipeNestMark';
 import SwipeHeader from '../features/swipe/SwipeHeader';
+import HomeFooter from '../features/home/HomeFooter';
 import AuthLoading from '../components/AuthLoading';
 import { 
   Search, MapPin, Home as HomeIcon, 
   Bed, Bath,
-  ChevronDown, ArrowRight, Heart, X, SlidersHorizontal,
+  ChevronDown, ArrowRight, Heart, X, Scan, Tag,
   ChevronRight, Sparkles,
   Ruler, Zap
 } from 'lucide-react';
 import './Home.css';
+import '../features/home/HomeHero.css';
 import { API_BASE_URL } from '../config';
 import { apiFetch, publicApiFetch } from '../auth/apiClient';
 import { useAuth } from '../auth/useAuth';
@@ -19,7 +20,7 @@ import { useRequireAuth } from '../auth/useRequireAuth';
 import PropertyDetailModal from '../components/PropertyDetailModal';
 import CheckedListingsSection from '../features/plus/CheckedListingsSection';
 import { SwipeNestBadges } from '../features/plus/SwipeNestBadges';
-import { writeSearch } from '../features/search/searchParams';
+import { priceRangeOf, writeSearch } from '../features/search/searchParams';
 import AreaSelect from '../features/location/AreaSelect';
 
 const getCategoryIllustration = (name = '') => {
@@ -69,11 +70,16 @@ const Home = () => {
   // Search parameters
   // Khu vực chọn từ dropdown (đơn vị hành chính mới).
   const [searchArea, setSearchArea] = useState({ province: '', ward: '' });
-  const [searchType, setSearchType] = useState('ALL');
-  const [priceRange, setPriceRange] = useState('ALL');
   
   // Advanced Filter state
   const [showAdvModal, setShowAdvModal] = useState(false);
+  const advancedFilterDialog = useRef(null);
+  useEffect(() => {
+    if (!showAdvModal) return undefined;
+    const dialog = advancedFilterDialog.current;
+    dialog.showModal();
+    return () => dialog.close();
+  }, [showAdvModal]);
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [minPrice, setMinPrice] = useState('');
   const [maxPrice, setMaxPrice] = useState('');
@@ -81,6 +87,12 @@ const Home = () => {
   const [maxArea, setMaxArea] = useState('');
   const [selectedBedrooms, setSelectedBedrooms] = useState([]);
   const [selectedLifestyles, setSelectedLifestyles] = useState([]);
+
+  const searchType = selectedCategories.length > 1 ? 'CUSTOM' : (selectedCategories[0] || 'ALL');
+  const priceRange = priceRangeOf({
+    minPrice: minPrice === '' ? '' : String(parseFloat(minPrice)),
+    maxPrice: maxPrice === '' ? '' : String(parseFloat(maxPrice))
+  });
 
 
   // Suggestions state
@@ -112,24 +124,23 @@ const Home = () => {
     return [...knownCategories, ...additionalCategories];
   }, [properties]);
 
-  const fetchFavorites = async () => {
-    if (!user) return;
-    try {
-      const response = await apiFetch(`${API_BASE_URL}/api/favorites`);
-      if (response.ok) {
-        const data = await response.json();
-        setDbFavorites(data.favorites || []);
-      }
-    } catch (err) {
-      console.error('Error fetching database favorites:', err);
-    }
-  };
-
   useEffect(() => {
-    if (user?.id) {
-      fetchFavorites();
-    }
-  }, [user]);
+    if (!user?.id) return undefined;
+    const controller = new AbortController();
+    const fetchFavorites = async () => {
+      try {
+        const response = await apiFetch(`${API_BASE_URL}/api/favorites`, { signal: controller.signal });
+        if (response.ok) {
+          const data = await response.json();
+          if (!controller.signal.aborted) setDbFavorites(data.favorites || []);
+        }
+      } catch (err) {
+        if (!controller.signal.aborted) console.error('Error fetching database favorites:', err);
+      }
+    };
+    fetchFavorites();
+    return () => controller.abort();
+  }, [user?.id]);
 
   useEffect(() => {
     if (!showDetailModal || !selectedProperty?.id || !user?.id) return;
@@ -279,7 +290,6 @@ const Home = () => {
   // Handle price range quick select
   const handlePriceRangeChange = (e) => {
     const val = e.target.value;
-    setPriceRange(val);
     if (val === 'under-5m') {
       setMinPrice('0');
       setMaxPrice('5000000');
@@ -298,41 +308,9 @@ const Home = () => {
     }
   };
 
-  // Sync priceRange select value with minPrice/maxPrice
-  useEffect(() => {
-    const min = minPrice === '' ? '' : parseFloat(minPrice);
-    const max = maxPrice === '' ? '' : parseFloat(maxPrice);
-
-    if (min === 0 && max === 5000000) {
-      setPriceRange('under-5m');
-    } else if (min === 5000000 && max === 10000000) {
-      setPriceRange('5m-10m');
-    } else if (min === 10000000 && max === 20000000) {
-      setPriceRange('10m-20m');
-    } else if (min === 20000000 && max === '') {
-      setPriceRange('over-20m');
-    } else if (min === '' && max === '') {
-      setPriceRange('ALL');
-    } else {
-      setPriceRange('CUSTOM');
-    }
-  }, [minPrice, maxPrice]);
-
-  // Sync category select dropdown with advanced filter category chips
-  useEffect(() => {
-    if (selectedCategories.length === 0) {
-      setSearchType('ALL');
-    } else if (selectedCategories.length === 1) {
-      setSearchType(selectedCategories[0]);
-    } else {
-      setSearchType('CUSTOM');
-    }
-  }, [selectedCategories]);
-
   // Sync select dropdown change to chips
   const handleSearchTypeChange = (e) => {
     const val = e.target.value;
-    setSearchType(val);
     if (val === 'ALL') {
       setSelectedCategories([]);
     } else if (val !== 'CUSTOM') {
@@ -490,74 +468,44 @@ const Home = () => {
         onSearch={() => navigate('/search')} 
       />
 
-      {/* Hero Section */}
-      <section className="hero-section">
-        <div className="hero-content">
-          <div className="hero-top-row">
-            <div className="hero-copy">
-              <div className="hero-eyebrow"><Sparkles size={12} /> NƠI NHỮNG ƯỚC MƠ CÓ TỔ ẤM BẮT ĐẦU</div>
-              <div className="hero-title-container">
-                <h1>Tìm Kiếm Ngôi Nhà</h1>
-                <h1><span className="highlight-blue">Mơ Ước Của Bạn</span></h1>
-              </div>
-              <p className="hero-description">
-                Khám phá hàng ngàn bất động sản phù hợp với phong cách sống của bạn. Dễ dàng. Nhanh chóng. Cùng <strong>Swipe Nest.</strong>
+      <section className="home-hero" aria-labelledby="home-hero-title">
+        <div className="home-hero-inner">
+          <div className="home-hero-intro">
+            <div className="home-hero-copy">
+              <p className="home-hero-kicker">Nơi những ước mơ có tổ ấm bắt đầu</p>
+              <h1 id="home-hero-title">Tìm Kiếm Ngôi Nhà<br />Mơ Ước <span>Của Bạn</span></h1>
+              <p className="home-hero-description">
+                Khám phá hàng ngàn bất động sản phù hợp với phong cách sống của bạn.<br className="home-hero-description-break" />
+                {' '}Dễ dàng. Nhanh chóng. Cùng <strong>Swipe Nest.</strong>
               </p>
             </div>
 
-            <div className="hero-mascot-container">
-              <div className="mascot-speech-bubble">
-                Cùng tìm<br/>ngôi nhà lý tưởng<br/>nào!
-                <div className="speech-bubble-tail"></div>
-              </div>
+            <div className="home-hero-mascot">
               <Mascot
                 directions="/mascots/otter-builder-directions.webp"
                 reactions="/mascots/otter-builder-reactions.webp"
-                size={176}
+                size={120}
                 label="rái cá Swipe Nest"
-                className="hero-mascot-img"
+                className="home-hero-otter"
               />
-            </div>
-
-            <div className="hero-visual">
-              <div className="hero-photo-frame">
-                <img
-                  src="https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=85"
-                  alt="House"
-                />
-              </div>
-              <div className="hero-photo-note" aria-label="Good Homes, Brighter Tomorrows">
-                <span>Good Homes</span>
-                <span>Brighter Tomorrows</span>
-                <svg viewBox="0 0 112 64" aria-hidden="true" focusable="false">
-                  <path d="M108 2C91 21 69 40 12 52" />
-                  <path d="M12 52L22 43M12 52L24 56" />
-                </svg>
-              </div>
             </div>
           </div>
 
-          {/* Search Form */}
-          <form className="search-bar-container" onSubmit={executeSearch}>
-            {/* 1. Ô địa điểm */}
-            <div className="search-field location-field-wrapper">
-              <div className="search-field-icon-wrapper light-blue-bg"><MapPin size={18} color="#1a42b8" /></div>
-              <div className="search-field-content">
-                <label>Khu vực</label>
-                {/* Chọn theo đơn vị hành chính mới; server vẫn khớp được tin ghi theo quận/phường cũ. */}
-                <AreaSelect province={searchArea.province} ward={searchArea.ward} className="home-area-select"
-                  onChange={setSearchArea} />
+          <form className="home-hero-search" aria-label="Tìm kiếm bất động sản" onSubmit={executeSearch}>
+            <div className="home-hero-field home-hero-field-area">
+              <MapPin aria-hidden="true" size={20} />
+              <div className="home-hero-field-content">
+                <span>Khu vực</span>
+                <AreaSelect province={searchArea.province} ward={searchArea.ward}
+                  className={searchArea.province ? 'home-hero-area has-province' : 'home-hero-area'} onChange={setSearchArea} />
               </div>
             </div>
-            
-            <div className="search-field-divider"></div>
 
-            {/* 2. Loại hình */}
-            <div className="search-field select-field">
-              <div className="search-field-icon-wrapper light-blue-bg"><HomeIcon size={18} color="#1a42b8" /></div>
-              <div className="search-field-content">
-                <label>Loại bất động sản</label>
-                <select value={searchType} onChange={handleSearchTypeChange} aria-label="Loại bất động sản">
+            <label className="home-hero-field">
+              <HomeIcon aria-hidden="true" size={20} />
+              <span className="home-hero-field-content">
+                <span>Loại bất động sản</span>
+                <select value={searchType} onChange={handleSearchTypeChange}>
                   <option value="ALL">Tất cả loại</option>
                   <option value="Căn Hộ">Căn hộ</option>
                   <option value="Chung Cư">Chung cư</option>
@@ -567,18 +515,14 @@ const Home = () => {
                   <option value="Văn Phòng">Văn phòng</option>
                   {searchType === 'CUSTOM' && <option value="CUSTOM">Nhiều loại hình</option>}
                 </select>
-              </div>
-              <ChevronDown size={14} className="select-arrow-icon" />
-            </div>
+              </span>
+            </label>
 
-            <div className="search-field-divider"></div>
-
-            {/* 3. Khoảng giá select */}
-            <div className="search-field select-field">
-              <div className="search-field-icon-wrapper solid-blue-bg"><span style={{color: 'white', fontWeight: 'bold', fontSize: '14px'}}>$</span></div>
-              <div className="search-field-content">
-                <label>Khoảng giá</label>
-                <select value={priceRange} onChange={handlePriceRangeChange} aria-label="Khoảng giá">
+            <label className="home-hero-field">
+              <Tag aria-hidden="true" size={20} />
+              <span className="home-hero-field-content">
+                <span>Khoảng giá</span>
+                <select value={priceRange} onChange={handlePriceRangeChange}>
                   <option value="ALL">Tất cả mức giá</option>
                   <option value="under-5m">Dưới 5 triệu</option>
                   <option value="5m-10m">5 - 10 triệu</option>
@@ -586,35 +530,28 @@ const Home = () => {
                   <option value="over-20m">Trên 20 triệu</option>
                   {priceRange === 'CUSTOM' && <option value="CUSTOM">Tùy chọn giá</option>}
                 </select>
-              </div>
-              <ChevronDown size={14} className="select-arrow-icon" />
-            </div>
+              </span>
+            </label>
 
-            <div className="search-field-divider"></div>
-
-            {/* 4. Diện tích */}
-            <div className="search-field select-field" onClick={() => setShowAdvModal(true)} style={{ cursor: 'pointer' }}>
-              <div className="search-field-icon-wrapper light-blue-bg">
-                <SlidersHorizontal size={18} color="#1a42b8" />
-              </div>
-              <div className="search-field-content">
-                <label>Diện tích</label>
-                <div className="pseudo-select-text" style={{ fontSize: '0.95rem', color: 'var(--text-primary)' }}>Tất cả diện tích</div>
-              </div>
-              <ChevronDown size={14} className="select-arrow-icon" />
+            <button type="button" className="home-hero-field home-hero-advanced" onClick={() => setShowAdvModal(true)}
+              aria-haspopup="dialog">
+              <Scan aria-hidden="true" size={20} />
+              <span className="home-hero-field-content">
+                <span>Diện tích</span>
+                <span className="home-hero-field-value">
+                  {(minArea || maxArea) ? `${minArea || '0'} – ${maxArea || '∞'} m²` : 'Tất cả diện tích'}
+                </span>
+              </span>
               {activeFilterCount > 0 && (
-                <span className="home-filter-badge-new">{activeFilterCount}</span>
+                <span className="home-hero-filter-count">{activeFilterCount}</span>
               )}
-            </div>
+              <ChevronDown aria-hidden="true" size={14} />
+            </button>
 
-            {/* 5. Tìm kiếm button */}
-            <div className="search-btn-wrapper" style={{ padding: '0 0.5rem 0 1rem' }}>
-              <button type="submit" className="search-btn">
-                <Search size={18} /> Tìm kiếm <ArrowRight size={16} />
-              </button>
-            </div>
+            <button type="submit" className="home-hero-submit">
+              <Search aria-hidden="true" size={16} /> Tìm kiếm <ArrowRight aria-hidden="true" size={15} />
+            </button>
           </form>
-
         </div>
       </section>
 
@@ -760,57 +697,7 @@ const Home = () => {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="footer">
-        <div className="footer-grid">
-          <div className="footer-col">
-            <button className="footer-brand" onClick={() => navigate('/')}>
-              <span className="brand-mark"><SwipeNestMark /></span>
-              <span className="footer-logo">Swipe Nest</span>
-            </button>
-            <p className="footer-desc">
-              Nâng tầm trải nghiệm bất động sản qua lăng kính của sự tinh tế và chuyên nghiệp.
-            </p>
-          </div>
-
-          <div className="footer-col">
-            <h4>DỊCH VỤ</h4>
-            <div className="footer-links">
-              <a href="#" className="footer-link">Mua</a>
-              <a href="#" className="footer-link">Thuê</a>
-              <a href="#" className="footer-link">Bán</a>
-            </div>
-          </div>
-
-          <div className="footer-col">
-            <h4>CÔNG TY</h4>
-            <div className="footer-links">
-              <a href="#" className="footer-link">Về Chúng Tôi</a>
-              <a href="#" className="footer-link">Tuyển Dụng</a>
-              <a href="#" className="footer-link">Liên Hệ</a>
-            </div>
-          </div>
-
-          <div className="footer-col">
-            <h4>PHÁP LÝ</h4>
-            <div className="footer-links">
-              <a href="/privacy.html" className="footer-link">Chính Sách Bảo Mật</a>
-              <a href="/terms.html" className="footer-link">Điều Khoản Sử Dụng</a>
-            </div>
-          </div>
-
-          <div className="footer-col footer-social-col">
-            <h4>KẾT NỐI VỚI CHÚNG TÔI</h4>
-            <div className="footer-socials">
-              <span>f</span><span>♪</span><span>▶</span><span>◎</span><span>in</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="footer-bottom">
-          © 2024 Swipe Nest. All rights reserved.
-        </div>
-      </footer>
+      <HomeFooter />
 
       {/* Property Details Modal (F18: Reusable Component) */}
       {showDetailModal && selectedProperty && (
@@ -829,12 +716,14 @@ const Home = () => {
 
       {/* Advanced Filter Modal */}
       {showAdvModal && (
-        <div className="modal-backdrop" onClick={() => setShowAdvModal(false)}>
-          <div className="filter-modal-content home-filter-modal-content" onClick={(e) => e.stopPropagation()}>
-            <button className="modal-close-btn" onClick={() => setShowAdvModal(false)}>
+        <dialog className="home-filter-dialog" ref={advancedFilterDialog} aria-labelledby="home-filter-title"
+          onCancel={(event) => { event.preventDefault(); setShowAdvModal(false); }}
+          onClick={(event) => { if (event.target === event.currentTarget) setShowAdvModal(false); }}>
+          <div className="home-filter-modal-content">
+            <button type="button" className="modal-close-btn" aria-label="Đóng bộ lọc" onClick={() => setShowAdvModal(false)}>
               <X size={24} />
             </button>
-            <h3>Bộ lọc nâng cao</h3>
+            <h3 id="home-filter-title">Bộ lọc nâng cao</h3>
             
             <div className="filter-modal-body">
               {/* Khu vực: dùng chung dropdown (đơn vị hành chính mới) với thanh tìm kiếm */}
@@ -1001,7 +890,7 @@ const Home = () => {
               <button type="button" className="btn-primary" onClick={() => setShowAdvModal(false)}>Áp dụng</button>
             </div>
           </div>
-        </div>
+        </dialog>
       )}
 
     </div>

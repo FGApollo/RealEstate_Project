@@ -160,6 +160,7 @@ export default function Header({
         <nav className="app-header-nav" aria-label="Điều hướng chính">
           {navItems.map(({ key, label, path, state, Icon }) => (
             <button type="button" key={key} className={`app-header-nav-link ${currentTab === key ? 'active' : ''}`}
+              aria-current={currentTab === key ? 'page' : undefined}
               onClick={() => handleTabClick(key, path, state)}>
               {key !== 'home' && <Icon size={17} />}<span>{label}</span>
             </button>

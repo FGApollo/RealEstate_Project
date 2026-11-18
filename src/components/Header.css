@@ -630,3 +630,88 @@
   font-family: inherit;
 }
 .app-header-drawer-register-btn:hover { background: #f3f7ff; }
+
+.home-container > .app-header-navbar {
+  background: #f9fafc;
+  border-bottom-color: #e8edfa;
+}
+
+.home-container > .app-header-navbar .app-header-nav {
+  gap: clamp(3px, 0.85vw, 13px);
+}
+
+.home-container .app-header-nav-link {
+  isolation: isolate;
+  gap: 6px;
+  padding: 0 clamp(8px, 1.05vw, 16px);
+  color: #3e507e;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.home-container .app-header-nav-link::before {
+  position: absolute;
+  z-index: -1;
+  inset: 50% 0 auto;
+  height: 34px;
+  border-radius: 999px;
+  background: #e9effc;
+  opacity: 0;
+  transform: translateY(-50%);
+  transition: opacity 0.18s ease;
+  content: '';
+}
+
+.home-container .app-header-nav-link:is(:hover, .active) { color: #075df2; }
+.home-container .app-header-nav-link:is(:hover, .active)::before { opacity: 1; }
+.home-container .app-header-nav-link.active::before {
+  background: linear-gradient(180deg, #e4ecfd, #eef3ff);
+}
+
+.home-container .app-header-nav-link.active::after {
+  inset-inline: 9px;
+  height: 3px;
+  background: linear-gradient(90deg, #247dff, #0864ff);
+}
+
+.home-container .app-header-nav-link:focus-visible {
+  outline: 2px solid #4384fb;
+  outline-offset: -3px;
+  border-radius: 14px;
+}
+
+@media (max-width: 900px) {
+  .home-container > .app-header-navbar {
+    display: grid;
+    grid-template: 59px 46px / minmax(0, 1fr) auto;
+    height: auto;
+    flex-basis: auto;
+    padding-inline: 15px;
+  }
+
+  .home-container > .app-header-navbar .app-header-nav {
+    display: grid !important;
+    grid-area: 2 / 1 / 3 / -1;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    width: min(100%, 525px);
+    justify-self: center;
+  }
+
+  .home-container > .app-header-navbar .app-header-tools { grid-area: 1 / 2; }
+  .home-container .app-header-nav-link { padding: 0 3px; }
+}
+
+@media (max-width: 530px) {
+  .home-container > .app-header-navbar { padding-inline: 10px; }
+  .home-container .app-header-navbar .app-header-register-btn { display: none; }
+  .home-container .app-header-login-btn { padding-inline: 11px; font-size: 12px; }
+  .home-container .app-header-nav-link { gap: 4px; font-size: clamp(10px, 2.8vw, 13px); }
+  .home-container .app-header-nav-link svg { width: 14px; height: 14px; flex: none; }
+  .home-container .app-header-nav-link::before { height: 30px; }
+}
+
+@media (max-width: 360px) {
+  .home-container .app-header-nav-link { gap: 3px; padding-inline: 1px; font-size: 9px; }
+  .home-container .app-header-nav-link svg { width: 11px; height: 11px; }
+}
