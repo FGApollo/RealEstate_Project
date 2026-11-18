@@ -43,6 +43,8 @@ npm run dev                   # giao diện ở http://localhost:5173
 
 Mỗi thành viên dùng một project Supabase dev riêng; production chỉ do chủ dự án cập nhật. Cách đồng bộ một database (đọc bảng sổ cái `app_schema_migrations`, chạy các file còn thiếu theo thứ tự) và quy ước viết migration mới: xem [server/db-migration/README.md](server/db-migration/README.md).
 
+Lịch ping giữ backend Render hoạt động dùng Supabase Cron mỗi 5 phút; cách kiểm tra và cấu hình lại nằm trong [docs/backend-keep-alive.md](docs/backend-keep-alive.md).
+
 ## Kiểm thử
 
 ```bash
