@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useSyncExternalStore } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Menu, X, Search, Bell, ChevronDown, User, LogOut, 
@@ -13,6 +14,15 @@ import './Header.css';
 
 export { SwipeNestMark };
 
+const mobileNavigationQuery = '(max-width: 820px)';
+const subscribeMobileNavigation = (onChange) => {
+  const query = window.matchMedia(mobileNavigationQuery);
+  query.addEventListener('change', onChange);
+  return () => query.removeEventListener('change', onChange);
+};
+const getMobileNavigation = () => window.matchMedia(mobileNavigationQuery).matches;
+const getServerMobileNavigation = () => false;
+
 export default function Header({
   activeTab, // 'home' | 'swipe' | 'saved' | 'chat' | 'profile'
   onMenuClick,
@@ -26,6 +36,8 @@ export default function Header({
 }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const isMobile = useSyncExternalStore(subscribeMobileNavigation, getMobileNavigation, getServerMobileNavigation);
+  const useBottomNavigation = isMobile && location.pathname === '/';
   const auth = useAuth();
   const user = userProp !== undefined ? userProp : auth?.user;
   const role = normalizeRole(auth?.user?.role);
@@ -137,6 +149,17 @@ export default function Header({
   };
 
   const displayName = user?.name || user?.email?.split('@')[0] || 'Tài khoản';
+  const navigation = (
+    <nav className={`app-header-nav${useBottomNavigation ? ' app-mobile-bottom-nav' : ''}`} aria-label="Điều hướng chính">
+      {navItems.map(({ key, label, path, state, Icon }) => (
+        <button type="button" key={key} className={`app-header-nav-link ${currentTab === key ? 'active' : ''}`}
+          aria-current={currentTab === key ? 'page' : undefined}
+          onClick={() => handleTabClick(key, path, state)}>
+          <Icon size={17} className={key === 'home' ? 'app-header-home-icon' : undefined} /><span>{label}</span>
+        </button>
+      ))}
+    </nav>
+  );
 
   return (
     <>
@@ -157,15 +180,7 @@ export default function Header({
         </div>
 
         {/* Middle: Primary Navigation (Desktop) */}
-        <nav className="app-header-nav" aria-label="Điều hướng chính">
-          {navItems.map(({ key, label, path, state, Icon }) => (
-            <button type="button" key={key} className={`app-header-nav-link ${currentTab === key ? 'active' : ''}`}
-              aria-current={currentTab === key ? 'page' : undefined}
-              onClick={() => handleTabClick(key, path, state)}>
-              {key !== 'home' && <Icon size={17} />}<span>{label}</span>
-            </button>
-          ))}
-        </nav>
+        {!useBottomNavigation && navigation}
 
         {/* Right: Tools & Profile & Mobile Hamburger Menu Button */}
         <div className="app-header-tools">
@@ -279,6 +294,7 @@ export default function Header({
           )}
         </div>
       </header>
+      {useBottomNavigation && createPortal(navigation, document.body)}
 
       {/* Unified Mobile Navigation Drawer */}
       {mobileDrawerOpen && (
