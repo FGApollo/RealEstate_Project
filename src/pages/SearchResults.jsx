@@ -1,28 +1,20 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Bath, Bed, Heart, Loader2, MapPin, Ruler, Search, X } from 'lucide-react';
+import { ArrowLeft, Bath, Bed, Heart, Loader2, MapPin, Ruler, X } from 'lucide-react';
 import Header from '../components/Header';
 import PropertyDetailModal from '../components/PropertyDetailModal';
 import { SwipeNestBadges } from '../features/plus/SwipeNestBadges';
-import AreaSelect from '../features/location/AreaSelect';
+import SearchFilterBar from '../features/search/SearchFilterBar';
 import { API_BASE_URL } from '../config';
 import { apiFetch, publicApiFetch } from '../auth/apiClient';
 import { useAuth } from '../auth/useAuth';
 import {
-  PRICE_RANGES, PROPERTY_TYPE_OPTIONS, formatPrice, priceRangeOf, readSearch, toApiFilters, writeSearch
+  formatPrice, readSearch, toApiFilters, writeSearch
 } from '../features/search/searchParams';
 import './SearchResults.css';
 
 const PAGE_SIZE = 24;
 const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=600&q=80';
-
-const draftFromSearch = (search) => ({
-  province: search.province,
-  ward: search.ward,
-  type: search.types.length === 1 ? search.types[0] : (search.types.length > 1 ? 'CUSTOM' : 'ALL'),
-  price: priceRangeOf(search),
-  listing: search.listing
-});
 
 // Trang kết quả tìm kiếm: thanh tìm kiếm luôn ở trên để tìm tiếp; bấm một tin để mở chi tiết, đóng chi tiết vẫn ở đây.
 const SearchResults = () => {
@@ -32,11 +24,6 @@ const SearchResults = () => {
   const isCustomer = String(user?.role || '').toUpperCase() === 'USER';
   const search = useMemo(() => readSearch(new URLSearchParams(location.search)), [location.search]);
 
-  // Bản nháp của thanh tìm kiếm; chỉ áp dụng khi bấm Tìm / Enter, đồng bộ lại nếu URL đổi (chip, Back/Forward, reset).
-  const [draft, setDraft] = useState(() => draftFromSearch(search));
-  useEffect(() => {
-    setDraft(draftFromSearch(search));
-  }, [search]);
   const [result, setResult] = useState({ key: null, items: [], hasMore: false, error: '' });
   const [loadingMore, setLoadingMore] = useState(false);
   const [selected, setSelected] = useState(null);
@@ -88,18 +75,6 @@ const SearchResults = () => {
   };
 
   const apply = (next) => navigate(`/search?${writeSearch(next)}`, { replace: true });
-  const submit = (event) => {
-    event.preventDefault();
-    const range = PRICE_RANGES.find((item) => item.value === draft.price);
-    apply({
-      ...search,
-      province: draft.province,
-      ward: draft.ward,
-      types: draft.type === 'ALL' ? [] : draft.type === 'CUSTOM' ? search.types : [draft.type],
-      listing: draft.listing,
-      ...(range ? { minPrice: range.min, maxPrice: range.max } : {})
-    });
-  };
 
   // Bộ lọc nâng cao mang từ trang chủ sang: hiện dạng chip, bấm để bỏ.
   const chips = [
@@ -130,29 +105,7 @@ const SearchResults = () => {
     <div className="search-page">
       <Header activeTab="home" />
       <div className="search-page-bar-wrap">
-        <form className="search-page-bar" onSubmit={submit} role="search">
-          <button type="button" className="search-page-back" onClick={goBack} aria-label="Quay lại"><ArrowLeft size={18} /></button>
-          <div className="search-page-field search-page-location">
-            <MapPin size={16} aria-hidden="true" />
-            <AreaSelect province={draft.province} ward={draft.ward} className="search-page-area"
-              onChange={(area) => setDraft({ ...draft, ...area })} />
-          </div>
-          <select value={draft.type} onChange={(e) => setDraft({ ...draft, type: e.target.value })} aria-label="Loại bất động sản">
-            <option value="ALL">Tất cả loại</option>
-            {PROPERTY_TYPE_OPTIONS.map((type) => <option key={type} value={type}>{type}</option>)}
-            {draft.type === 'CUSTOM' && <option value="CUSTOM">Nhiều loại hình</option>}
-          </select>
-          <select value={draft.price} onChange={(e) => setDraft({ ...draft, price: e.target.value })} aria-label="Khoảng giá">
-            {PRICE_RANGES.map((range) => <option key={range.value} value={range.value}>{range.label}</option>)}
-            {draft.price === 'CUSTOM' && <option value="CUSTOM">Tùy chọn giá</option>}
-          </select>
-          <select value={draft.listing} onChange={(e) => setDraft({ ...draft, listing: e.target.value })} aria-label="Hình thức">
-            <option value="">Thuê & bán</option>
-            <option value="RENT">Cho thuê</option>
-            <option value="SALE">Mua bán</option>
-          </select>
-          <button type="submit" className="search-page-submit"><Search size={16} /> Tìm</button>
-        </form>
+        <SearchFilterBar key={location.search} search={search} onApply={apply} />
         {chips.length > 0 && (
           <div className="search-page-chips" aria-label="Bộ lọc đang áp dụng">
             {chips.map((chip) => (
@@ -164,7 +117,10 @@ const SearchResults = () => {
 
       <main className="search-page-main">
         <div className="search-page-heading">
-          <h1>{title}</h1>
+          <div className="search-page-heading-title">
+            <button type="button" className="search-page-back" onClick={goBack} aria-label="Quay lại"><ArrowLeft size={18} /></button>
+            <h1>{title}</h1>
+          </div>
           {!loading && !result.error && <p>{result.items.length}{result.hasMore ? '+' : ''} tin phù hợp</p>}
         </div>
 
