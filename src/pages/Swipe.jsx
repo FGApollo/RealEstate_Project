@@ -23,15 +23,6 @@ import { getCategoryKey } from '../services/propertyCategory.js';
 
 
 
-const SwipeNestMark = () => (
-  <svg className="brand-mark-art" viewBox="0 0 150 150" aria-hidden="true" focusable="false" style={{ width: '28px', height: '28px' }}>
-    <path d="M75 7 139 53v61a25 25 0 0 1-25 25H36a25 25 0 0 1-25-25V53L75 7Z" fill="#25499b" />
-    <path d="M75 7 24 55v57a27 27 0 0 0 27 27h24V7Z" fill="#fff" opacity=".055" />
-    <path d="M29 72c27-14 65-15 92-1" fill="none" stroke="#f3c52f" strokeWidth="8" strokeLinecap="round" />
-    <path d="M57 49v54m0-54 39 54V49" fill="none" stroke="#fff" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
-
 const Swipe = () => {
   const { user } = useAuth();
   const { categoryName } = useParams();
@@ -58,39 +49,34 @@ const Swipe = () => {
   const [showHistory, setShowHistory] = useState(false);
   const [activeView, setActiveView] = useState(() => location.state?.activeView || 'swipe'); // 'swipe' or 'saved'
 
-  useEffect(() => {
-    if (location.state?.activeView) {
-      setActiveView(location.state.activeView);
-    }
-  }, [location.state]);
+  const [lastViewRequest, setLastViewRequest] = useState(location.state);
+  // Consume a navigation request before painting the previous tab.
+  if (location.state !== lastViewRequest) {
+    setLastViewRequest(location.state);
+    if (location.state?.activeView) setActiveView(location.state.activeView);
+  }
   const [selectedSavedCategory, setSelectedSavedCategory] = useState('Tất cả');
   const [sortBy, setSortBy] = useState('recent');
   const [selectedSavedProperty, setSelectedSavedProperty] = useState(null);
 
   const [dbFavorites, setDbFavorites] = useState([]);
-  const [isLoadingSaved, setIsLoadingSaved] = useState(false);
-
-  const fetchFavorites = async () => {
-    if (!user) return;
-    setIsLoadingSaved(true);
-    try {
-      const response = await apiFetch(`${API_BASE_URL}/api/favorites`);
-      if (response.ok) {
-        const data = await response.json();
-        setDbFavorites(data.favorites || []);
-      }
-    } catch (err) {
-      console.error('Error fetching database favorites:', err);
-    } finally {
-      setIsLoadingSaved(false);
-    }
-  };
-
+  const [favoritesLoadedFor, setFavoritesLoadedFor] = useState(null);
+  const favoritesQueryKey = `${user?.id || 'guest'}:${activeView}`;
+  const isLoadingSaved = Boolean(user?.id) && favoritesLoadedFor !== favoritesQueryKey;
   useEffect(() => {
-    if (user?.id) {
-      fetchFavorites();
-    }
-  }, [user, activeView]);
+    if (!user?.id) return undefined;
+    const controller = new AbortController();
+    let active = true;
+    apiFetch(`${API_BASE_URL}/api/favorites`, { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`Favorites request failed (${response.status})`);
+        return response.json();
+      })
+      .then((data) => { if (active) setDbFavorites(data.favorites || []); })
+      .catch((error) => { if (error.name !== 'AbortError') console.error('Error fetching database favorites:', error); })
+      .finally(() => { if (active) setFavoritesLoadedFor(favoritesQueryKey); });
+    return () => { active = false; controller.abort(); };
+  }, [user?.id, favoritesQueryKey]);
 
   // Lịch sử vuốt lấy từ server (không mất khi tải lại trang): panel hiện 10 lượt gần nhất.
   useEffect(() => {
@@ -240,7 +226,7 @@ const Swipe = () => {
     setCurrentIndex((previousIndex) => shouldResetIndex
       ? targetIndex
       : Math.min(previousIndex, Math.max(0, combined.length - 1)));
-  }, [activeCategoryKey, dbProperties, location.state?.selectPropertyId]);
+  }, [activeCategoryKey, dbProperties, location.pathname, location.state, navigate]);
 
   useEffect(() => {
     if (!isLoadingProperties && currentIndex >= currentProperties.length - 4) loadMoreRecommendations();
@@ -278,10 +264,10 @@ const Swipe = () => {
     const million = 1000000;
     
     if (price >= billion) {
-      return `${(price / billion).toFixed(1).replace('.0', '')} Tỷ`;
+      return `${new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 1 }).format(price / billion)} Tỷ`;
     }
     if (price >= million) {
-      return `${(price / million).toFixed(1).replace('.0', '')} Triệu`;
+      return `${new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 1 }).format(price / million)} Triệu`;
     }
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
   };
@@ -456,7 +442,9 @@ const Swipe = () => {
           )}
           <SwipeMainSection
             discoveryTitle={activeCategoryKey === 'Tất cả' ? 'Khám phá tất cả' : 'Khám phá ' + activeCategoryKey}
+            category={activeCategoryKey}
             currentProperty={currentProperty}
+            isFavorite={dbFavorites.some((property) => Number(property.id) === Number(currentProperty?.id))}
             formatPrice={formatPrice}
             onOpenHistory={() => setShowHistory(true)}
             onPrevious={() => swipeCard('left')}

@@ -1,18 +1,22 @@
 import { motion } from 'framer-motion';
 import {
-  Bed, Bath, ChevronLeft, ChevronRight, Compass, Heart, History, Info, MapPin,
+  Bed, Bath, Building2, ChevronLeft, ChevronRight, Compass, Heart, History, Info, MapPin,
   Maximize, RefreshCw, X
 } from 'lucide-react';
 import { SwipeNestBadges } from '../plus/SwipeNestBadges';
 
 const SwipeMainSection = ({
-  discoveryTitle, currentProperty, formatPrice, onOpenHistory,
+  discoveryTitle, category, currentProperty, isFavorite, formatPrice, onOpenHistory,
   onPrevious, onNext, onShowDetails, onRestart, onAdjustPreferences, isLoading, hasError,
   cardMotion, cardController, handleDragEnd, currentIndex, propertyCount, isSwiping
 }) => {
   const location = currentProperty?.address || [currentProperty?.ward, currentProperty?.district, currentProperty?.city].filter(Boolean).join(', ');
   const pageCount = Math.max(1, Math.min(propertyCount || 1, 5));
   const activeDot = propertyCount ? currentIndex % pageCount : 0;
+  const DiscoveryIcon = category === 'Văn Phòng' ? Building2 : Compass;
+  const discoveryHint = category === 'Văn Phòng'
+    ? 'Vuốt để khám phá và lựa chọn không gian văn phòng phù hợp với bạn.'
+    : 'Vuốt để khám phá và lựa chọn bất động sản phù hợp với bạn.';
 
   return (
     <main className="swipe-experience-main">
@@ -20,10 +24,10 @@ const SwipeMainSection = ({
       <div className="swipe-main-content">
         <header className="swipe-discovery-heading">
           <div className="swipe-discovery-copy">
-            <span className="swipe-discovery-icon"><Compass size={23} /></span>
+            <span className="swipe-discovery-icon"><DiscoveryIcon size={23} aria-hidden="true" /></span>
             <div>
               <h1>{discoveryTitle}</h1>
-              <p>Khám phá tin đăng và vuốt để Swipe Nest dần hiểu lựa chọn của bạn</p>
+              <p>{discoveryHint}</p>
             </div>
           </div>
           <div className="swipe-heading-actions">
@@ -35,13 +39,6 @@ const SwipeMainSection = ({
         </header>
 
         <div className="swipe-experience-deck">
-          {currentProperty && (
-            <>
-              <button type="button" className="swipe-deck-arrow previous" onClick={onPrevious} disabled={isSwiping} aria-label="Bỏ qua bất động sản"><ChevronLeft size={23} /></button>
-              <button type="button" className="swipe-deck-arrow next" onClick={onNext} disabled={isSwiping} aria-label="Thích bất động sản"><ChevronRight size={23} /></button>
-            </>
-          )}
-
           {currentProperty ? (
             <motion.article
               className="swipe-property-card"
@@ -54,10 +51,21 @@ const SwipeMainSection = ({
               animate={cardController}
               whileDrag={{ scale: 1.02 }}
             >
-              {currentProperty.thumbnail ? <img className="swipe-property-image" src={currentProperty.thumbnail} alt={currentProperty.title} draggable="false" /> : <div className="swipe-property-image-placeholder" />}
-              <div className="swipe-property-image-shade" />
-              {/* Chỉ còn nhãn Swipe Nest; chủ tin đã KYC thì xem ở chi tiết tin và trong chat. */}
-              <SwipeNestBadges property={currentProperty} className="swipe-sn-badges" />
+              <div className="swipe-property-media">
+                {currentProperty.thumbnail ? <img className="swipe-property-image" src={currentProperty.thumbnail} alt={currentProperty.title} draggable="false" /> : <div className="swipe-property-image-placeholder" />}
+                <div className="swipe-property-image-shade" />
+                {/* Chỉ còn nhãn Swipe Nest; chủ tin đã KYC thì xem ở chi tiết tin và trong chat. */}
+                <SwipeNestBadges property={currentProperty} className="swipe-sn-badges" />
+                <button type="button" className={`swipe-property-favorite${isFavorite ? ' active' : ''}`}
+                  onPointerDown={(event) => event.stopPropagation()} onClick={onNext} disabled={isSwiping}
+                  aria-label={isFavorite ? 'Đã lưu, xem bất động sản tiếp theo' : 'Lưu và xem bất động sản tiếp theo'}>
+                  <Heart size={23} fill={isFavorite ? 'currentColor' : 'none'} />
+                </button>
+                <button type="button" className="swipe-deck-arrow previous" onPointerDown={(event) => event.stopPropagation()}
+                  onClick={onPrevious} disabled={isSwiping} aria-label="Bỏ qua bất động sản"><ChevronLeft size={23} /></button>
+                <button type="button" className="swipe-deck-arrow next" onPointerDown={(event) => event.stopPropagation()}
+                  onClick={onNext} disabled={isSwiping} aria-label="Thích bất động sản"><ChevronRight size={23} /></button>
+              </div>
 
               <div className="swipe-property-overlay">
                 <div className="swipe-property-heading">
@@ -96,12 +104,19 @@ const SwipeMainSection = ({
               {/* Nút tim = quẹt phải: cùng một cơ chế (ghi lượt thích, lưu Yêu thích, chuyển sang thẻ kế tiếp). */}
               <button type="button" className="swipe-action-button like" onClick={onNext} disabled={isSwiping} aria-label="Thích (quẹt phải)"><Heart size={29} /></button>
             </div>
-            <div className="swipe-discover-hint"><span>Vuốt để khám phá thêm</span></div>
-            <div className="swipe-pagination" aria-label={`Bất động sản ${currentIndex + 1} trên ${propertyCount}`}>
-              {Array.from({ length: pageCount }, (_, index) => <span key={index} className={index === activeDot ? 'active' : ''} />)}
-            </div>
+            <div className="swipe-discover-hint"><span>Vuốt sang trái để bỏ qua, sang phải để lưu</span></div>
           </>
         )}
+        <div className="swipe-bottom-tools">
+          {currentProperty && (
+              <div className="swipe-pagination" aria-label={`Bất động sản ${currentIndex + 1} trên ${propertyCount}`}>
+                {Array.from({ length: pageCount }, (_, index) => <span key={index} className={index === activeDot ? 'active' : ''} />)}
+              </div>
+          )}
+          <button type="button" className="swipe-mobile-history" onClick={onOpenHistory} aria-haspopup="dialog" aria-label="Lịch sử vuốt">
+            <History size={17} /><span>Lịch sử</span>
+          </button>
+        </div>
       </div>
     </main>
   );
