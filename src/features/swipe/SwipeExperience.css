@@ -260,6 +260,8 @@
 .swipe-experience-deck { position: relative; display: flex; flex: 1; align-items: center; justify-content: center; width: 100%; min-height: 445px; }
 .swipe-property-card { position: relative; width: min(100%, 650px); height: clamp(435px, 57vh, 560px); overflow: hidden; border: 2px solid rgba(255,255,255,.92); border-radius: 27px; background: #9fb9d3; box-shadow: 0 18px 42px rgba(18, 40, 79, .24); cursor: grab; user-select: none; touch-action: pan-y; }
 .swipe-property-card:active { cursor: grabbing; }
+.swipe-property-media { display: contents; }
+.swipe-property-media > .swipe-property-favorite { display: none; }
 .swipe-property-image,.swipe-property-image-placeholder { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .swipe-property-image-placeholder { background: linear-gradient(135deg, #9fc6ed, #e7eff7); }
 .swipe-property-image-shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(12, 29, 61, .05) 28%, rgba(9, 21, 48, .02) 45%, rgba(8, 20, 48, .84) 100%); pointer-events: none; }
@@ -302,6 +304,8 @@
 .swipe-pagination { display: flex; align-items: center; justify-content: center; gap: 9px; min-height: 24px; margin-top: 7px; }
 .swipe-pagination span { width: 27px; height: 6px; border-radius: 5px; background: rgba(100, 127, 170, .22); transition: width .18s, background .18s; }
 .swipe-pagination span.active { width: 44px; background: #0870ff; }
+.swipe-bottom-tools { width: 100%; }
+.swipe-mobile-history { display: none; }
 
 .swipe-suggestion-list { display: flex; flex: 1; flex-direction: column; gap: 14px; min-height: 0; }
 .swipe-suggestion-card { position: relative; display: flex; flex: 1 1 0; min-height: 118px; overflow: hidden; padding: 0; border: 0; border-radius: 17px; background: #d4e2f2; text-align: left; cursor: pointer; isolation: isolate; }
@@ -407,24 +411,6 @@
   .swipe-filter-pill { min-width: 75px; gap: 6px; padding: 10px 11px; font-size: 12px; }
   .swipe-filter-pill svg { width: 16px; height: 16px; }
   .swipe-experience-deck { min-height: 0; }
-  .swipe-property-card { width: 100%; height: min(62vh, 520px); min-height: 390px; border-radius: 20px; }
-  .swipe-deck-arrow { width: 39px; height: 39px; }
-  .swipe-deck-arrow svg { width: 20px; height: 20px; }
-  .swipe-deck-arrow.previous { left: -7px; }
-  .swipe-deck-arrow.next { right: -7px; }
-  .swipe-property-overlay { gap: 11px; padding: 18px 14px 14px; }
-  .swipe-property-heading h2 { font-size: 20px; }
-  .swipe-property-heading p { font-size: 11px; }
-  .swipe-property-facts-row { align-items: flex-end; flex-direction: column; gap: 9px; }
-  .swipe-property-price { align-self: flex-start; font-size: 23px; }
-  .swipe-property-facts { align-self: stretch; justify-content: center; }
-  .swipe-property-facts > span { flex: 1; min-width: 0; padding: 0 4px; }
-  .swipe-property-facts small { font-size: 9px; }
-  .swipe-property-favorite { top: 13px; right: 13px; width: 44px; height: 44px; }
-  .swipe-experience-actions { gap: 19px; margin: 13px 0 7px; }
-  .swipe-action-button { width: 57px; height: 57px; }
-  .swipe-action-button.details { width: 51px; height: 51px; }
-  .swipe-action-button.like { width: 68px; height: 68px; }
   .swipe-card-empty { min-height: 330px; padding: 27px 18px; }
   .swipe-suggestion-list { grid-template-columns: minmax(0, 1fr); }
   .swipe-suggestion-card { min-height: 155px; }
@@ -483,4 +469,91 @@
   .swipe-discovery-heading { flex-wrap: wrap; row-gap: 10px; }
   .swipe-discovery-heading .swipe-discovery-copy { flex: 1 1 100%; min-width: 0; }
   .swipe-discovery-heading .swipe-heading-actions { flex: 1 1 100%; justify-content: flex-start; }
+}
+
+/* Mobile discovery uses document flow. A viewport-sized flex deck squeezed by
+   a tall card must never push the card over its controls or crop its details. */
+@media (max-width: 820px) {
+  .swipe-page-container { overflow-x: clip; background: #edf5ff; }
+  .swipe-main-layout {
+    flex: none;
+    height: auto;
+    min-height: calc(100svh - 66px);
+    max-width: none;
+    margin: 0;
+    padding: 0 0 max(20px, env(safe-area-inset-bottom));
+    gap: 0;
+    background: #f5f9ff;
+  }
+  .swipe-experience-main { min-height: 0; height: auto; border-radius: 0; box-shadow: none; overflow: hidden; }
+  .swipe-main-backdrop { background: radial-gradient(ellipse at 85% 0%, #c6e0ff, transparent 55%), linear-gradient(155deg, #e0eeff, #f5f9ff 75%); }
+  .swipe-main-backdrop::after { background: radial-gradient(ellipse at 10% 50%, #ffffff45, transparent 70%); }
+  .swipe-main-content { flex: none; width: 100%; padding: 21px clamp(18px, 6vw, 30px) 10px; box-sizing: border-box; }
+  .swipe-discovery-heading { width: 100%; max-width: 460px; align-items: flex-start; flex-wrap: nowrap; gap: 0; margin: 0 auto 23px; }
+  .swipe-discovery-heading .swipe-discovery-copy { flex: 1; align-items: flex-start; gap: 12px; }
+  .swipe-discovery-icon { width: 38px; height: 40px; margin-top: 3px; border: 0; border-radius: 15px; background: linear-gradient(135deg, #328de5, #0054b5); box-shadow: none; }
+  .swipe-discovery-icon svg { width: 23px; height: 23px; }
+  .swipe-discovery-copy > div { min-width: 0; padding-left: 12px; border-left: 1px solid #9dbce8; }
+  .swipe-discovery-copy h1 { font-size: clamp(19px, 5.3vw, 25px); line-height: 1.25; letter-spacing: -.6px; color: #0d1b45; }
+  .swipe-discovery-copy p { max-width: none; margin-top: 5px; font-size: 13px; line-height: 1.45; color: #526789; }
+  .swipe-discovery-heading .swipe-heading-actions { display: none; }
+  .swipe-experience-deck { display: block; flex: none; width: 100%; max-width: 460px; min-height: 0; padding-top: 12px; }
+  .swipe-experience-deck::before { position: absolute; top: 1px; right: 5%; left: 5%; height: 60px; border-radius: 23px; background: #ffffffad; transform: rotate(1deg); content: ''; pointer-events: none; }
+  .swipe-property-card { display: flex; flex-direction: column; width: 100%; height: auto; min-height: 0; border: 2px solid #fff; border-radius: 23px; background: #fff; box-shadow: 0 12px 25px #294d9329; box-sizing: border-box; }
+  .swipe-property-media { position: relative; display: block; flex: none; width: 100%; aspect-ratio: 4 / 3; overflow: hidden; border-radius: 21px 21px 0 0; background: #d9e8f8; }
+  .swipe-property-image, .swipe-property-image-placeholder { height: 100%; width: 100%; object-position: center; }
+  .swipe-property-image-shade { background: linear-gradient(180deg, #15345a12, transparent 40%); }
+  .swipe-property-media > .swipe-property-favorite { display: grid; z-index: 6; top: 12px; right: 12px; width: 44px; height: 44px; padding: 0; border: 1px solid #fff; background: #ffffffed; color: #304569; backdrop-filter: none; box-shadow: 0 3px 12px #203e7020; }
+  .swipe-property-media > .swipe-property-favorite.active { background: #075fee; color: #fff; }
+  .swipe-property-media .swipe-sn-badges { top: 13px; left: 12px; max-width: calc(100% - 80px); }
+  .swipe-property-media .sn-badge { padding: 6px 9px; font-size: 11px; line-height: 16px; }
+  .swipe-property-media .swipe-deck-arrow { top: 55%; width: 44px; height: 44px; padding: 0; }
+  .swipe-property-media .swipe-deck-arrow.previous { left: 8px; }
+  .swipe-property-media .swipe-deck-arrow.next { right: 8px; }
+  .swipe-property-media .swipe-deck-arrow svg { width: 22px; height: 22px; }
+  .swipe-property-overlay { position: relative; inset: auto; z-index: 2; gap: 12px; margin-top: -13px; padding: 13px 12px 12px; border-radius: 21px 21px 0 0; background: #fff; color: #10214d; }
+  .swipe-property-heading h2 { margin: 0 0 8px; color: #0c1b47; font-size: clamp(16px, 4.3vw, 20px); line-height: 1.35; font-weight: 780; letter-spacing: -.35px; text-shadow: none; overflow-wrap: anywhere; }
+  .swipe-property-heading p { align-items: flex-start; gap: 6px; color: #526789; font-size: 12px; line-height: 1.5; text-shadow: none; }
+  .swipe-property-heading p > svg { flex: none; margin-top: 2px; }
+  .swipe-property-heading p span { white-space: normal; overflow-wrap: anywhere; }
+  .swipe-property-facts-row { flex-direction: column; align-items: stretch; gap: 12px; }
+  .swipe-property-price { align-self: flex-start; max-width: 100%; color: #0064f5; font-size: clamp(23px, 6vw, 29px); line-height: 1.25; text-shadow: none; white-space: normal; overflow-wrap: anywhere; }
+  .swipe-property-price span { color: #425677; font-size: 14px; white-space: nowrap; }
+  .swipe-property-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-self: stretch; gap: 0; padding: 10px 0; border: 0; border-radius: 14px; background: #edf4ff; backdrop-filter: none; }
+  .swipe-property-facts > span { display: grid; grid-template-columns: auto auto; justify-content: center; align-items: center; gap: 4px 7px; min-width: 0; padding: 0 5px; color: #14234f; }
+  .swipe-property-facts > span + span { border-color: #b3c7e2; }
+  .swipe-property-facts svg { width: 17px; height: 17px; margin: 0; }
+  .swipe-property-facts b { font-size: 14px; line-height: 20px; overflow-wrap: anywhere; }
+  .swipe-property-facts small { grid-column: 1 / -1; color: #5d708d; font-size: 10px; line-height: 16px; }
+  .swipe-experience-actions { flex: none; gap: 23px; width: 100%; margin: 20px 0 12px; }
+  .swipe-action-button, .swipe-action-button.details { width: 52px; height: 52px; flex: none; }
+  .swipe-action-button.like { width: 58px; height: 58px; }
+  .swipe-action-button.dislike { color: #ff2536; }
+  .swipe-action-button:hover { transform: none; }
+  .swipe-action-button:focus-visible, .swipe-deck-arrow:focus-visible, .swipe-property-favorite:focus-visible, .swipe-mobile-history:focus-visible { outline: 3px solid #83b8ff; outline-offset: 3px; }
+  .swipe-discover-hint { flex: none; justify-content: center; max-width: 100%; color: #687e9f; font-size: 11px; line-height: 1.5; text-align: center; }
+  .swipe-bottom-tools { position: relative; display: flex; justify-content: center; align-items: center; flex: none; width: 100%; min-height: 44px; margin-top: 2px; }
+  .swipe-pagination { margin: 0; gap: 5px; }
+  .swipe-pagination span { width: 16px; height: 4px; }
+  .swipe-pagination span.active { width: 25px; }
+  .swipe-mobile-history { position: absolute; right: 0; display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 44px; padding: 0 7px; border: 0; background: transparent; color: #536d93; font: inherit; font-size: 11px; cursor: pointer; }
+  .swipe-card-empty { min-height: 280px; padding: 30px 18px; }
+  /* Keep the mascot and chat entry in the page, after the deck controls. */
+  .swipe-chat-prompt { position: relative; inset: auto; display: flex; justify-content: flex-end; align-items: flex-end; width: 100%; max-width: 500px; margin: 0 auto; padding: 0 18px 4px; box-sizing: border-box; transform: none; pointer-events: auto; }
+  .swipe-chat-prompt-copy { margin: 0 0 17px; padding: 8px 10px; font-size: 11px; }
+  .swipe-chat-mascot { flex: none; }
+  .swipe-chat-prompt-button { width: 44px; height: 44px; flex: none; margin: 0 0 1px -13px; }
+}
+
+@media (max-width: 360px) {
+  .swipe-main-content { padding-inline: 16px; }
+  .swipe-discovery-icon { width: 32px; height: 36px; border-radius: 12px; }
+  .swipe-discovery-copy { gap: 9px; }
+  .swipe-discovery-copy > div { padding-left: 9px; }
+  .swipe-discovery-copy h1 { font-size: 18px; }
+  .swipe-discovery-copy p { font-size: 12px; }
+  .swipe-property-facts > span { gap: 3px 5px; padding-inline: 3px; }
+  .swipe-property-facts svg { width: 15px; height: 15px; }
+  .swipe-property-facts b { font-size: 13px; }
+  .swipe-mobile-history span { display: none; }
 }
