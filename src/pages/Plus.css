@@ -10,15 +10,7 @@
   overflow-x: clip;
 }
 
-/* Soft Atmospheric Background Dome & Sweeping Waves */
-.plus-bg-decor {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  overflow: hidden;
-}
-
+.plus-bg-decor { position: absolute; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
 .plus-bg-halo {
   position: absolute;
   top: 64px;
@@ -27,35 +19,13 @@
   width: min(940px, 118vw);
   height: 520px;
   border-radius: 50%;
-  background: radial-gradient(
-    ellipse at center,
-    rgba(202, 224, 255, 0.72) 0%,
-    rgba(218, 234, 255, 0.45) 48%,
-    transparent 74%
-  );
+  background: radial-gradient(ellipse at center, rgba(202, 224, 255, 0.72) 0%, rgba(218, 234, 255, 0.45) 48%, transparent 74%);
 }
+.plus-bg-waves { position: absolute; inset: auto 0 0 0; width: 100%; height: 56vh; min-height: 440px; display: block; }
 
-.plus-bg-waves {
-  position: absolute;
-  inset: auto 0 0 0;
-  width: 100%;
-  height: 56vh;
-  min-height: 440px;
-  display: block;
-}
+.plus-page > .app-header-navbar { background: rgba(255, 255, 255, 0.94); border-bottom: 1px solid rgba(226, 236, 252, 0.95); box-shadow: 0 4px 18px rgba(30, 64, 175, 0.04); }
+.plus-page > .app-header-navbar .app-header-home-icon { display: inline-block; }
 
-/* Scoped Header Polish for Plus page */
-.plus-page > .app-header-navbar {
-  background: rgba(255, 255, 255, 0.94);
-  border-bottom: 1px solid rgba(226, 236, 252, 0.95);
-  box-shadow: 0 4px 18px rgba(30, 64, 175, 0.04);
-}
-
-.plus-page > .app-header-navbar .app-header-home-icon {
-  display: inline-block;
-}
-
-/* Main Container */
 .plus-main {
   position: relative;
   z-index: 1;
@@ -69,71 +39,16 @@
   gap: 22px;
 }
 
-/* =========================================================
-   HERO HEADER
-   ========================================================= */
-.plus-hero {
-  position: relative;
-  width: 100%;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 24px 8px;
-}
-
-.plus-sparkle {
-  position: absolute;
-  color: #93c5fd;
-  pointer-events: none;
-}
-
-.plus-sparkle-left {
-  left: 14%;
-  bottom: 24px;
-  opacity: 0.75;
-}
-
-.plus-sparkle-right {
-  right: 12%;
-  top: 42px;
-  color: #7eb5fc;
-  opacity: 0.85;
-}
-
-.plus-hero-crown-wrap {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 2px;
-}
-
-.plus-crown-emblem {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.plus-crown-emblem.has-rays {
-  padding: 0 26px;
-}
-
-.plus-crown-rays {
-  position: absolute;
-  inset: 4px 0 auto 0;
-  width: 100%;
-  height: 54px;
-  pointer-events: none;
-}
-
-.plus-crown-svg {
-  display: block;
-  position: relative;
-  z-index: 1;
-}
-
+/* Hero */
+.plus-hero { position: relative; width: 100%; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 6px 24px 8px; }
+.plus-sparkle { position: absolute; color: #93c5fd; pointer-events: none; }
+.plus-sparkle-left { left: 14%; bottom: 24px; opacity: 0.75; }
+.plus-sparkle-right { right: 12%; top: 42px; color: #7eb5fc; opacity: 0.85; }
+.plus-hero-crown-wrap { display: flex; justify-content: center; margin-bottom: 2px; }
+.plus-crown-emblem { position: relative; display: inline-flex; align-items: center; justify-content: center; }
+.plus-crown-emblem.has-rays { padding: 0 26px; }
+.plus-crown-rays { position: absolute; inset: 4px 0 auto 0; width: 100%; height: 54px; pointer-events: none; }
+.plus-crown-svg { display: block; position: relative; z-index: 1; }
 .plus-crown-verified-dot {
   position: absolute;
   right: 22px;
@@ -142,40 +57,21 @@
   height: 24px;
   border-radius: 50%;
   background: linear-gradient(135deg, #2b7aff 0%, #0b53e0 100%);
-  color: #ffffff;
-  border: 2.5px solid #ffffff;
+  color: #fff;
+  border: 2.5px solid #fff;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   box-shadow: 0 4px 10px rgba(13, 99, 243, 0.35);
   z-index: 2;
 }
+.plus-hero-title { margin: 0; font-size: clamp(2rem, 3.8vw, 2.55rem); font-weight: 850; letter-spacing: -0.03em; line-height: 1.15; color: #101e47; }
+.plus-hero-title span { color: #1464f6; }
+.plus-hero-subtitle { margin: 2px 0 0; font-size: 1.02rem; font-weight: 500; color: #516485; }
 
-.plus-hero-title {
-  margin: 0;
-  font-size: clamp(2rem, 3.8vw, 2.55rem);
-  font-weight: 850;
-  letter-spacing: -0.03em;
-  line-height: 1.15;
-  color: #101e47;
-}
-
-.plus-hero-title span {
-  color: #1464f6;
-}
-
-.plus-hero-subtitle {
-  margin: 2px 0 0;
-  font-size: 1.02rem;
-  font-weight: 500;
-  color: #516485;
-}
-
-/* Loading & Error */
 .plus-loading {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
   gap: 10px;
   padding: 16px 26px;
   border-radius: 16px;
@@ -185,56 +81,25 @@
   font-weight: 600;
   box-shadow: 0 10px 26px -14px rgba(30, 58, 138, 0.14);
 }
+.plus-error { width: 100%; margin: 0; padding: 13px 18px; border-radius: 14px; background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; font-size: 0.92rem; font-weight: 600; text-align: center; }
+.plus-spin { animation: plusSpin 0.9s linear infinite; }
+@keyframes plusSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
-.plus-error {
-  width: 100%;
-  margin: 0;
-  padding: 13px 18px;
-  border-radius: 14px;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #b91c1c;
-  font-size: 0.92rem;
-  font-weight: 600;
-  text-align: center;
-}
-
-.plus-spin {
-  animation: plusSpin 0.9s linear infinite;
-}
-
-@keyframes plusSpin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-/* =========================================================
-   BASE ELEVATED CARD
-   ========================================================= */
+/* Base Card */
 .plus-card {
   width: 100%;
   background: rgba(255, 255, 255, 0.98);
   border: 1.5px solid rgba(255, 255, 255, 0.96);
   border-radius: 26px;
   padding: 28px;
-  box-shadow:
-    0 24px 52px -22px rgba(37, 99, 235, 0.17),
-    0 4px 16px -4px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 24px 52px -22px rgba(37, 99, 235, 0.17), 0 4px 16px -4px rgba(15, 23, 42, 0.04);
   display: flex;
   flex-direction: column;
   gap: 22px;
 }
 
-/* =========================================================
-   VIEW A: PLAN DETAIL / SUBSCRIBE / RENEW CARD
-   ========================================================= */
-.plus-view-switch-row {
-  width: 100%;
-  display: flex;
-  justify-content: flex-start;
-  margin-bottom: -8px;
-}
-
+/* Plan Detail / Subscribe View */
+.plus-view-switch-row { width: 100%; display: flex; margin-bottom: -8px; }
 .plus-back-toggle {
   display: inline-flex;
   align-items: center;
@@ -247,21 +112,10 @@
   font-size: 0.86rem;
   font-weight: 650;
   cursor: pointer;
-  transition: background-color 0.18s ease, transform 0.15s ease;
 }
+.plus-back-toggle:hover { background: #fff; }
 
-.plus-back-toggle:hover {
-  background: #ffffff;
-  transform: translateX(-2px);
-}
-
-.plus-plan-layout {
-  display: grid;
-  grid-template-columns: 186px minmax(0, 1fr);
-  gap: 28px;
-  align-items: start;
-}
-
+.plus-plan-layout { display: grid; grid-template-columns: 186px minmax(0, 1fr); gap: 28px; align-items: start; }
 .plus-crown-tile {
   width: 186px;
   height: 186px;
@@ -269,59 +123,15 @@
   overflow: hidden;
   background: linear-gradient(145deg, #ebf4ff 0%, #dcebff 100%);
   border: 1px solid rgba(203, 223, 255, 0.8);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    0 12px 26px -14px rgba(37, 99, 235, 0.25);
-  flex-shrink: 0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 12px 26px -14px rgba(37, 99, 235, 0.25);
 }
+.plus-crown-tile-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.plus-plan-details { min-width: 0; display: flex; flex-direction: column; gap: 14px; }
 
-.plus-crown-tile-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-.plus-plan-details {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.plus-card-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.plus-card-head h2 {
-  margin: 0 0 6px;
-  font-size: 1.32rem;
-  font-weight: 800;
-  color: #101e47;
-  letter-spacing: -0.02em;
-}
-
-.plus-price {
-  margin: 0;
-  font-size: 2.05rem;
-  font-weight: 850;
-  color: #0b5bf5;
-  letter-spacing: -0.025em;
-  line-height: 1.1;
-}
-
-.plus-price span {
-  font-size: 0.98rem;
-  font-weight: 600;
-  color: #6b7d9b;
-  letter-spacing: 0;
-  margin-left: 2px;
-}
-
+.plus-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.plus-card-head h2 { margin: 0 0 6px; font-size: 1.32rem; font-weight: 800; color: #101e47; letter-spacing: -0.02em; }
+.plus-price { margin: 0; font-size: 2.05rem; font-weight: 850; color: #0b5bf5; letter-spacing: -0.025em; line-height: 1.1; }
+.plus-price span { font-size: 0.98rem; font-weight: 600; color: #6b7d9b; letter-spacing: 0; margin-left: 2px; }
 .plus-status {
   display: inline-flex;
   align-items: center;
@@ -335,34 +145,11 @@
   font-weight: 650;
   white-space: nowrap;
 }
+.plus-status.active { background: #dcfce7; border-color: #86efac; color: #15803d; }
+.plus-card-divider { height: 1px; background: #edf2fa; }
 
-.plus-status.active {
-  background: #dcfce7;
-  border-color: #86efac;
-  color: #15803d;
-}
-
-.plus-card-divider {
-  height: 1px;
-  background: #edf2fa;
-  width: 100%;
-}
-
-.plus-benefits {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.plus-benefits li {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-}
-
+.plus-benefits { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.plus-benefits li { display: flex; gap: 12px; align-items: flex-start; }
 .plus-benefit-check {
   width: 24px;
   height: 24px;
@@ -375,34 +162,11 @@
   flex-shrink: 0;
   margin-top: 1px;
 }
+.plus-benefits strong { display: block; font-size: 0.96rem; font-weight: 750; color: #142347; line-height: 1.35; }
+.plus-benefits p { margin: 3px 0 0; color: #60708d; font-size: 0.89rem; line-height: 1.5; }
+.plus-note { margin: 0; color: #5b6e8e; font-size: 0.88rem; line-height: 1.5; }
+.plus-note-center { text-align: center; }
 
-.plus-benefits strong {
-  display: block;
-  font-size: 0.96rem;
-  font-weight: 750;
-  color: #142347;
-  line-height: 1.35;
-}
-
-.plus-benefits p {
-  margin: 3px 0 0;
-  color: #60708d;
-  font-size: 0.89rem;
-  line-height: 1.5;
-}
-
-.plus-note {
-  margin: 0;
-  color: #5b6e8e;
-  font-size: 0.88rem;
-  line-height: 1.5;
-}
-
-.plus-note-center {
-  text-align: center;
-}
-
-/* Primary Buy / Renew Button */
 .plus-buy {
   width: 100%;
   height: 52px;
@@ -414,27 +178,16 @@
   border: 0;
   border-radius: 14px;
   background: linear-gradient(135deg, #1e73ff 0%, #0b54e0 100%);
-  color: #ffffff;
+  color: #fff;
   font-weight: 700;
   font-size: 1rem;
   cursor: pointer;
   box-shadow: 0 12px 24px -8px rgba(13, 99, 243, 0.5);
-  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+  transition: transform 0.18s, box-shadow 0.18s, filter 0.18s;
 }
+.plus-buy:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.04); }
+.plus-buy:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
 
-.plus-buy:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 16px 28px -8px rgba(13, 99, 243, 0.56);
-  filter: brightness(1.04);
-}
-
-.plus-buy:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
-}
-
-/* Bottom Info Pill Bar (Plan View) */
 .plus-info-bar {
   display: inline-flex;
   align-items: center;
@@ -449,180 +202,48 @@
   font-size: 0.88rem;
   box-shadow: 0 6px 18px -10px rgba(37, 99, 235, 0.18);
 }
+.plus-info-item { display: inline-flex; align-items: center; gap: 7px; }
+.plus-info-item svg { color: #1d63f6; flex-shrink: 0; }
+.plus-info-item strong { color: #101e47; font-weight: 750; }
+.plus-info-sep { width: 1px; height: 16px; background: #bdd2f6; }
 
-.plus-info-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-}
+/* Owned Celebration View */
+.plus-owned-card { position: relative; padding: 0; overflow: hidden; gap: 0; }
+.plus-owned-backdrop { position: absolute; inset: 0 0 auto 0; height: 190px; pointer-events: none; z-index: 0; }
+.plus-owned-backdrop svg { width: 100%; height: 100%; display: block; }
+.plus-owned-inner { position: relative; z-index: 1; padding: 46px 32px 40px; display: flex; flex-direction: column; align-items: center; text-align: center; }
 
-.plus-info-item svg {
-  color: #1d63f6;
-  flex-shrink: 0;
-}
+.plus-owned-badge-stage { position: relative; width: 136px; height: 104px; display: flex; align-items: center; justify-content: center; margin-bottom: 14px; }
+.plus-owned-sparkle { position: absolute; color: #7cb4fc; }
+.plus-owned-sparkle-1 { top: 4px; right: 16px; opacity: 0.8; }
+.plus-owned-sparkle-2 { right: -6px; bottom: 14px; color: #60a5fa; opacity: 0.9; }
+.plus-owned-check-halo { width: 96px; height: 96px; border-radius: 50%; background: radial-gradient(circle, rgba(191, 219, 254, 0.85) 0%, rgba(219, 234, 254, 0.45) 64%, transparent 100%); display: flex; align-items: center; justify-content: center; }
+.plus-owned-check-orb { width: 72px; height: 72px; border-radius: 50%; background: linear-gradient(145deg, #68abff 0%, #2674ff 52%, #0d52db 100%); color: #fff; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 3px 6px rgba(255, 255, 255, 0.48), 0 14px 28px -8px rgba(19, 98, 245, 0.52); }
 
-.plus-info-item strong {
-  color: #101e47;
-  font-weight: 750;
-}
-
-.plus-info-sep {
-  width: 1px;
-  height: 16px;
-  background: #bdd2f6;
-}
-
-/* =========================================================
-   VIEW B: OWNED / ACTIVE PLUS CELEBRATION CARD
-   ========================================================= */
-.plus-owned-card {
-  position: relative;
-  padding: 0;
-  overflow: hidden;
-  gap: 0;
-}
-
-.plus-owned-backdrop {
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 190px;
-  pointer-events: none;
-  z-index: 0;
-}
-
-.plus-owned-backdrop svg {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-
-.plus-owned-inner {
-  position: relative;
-  z-index: 1;
-  padding: 46px 32px 40px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-}
-
-.plus-owned-badge-stage {
-  position: relative;
-  width: 136px;
-  height: 104px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 14px;
-}
-
-.plus-owned-sparkle {
-  position: absolute;
-  color: #7cb4fc;
-}
-
-.plus-owned-sparkle-1 {
-  top: 4px;
-  right: 16px;
-  opacity: 0.8;
-}
-
-.plus-owned-sparkle-2 {
-  right: -6px;
-  bottom: 14px;
-  color: #60a5fa;
-  opacity: 0.9;
-}
-
-.plus-owned-check-halo {
-  width: 96px;
-  height: 96px;
-  border-radius: 50%;
-  background: radial-gradient(
-    circle,
-    rgba(191, 219, 254, 0.85) 0%,
-    rgba(219, 234, 254, 0.45) 64%,
-    transparent 100%
-  );
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.plus-owned-check-orb {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  background: linear-gradient(145deg, #68abff 0%, #2674ff 52%, #0d52db 100%);
-  color: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow:
-    inset 0 3px 6px rgba(255, 255, 255, 0.48),
-    0 14px 28px -8px rgba(19, 98, 245, 0.52);
-}
-
-.plus-owned-heading {
-  margin: 0;
-  font-size: clamp(1.38rem, 2.5vw, 1.65rem);
-  font-weight: 800;
-  color: #101e47;
-  letter-spacing: -0.02em;
-}
-
-.plus-owned-heading span {
-  color: #1464f6;
-}
-
-.plus-owned-expiry {
-  margin: 8px 0 0;
-  font-size: 0.98rem;
-  color: #536685;
-}
-
-.plus-owned-expiry strong {
-  color: #1e3a8a;
-  font-weight: 700;
-}
-
-.plus-owned-stack-note {
-  margin: 6px 0 0;
-  font-size: 0.85rem;
-  color: #15803d;
-  background: #f0fdf4;
-  border: 1px solid #bbf7d0;
-  padding: 5px 12px;
-  border-radius: 999px;
-  font-weight: 600;
-}
+.plus-owned-heading { margin: 0; font-size: clamp(1.38rem, 2.5vw, 1.65rem); font-weight: 800; color: #101e47; letter-spacing: -0.02em; }
+.plus-owned-heading span { color: #1464f6; }
+.plus-owned-expiry { margin: 8px 0 0; font-size: 0.98rem; color: #536685; }
+.plus-owned-expiry strong { color: #1e3a8a; font-weight: 700; }
+.plus-owned-stack-note { margin: 6px 0 0; font-size: 0.85rem; color: #15803d; background: #f0fdf4; border: 1px solid #bbf7d0; padding: 5px 12px; border-radius: 999px; font-weight: 600; }
 
 .plus-detail-btn {
   margin-top: 22px;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
   gap: 9px;
   padding: 12px 26px;
   border-radius: 999px;
-  background: #ffffff;
+  background: #fff;
   border: 1.5px solid #cbdcf8;
   color: #0b5bf5;
   font-size: 0.94rem;
   font-weight: 700;
   cursor: pointer;
   box-shadow: 0 10px 22px -12px rgba(37, 99, 235, 0.3);
-  transition: transform 0.18s ease, border-color 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease;
+  transition: transform 0.18s, border-color 0.18s, background-color 0.18s;
 }
+.plus-detail-btn:hover { background: #f6faff; border-color: #93c5fd; transform: translateY(-1px); }
 
-.plus-detail-btn:hover {
-  background: #f6faff;
-  border-color: #93c5fd;
-  transform: translateY(-1px);
-  box-shadow: 0 14px 26px -12px rgba(37, 99, 235, 0.36);
-}
-
-/* Bottom Thank-You Banner Strip */
 .plus-thanks-banner {
   width: 100%;
   display: flex;
@@ -635,289 +256,52 @@
   border: 1px solid rgba(196, 218, 255, 0.95);
   box-shadow: 0 12px 26px -16px rgba(37, 99, 235, 0.22);
 }
+.plus-thanks-left { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.plus-thanks-crown { position: relative; display: inline-flex; flex-shrink: 0; }
+.plus-thanks-sparkle { position: absolute; right: -5px; bottom: 4px; color: #60a5fa; }
+.plus-thanks-copy { min-width: 0; }
+.plus-thanks-copy strong { display: block; font-size: 0.98rem; font-weight: 800; color: #101e47; }
+.plus-thanks-copy p { margin: 3px 0 0; font-size: 0.87rem; color: #4f6385; }
+.plus-thanks-rays { width: 26px; height: 26px; flex-shrink: 0; }
 
-.plus-thanks-left {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  min-width: 0;
-}
+/* Payment History & PlusPayment.jsx Support */
+.plus-history { width: 100%; background: rgba(255, 255, 255, 0.95); border: 1px solid rgba(226, 235, 249, 0.95); border-radius: 22px; padding: 22px 24px; box-shadow: 0 14px 32px -18px rgba(30, 58, 138, 0.1); }
+.plus-history-head { display: flex; align-items: center; gap: 9px; margin-bottom: 14px; color: #1d63f6; }
+.plus-history h2 { font-size: 1.04rem; font-weight: 750; color: #101e47; margin: 0; }
+.plus-history ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.plus-history li { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 4px 14px; padding: 12px 15px; background: #f8fbff; border: 1px solid #e6eefb; border-radius: 14px; font-size: 0.9rem; }
+.plus-order-link { color: #0b5bf5; font-weight: 700; text-decoration: none; }
+.plus-order-link:hover { text-decoration: underline; }
+.plus-order-amount { font-weight: 700; color: #101e47; }
+.plus-order-status { padding: 4px 10px; border-radius: 999px; font-size: 0.78rem; font-weight: 700; background: #edf2f7; color: #475569; }
+.plus-order-status.status-paid { background: #dcfce7; color: #15803d; }
+.plus-order-status.status-pending, .plus-order-status.status-creating { background: #dbeafe; color: #1d4ed8; }
+.plus-order-status.status-cancelled, .plus-order-status.status-expired, .plus-order-status.status-failed { background: #fee2e2; color: #b91c1c; }
+.plus-order-date { grid-column: 1 / -1; color: #7183a0; font-size: 0.8rem; }
 
-.plus-thanks-crown {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
+.plus-back { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 999px; background: rgba(255, 255, 255, 0.9); border: 1px solid #d5e4fb; color: #0b5bf5; text-decoration: none; font-size: 0.9rem; font-weight: 700; }
+.plus-back:hover { background: #fff; }
+.plus-result { align-items: center; text-align: center; padding: 36px 28px; gap: 14px; }
+.plus-result h1 { margin: 0; font-size: 1.5rem; font-weight: 800; color: #101e47; }
+.plus-result p { margin: 0; color: #4f6385; line-height: 1.55; }
+.plus-actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 8px; width: 100%; }
+.plus-actions .plus-buy { width: auto; min-width: 210px; }
+.plus-secondary { height: 52px; padding: 0 22px; border: 1.5px solid #cbdcf8; border-radius: 14px; background: #fff; color: #36507d; font-weight: 700; font-size: 0.95rem; cursor: pointer; }
+.plus-secondary:hover:not(:disabled) { background: #f5f9ff; border-color: #93c5fd; }
 
-.plus-thanks-sparkle {
-  position: absolute;
-  right: -5px;
-  bottom: 4px;
-  color: #60a5fa;
-}
-
-.plus-thanks-copy {
-  min-width: 0;
-}
-
-.plus-thanks-copy strong {
-  display: block;
-  font-size: 0.98rem;
-  font-weight: 800;
-  color: #101e47;
-}
-
-.plus-thanks-copy p {
-  margin: 3px 0 0;
-  font-size: 0.87rem;
-  color: #4f6385;
-}
-
-.plus-thanks-rays {
-  width: 26px;
-  height: 26px;
-  flex-shrink: 0;
-}
-
-/* =========================================================
-   PAYMENT HISTORY SECTION
-   ========================================================= */
-.plus-history {
-  width: 100%;
-  background: rgba(255, 255, 255, 0.95);
-  border: 1px solid rgba(226, 235, 249, 0.95);
-  border-radius: 22px;
-  padding: 22px 24px;
-  box-shadow: 0 14px 32px -18px rgba(30, 58, 138, 0.1);
-}
-
-.plus-history-head {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  margin-bottom: 14px;
-  color: #1d63f6;
-}
-
-.plus-history h2 {
-  font-size: 1.04rem;
-  font-weight: 750;
-  color: #101e47;
-  margin: 0;
-}
-
-.plus-history ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 10px;
-}
-
-.plus-history li {
-  display: grid;
-  grid-template-columns: 1fr auto auto;
-  align-items: center;
-  gap: 4px 14px;
-  padding: 12px 15px;
-  background: #f8fbff;
-  border: 1px solid #e6eefb;
-  border-radius: 14px;
-  font-size: 0.9rem;
-}
-
-.plus-order-link {
-  color: #0b5bf5;
-  font-weight: 700;
-  text-decoration: none;
-}
-
-.plus-order-link:hover {
-  text-decoration: underline;
-}
-
-.plus-order-amount {
-  font-weight: 700;
-  color: #101e47;
-}
-
-.plus-order-status {
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 0.78rem;
-  font-weight: 700;
-  background: #edf2f7;
-  color: #475569;
-}
-
-.plus-order-status.status-paid {
-  background: #dcfce7;
-  color: #15803d;
-}
-
-.plus-order-status.status-pending,
-.plus-order-status.status-creating {
-  background: #dbeafe;
-  color: #1d4ed8;
-}
-
-.plus-order-status.status-cancelled,
-.plus-order-status.status-expired,
-.plus-order-status.status-failed {
-  background: #fee2e2;
-  color: #b91c1c;
-}
-
-.plus-order-date {
-  grid-column: 1 / -1;
-  color: #7183a0;
-  font-size: 0.8rem;
-}
-
-/* =========================================================
-   PLUS PAYMENT RESULT PAGE SUPPORT (PlusPayment.jsx)
-   ========================================================= */
-.plus-back {
-  align-self: flex-start;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 14px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid #d5e4fb;
-  color: #0b5bf5;
-  text-decoration: none;
-  font-size: 0.9rem;
-  font-weight: 700;
-}
-
-.plus-back:hover {
-  background: #ffffff;
-}
-
-.plus-result {
-  align-items: center;
-  text-align: center;
-  padding: 36px 28px;
-  gap: 14px;
-}
-
-.plus-result h1 {
-  margin: 0;
-  font-size: 1.5rem;
-  font-weight: 800;
-  color: #101e47;
-}
-
-.plus-result p {
-  margin: 0;
-  color: #4f6385;
-  line-height: 1.55;
-}
-
-.plus-actions {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  justify-content: center;
-  margin-top: 8px;
-  width: 100%;
-}
-
-.plus-actions .plus-buy {
-  width: auto;
-  min-width: 210px;
-}
-
-.plus-secondary {
-  height: 52px;
-  padding: 0 22px;
-  border: 1.5px solid #cbdcf8;
-  border-radius: 14px;
-  background: #ffffff;
-  color: #36507d;
-  font-weight: 700;
-  font-size: 0.95rem;
-  cursor: pointer;
-  transition: background-color 0.18s ease, border-color 0.18s ease;
-}
-
-.plus-secondary:hover:not(:disabled) {
-  background: #f5f9ff;
-  border-color: #93c5fd;
-}
-
-/* =========================================================
-   RESPONSIVENESS
-   ========================================================= */
 @media (max-width: 700px) {
-  .plus-main {
-    padding: 24px 14px 56px;
-    gap: 18px;
-  }
-
-  .plus-sparkle-left {
-    left: 4%;
-  }
-
-  .plus-sparkle-right {
-    right: 4%;
-  }
-
-  .plus-card {
-    border-radius: 22px;
-    padding: 20px 18px;
-  }
-
-  .plus-plan-layout {
-    grid-template-columns: minmax(0, 1fr);
-    justify-items: center;
-    gap: 20px;
-  }
-
-  .plus-crown-tile {
-    width: 156px;
-    height: 156px;
-  }
-
-  .plus-plan-details {
-    width: 100%;
-  }
-
-  .plus-price {
-    font-size: 1.8rem;
-  }
-
-  .plus-info-bar {
-    width: 100%;
-    padding: 12px 16px;
-    justify-content: center;
-  }
-
-  .plus-info-sep {
-    display: none;
-  }
-
-  .plus-owned-inner {
-    padding: 36px 20px 32px;
-  }
-
-  .plus-thanks-banner {
-    padding: 16px 18px;
-  }
-
-  .plus-thanks-rays {
-    display: none;
-  }
-
-  .plus-history {
-    padding: 18px 16px;
-  }
-
-  .plus-history li {
-    grid-template-columns: 1fr auto;
-  }
+  .plus-main { padding: 24px 14px 56px; gap: 18px; }
+  .plus-sparkle-left { left: 4%; }
+  .plus-sparkle-right { right: 4%; }
+  .plus-card { border-radius: 22px; padding: 20px 18px; }
+  .plus-plan-layout { grid-template-columns: minmax(0, 1fr); justify-items: center; gap: 20px; }
+  .plus-crown-tile { width: 156px; height: 156px; }
+  .plus-plan-details { width: 100%; }
+  .plus-price { font-size: 1.8rem; }
+  .plus-info-bar { width: 100%; padding: 12px 16px; }
+  .plus-info-sep, .plus-thanks-rays { display: none; }
+  .plus-owned-inner { padding: 36px 20px 32px; }
+  .plus-thanks-banner { padding: 16px 18px; }
+  .plus-history { padding: 18px 16px; }
+  .plus-history li { grid-template-columns: 1fr auto; }
 }
