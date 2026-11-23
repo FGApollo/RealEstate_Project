@@ -125,7 +125,7 @@ const Swipe = () => {
         if (!response.ok) throw new Error(`Recommendations request failed (${response.status})`);
         const data = await response.json();
         if (isCurrentRequest) {
-          setDbProperties((data.properties || []).filter(p => !p.is_hidden));
+          setDbProperties((data.properties || []).filter(p => !p.is_hidden && !p.plus_locked));
           recommendationPagingRef.current = {
             offset: data.pagination?.nextOffset || 0,
             hasMore: Boolean(data.pagination?.hasMore),
@@ -163,7 +163,7 @@ const Swipe = () => {
       if (feedId !== recommendationFeedIdRef.current) return;
       setDbProperties((previous) => {
         const currentIds = new Set(previous.map((property) => Number(property.id)));
-        return [...previous, ...(data.properties || []).filter((property) => !currentIds.has(Number(property.id)) && !property.is_hidden)];
+        return [...previous, ...(data.properties || []).filter((property) => !currentIds.has(Number(property.id)) && !property.is_hidden && !property.plus_locked)];
       });
       paging.offset = data.pagination?.nextOffset || paging.offset;
       paging.hasMore = Boolean(data.pagination?.hasMore);

@@ -21,6 +21,7 @@ import { useRequireAuth } from '../auth/useRequireAuth';
 import PropertyDetailModal from '../components/PropertyDetailModal';
 import PageWaveBackground from '../components/PageWaveBackground';
 import CheckedListingsSection from '../features/plus/CheckedListingsSection';
+import PlusLockedCard from '../features/plus/PlusLockedCard';
 import { SwipeNestBadges } from '../features/plus/SwipeNestBadges';
 import { priceRangeOf, writeSearch } from '../features/search/searchParams';
 import AreaSelect from '../features/location/AreaSelect';
@@ -182,6 +183,7 @@ const Home = () => {
 
   // The server filters and orders before limiting the featured results.
   useEffect(() => {
+    if (authStatus === 'authenticating') return undefined;
     const controller = new AbortController();
     let active = true;
     const fetchProperties = async () => {
@@ -209,7 +211,7 @@ const Home = () => {
               const single = await publicApiFetch(`${API_BASE_URL}/api/properties/${sharedPropertyId}`, { signal: controller.signal });
               if (single.ok) found = (await single.json()).property || null;
             }
-            if (found && active) {
+            if (found && !found.plus_locked && active) {
               setSelectedProperty(found);
               setShowDetailModal(true);
             }
@@ -230,7 +232,7 @@ const Home = () => {
       active = false;
       controller.abort();
     };
-  }, [sharedPropertyId, propertiesReloadKey, publicSearchFilters]);
+  }, [authStatus, user?.id, sharedPropertyId, propertiesReloadKey, publicSearchFilters]);
 
   const selectCategoryPreview = async (category) => {
     const returnTo = `/swipe/${encodeURIComponent(category.name)}`;
@@ -600,6 +602,9 @@ const Home = () => {
         <div className="featured-properties-grid">
           {actionNotice && <p className="home-action-notice" role="status">{actionNotice}</p>}
           {showcaseProperties.map((property) => {
+            if (property.plus_locked) {
+              return <PlusLockedCard key={property.id} property={property} formatPrice={formatPrice} />;
+            }
             const isFavorite = dbFavorites.some(fav => fav.id === property.id);
             return (
               <article
