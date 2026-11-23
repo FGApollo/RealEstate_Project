@@ -6,6 +6,7 @@ const {
   summarizePlusSubscriptions,
   buildActivePlusUsersPage
 } = require('./plusAnalyticsLogic');
+const { parseTransactionAudience } = require('./transactionsAnalyticsLogic');
 
 // An absent ledger is unknown revenue, not zero revenue. No subscription price
 // or status is accepted as evidence of a settled payment.
@@ -50,10 +51,11 @@ async function getDashboard(query, now = new Date()) {
 }
 
 async function getTransactions(query, now = new Date()) {
-  const { page, limit, ...dates } = query;
+  const { page, limit, audience, ...dates } = query;
   const pagination = parsePagination({ ...(page !== undefined ? { page } : {}), ...(limit !== undefined ? { limit } : {}) });
+  const parsedAudience = parseTransactionAudience(audience);
   const filters = parseAnalyticsQuery(dates, now);
-  return await repository.getTransactions(filters, pagination, now)
+  return await repository.getTransactions(filters, pagination, now, parsedAudience)
     || { available: false, reason: 'Chưa có dữ liệu thanh toán xác thực', items: [], total: null, ...pagination };
 }
 

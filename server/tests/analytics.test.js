@@ -384,3 +384,40 @@ test('customer Plus analytics reconciles dashboard KPIs with active Plus custome
   assert.equal(page2.items[0].activePeriods, 2);
   assert.equal(page2.items[0].endDate, '2026-12-10T04:00:00.000Z');
 });
+
+test('transactions endpoint splits AGENT and USER orders with accurate audience counts', async () => {
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS agent_payment_orders (
+      id text PRIMARY KEY, order_code bigint NOT NULL, user_id integer NOT NULL REFERENCES users(id),
+      plan_code text NOT NULL, plan_name text NOT NULL, amount_vnd integer NOT NULL,
+      currency text NOT NULL DEFAULT 'VND', status text NOT NULL, audience text NOT NULL,
+      created_at timestamptz NOT NULL, paid_at timestamptz
+    );
+    INSERT INTO agent_payment_orders (id,order_code,user_id,plan_code,plan_name,amount_vnd,status,audience,created_at,paid_at) VALUES
+      ('ord-1',1000000000001,9,'PRO','Pro',299000,'PAID','AGENT','2026-10-12T05:00:00Z','2026-10-12T05:01:00Z'),
+      ('ord-2',1000000000002,1,'USER_PLUS','Swipe Nest Plus',20000,'PAID','USER','2026-10-13T05:00:00Z','2026-10-13T05:01:00Z'),
+      ('ord-3',1000000000003,2,'USER_PLUS','Swipe Nest Plus',20000,'CANCELLED','USER','2026-10-14T05:00:00Z',NULL);
+  `);
+  try {
+    const now = new Date('2026-10-16T12:00:00Z');
+    const all = await service.getTransactions({ start: '2026-10-10', end: '2026-10-16' }, now);
+    assert.equal(all.available, true);
+    assert.equal(all.total, 3);
+    assert.deepEqual(all.counts, { all: 3, agent: 1, user: 2 });
+
+    const agentsOnly = await service.getTransactions({ start: '2026-10-10', end: '2026-10-16', audience: 'AGENT' }, now);
+    assert.equal(agentsOnly.total, 1);
+    assert.equal(agentsOnly.items.length, 1);
+    assert.equal(agentsOnly.items[0].audience, 'AGENT');
+    assert.equal(agentsOnly.items[0].accountName, 'Fixture 9');
+
+    const usersOnly = await service.getTransactions({ start: '2026-10-10', end: '2026-10-16', audience: 'USER' }, now);
+    assert.equal(usersOnly.total, 2);
+    assert.equal(usersOnly.items.length, 2);
+    assert.ok(usersOnly.items.every((item) => item.audience === 'USER'));
+
+    await assert.rejects(service.getTransactions({ audience: 'INVALID' }, now), (err) => err.statusCode === 400);
+  } finally {
+    await db.exec('DROP TABLE IF EXISTS agent_payment_orders');
+  }
+});
