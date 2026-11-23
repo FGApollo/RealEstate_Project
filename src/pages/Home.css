@@ -4,7 +4,7 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background-color: #f7f9fc;
+  background-color: #eef5ff;
 }
 
 /* Header & Navbar */
@@ -2410,7 +2410,32 @@
   --home-ink: #111a2e;
   --home-muted: #7a8495;
   --home-line: #e8edf4;
-  background: #f7f9fc;
+  background: linear-gradient(180deg, #f5f9ff 0%, #eef5ff 54%, #e5f0ff 100%);
+  position: relative;
+  overflow-x: clip;
+}
+
+.home-bg-decor {
+  position: fixed;
+  inset: auto 0 0 0;
+  height: 290px;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.home-bg-waves {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.home-container > .home-hero,
+.home-container > .categories-section,
+.home-container > .recommended-section,
+.home-container > .home-footer {
+  position: relative;
+  z-index: 1;
 }
 
 .home-container .navbar {
