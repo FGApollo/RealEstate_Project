@@ -1,5 +1,11 @@
 const repository = require('../repositories/analyticsRepository');
 const { parseAnalyticsQuery, parsePagination, parseActiveAgentsQuery } = require('./analyticsQuery');
+const {
+  getAnalyticsWindow,
+  unavailablePlusSubscriptions,
+  summarizePlusSubscriptions,
+  buildActivePlusUsersPage
+} = require('./plusAnalyticsLogic');
 
 // An absent ledger is unknown revenue, not zero revenue. No subscription price
 // or status is accepted as evidence of a settled payment.
@@ -16,10 +22,31 @@ const unavailableRevenue = () => ({
 
 async function getDashboard(query, now = new Date()) {
   const filters = parseAnalyticsQuery(query, now);
-  const [result, revenue] = await Promise.all([repository.getDashboard(filters, now), repository.getRevenue(filters, now)]);
-  const packages = result.packages.map((plan) => ({ ...plan, revenue: revenue ? revenue.byPackage
-    .filter((item) => item.code === plan.name).reduce((sum, item) => sum + Number(item.gross), 0) : null }));
-  return { ...result, packages, filters, revenue: revenue || unavailableRevenue() };
+  const [result, revenue, plusData] = await Promise.all([
+    repository.getDashboard(filters, now),
+    repository.getRevenue(filters, now),
+    repository.getPlusSnapshotData().catch(() => null)
+  ]);
+  const packages = result.packages.map((plan) => ({
+    ...plan,
+    revenue: revenue
+      ? revenue.byPackage
+        .filter((item) => item.code === plan.name)
+        .reduce((sum, item) => sum + Number(item.gross), 0)
+      : null
+  }));
+  const window = getAnalyticsWindow(filters, now, result.snapshotAt);
+  const plusSubscriptions = plusData
+    ? summarizePlusSubscriptions({
+      subscriptions: plusData.subscriptions,
+      usersById: plusData.usersById,
+      plans: plusData.plans,
+      totalCustomers: result.users?.customers,
+      revenueByPackage: revenue?.byPackage || null,
+      window
+    })
+    : unavailablePlusSubscriptions(result.users?.customers);
+  return { ...result, packages, plusSubscriptions, filters, revenue: revenue || unavailableRevenue() };
 }
 
 async function getTransactions(query, now = new Date()) {
@@ -33,4 +60,22 @@ async function getTransactions(query, now = new Date()) {
 async function getActiveAgents(query, now = new Date()) {
   return repository.getActiveAgents(parseActiveAgentsQuery(query, now));
 }
-module.exports = { getDashboard, getTransactions, getActiveAgents };
+
+async function getActivePlusUsers(query, now = new Date()) {
+  const parsed = parseActiveAgentsQuery(query, now);
+  const plusData = await repository.getPlusSnapshotData();
+  if (!plusData) {
+    throw Object.assign(new Error('Danh sách khách hàng Plus chưa được cấu hình. Vui lòng thử lại sau.'), {
+      statusCode: 503,
+      code: 'ACTIVE_PLUS_USERS_NOT_CONFIGURED'
+    });
+  }
+  return buildActivePlusUsersPage({
+    subscriptions: plusData.subscriptions,
+    usersById: plusData.usersById,
+    plans: plusData.plans,
+    ...parsed
+  });
+}
+
+module.exports = { getDashboard, getTransactions, getActiveAgents, getActivePlusUsers };
