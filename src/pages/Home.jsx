@@ -469,6 +469,29 @@ const Home = () => {
 
   return (
     <div className="home-container">
+      {/* Nền sóng xanh nhạt đồng bộ với trang Profile */}
+      <div className="home-bg-decor" aria-hidden="true">
+        <svg className="home-bg-waves" viewBox="0 0 1440 320" preserveAspectRatio="none" fill="none">
+          <path
+            d="M0 192C220 132 420 260 720 218C1020 176 1220 92 1440 146V320H0V192Z"
+            fill="url(#homeWaveA)"
+          />
+          <path
+            d="M0 248C280 198 540 296 860 250C1120 212 1300 172 1440 202V320H0V248Z"
+            fill="url(#homeWaveB)"
+          />
+          <defs>
+            <linearGradient id="homeWaveA" x1="0" y1="0" x2="1440" y2="320" gradientUnits="userSpaceOnUse">
+              <stop stopColor="#dbeafe" stopOpacity="0.65" />
+              <stop offset="1" stopColor="#bfdbfe" stopOpacity="0.35" />
+            </linearGradient>
+            <linearGradient id="homeWaveB" x1="0" y1="180" x2="1440" y2="320" gradientUnits="userSpaceOnUse">
+              <stop stopColor="#e0ecff" stopOpacity="0.8" />
+              <stop offset="1" stopColor="#c7ddff" stopOpacity="0.55" />
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
       {/* Header */}
       <SwipeHeader 
         activeView="home" 

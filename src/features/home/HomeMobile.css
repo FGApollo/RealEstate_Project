@@ -11,7 +11,7 @@
 @media (max-width: 820px) {
   body .home-container {
     padding-bottom: calc(76px + env(safe-area-inset-bottom));
-    background: radial-gradient(ellipse at 50% 6%, #eaf0ff66, transparent 35%), #f9faff;
+    background: linear-gradient(180deg, #f5f9ff 0%, #eef5ff 54%, #e5f0ff 100%);
   }
 
   body .home-container > .app-header-navbar {
