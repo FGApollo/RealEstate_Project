@@ -4,6 +4,7 @@ import {
   filterAndSortProvinces,
   filterWards,
   formatAreaDropdownLabel,
+  formatListingTypeLabel,
   formatPriceDropdownLabel,
   formatPropertyTypeLabel,
   matchPricePreset,
@@ -94,4 +95,7 @@ test('matchPricePreset and display label formatters handle presets and custom va
     formatAreaDropdownLabel({ province: 'Thành phố Hồ Chí Minh', ward: 'Phường Bến Nghé', hasProvinces: true }),
     'Phường Bến Nghé, Hồ Chí Minh'
   );
+  assert.equal(formatListingTypeLabel(''), 'Thuê & bán');
+  assert.equal(formatListingTypeLabel('RENT'), 'Cho thuê');
+  assert.equal(formatListingTypeLabel('SALE'), 'Mua bán');
 });

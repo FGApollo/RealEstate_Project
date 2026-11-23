@@ -1,18 +1,20 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  ArrowLeft, BedDouble, BriefcaseBusiness, Building2, Check,
-  ChevronDown, ChevronRight, Home as HomeIcon, LayoutGrid,
+  ArrowLeft, BedDouble, BriefcaseBusiness, Building2, CalendarDays, Check,
+  ChevronDown, ChevronRight, Home as HomeIcon, KeyRound, LayoutGrid,
   MapPin, Search, Store, Tag, X
 } from 'lucide-react';
 import { useAdminAreas } from '../location/adminAreas';
 import {
+  LISTING_TYPE_ITEMS,
   PRICE_PRESET_OPTIONS,
   PROPERTY_TYPE_ITEMS,
   REGION_TABS,
   filterAndSortProvinces,
   filterWards,
   formatAreaDropdownLabel,
+  formatListingTypeLabel,
   formatPriceDropdownLabel,
   formatPropertyTypeLabel,
   matchPricePreset,
@@ -30,6 +32,12 @@ const TYPE_ICONS = {
   room: BedDouble,
   shop: Store,
   office: BriefcaseBusiness
+};
+
+const LISTING_ICONS = {
+  all: CalendarDays,
+  rent: KeyRound,
+  sale: Building2
 };
 
 const DropdownPopover = ({ open, anchorRef, onClose, width = 336, label, children }) => {
@@ -104,7 +112,8 @@ const DropdownPopover = ({ open, anchorRef, onClose, width = 336, label, childre
 
 // Shared trigger + popover shell with consistent footer actions.
 const FilterDropdown = ({
-  fieldClassName,
+  variant = 'home',
+  fieldClassName = '',
   icon: Icon,
   label,
   value,
@@ -119,22 +128,39 @@ const FilterDropdown = ({
   children
 }) => {
   const triggerRef = useRef(null);
+  const isSearch = variant === 'search';
   return (
     <>
       <button
         ref={triggerRef}
         type="button"
-        className={`home-hero-field ${fieldClassName} home-hero-dropdown-trigger ${open ? 'is-open' : ''}`}
+        className={isSearch
+          ? `search-filter-field search-filter-dropdown-trigger ${fieldClassName} ${open ? 'is-open' : ''}`.trim()
+          : `home-hero-field ${fieldClassName} home-hero-dropdown-trigger ${open ? 'is-open' : ''}`.trim()}
         onClick={onToggle}
         aria-haspopup="dialog"
         aria-expanded={open}
+        aria-label={`${label}: ${value}`}
       >
-        <Icon aria-hidden="true" size={20} />
-        <span className="home-hero-field-content">
-          <span>{label}</span>
-          <span className={`home-hero-field-value ${isActive ? 'is-active' : ''}`}>{value}</span>
-        </span>
-        <ChevronDown aria-hidden="true" size={14} className="hsd-chevron" />
+        {isSearch ? (
+          <>
+            <span className="search-filter-icon"><Icon size={19} strokeWidth={1.8} aria-hidden="true" /></span>
+            <span className="search-filter-copy">
+              <span className="search-filter-label">{label}</span>
+              <span className={`search-filter-value ${isActive ? 'is-active' : ''}`} title={value}>{value}</span>
+            </span>
+            <ChevronDown aria-hidden="true" size={15} className="search-filter-chevron hsd-chevron" />
+          </>
+        ) : (
+          <>
+            <Icon aria-hidden="true" size={20} />
+            <span className="home-hero-field-content">
+              <span>{label}</span>
+              <span className={`home-hero-field-value ${isActive ? 'is-active' : ''}`}>{value}</span>
+            </span>
+            <ChevronDown aria-hidden="true" size={14} className="hsd-chevron" />
+          </>
+        )}
       </button>
 
       <DropdownPopover open={open} anchorRef={triggerRef} onClose={onClose} width={width} label={dialogLabel}>
@@ -181,7 +207,7 @@ const DropdownOptionRow = ({ icon: Icon, label, selected, onClick }) => (
   </button>
 );
 
-export const HomeAreaDropdown = ({ province, ward, onChange }) => {
+export const HomeAreaDropdown = ({ province, ward, onChange, variant = 'home' }) => {
   const { provinces, error } = useAdminAreas();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -220,6 +246,7 @@ export const HomeAreaDropdown = ({ province, ward, onChange }) => {
 
   return (
     <FilterDropdown
+      variant={variant}
       fieldClassName="home-hero-field-area"
       icon={MapPin}
       label="Khu vực"
@@ -325,7 +352,7 @@ export const HomeAreaDropdown = ({ province, ward, onChange }) => {
   );
 };
 
-export const HomePropertyTypeDropdown = ({ selectedCategories = [], onApplyCategories }) => {
+export const HomePropertyTypeDropdown = ({ selectedCategories = [], onApplyCategories, variant = 'home', label = 'Loại bất động sản', icon = HomeIcon }) => {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [draft, setDraft] = useState(selectedCategories);
@@ -342,9 +369,10 @@ export const HomePropertyTypeDropdown = ({ selectedCategories = [], onApplyCateg
 
   return (
     <FilterDropdown
+      variant={variant}
       fieldClassName="home-hero-field-type"
-      icon={HomeIcon}
-      label="Loại bất động sản"
+      icon={icon}
+      label={label}
       value={formatPropertyTypeLabel(selectedCategories)}
       isActive={selectedCategories.length > 0}
       open={open}
@@ -375,7 +403,7 @@ export const HomePropertyTypeDropdown = ({ selectedCategories = [], onApplyCateg
   );
 };
 
-export const HomePriceDropdown = ({ priceRange, minPrice, maxPrice, onApplyPrice }) => {
+export const HomePriceDropdown = ({ priceRange, minPrice, maxPrice, onApplyPrice, variant = 'home' }) => {
   const [open, setOpen] = useState(false);
   const [draftMin, setDraftMin] = useState(() => vndToMillionInput(minPrice));
   const [draftMax, setDraftMax] = useState(() => vndToMillionInput(maxPrice));
@@ -384,6 +412,7 @@ export const HomePriceDropdown = ({ priceRange, minPrice, maxPrice, onApplyPrice
 
   return (
     <FilterDropdown
+      variant={variant}
       fieldClassName="home-hero-field-price"
       icon={Tag}
       label="Khoảng giá"
@@ -416,6 +445,41 @@ export const HomePriceDropdown = ({ priceRange, minPrice, maxPrice, onApplyPrice
           <span className="hsd-custom-dash">–</span>
           <input type="number" min="0" step="0.5" placeholder="Đến" value={draftMax} onChange={(e) => setDraftMax(e.target.value)} aria-label="Giá tối đa (triệu)" />
         </div>
+      </div>
+    </FilterDropdown>
+  );
+};
+
+export const HomeListingTypeDropdown = ({ listing = '', onChange, variant = 'home' }) => {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState(listing || '');
+
+  return (
+    <FilterDropdown
+      variant={variant}
+      fieldClassName="search-filter-field-listing"
+      icon={CalendarDays}
+      label="Hình thức giao dịch"
+      value={formatListingTypeLabel(listing)}
+      isActive={Boolean(listing)}
+      open={open}
+      onToggle={() => { setDraft(listing || ''); setOpen((prev) => !prev); }}
+      onClose={() => setOpen(false)}
+      onReset={() => { setDraft(''); onChange(''); setOpen(false); }}
+      onApply={() => { onChange(draft); setOpen(false); }}
+      width={276}
+      dialogLabel="Chọn hình thức giao dịch"
+    >
+      <div className="hsd-list hsd-list-compact" role="listbox" aria-label="Danh sách hình thức giao dịch">
+        {LISTING_TYPE_ITEMS.map((opt) => (
+          <DropdownOptionRow
+            key={opt.value || 'ALL'}
+            icon={LISTING_ICONS[opt.iconKey] || CalendarDays}
+            label={opt.label}
+            selected={draft === opt.value}
+            onClick={() => setDraft(opt.value)}
+          />
+        ))}
       </div>
     </FilterDropdown>
   );
