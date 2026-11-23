@@ -7,6 +7,7 @@ export const fetchPlusPayments = (options) => billingRequest('/api/plus/payments
 export const fetchPlusPayment = (orderId, options) => billingRequest(`/api/plus/payments/${encodeURIComponent(orderId)}`, options);
 export const cancelPlusPayment = (orderId) => billingRequest(`/api/plus/payments/${encodeURIComponent(orderId)}/cancel`, { method: 'POST' });
 export const fetchOfficialListings = (options) => billingRequest('/api/plus/official-listings', options);
+export const fetchOfficialPreview = (options) => billingRequest('/api/plus/official-preview', options);
 
 export const createPlusPayment = (plan) => billingRequest('/api/plus/payments', {
   method: 'POST',
