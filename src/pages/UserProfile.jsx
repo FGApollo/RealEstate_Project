@@ -1,18 +1,20 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   User, Mail, Phone, ShieldCheck, Shield, Camera, Lock,
-  CheckCircle2, AlertCircle, Eye, EyeOff, ArrowLeft, Calendar,
-  Heart, MessageSquare, Loader2, Sparkles, Home as HomeIcon, Check,
-  LogOut
+  CheckCircle2, AlertCircle, Eye, EyeOff, Calendar,
+  Heart, MessageSquare, Loader2, Sparkles, Check,
+  LogOut, Save, ChevronDown, Clock, ArrowRight, Gem,
+  Crown, SlidersHorizontal
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import { apiFetch } from '../auth/apiClient';
 import { useAuth } from '../auth/useAuth';
+import { fetchPlusStatus } from '../features/plus/plusApi';
 import Header from '../components/Header';
 import Avatar from '../components/Avatar';
+import heroVillaArt from '../assets/profile-hero-villa.jpg';
 import './UserProfile.css';
-
 
 export default function UserProfile() {
   const navigate = useNavigate();
@@ -21,6 +23,7 @@ export default function UserProfile() {
 
   const [activeTab, setActiveTab] = useState('info'); // 'info' | 'security'
   const [profile, setProfile] = useState(null);
+  const [plusStatus, setPlusStatus] = useState(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
 
   // Form states - Profile Info
@@ -44,9 +47,13 @@ export default function UserProfile() {
   const [avatarError, setAvatarError] = useState('');
   const [avatarSuccess, setAvatarSuccess] = useState('');
 
-  // Fetch full profile from API on mount
+  const isRegularUser = String(profile?.role || authUser?.role || '').toUpperCase() === 'USER';
+
+  // Fetch full profile & Plus status from API on mount
   useEffect(() => {
     let isMounted = true;
+    const controller = new AbortController();
+
     const loadProfile = async () => {
       try {
         setLoadingProfile(true);
@@ -72,8 +79,25 @@ export default function UserProfile() {
       }
     };
 
+    const loadPlusStatus = async () => {
+      if (String(authUser?.role || '').toUpperCase() !== 'USER') return;
+      try {
+        const data = await fetchPlusStatus({ signal: controller.signal });
+        if (isMounted && data?.plus) {
+          setPlusStatus(data.plus);
+        }
+      } catch {
+        // Plus status is supplementary; profile renders standard tier cleanly if unavailable
+      }
+    };
+
     loadProfile();
-    return () => { isMounted = false; };
+    loadPlusStatus();
+
+    return () => {
+      isMounted = false;
+      controller.abort();
+    };
   }, [authUser]);
 
   // Handle avatar file selection
@@ -143,7 +167,10 @@ export default function UserProfile() {
       const vnPhoneRegex = /^0[35789]\d{8}$/;
       const cleaned = trimmedPhone.replace(/[\s().-]/g, '').replace(/^\+84/, '0');
       if (!vnPhoneRegex.test(cleaned)) {
-        setProfileMessage({ type: 'error', text: 'Số điện thoại không hợp lệ (cần 10 chữ số, bắt đầu bằng 03, 05, 07, 08, 09)' });
+        setProfileMessage({
+          type: 'error',
+          text: 'Số điện thoại không hợp lệ (cần 10 chữ số, bắt đầu bằng 03, 05, 07, 08, 09)'
+        });
         return;
       }
     }
@@ -164,7 +191,7 @@ export default function UserProfile() {
         throw new Error(data.error || 'Cập nhật thất bại');
       }
 
-      setProfile(data.user);
+      setProfile((prev) => ({ ...prev, ...data.user }));
       updateUser({ name: data.user.name, phone: data.user.phone });
       setProfileMessage({ type: 'success', text: 'Cập nhật thông tin thành công!' });
     } catch (err) {
@@ -212,7 +239,10 @@ export default function UserProfile() {
 
       if (data.requiresLogin) {
         expireSession();
-        navigate('/login', { replace: true, state: { message: 'Đã đổi mật khẩu và đăng xuất các phiên cũ. Vui lòng đăng nhập lại.' } });
+        navigate('/login', {
+          replace: true,
+          state: { message: 'Đã đổi mật khẩu và đăng xuất các phiên cũ. Vui lòng đăng nhập lại.' }
+        });
         return;
       }
 
@@ -252,33 +282,82 @@ export default function UserProfile() {
 
   const currentAvatar = profile?.avatar || authUser?.avatar;
   const trustScore = profile?.trust_score ?? authUser?.trust_score ?? 80;
-  const roleName = profile?.role === 'AGENT' ? 'Môi giới' : profile?.role === 'ADMIN' ? 'Quản trị viên' : 'Người tìm nhà';
+  const roleName =
+    profile?.role === 'AGENT'
+      ? 'Môi giới'
+      : profile?.role === 'ADMIN'
+        ? 'Quản trị viên'
+        : 'Người tìm nhà';
+
+  const isPlusActive = Boolean(plusStatus?.active);
+  const accountTierLabel = isPlusActive
+    ? 'Thành viên Plus'
+    : profile?.verification_status === 'VERIFIED'
+      ? 'Đã xác thực danh tính'
+      : 'Tài khoản tiêu chuẩn';
 
   return (
     <div className="uprofile-page-wrapper">
+      {/* Subtle decorative background waves */}
+      <div className="uprofile-bg-decor" aria-hidden="true">
+        <svg
+          className="uprofile-bg-waves"
+          viewBox="0 0 1440 320"
+          preserveAspectRatio="none"
+          fill="none"
+        >
+          <path
+            d="M0 192C220 132 420 260 720 218C1020 176 1220 92 1440 146V320H0V192Z"
+            fill="url(#uprofileWaveA)"
+          />
+          <path
+            d="M0 248C280 198 540 296 860 250C1120 212 1300 172 1440 202V320H0V248Z"
+            fill="url(#uprofileWaveB)"
+          />
+          <defs>
+            <linearGradient id="uprofileWaveA" x1="0" y1="0" x2="1440" y2="320" gradientUnits="userSpaceOnUse">
+              <stop stopColor="#dbeafe" stopOpacity="0.65" />
+              <stop offset="1" stopColor="#bfdbfe" stopOpacity="0.35" />
+            </linearGradient>
+            <linearGradient id="uprofileWaveB" x1="0" y1="180" x2="1440" y2="320" gradientUnits="userSpaceOnUse">
+              <stop stopColor="#e0ecff" stopOpacity="0.8" />
+              <stop offset="1" stopColor="#c7ddff" stopOpacity="0.55" />
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+
       {/* Unified Top Navbar */}
       <Header activeTab="profile" />
 
       {/* Main Container */}
       <main className="uprofile-main-container">
-        {String(authUser?.role || '').toUpperCase() === 'USER' && (
-          <section style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '20px', marginBottom: '22px', padding: '20px 24px', border: '1px solid #e5eaf4', borderRadius: '18px', background: '#fff' }}>
-            <div>
-              <h2 style={{ margin: '0 0 5px', color: '#1d2e55', fontSize: '17px' }}>Tùy chọn gợi ý</h2>
-              <p style={{ margin: 0, color: '#74809a', fontSize: '13px' }}>Thêm khu vực, ngân sách và kiểu nhà nếu bạn muốn cá nhân hóa gợi ý.</p>
-            </div>
-            <Link to="/onboarding?edit=1" state={{ from: '/profile' }} style={{ flexShrink: 0, padding: '11px 15px', borderRadius: '12px', color: '#fff', background: '#25499b', textDecoration: 'none', fontWeight: 700, fontSize: '13px' }}>
-              Thiết lập
-            </Link>
-          </section>
-        )}
-        {/* Profile Hero Header Card */}
+        {/* Profile Hero Banner Card */}
         <section className="uprofile-hero-card">
-          <div className="uprofile-hero-banner" />
+          <div className="uprofile-hero-visual" aria-hidden="true">
+            <img
+              src={heroVillaArt}
+              alt=""
+              className="uprofile-hero-villa-img"
+              decoding="async"
+            />
+            <div className="uprofile-hero-scrim" />
+          </div>
 
           <div className="uprofile-hero-content">
-            {/* Avatar with Camera Button */}
+            {/* Avatar with Camera Button & Accent Rays */}
             <div className="uprofile-avatar-box">
+              <svg
+                className="uprofile-avatar-rays"
+                viewBox="0 0 36 36"
+                fill="none"
+                aria-hidden="true"
+              >
+                <path d="M8 14L12 4" stroke="#60a5fa" strokeWidth="3.2" strokeLinecap="round" />
+                <path d="M16 19L27 11" stroke="#3b82f6" strokeWidth="3.2" strokeLinecap="round" />
+                <path d="M19 26L30 24" stroke="#93c5fd" strokeWidth="3" strokeLinecap="round" />
+              </svg>
+
               <div className="uprofile-avatar-circle">
                 <Avatar
                   src={currentAvatar}
@@ -287,7 +366,7 @@ export default function UserProfile() {
                 />
                 {isUploadingAvatar && (
                   <div className="uprofile-avatar-loading">
-                    <Loader2 size={26} className="uprofile-spinner" />
+                    <Loader2 size={24} className="uprofile-spinner" />
                     <span>Đang tải...</span>
                   </div>
                 )}
@@ -299,6 +378,7 @@ export default function UserProfile() {
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isUploadingAvatar}
                 title="Thay đổi ảnh đại diện"
+                aria-label="Thay đổi ảnh đại diện"
               >
                 <Camera size={16} />
               </button>
@@ -315,7 +395,9 @@ export default function UserProfile() {
             {/* User Meta Information */}
             <div className="uprofile-user-meta">
               <div className="uprofile-name-row">
-                <h1 className="uprofile-name-heading">{profile?.name || 'Người dùng Swipe Nest'}</h1>
+                <h1 className="uprofile-name-heading">
+                  {profile?.name || authUser?.name || 'Người dùng Swipe Nest'}
+                </h1>
                 <span className={`uprofile-role-tag role-${profile?.role?.toLowerCase() || 'user'}`}>
                   {roleName}
                 </span>
@@ -323,20 +405,26 @@ export default function UserProfile() {
 
               <p className="uprofile-email-subtext">
                 <Mail size={15} />
-                <span>{profile?.email || 'Chưa cập nhật email'}</span>
+                <span>{profile?.email || authUser?.email || 'Chưa cập nhật email'}</span>
               </p>
 
-              {/* Clean Badges Row without CSS collisions */}
+              {/* Status & Info Pills */}
               <div className="uprofile-pills-row">
                 <div className="uprofile-pill uprofile-pill-trust" title="Điểm tín nhiệm tài khoản">
-                  <ShieldCheck size={16} />
+                  <ShieldCheck size={15} />
                   <span>Điểm tín nhiệm:</span>
                   <strong>{trustScore} / 100</strong>
                 </div>
 
-                <div className="uprofile-pill uprofile-pill-status">
-                  <CheckCircle2 size={15} />
-                  <span>{profile?.verification_status === 'VERIFIED' ? 'Đã xác thực danh tính' : 'Tài khoản tiêu chuẩn'}</span>
+                <div className={`uprofile-pill ${isPlusActive ? 'uprofile-pill-plus' : 'uprofile-pill-status'}`}>
+                  {isPlusActive ? (
+                    <Crown size={15} />
+                  ) : profile?.verification_status === 'VERIFIED' ? (
+                    <CheckCircle2 size={15} />
+                  ) : (
+                    <Clock size={15} />
+                  )}
+                  <span>{accountTierLabel}</span>
                 </div>
 
                 <div className="uprofile-pill uprofile-pill-date">
@@ -347,155 +435,255 @@ export default function UserProfile() {
 
               {/* Avatar Notification Banners */}
               {avatarSuccess && (
-                <div className="uprofile-toast-message success">
-                  <Check size={16} /> {avatarSuccess}
+                <div className="uprofile-toast-message success" role="status">
+                  <Check size={15} /> {avatarSuccess}
                 </div>
               )}
               {avatarError && (
-                <div className="uprofile-toast-message error">
-                  <AlertCircle size={16} /> {avatarError}
+                <div className="uprofile-toast-message error" role="alert">
+                  <AlertCircle size={15} /> {avatarError}
                 </div>
               )}
             </div>
           </div>
         </section>
 
-        {/* Main Content Layout */}
+        {/* Main 2-Column Content Layout */}
         <div className="uprofile-body-grid">
-          {/* Left Column: Navigation Tabs & Quick Links */}
+          {/* Left Column: Unified Sidebar Card */}
           <aside className="uprofile-sidebar">
-            <div className="uprofile-tab-box">
-              <button
-                className={`uprofile-tab-btn ${activeTab === 'info' ? 'active' : ''}`}
-                onClick={() => setActiveTab('info')}
-              >
-                <User size={18} />
-                <span>Thông tin cá nhân</span>
-              </button>
+            <div className="uprofile-sidebar-card">
+              {/* Primary Navigation Tabs */}
+              <nav className="uprofile-tab-list" aria-label="Danh mục hồ sơ">
+                <button
+                  type="button"
+                  className={`uprofile-tab-btn ${activeTab === 'info' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('info')}
+                  aria-current={activeTab === 'info' ? 'page' : undefined}
+                >
+                  <span className="uprofile-tab-icon">
+                    <User size={18} />
+                  </span>
+                  <span>Thông tin cá nhân</span>
+                </button>
 
-              <button
-                className={`uprofile-tab-btn ${activeTab === 'security' ? 'active' : ''}`}
-                onClick={() => setActiveTab('security')}
-              >
-                <Lock size={18} />
-                <span>Bảo mật & Mật khẩu</span>
-              </button>
-            </div>
+                <button
+                  type="button"
+                  className={`uprofile-tab-btn ${activeTab === 'security' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('security')}
+                  aria-current={activeTab === 'security' ? 'page' : undefined}
+                >
+                  <span className="uprofile-tab-icon">
+                    <Lock size={18} />
+                  </span>
+                  <span>Bảo mật &amp; Mật khẩu</span>
+                </button>
+              </nav>
 
-            <div className="uprofile-quicklinks-box">
-              <h4 className="uprofile-box-title">Tiện ích nhanh</h4>
-              <Link to="/swipe/Tất cả" state={{ activeView: 'saved' }} className="uprofile-quicklink-item">
-                <Heart size={16} className="text-red" />
-                <span>BĐS Đã lưu ({authUser ? 'Yêu thích' : 0})</span>
-              </Link>
-              <Link to="/chat" className="uprofile-quicklink-item">
-                <MessageSquare size={16} className="text-blue" />
-                <span>Tin nhắn tư vấn</span>
-              </Link>
-              <button onClick={handleLogout} className="uprofile-quicklink-item logout-link">
-                <LogOut size={16} />
-                <span>Đăng xuất tài khoản</span>
-              </button>
+              <div className="uprofile-sidebar-divider" />
+
+              {/* Quick Utilities */}
+              <div className="uprofile-quicklinks-section">
+                <h2 className="uprofile-box-title">Tiện ích nhanh</h2>
+
+                <Link
+                  to="/swipe/Tất cả"
+                  state={{ activeView: 'saved' }}
+                  className="uprofile-quicklink-item"
+                >
+                  <span className="uprofile-quicklink-icon icon-red">
+                    <Heart size={17} />
+                  </span>
+                  <span>BĐS Đã lưu ({authUser ? 'Yêu thích' : 0})</span>
+                </Link>
+
+                <Link to="/chat" className="uprofile-quicklink-item">
+                  <span className="uprofile-quicklink-icon icon-blue">
+                    <MessageSquare size={17} />
+                  </span>
+                  <span>Tin nhắn tư vấn</span>
+                </Link>
+
+                {isRegularUser && (
+                  <Link
+                    to="/onboarding?edit=1"
+                    state={{ from: '/profile' }}
+                    className="uprofile-quicklink-item"
+                  >
+                    <span className="uprofile-quicklink-icon icon-indigo">
+                      <SlidersHorizontal size={17} />
+                    </span>
+                    <span>Tùy chọn gợi ý</span>
+                  </Link>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="uprofile-quicklink-item logout-link"
+                >
+                  <span className="uprofile-quicklink-icon icon-logout">
+                    <LogOut size={17} />
+                  </span>
+                  <span>Đăng xuất tài khoản</span>
+                </button>
+              </div>
+
+              {/* Plus Upgrade / Status Card */}
+              {isRegularUser && (
+                <div className={`uprofile-plus-card ${isPlusActive ? 'is-active' : ''}`}>
+                  <div className="uprofile-plus-sparkles" aria-hidden="true">
+                    <Sparkles size={16} />
+                  </div>
+                  <div className="uprofile-plus-top">
+                    <div className="uprofile-plus-badge-icon">
+                      {isPlusActive ? <Crown size={20} /> : <Gem size={20} />}
+                    </div>
+                    <div className="uprofile-plus-copy">
+                      <h3>{isPlusActive ? 'Swipe Nest Plus' : 'Nâng cấp Plus'}</h3>
+                      <p>
+                        {isPlusActive && plusStatus?.currentEnd
+                          ? `Đang hoạt động đến ${formatDate(plusStatus.currentEnd)}`
+                          : 'Trải nghiệm nhiều tính năng vượt trội hơn'}
+                      </p>
+                    </div>
+                  </div>
+                  <Link to="/plus" className="uprofile-plus-cta">
+                    <span>{isPlusActive ? 'Quản lý gói Plus' : 'Khám phá ngay'}</span>
+                    <ArrowRight size={15} />
+                  </Link>
+                </div>
+              )}
             </div>
           </aside>
 
-          {/* Right Column: Tab Content */}
+          {/* Right Column: Main Tab Content Card */}
           <div className="uprofile-content-area">
             {/* TAB 1: THÔNG TIN CÁ NHÂN */}
             {activeTab === 'info' && (
-              <div className="uprofile-card-panel">
+              <section className="uprofile-card-panel" aria-labelledby="uprofile-info-heading">
                 <div className="uprofile-panel-header">
                   <div className="uprofile-header-icon-wrap">
-                    <User size={22} />
+                    <User size={21} />
                   </div>
                   <div>
-                    <h2 className="uprofile-panel-title">Thông tin cá nhân</h2>
-                    <p className="uprofile-panel-desc">Cập nhật họ tên và số điện thoại để kết nối với môi giới dễ dàng hơn.</p>
+                    <h2 id="uprofile-info-heading" className="uprofile-panel-title">
+                      Thông tin cá nhân
+                    </h2>
+                    <p className="uprofile-panel-desc">
+                      Cập nhật họ tên và số điện thoại để kết nối với môi giới dễ dàng hơn.
+                    </p>
                   </div>
                 </div>
 
                 {profileMessage.text && (
-                  <div className={`uprofile-alert ${profileMessage.type}`}>
-                    {profileMessage.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
+                  <div
+                    className={`uprofile-alert ${profileMessage.type}`}
+                    role={profileMessage.type === 'error' ? 'alert' : 'status'}
+                  >
+                    {profileMessage.type === 'success' ? (
+                      <CheckCircle2 size={18} />
+                    ) : (
+                      <AlertCircle size={18} />
+                    )}
                     <span>{profileMessage.text}</span>
                   </div>
                 )}
 
                 <form onSubmit={handleSaveProfile} className="uprofile-form">
-                  <div className="uprofile-form-group">
-                    <label htmlFor="user-name-input">Họ và tên *</label>
-                    <div className="uprofile-input-container">
-                      <div className="uprofile-leading-icon">
-                        <User size={18} />
+                  <div className="uprofile-form-grid">
+                    <div className="uprofile-form-group">
+                      <label htmlFor="user-name-input">
+                        Họ và tên <span className="uprofile-required">*</span>
+                      </label>
+                      <div className="uprofile-input-container">
+                        <div className="uprofile-leading-icon">
+                          <User size={18} />
+                        </div>
+                        <input
+                          id="user-name-input"
+                          type="text"
+                          className="uprofile-input-field"
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                          placeholder="Nhập họ và tên của bạn"
+                          maxLength={120}
+                          required
+                        />
                       </div>
-                      <input
-                        id="user-name-input"
-                        type="text"
-                        className="uprofile-input-field"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        placeholder="Nhập họ và tên của bạn"
-                        maxLength={120}
-                        required
-                      />
+                      <span className="uprofile-hint-text">
+                        Tên hiển thị khi trao đổi với môi giới hoặc quản trị viên.
+                      </span>
                     </div>
-                    <span className="uprofile-hint-text">Tên hiển thị khi trao đổi với môi giới hoặc quản trị viên.</span>
-                  </div>
 
-                  <div className="uprofile-form-group">
-                    <label htmlFor="user-phone-input">Số điện thoại</label>
-                    <div className="uprofile-input-container">
-                      <div className="uprofile-leading-icon">
-                        <Phone size={18} />
+                    <div className="uprofile-form-group">
+                      <label htmlFor="user-phone-input">Số điện thoại</label>
+                      <div className="uprofile-input-container">
+                        <div className="uprofile-leading-icon">
+                          <Phone size={18} />
+                        </div>
+                        <input
+                          id="user-phone-input"
+                          type="tel"
+                          className="uprofile-input-field"
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value)}
+                          placeholder="Ví dụ: 0912345678"
+                          maxLength={15}
+                        />
                       </div>
-                      <input
-                        id="user-phone-input"
-                        type="tel"
-                        className="uprofile-input-field"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        placeholder="Ví dụ: 0912345678"
-                        maxLength={15}
-                      />
+                      <span className="uprofile-hint-text">
+                        Số di động dùng để xác thực và liên hệ.
+                      </span>
                     </div>
-                    <span className="uprofile-hint-text">Số di động 10 số tại Việt Nam (bắt đầu bằng 03, 05, 07, 08, 09).</span>
-                  </div>
 
-                  <div className="uprofile-form-group">
-                    <label htmlFor="user-email-input">Địa chỉ Email</label>
-                    <div className="uprofile-input-container disabled">
-                      <div className="uprofile-leading-icon">
-                        <Mail size={18} />
+                    <div className="uprofile-form-group">
+                      <label htmlFor="user-email-input">Địa chỉ Email</label>
+                      <div className="uprofile-input-container disabled">
+                        <div className="uprofile-leading-icon">
+                          <Mail size={18} />
+                        </div>
+                        <input
+                          id="user-email-input"
+                          type="email"
+                          className="uprofile-input-field"
+                          value={profile?.email || authUser?.email || ''}
+                          disabled
+                          readOnly
+                        />
+                        <div
+                          className="uprofile-trailing-icon"
+                          title="Email dùng để đăng nhập, không thể thay đổi"
+                        >
+                          <Lock size={15} />
+                        </div>
                       </div>
-                      <input
-                        id="user-email-input"
-                        type="email"
-                        className="uprofile-input-field"
-                        value={profile?.email || ''}
-                        disabled
-                        readOnly
-                      />
-                      <div className="uprofile-trailing-icon" title="Email dùng để đăng nhập, không thể thay đổi">
-                        <Lock size={16} />
-                      </div>
+                      <span className="uprofile-hint-text">
+                        Email dùng để nhận thông báo, thông tin truy cập.
+                      </span>
                     </div>
-                    <span className="uprofile-hint-text">Email định danh tài khoản, không thể thay đổi trực tiếp.</span>
-                  </div>
 
-                  <div className="uprofile-form-group">
-                    <label htmlFor="user-role-input">Vai trò hệ thống</label>
-                    <div className="uprofile-input-container disabled">
-                      <div className="uprofile-leading-icon">
-                        <Shield size={18} />
+                    <div className="uprofile-form-group">
+                      <label htmlFor="user-role-input">Vai trò hệ thống</label>
+                      <div className="uprofile-input-container disabled">
+                        <div className="uprofile-leading-icon">
+                          <Shield size={18} />
+                        </div>
+                        <input
+                          id="user-role-input"
+                          type="text"
+                          className="uprofile-input-field"
+                          value={roleName}
+                          disabled
+                          readOnly
+                        />
+                        <div className="uprofile-trailing-icon" aria-hidden="true">
+                          <ChevronDown size={16} />
+                        </div>
                       </div>
-                      <input
-                        id="user-role-input"
-                        type="text"
-                        className="uprofile-input-field"
-                        value={roleName}
-                        disabled
-                        readOnly
-                      />
+                      <span className="uprofile-hint-text">
+                        Vai trò hiện tại của bạn trên hệ thống.
+                      </span>
                     </div>
                   </div>
 
@@ -507,119 +695,151 @@ export default function UserProfile() {
                     >
                       {isSavingProfile ? (
                         <>
-                          <Loader2 size={16} className="uprofile-spinner" />
+                          <Loader2 size={17} className="uprofile-spinner" />
                           <span>Đang lưu...</span>
                         </>
                       ) : (
-                        'Lưu thay đổi'
+                        <>
+                          <Save size={17} />
+                          <span>Lưu thay đổi</span>
+                        </>
                       )}
                     </button>
                   </div>
                 </form>
-              </div>
+              </section>
             )}
 
-            {/* TAB 2: ĐỔI MẬT KHẨU */}
+            {/* TAB 2: BẢO MẬT & MẬT KHẨU */}
             {activeTab === 'security' && (
-              <div className="uprofile-card-panel">
+              <section className="uprofile-card-panel" aria-labelledby="uprofile-security-heading">
                 <div className="uprofile-panel-header">
                   <div className="uprofile-header-icon-wrap">
-                    <Lock size={22} />
+                    <Lock size={21} />
                   </div>
                   <div>
-                    <h2 className="uprofile-panel-title">Bảo mật & Đổi mật khẩu</h2>
-                    <p className="uprofile-panel-desc">Bảo vệ tài khoản bằng mật khẩu an toàn tối thiểu 10 ký tự.</p>
+                    <h2 id="uprofile-security-heading" className="uprofile-panel-title">
+                      Bảo mật &amp; Mật khẩu
+                    </h2>
+                    <p className="uprofile-panel-desc">
+                      Bảo vệ tài khoản bằng mật khẩu an toàn tối thiểu 10 ký tự.
+                    </p>
                   </div>
                 </div>
 
                 {passwordMessage.text && (
-                  <div className={`uprofile-alert ${passwordMessage.type}`}>
-                    {passwordMessage.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
+                  <div
+                    className={`uprofile-alert ${passwordMessage.type}`}
+                    role={passwordMessage.type === 'error' ? 'alert' : 'status'}
+                  >
+                    {passwordMessage.type === 'success' ? (
+                      <CheckCircle2 size={18} />
+                    ) : (
+                      <AlertCircle size={18} />
+                    )}
                     <span>{passwordMessage.text}</span>
                   </div>
                 )}
 
                 <form onSubmit={handleChangePassword} className="uprofile-form">
-                  {profile?.has_password && (
+                  <div className="uprofile-form-grid">
+                    {profile?.has_password && (
+                      <div className="uprofile-form-group uprofile-field-full">
+                        <label htmlFor="current-pw-input">
+                          Mật khẩu hiện tại <span className="uprofile-required">*</span>
+                        </label>
+                        <div className="uprofile-input-container">
+                          <div className="uprofile-leading-icon">
+                            <Lock size={18} />
+                          </div>
+                          <input
+                            id="current-pw-input"
+                            type={showCurrentPw ? 'text' : 'password'}
+                            className="uprofile-input-field"
+                            value={currentPassword}
+                            onChange={(e) => setCurrentPassword(e.target.value)}
+                            placeholder="Nhập mật khẩu đang dùng"
+                            required
+                          />
+                          <button
+                            type="button"
+                            className="uprofile-eye-btn"
+                            onClick={() => setShowCurrentPw(!showCurrentPw)}
+                            aria-label={showCurrentPw ? 'Ẩn mật khẩu hiện tại' : 'Hiện mật khẩu hiện tại'}
+                          >
+                            {showCurrentPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="uprofile-form-group">
-                      <label htmlFor="current-pw-input">Mật khẩu hiện tại *</label>
+                      <label htmlFor="new-pw-input">
+                        Mật khẩu mới <span className="uprofile-required">*</span>
+                      </label>
                       <div className="uprofile-input-container">
                         <div className="uprofile-leading-icon">
                           <Lock size={18} />
                         </div>
                         <input
-                          id="current-pw-input"
-                          type={showCurrentPw ? 'text' : 'password'}
+                          id="new-pw-input"
+                          type={showNewPw ? 'text' : 'password'}
                           className="uprofile-input-field"
-                          value={currentPassword}
-                          onChange={(e) => setCurrentPassword(e.target.value)}
-                          placeholder="Nhập mật khẩu đang dùng"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="Ít nhất 10 ký tự"
+                          required
+                          minLength={10}
+                        />
+                        <button
+                          type="button"
+                          className="uprofile-eye-btn"
+                          onClick={() => setShowNewPw(!showNewPw)}
+                          aria-label={showNewPw ? 'Ẩn mật khẩu mới' : 'Hiện mật khẩu mới'}
+                        >
+                          {showNewPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
+                      <span className="uprofile-hint-text">
+                        Tối thiểu 10 ký tự, tránh các chuỗi dễ đoán như 123456.
+                      </span>
+                    </div>
+
+                    <div className="uprofile-form-group">
+                      <label htmlFor="confirm-pw-input">
+                        Xác nhận mật khẩu mới <span className="uprofile-required">*</span>
+                      </label>
+                      <div className="uprofile-input-container">
+                        <div className="uprofile-leading-icon">
+                          <Lock size={18} />
+                        </div>
+                        <input
+                          id="confirm-pw-input"
+                          type={showConfirmPw ? 'text' : 'password'}
+                          className="uprofile-input-field"
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          placeholder="Nhập lại mật khẩu mới"
                           required
                         />
                         <button
                           type="button"
                           className="uprofile-eye-btn"
-                          onClick={() => setShowCurrentPw(!showCurrentPw)}
-                          tabIndex={-1}
+                          onClick={() => setShowConfirmPw(!showConfirmPw)}
+                          aria-label={showConfirmPw ? 'Ẩn mật khẩu xác nhận' : 'Hiện mật khẩu xác nhận'}
                         >
-                          {showCurrentPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                          {showConfirmPw ? <EyeOff size={16} /> : <Eye size={16} />}
                         </button>
                       </div>
+                      <span className="uprofile-hint-text">
+                        Nhập lại chính xác mật khẩu mới để xác nhận.
+                      </span>
                     </div>
-                  )}
-
-                  <div className="uprofile-form-group">
-                    <label htmlFor="new-pw-input">Mật khẩu mới *</label>
-                    <div className="uprofile-input-container">
-                      <div className="uprofile-leading-icon">
-                        <Lock size={18} />
-                      </div>
-                      <input
-                        id="new-pw-input"
-                        type={showNewPw ? 'text' : 'password'}
-                        className="uprofile-input-field"
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        placeholder="Nhập mật khẩu mới (ít nhất 10 ký tự)"
-                        required
-                        minLength={10}
-                      />
-                      <button
-                        type="button"
-                        className="uprofile-eye-btn"
-                        onClick={() => setShowNewPw(!showNewPw)}
-                        tabIndex={-1}
-                      >
-                        {showNewPw ? <EyeOff size={16} /> : <Eye size={16} />}
-                      </button>
-                    </div>
-                    <span className="uprofile-hint-text">Mật khẩu tối thiểu 10 ký tự, tránh các chuỗi dễ đoán như 123456.</span>
                   </div>
 
-                  <div className="uprofile-form-group">
-                    <label htmlFor="confirm-pw-input">Xác nhận mật khẩu mới *</label>
-                    <div className="uprofile-input-container">
-                      <div className="uprofile-leading-icon">
-                        <Lock size={18} />
-                      </div>
-                      <input
-                        id="confirm-pw-input"
-                        type={showConfirmPw ? 'text' : 'password'}
-                        className="uprofile-input-field"
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        placeholder="Nhập lại mật khẩu mới"
-                        required
-                      />
-                      <button
-                        type="button"
-                        className="uprofile-eye-btn"
-                        onClick={() => setShowConfirmPw(!showConfirmPw)}
-                        tabIndex={-1}
-                      >
-                        {showConfirmPw ? <EyeOff size={16} /> : <Eye size={16} />}
-                      </button>
-                    </div>
+                  <div className="uprofile-security-note">
+                    <ShieldCheck size={16} />
+                    <span>Sau khi đổi mật khẩu thành công, các phiên đăng nhập cũ sẽ được đăng xuất để đảm bảo an toàn.</span>
                   </div>
 
                   <div className="uprofile-submit-row">
@@ -630,16 +850,19 @@ export default function UserProfile() {
                     >
                       {isChangingPw ? (
                         <>
-                          <Loader2 size={16} className="uprofile-spinner" />
+                          <Loader2 size={17} className="uprofile-spinner" />
                           <span>Đang cập nhật...</span>
                         </>
                       ) : (
-                        'Cập nhật mật khẩu'
+                        <>
+                          <ShieldCheck size={17} />
+                          <span>Cập nhật mật khẩu</span>
+                        </>
                       )}
                     </button>
                   </div>
                 </form>
-              </div>
+              </section>
             )}
           </div>
         </div>

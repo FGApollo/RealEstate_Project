@@ -1,57 +1,161 @@
-/* UserProfile.css - Modern, Clean & High-End Design (Fully Scoped) */
+/* UserProfile.css - Airy Real-Estate Profile Redesign (Fully Scoped) */
 
 .uprofile-page-wrapper {
+  position: relative;
   min-height: 100vh;
-  background-color: #f8fafc;
+  background: linear-gradient(180deg, #f5f9ff 0%, #eef5ff 54%, #e5f0ff 100%);
   color: #1e293b;
   display: flex;
   flex-direction: column;
+  overflow-x: clip;
 }
 
+/* Decorative Subtle Bottom Waves */
+.uprofile-bg-decor {
+  position: fixed;
+  inset: auto 0 0 0;
+  height: 290px;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
 
-
-/* Container */
-.uprofile-main-container {
-  max-width: 1080px;
+.uprofile-bg-waves {
   width: 100%;
-  margin: 2rem auto;
-  padding: 0 1.5rem;
+  height: 100%;
+  display: block;
+}
+
+/* Scoped Header Polish matching the light-blue airy aesthetic */
+.uprofile-page-wrapper > .app-header-navbar {
+  background: rgba(255, 255, 255, 0.92);
+  border-bottom: 1px solid rgba(226, 236, 252, 0.9);
+  box-shadow: 0 4px 20px rgba(30, 64, 175, 0.04);
+}
+
+.uprofile-page-wrapper > .app-header-navbar .app-header-home-icon {
+  display: inline-block;
+}
+
+.uprofile-page-wrapper > .app-header-navbar .app-header-nav {
+  gap: clamp(8px, 1.4vw, 20px);
+}
+
+.uprofile-page-wrapper > .app-header-navbar .app-header-nav-link {
+  isolation: isolate;
+  padding: 0 12px;
+  color: #3b4c6e;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.uprofile-page-wrapper > .app-header-navbar .app-header-nav-link::before {
+  position: absolute;
+  z-index: -1;
+  inset: 50% 0 auto;
+  height: 36px;
+  border-radius: 999px;
+  background: #edf4ff;
+  opacity: 0;
+  transform: translateY(-50%);
+  transition: opacity 0.18s ease;
+  content: '';
+}
+
+.uprofile-page-wrapper > .app-header-navbar .app-header-nav-link:hover,
+.uprofile-page-wrapper > .app-header-navbar .app-header-nav-link.active {
+  color: #0b63f6;
+}
+
+.uprofile-page-wrapper > .app-header-navbar .app-header-nav-link:hover::before,
+.uprofile-page-wrapper > .app-header-navbar .app-header-nav-link.active::before {
+  opacity: 1;
+}
+
+/* Main Container */
+.uprofile-main-container {
+  position: relative;
+  z-index: 1;
+  max-width: 1180px;
+  width: 100%;
+  margin: 28px auto 56px;
+  padding: 0 24px;
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 24px;
 }
 
-/* Hero Section Card */
+/* =========================================================
+   HERO BANNER CARD
+   ========================================================= */
 .uprofile-hero-card {
   position: relative;
-  background: #ffffff;
-  border-radius: 20px;
+  border-radius: 26px;
   overflow: hidden;
-  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
-  border: 1px solid #e2e8f0;
+  min-height: 206px;
+  background: linear-gradient(125deg, #f3f8ff 0%, #e4f0ff 46%, #cde2ff 100%);
+  border: 1.5px solid rgba(255, 255, 255, 0.92);
+  box-shadow:
+    0 20px 44px -18px rgba(37, 99, 235, 0.18),
+    0 4px 14px -4px rgba(15, 23, 42, 0.04);
+  display: flex;
+  align-items: center;
 }
 
-.uprofile-hero-banner {
-  height: 120px;
-  background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 50%, #60a5fa 100%);
-  position: relative;
-}
-
-.uprofile-hero-banner::after {
-  content: '';
+.uprofile-hero-visual {
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.2) 0%, transparent 60%);
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.uprofile-hero-villa-img {
+  position: absolute;
+  right: -8px;
+  top: 50%;
+  transform: translateY(-49%);
+  height: 122%;
+  width: auto;
+  max-width: none;
+  object-fit: cover;
+  user-select: none;
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    rgba(0, 0, 0, 0.2) 14%,
+    rgba(0, 0, 0, 0.85) 34%,
+    #000000 54%
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    rgba(0, 0, 0, 0.2) 14%,
+    rgba(0, 0, 0, 0.85) 34%,
+    #000000 54%
+  );
+}
+
+.uprofile-hero-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(241, 247, 255, 0.94) 0%,
+    rgba(235, 244, 255, 0.82) 38%,
+    rgba(222, 237, 255, 0.34) 60%,
+    rgba(222, 237, 255, 0) 76%
+  );
 }
 
 .uprofile-hero-content {
-  padding: 0 2rem 2rem 2rem;
-  display: flex;
-  align-items: flex-start;
-  gap: 2rem;
-  margin-top: -55px;
   position: relative;
   z-index: 2;
+  width: 100%;
+  padding: 32px 38px;
+  display: flex;
+  align-items: center;
+  gap: 28px;
 }
 
 /* Avatar Box & Camera Button */
@@ -60,57 +164,83 @@
   flex-shrink: 0;
 }
 
+.uprofile-avatar-rays {
+  position: absolute;
+  top: -8px;
+  right: -16px;
+  width: 30px;
+  height: 30px;
+  pointer-events: none;
+  z-index: 1;
+}
+
 .uprofile-avatar-circle {
-  width: 120px;
-  height: 120px;
+  width: 116px;
+  height: 116px;
   border-radius: 50%;
-  border: 4px solid #ffffff;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15);
+  border: 5px solid #ffffff;
+  box-shadow:
+    0 14px 30px -8px rgba(79, 70, 229, 0.28),
+    0 4px 12px rgba(15, 23, 42, 0.08);
   overflow: hidden;
   position: relative;
-  background: #e2e8f0;
+  background: #ede9fe;
 }
 
 .uprofile-avatar-img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  display: block;
+}
+
+.uprofile-avatar-circle .avatar-fallback {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 56%, #6d48c7 100%);
+  color: #ffffff;
+  font-size: 2.65rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
 }
 
 .uprofile-avatar-loading {
   position: absolute;
   inset: 0;
-  background: rgba(15, 23, 42, 0.7);
+  background: rgba(15, 23, 42, 0.72);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   color: #ffffff;
   font-size: 0.75rem;
-  gap: 4px;
+  font-weight: 600;
+  gap: 5px;
 }
 
 .uprofile-camera-btn {
   position: absolute;
-  bottom: 4px;
-  right: 4px;
-  width: 36px;
-  height: 36px;
+  bottom: 2px;
+  right: 2px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
-  background: #1a3683;
+  background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 100%);
   color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 10px rgba(26, 54, 131, 0.3);
-  transition: all 0.2s ease;
-  border: 2px solid #ffffff;
+  box-shadow: 0 6px 14px rgba(29, 78, 216, 0.36);
+  transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+  border: 3px solid #ffffff;
   cursor: pointer;
+  z-index: 3;
 }
 
 .uprofile-camera-btn:hover:not(:disabled) {
-  background: #2563eb;
+  background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%);
   transform: scale(1.08);
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.45);
 }
 
 .uprofile-camera-btn:disabled {
@@ -122,235 +252,315 @@
   display: none;
 }
 
-/* Hero Details */
+/* Hero User Meta */
 .uprofile-user-meta {
   flex: 1;
-  padding-top: 60px;
+  min-width: 0;
+  max-width: 640px;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 10px;
 }
 
 .uprofile-name-row {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 12px;
   flex-wrap: wrap;
 }
 
 .uprofile-name-heading {
-  font-size: 1.75rem;
-  font-weight: 700;
-  color: #0f172a;
-  letter-spacing: -0.02em;
+  font-size: clamp(1.5rem, 2.3vw, 1.9rem);
+  font-weight: 800;
+  color: #101e47;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
   margin: 0;
 }
 
 .uprofile-role-tag {
-  font-size: 0.75rem;
-  font-weight: 600;
+  font-size: 0.72rem;
+  font-weight: 750;
   text-transform: uppercase;
-  padding: 0.25rem 0.75rem;
-  border-radius: 9999px;
-  letter-spacing: 0.04em;
+  padding: 5px 12px;
+  border-radius: 999px;
+  letter-spacing: 0.045em;
+  line-height: 1;
+  backdrop-filter: blur(6px);
 }
 
 .uprofile-role-tag.role-user {
-  background: #eff6ff;
-  color: #1d4ed8;
+  background: rgba(255, 255, 255, 0.86);
+  color: #1d63ed;
   border: 1px solid #bfdbfe;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.08);
 }
 
 .uprofile-role-tag.role-agent {
-  background: #f0fdf4;
+  background: rgba(240, 253, 244, 0.92);
   color: #15803d;
-  border: 1px solid #bbf7d0;
+  border: 1px solid #86efac;
 }
 
 .uprofile-role-tag.role-admin {
-  background: #fef2f2;
+  background: rgba(254, 242, 242, 0.92);
   color: #b91c1c;
-  border: 1px solid #fecaca;
+  border: 1px solid #fca5a5;
 }
 
 .uprofile-email-subtext {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  color: #64748b;
+  gap: 8px;
+  color: #2f4263;
   font-size: 0.95rem;
+  font-weight: 500;
   margin: 0;
 }
 
-/* User Badges Row - Clean and NOT absolutely positioned */
+.uprofile-email-subtext svg {
+  color: #4f6792;
+  flex-shrink: 0;
+}
+
+/* Badges / Pills Row */
 .uprofile-pills-row {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 10px;
   flex-wrap: wrap;
-  margin-top: 0.25rem;
+  margin-top: 4px;
 }
 
 .uprofile-pill {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.35rem 0.85rem;
-  border-radius: 9999px;
-  font-size: 0.825rem;
-  line-height: 1;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  line-height: 1.1;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
 }
 
 .uprofile-pill-trust {
-  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  background: rgba(220, 252, 231, 0.9);
   color: #15803d;
   border: 1px solid #86efac;
   font-weight: 600;
 }
 
+.uprofile-pill-trust strong {
+  font-weight: 750;
+}
+
 .uprofile-pill-status {
-  background: #f8fafc;
-  color: #334155;
-  border: 1px solid #e2e8f0;
-  font-weight: 500;
+  background: rgba(235, 244, 255, 0.92);
+  color: #1e40af;
+  border: 1px solid #bfdbfe;
+  font-weight: 600;
 }
 
 .uprofile-pill-status svg {
-  color: #0284c7;
+  color: #2563eb;
+}
+
+.uprofile-pill-plus {
+  background: linear-gradient(135deg, rgba(239, 246, 255, 0.96) 0%, rgba(219, 234, 254, 0.96) 100%);
+  color: #1d4ed8;
+  border: 1px solid #93c5fd;
+  font-weight: 700;
+}
+
+.uprofile-pill-plus svg {
+  color: #2563eb;
 }
 
 .uprofile-pill-date {
-  background: #ffffff;
-  color: #64748b;
-  border: 1px solid #f1f5f9;
+  background: rgba(255, 255, 255, 0.88);
+  color: #475569;
+  border: 1px solid rgba(203, 213, 225, 0.8);
   font-weight: 500;
 }
 
-/* Toast Messages */
+.uprofile-pill-date svg {
+  color: #64748b;
+}
+
+/* Avatar Toast Messages */
 .uprofile-toast-message {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  font-size: 0.875rem;
-  padding: 0.5rem 0.875rem;
-  border-radius: 8px;
-  margin-top: 0.5rem;
+  gap: 7px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  padding: 7px 13px;
+  border-radius: 10px;
+  margin-top: 2px;
   width: fit-content;
-  animation: uprofileFadeIn 0.2s ease-in-out;
+  animation: uprofileFadeIn 0.2s ease-out;
 }
 
 .uprofile-toast-message.success {
-  background: #f0fdf4;
+  background: rgba(240, 253, 244, 0.95);
   color: #15803d;
   border: 1px solid #bbf7d0;
 }
 
 .uprofile-toast-message.error {
-  background: #fef2f2;
+  background: rgba(254, 242, 242, 0.95);
   color: #b91c1c;
   border: 1px solid #fecaca;
 }
 
-/* Layout Grid */
+/* =========================================================
+   BODY 2-COLUMN LAYOUT
+   ========================================================= */
 .uprofile-body-grid {
   display: grid;
-  grid-template-columns: 280px 1fr;
-  gap: 2rem;
+  grid-template-columns: 274px minmax(0, 1fr);
+  gap: 24px;
   align-items: start;
 }
 
-/* Sidebar */
+/* =========================================================
+   LEFT SIDEBAR CARD
+   ========================================================= */
 .uprofile-sidebar {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
+  min-width: 0;
 }
 
-.uprofile-tab-box {
-  background: #ffffff;
-  border-radius: 16px;
-  border: 1px solid #e2e8f0;
-  padding: 0.5rem;
+.uprofile-sidebar-card {
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 24px;
+  border: 1px solid rgba(226, 235, 249, 0.95);
+  padding: 14px;
+  box-shadow:
+    0 18px 38px -18px rgba(30, 58, 138, 0.12),
+    0 2px 8px rgba(15, 23, 42, 0.03);
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+  gap: 12px;
+}
+
+.uprofile-tab-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .uprofile-tab-btn {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.85rem 1rem;
-  border-radius: 10px;
-  font-size: 0.925rem;
-  font-weight: 500;
-  color: #64748b;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  font-size: 0.94rem;
+  font-weight: 600;
+  color: #475569;
   width: 100%;
   text-align: left;
-  border: none;
-  background: none;
+  border: 1px solid transparent;
+  background: transparent;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.18s ease;
+}
+
+.uprofile-tab-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #64748b;
+  transition: color 0.18s ease;
 }
 
 .uprofile-tab-btn:hover {
-  background: #f8fafc;
-  color: #1e293b;
+  background: #f4f8ff;
+  color: #1e3a8a;
+}
+
+.uprofile-tab-btn:hover .uprofile-tab-icon {
+  color: #1d63ed;
 }
 
 .uprofile-tab-btn.active {
-  background: #eff6ff;
-  color: #1a3683;
-  font-weight: 600;
+  background: linear-gradient(135deg, #ebf3ff 0%, #dcebff 100%);
+  color: #0b63f6;
+  font-weight: 700;
+  border-color: rgba(191, 219, 254, 0.85);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.08);
 }
 
-.uprofile-quicklinks-box {
-  background: #ffffff;
-  border-radius: 16px;
-  border: 1px solid #e2e8f0;
-  padding: 1.25rem;
+.uprofile-tab-btn.active .uprofile-tab-icon {
+  color: #0b63f6;
+}
+
+.uprofile-sidebar-divider {
+  height: 1px;
+  background: #eff3fa;
+  margin: 2px 8px;
+}
+
+/* Quick Utilities */
+.uprofile-quicklinks-section {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 4px;
+  padding: 2px 4px;
 }
 
 .uprofile-box-title {
-  font-size: 0.8rem;
+  font-size: 0.72rem;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #94a3b8;
-  font-weight: 600;
-  margin: 0 0 0.25rem 0;
+  letter-spacing: 0.07em;
+  color: #8f9db5;
+  font-weight: 750;
+  margin: 0 0 6px 10px;
 }
 
 .uprofile-quicklink-item {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  padding: 0.65rem 0.5rem;
-  border-radius: 8px;
-  font-size: 0.875rem;
-  color: #475569;
+  gap: 11px;
+  padding: 10px 10px;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-weight: 550;
+  color: #334155;
   text-decoration: none;
   border: none;
-  background: none;
+  background: transparent;
   cursor: pointer;
   width: 100%;
   text-align: left;
-  transition: all 0.2s ease;
+  transition: background-color 0.18s ease, color 0.18s ease, transform 0.15s ease;
 }
 
 .uprofile-quicklink-item:hover {
-  background: #f8fafc;
-  color: #1a3683;
+  background: #f4f8ff;
+  color: #0b63f6;
 }
+
+.uprofile-quicklink-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.uprofile-quicklink-icon.icon-red { color: #ef4444; }
+.uprofile-quicklink-icon.icon-blue { color: #2563eb; }
+.uprofile-quicklink-icon.icon-indigo { color: #4f46e5; }
+.uprofile-quicklink-icon.icon-logout { color: #ef4444; }
 
 .uprofile-quicklink-item.logout-link {
   color: #ef4444;
-  border-top: 1px solid #f1f5f9;
-  margin-top: 0.25rem;
-  padding-top: 0.85rem;
+  font-weight: 600;
+  margin-top: 2px;
 }
 
 .uprofile-quicklink-item.logout-link:hover {
@@ -358,65 +568,171 @@
   color: #dc2626;
 }
 
-.text-red { color: #ef4444; }
-.text-blue { color: #2563eb; }
+/* Plus Upgrade / Active Promo Card */
+.uprofile-plus-card {
+  position: relative;
+  margin-top: 6px;
+  padding: 18px 16px 16px;
+  border-radius: 18px;
+  background: linear-gradient(145deg, #f0f7ff 0%, #e2eeff 56%, #d3e6ff 100%);
+  border: 1px solid rgba(191, 219, 254, 0.95);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
 
-/* Main Content Area */
+.uprofile-plus-card::after {
+  content: '';
+  position: absolute;
+  right: -28px;
+  bottom: -32px;
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.18) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.uprofile-plus-sparkles {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  color: #60a5fa;
+  opacity: 0.9;
+  pointer-events: none;
+}
+
+.uprofile-plus-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  position: relative;
+  z-index: 1;
+}
+
+.uprofile-plus-badge-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 6px 14px rgba(37, 99, 235, 0.28);
+}
+
+.uprofile-plus-copy {
+  min-width: 0;
+}
+
+.uprofile-plus-copy h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 750;
+  color: #10214a;
+  line-height: 1.3;
+}
+
+.uprofile-plus-copy p {
+  margin: 3px 0 0;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: #475b7c;
+}
+
+.uprofile-plus-cta {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: 100%;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #1d72ff 0%, #0b57e0 100%);
+  color: #ffffff;
+  font-size: 0.86rem;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: 0 8px 18px -6px rgba(13, 99, 243, 0.5);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+}
+
+.uprofile-plus-cta:hover {
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 12px 22px -6px rgba(13, 99, 243, 0.56);
+  filter: brightness(1.04);
+}
+
+/* =========================================================
+   RIGHT MAIN CONTENT PANEL
+   ========================================================= */
 .uprofile-content-area {
   min-width: 0;
 }
 
 .uprofile-card-panel {
-  background: #ffffff;
-  border-radius: 16px;
-  border: 1px solid #e2e8f0;
-  padding: 2rem;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+  background: rgba(255, 255, 255, 0.98);
+  border-radius: 24px;
+  border: 1px solid rgba(226, 235, 249, 0.95);
+  padding: 32px 36px 34px;
+  box-shadow:
+    0 18px 38px -18px rgba(30, 58, 138, 0.1),
+    0 2px 8px rgba(15, 23, 42, 0.03);
 }
 
 .uprofile-panel-header {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding-bottom: 1.5rem;
-  border-bottom: 1px solid #f1f5f9;
-  margin-bottom: 1.75rem;
+  gap: 15px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid #eff4fb;
+  margin-bottom: 26px;
 }
 
 .uprofile-header-icon-wrap {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  background: #eff6ff;
-  color: #1a3683;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ebf3ff 0%, #dbeafe 100%);
+  color: #1d63ed;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
 .uprofile-panel-title {
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: #0f172a;
+  font-size: 1.32rem;
+  font-weight: 800;
+  color: #101e47;
+  letter-spacing: -0.02em;
   margin: 0;
 }
 
 .uprofile-panel-desc {
-  font-size: 0.875rem;
+  font-size: 0.9rem;
   color: #64748b;
-  margin: 0.15rem 0 0 0;
+  margin: 4px 0 0;
 }
 
 /* Alert Banners */
 .uprofile-alert {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.85rem 1rem;
-  border-radius: 10px;
+  gap: 10px;
+  padding: 13px 16px;
+  border-radius: 14px;
   font-size: 0.9rem;
-  margin-bottom: 1.5rem;
+  font-weight: 550;
+  margin-bottom: 22px;
+  animation: uprofileFadeIn 0.2s ease-out;
 }
 
 .uprofile-alert.success {
@@ -431,26 +747,41 @@
   border: 1px solid #fecaca;
 }
 
-/* Forms */
+/* Forms & 2-Column Grid */
 .uprofile-form {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 24px;
+}
+
+.uprofile-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px 28px;
+}
+
+.uprofile-field-full {
+  grid-column: 1 / -1;
 }
 
 .uprofile-form-group {
   display: flex;
   flex-direction: column;
-  gap: 0.45rem;
+  gap: 8px;
+  min-width: 0;
 }
 
 .uprofile-form-group label {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #334155;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #162547;
 }
 
-/* Pixel-perfect input container with centered icons */
+.uprofile-required {
+  color: #2563eb;
+}
+
+/* Input Container with Centered Icons */
 .uprofile-input-container {
   position: relative;
   display: flex;
@@ -460,20 +791,25 @@
 
 .uprofile-leading-icon {
   position: absolute;
-  left: 14px;
+  left: 15px;
   top: 50%;
   transform: translateY(-50%);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #94a3b8;
+  color: #7c8da6;
   pointer-events: none;
   z-index: 2;
+  transition: color 0.18s ease;
+}
+
+.uprofile-input-container:focus-within .uprofile-leading-icon {
+  color: #1d63ed;
 }
 
 .uprofile-trailing-icon {
   position: absolute;
-  right: 14px;
+  right: 15px;
   top: 50%;
   transform: translateY(-50%);
   display: flex;
@@ -485,89 +821,130 @@
 
 .uprofile-eye-btn {
   position: absolute;
-  right: 10px;
+  right: 8px;
   top: 50%;
   transform: translateY(-50%);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 6px;
-  background: none;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  background: transparent;
   border: none;
-  border-radius: 6px;
-  color: #94a3b8;
+  border-radius: 10px;
+  color: #7c8da6;
   cursor: pointer;
   z-index: 2;
-  transition: color 0.15s ease;
+  transition: color 0.15s ease, background-color 0.15s ease;
 }
 
 .uprofile-eye-btn:hover {
   color: #1e293b;
+  background: #edf3fc;
 }
 
 .uprofile-input-field {
   width: 100%;
-  height: 48px;
-  padding: 0 42px 0 44px;
-  background: #f8fafc;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 12px;
+  height: 50px;
+  padding: 0 44px 0 46px;
+  background: #f8fafd;
+  border: 1.5px solid #dfe7f3;
+  border-radius: 14px;
   font-size: 0.95rem;
-  color: #1e293b;
+  font-weight: 500;
+  color: #101e47;
   outline: none;
-  transition: all 0.2s ease;
+  transition: border-color 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease;
   line-height: normal;
 }
 
+.uprofile-input-field::placeholder {
+  color: #94a3b8;
+  font-weight: 400;
+}
+
+.uprofile-input-field:hover:not(:disabled) {
+  border-color: #c2d4f0;
+  background: #fbfdff;
+}
+
 .uprofile-input-field:focus {
-  border-color: #1a3683;
+  border-color: #2563eb;
   background: #ffffff;
-  box-shadow: 0 0 0 3px rgba(26, 54, 131, 0.1);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.11);
 }
 
 .uprofile-input-container.disabled .uprofile-input-field {
-  background: #f1f5f9;
-  border-color: #e2e8f0;
-  color: #64748b;
+  background: #f2f5fa;
+  border-color: #e4ebf5;
+  color: #5b6c88;
   cursor: not-allowed;
 }
 
 .uprofile-hint-text {
-  font-size: 0.775rem;
-  color: #94a3b8;
-  margin-top: 0.1rem;
+  font-size: 0.79rem;
+  line-height: 1.45;
+  color: #8292ab;
 }
 
+.uprofile-security-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 13px 16px;
+  border-radius: 14px;
+  background: #f4f8ff;
+  border: 1px solid #dce9ff;
+  color: #36507d;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.uprofile-security-note svg {
+  color: #2563eb;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+/* Submit Footer */
 .uprofile-submit-row {
   display: flex;
   justify-content: flex-end;
-  padding-top: 0.75rem;
+  padding-top: 6px;
 }
 
 .uprofile-submit-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.85rem 1.75rem;
-  border-radius: 10px;
-  background: #1a3683;
+  justify-content: center;
+  gap: 9px;
+  padding: 13px 28px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #1e73ff 0%, #0a58e6 100%);
   color: #ffffff;
-  font-weight: 600;
+  font-weight: 700;
   font-size: 0.95rem;
   border: none;
   cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 4px 12px rgba(26, 54, 131, 0.25);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+  box-shadow: 0 10px 22px -6px rgba(13, 99, 243, 0.48);
 }
 
 .uprofile-submit-btn:hover:not(:disabled) {
-  background: #2563eb;
   transform: translateY(-1px);
+  box-shadow: 0 14px 26px -6px rgba(13, 99, 243, 0.55);
+  filter: brightness(1.04);
+}
+
+.uprofile-submit-btn:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .uprofile-submit-btn:disabled {
   opacity: 0.7;
   cursor: not-allowed;
+  transform: none;
 }
 
 .uprofile-spinner {
@@ -584,29 +961,150 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* Responsiveness */
-@media (max-width: 768px) {
+/* =========================================================
+   RESPONSIVENESS
+   ========================================================= */
+@media (max-width: 1024px) {
+  .uprofile-main-container {
+    padding: 0 20px;
+  }
+
   .uprofile-body-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: 248px minmax(0, 1fr);
+    gap: 20px;
+  }
+
+  .uprofile-card-panel {
+    padding: 26px 26px 28px;
+  }
+
+  .uprofile-hero-villa-img {
+    opacity: 0.85;
+    right: -36px;
+  }
+}
+
+@media (max-width: 900px) {
+  .uprofile-body-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .uprofile-sidebar-card {
+    padding: 16px;
+  }
+
+  .uprofile-tab-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .uprofile-tab-btn {
+    justify-content: center;
+    padding: 11px 12px;
+    font-size: 0.9rem;
+  }
+
+  /* Preserve circular/square geometry with mobile.css 44px touch target rule */
+  .uprofile-camera-btn {
+    width: 44px;
+    height: 44px;
+    bottom: -2px;
+    right: -2px;
+  }
+
+  .uprofile-eye-btn {
+    width: 44px;
+    height: 44px;
+    right: 4px;
+  }
+
+  .uprofile-hero-scrim {
+    background: linear-gradient(
+      90deg,
+      rgba(241, 247, 255, 0.96) 0%,
+      rgba(235, 244, 255, 0.88) 54%,
+      rgba(222, 237, 255, 0.45) 80%,
+      rgba(222, 237, 255, 0.15) 100%
+    );
+  }
+}
+
+@media (max-width: 720px) {
+  .uprofile-form-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
   }
 
   .uprofile-hero-content {
     flex-direction: column;
     align-items: center;
     text-align: center;
-    gap: 1rem;
+    padding: 28px 22px 26px;
+    gap: 18px;
+  }
+
+  .uprofile-hero-villa-img {
+    height: 100%;
+    opacity: 0.32;
+    right: -24px;
+    top: 50%;
+  }
+
+  .uprofile-hero-scrim {
+    background: linear-gradient(
+      180deg,
+      rgba(241, 247, 255, 0.82) 0%,
+      rgba(234, 243, 255, 0.92) 100%
+    );
   }
 
   .uprofile-user-meta {
-    padding-top: 0;
     align-items: center;
   }
 
-  .uprofile-name-row {
+  .uprofile-name-row,
+  .uprofile-pills-row {
     justify-content: center;
   }
 
-  .uprofile-pills-row {
+  .uprofile-email-subtext {
     justify-content: center;
+  }
+}
+
+@media (max-width: 560px) {
+  .uprofile-main-container {
+    margin: 18px auto 40px;
+    padding: 0 14px;
+    gap: 16px;
+  }
+
+  .uprofile-hero-card {
+    border-radius: 22px;
+  }
+
+  .uprofile-sidebar-card,
+  .uprofile-card-panel {
+    border-radius: 20px;
+    padding: 20px 18px;
+  }
+
+  .uprofile-panel-header {
+    align-items: flex-start;
+    padding-bottom: 16px;
+    margin-bottom: 20px;
+  }
+
+  .uprofile-tab-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .uprofile-tab-btn {
+    justify-content: flex-start;
+  }
+
+  .uprofile-submit-btn {
+    width: 100%;
   }
 }
