@@ -29,6 +29,12 @@ export const PRICE_PRESET_OPTIONS = [
   { value: 'over-20m', label: 'Trên 20 triệu', min: '20000000', max: '' }
 ];
 
+export const LISTING_TYPE_ITEMS = [
+  { value: '', label: 'Thuê & bán', iconKey: 'all' },
+  { value: 'RENT', label: 'Cho thuê', iconKey: 'rent' },
+  { value: 'SALE', label: 'Mua bán', iconKey: 'sale' }
+];
+
 export const normalizeSearchText = (value = '') =>
   String(value)
     .normalize('NFD')
@@ -117,3 +123,6 @@ export const formatAreaDropdownLabel = ({ province, ward, hasProvinces, error })
   if (province) return province;
   return hasProvinces ? 'Tất cả tỉnh/thành phố' : (error || 'Đang tải…');
 };
+
+export const formatListingTypeLabel = (listing = '') =>
+  LISTING_TYPE_ITEMS.find((item) => item.value === listing)?.label || 'Thuê & bán';
