@@ -416,7 +416,21 @@ test('transactions endpoint splits AGENT and USER orders with accurate audience 
     assert.equal(usersOnly.items.length, 2);
     assert.ok(usersOnly.items.every((item) => item.audience === 'USER'));
 
+    const byName = await service.getTransactions({ start: '2026-10-10', end: '2026-10-16', audience: 'USER', search: 'Fixture 1' }, now);
+    assert.equal(byName.total, 1);
+    assert.equal(byName.items[0].accountName, 'Fixture 1');
+    assert.deepEqual(byName.counts, { all: 3, agent: 1, user: 2 });
+
+    const byEmail = await service.getTransactions({ start: '2026-10-10', end: '2026-10-16', audience: 'AGENT', search: 'fixture9@example.test' }, now);
+    assert.equal(byEmail.total, 1);
+    assert.equal(byEmail.items[0].audience, 'AGENT');
+
+    const noMatch = await service.getTransactions({ start: '2026-10-10', end: '2026-10-16', audience: 'USER', search: 'notfound' }, now);
+    assert.equal(noMatch.total, 0);
+    assert.deepEqual(noMatch.items, []);
+
     await assert.rejects(service.getTransactions({ audience: 'INVALID' }, now), (err) => err.statusCode === 400);
+    await assert.rejects(service.getTransactions({ search: ['dup'] }, now), (err) => err.statusCode === 400);
   } finally {
     await db.exec('DROP TABLE IF EXISTS agent_payment_orders');
   }

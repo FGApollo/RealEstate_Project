@@ -2,6 +2,8 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const {
   parseTransactionAudience,
+  parseTransactionSearch,
+  matchesAccountSearch,
   getTransactionsWindowIso,
   normalizeTransactionRow
 } = require('../services/transactionsAnalyticsLogic');
@@ -66,4 +68,18 @@ test('normalizeTransactionRow classifies AGENT vs USER orders and preserves acco
   assert.equal(agentOrder.audience, 'AGENT');
   assert.equal(agentOrder.accountName, 'Môi giới');
   assert.equal(agentOrder.paidAt, null);
+});
+
+test('parseTransactionSearch and matchesAccountSearch validate input and fold Vietnamese accents', () => {
+  assert.equal(parseTransactionSearch(undefined), '');
+  assert.equal(parseTransactionSearch('  chánh hiếu  '), 'chánh hiếu');
+  assert.throws(() => parseTransactionSearch(['a']), (err) => err.statusCode === 400);
+  assert.throws(() => parseTransactionSearch('a'.repeat(121)), (err) => err.statusCode === 400);
+
+  const user = { name: 'Chánh Hiếu', email: 'caochannhieu@gmail.com' };
+  assert.equal(matchesAccountSearch(user, 'chanh hieu'), true);
+  assert.equal(matchesAccountSearch(user, 'HIẾU'), true);
+  assert.equal(matchesAccountSearch(user, 'caochannhieu@'), true);
+  assert.equal(matchesAccountSearch(user, 'khongton'), false);
+  assert.equal(matchesAccountSearch(null, 'hieu'), false);
 });

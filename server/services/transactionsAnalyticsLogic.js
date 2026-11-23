@@ -14,6 +14,35 @@ function parseTransactionAudience(value) {
   return normalized;
 }
 
+function parseTransactionSearch(value) {
+  if (value === undefined || value === '') return '';
+  if (typeof value !== 'string') {
+    throw Object.assign(new Error('Từ khóa tìm kiếm giao dịch không hợp lệ.'), { statusCode: 400 });
+  }
+  const trimmed = value.trim();
+  if (trimmed.length > 120) {
+    throw Object.assign(new Error('Từ khóa tìm kiếm tối đa 120 ký tự.'), { statusCode: 400 });
+  }
+  return trimmed;
+}
+
+function normalizeSearchToken(value = '') {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[đĐ]/g, 'd')
+    .toLowerCase()
+    .trim();
+}
+
+function matchesAccountSearch(user, search) {
+  const needle = normalizeSearchToken(search);
+  if (!needle) return true;
+  if (!user) return false;
+  return normalizeSearchToken(user.name).includes(needle)
+    || normalizeSearchToken(user.email).includes(needle);
+}
+
 function getTransactionsWindowIso(filters, now = new Date()) {
   const startMs = Date.parse(`${filters.start}T00:00:00${VN_OFFSET}`);
   const endMs = Date.parse(`${filters.end}T00:00:00${VN_OFFSET}`) + DAY_MS;
@@ -57,6 +86,9 @@ function normalizeTransactionRow(row, usersById = new Map()) {
 
 module.exports = {
   parseTransactionAudience,
+  parseTransactionSearch,
+  normalizeSearchToken,
+  matchesAccountSearch,
   getTransactionsWindowIso,
   resolveOrderAudience,
   normalizeTransactionRow

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { BriefcaseBusiness, Crown } from 'lucide-react';
+import { BriefcaseBusiness, Crown, Search, X } from 'lucide-react';
 import { apiFetch } from '../../../auth/apiClient';
 import { API_BASE_URL } from '../../../config';
 import { money, number } from './analyticsFormat';
@@ -22,11 +22,13 @@ const STATUS_TONE = {
   FAILED: 'failed'
 };
 
-function AudienceTransactionsBody({ filters, revision, audience, accountLabel, emptyLabel, onCounts }) {
+function AudienceTransactionsBody({ filters, revision, audience, search, accountLabel, emptyLabel, onCounts }) {
   const [page, setPage] = useState(1);
   const [retry, setRetry] = useState(0);
   const [result, setResult] = useState(null);
-  const query = new URLSearchParams({ ...filters, audience, page, limit: 10 }).toString();
+  const params = new URLSearchParams({ ...filters, audience, page, limit: 10 });
+  if (search) params.set('search', search);
+  const query = params.toString();
   const key = `${query}:${revision}:${retry}`;
 
   useEffect(() => {
@@ -63,10 +65,14 @@ function AudienceTransactionsBody({ filters, revision, audience, accountLabel, e
   return (
     <>
       <p className="analytics-agent-summary">
-        Đơn tạo trong khoảng đã chọn · <strong>{number(data.total)}</strong> đơn. Ngày thanh toán được hiển thị riêng để đối soát doanh thu.
+        {search ? (
+          <>Tìm thấy <strong>{number(data.total)}</strong> đơn khớp với “{search}”.</>
+        ) : (
+          <>Đơn tạo trong khoảng đã chọn · <strong>{number(data.total)}</strong> đơn. Ngày thanh toán được hiển thị riêng để đối soát doanh thu.</>
+        )}
       </p>
       {!data.items.length ? (
-        <p>{emptyLabel}</p>
+        <p>{search ? `Không có giao dịch nào khớp với “${search}”.` : emptyLabel}</p>
       ) : (
         <div className="analytics-table-wrap">
           <table className="analytics-agents-table">
@@ -114,6 +120,79 @@ function AudienceTransactionsBody({ filters, revision, audience, accountLabel, e
   );
 }
 
+function AudienceTransactionsPanel({
+  title,
+  subtitle,
+  icon: Icon,
+  iconClassName = '',
+  filters,
+  filterKey,
+  revision,
+  audience,
+  accountLabel,
+  emptyLabel,
+  onCounts
+}) {
+  const [inputValue, setInputValue] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  useEffect(() => {
+    const trimmed = inputValue.trim();
+    const timer = setTimeout(() => setDebouncedSearch(trimmed), trimmed ? 300 : 0);
+    return () => clearTimeout(timer);
+  }, [inputValue]);
+
+  return (
+    <article className="analytics-panel analytics-wide">
+      <div className="analytics-panel-heading">
+        <div>
+          <h3 className="analytics-panel-title">
+            <Icon size={17} className={iconClassName} /> {title}
+          </h3>
+          <p>{subtitle}</p>
+        </div>
+        <div className="analytics-panel-search">
+          <Search size={15} className="analytics-panel-search-icon" aria-hidden="true" />
+          <input
+            type="text"
+            value={inputValue}
+            maxLength={120}
+            placeholder="Tìm theo tên hoặc email..."
+            aria-label={`Tìm ${title.toLowerCase()} theo tên hoặc email`}
+            onChange={(event) => setInputValue(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                setDebouncedSearch(inputValue.trim());
+              }
+            }}
+          />
+          {inputValue && (
+            <button
+              type="button"
+              className="analytics-panel-search-clear"
+              aria-label="Xóa từ khóa tìm kiếm"
+              onClick={() => { setInputValue(''); setDebouncedSearch(''); }}
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
+      </div>
+      <AudienceTransactionsBody
+        key={`${audience}:${filterKey}:${debouncedSearch}`}
+        filters={filters}
+        revision={revision}
+        audience={audience}
+        search={debouncedSearch}
+        accountLabel={accountLabel}
+        emptyLabel={emptyLabel}
+        onCounts={onCounts}
+      />
+    </article>
+  );
+}
+
 export default function PaymentTransactions({ filters, revision }) {
   const [view, setView] = useState('all');
   const filterKey = `${new URLSearchParams(filters).toString()}:${revision}`;
@@ -138,43 +217,34 @@ export default function PaymentTransactions({ filters, revision }) {
       </div>
 
       {showAgent && (
-        <article className="analytics-panel analytics-wide">
-          <div className="analytics-panel-heading">
-            <div>
-              <h3 className="analytics-panel-title"><BriefcaseBusiness size={17} /> Giao dịch môi giới</h3>
-              <p>Đơn thanh toán gói dịch vụ môi giới qua payOS · Ngày · môi giới · gói · số tiền · trạng thái</p>
-            </div>
-          </div>
-          <AudienceTransactionsBody
-            key={`AGENT:${filterKey}`}
-            filters={filters}
-            revision={revision}
-            audience="AGENT"
-            accountLabel="Môi giới"
-            emptyLabel="Chưa có giao dịch của môi giới trong khoảng thời gian này."
-            onCounts={handleCounts}
-          />
-        </article>
+        <AudienceTransactionsPanel
+          title="Giao dịch môi giới"
+          subtitle="Đơn thanh toán gói dịch vụ môi giới qua payOS · Ngày · môi giới · gói · số tiền · trạng thái"
+          icon={BriefcaseBusiness}
+          filters={filters}
+          filterKey={filterKey}
+          revision={revision}
+          audience="AGENT"
+          accountLabel="Môi giới"
+          emptyLabel="Chưa có giao dịch của môi giới trong khoảng thời gian này."
+          onCounts={handleCounts}
+        />
       )}
 
       {showUser && (
-        <article className="analytics-panel analytics-wide">
-          <div className="analytics-panel-heading">
-            <div>
-              <h3 className="analytics-panel-title"><Crown size={17} className="analytics-plus-heading-icon" /> Giao dịch khách hàng</h3>
-              <p>Đơn thanh toán gói Swipe Nest Plus của khách hàng qua payOS · Ngày · khách hàng · gói · số tiền · trạng thái</p>
-            </div>
-          </div>
-          <AudienceTransactionsBody
-            key={`USER:${filterKey}`}
-            filters={filters}
-            revision={revision}
-            audience="USER"
-            accountLabel="Khách hàng"
-            emptyLabel="Chưa có giao dịch của khách hàng trong khoảng thời gian này."
-            onCounts={handleCounts}
-          />
-        </article>
+        <AudienceTransactionsPanel
+          title="Giao dịch khách hàng"
+          subtitle="Đơn thanh toán gói Swipe Nest Plus của khách hàng qua payOS · Ngày · khách hàng · gói · số tiền · trạng thái"
+          icon={Crown}
+          iconClassName="analytics-plus-heading-icon"
+          filters={filters}
+          filterKey={filterKey}
+          revision={revision}
+          audience="USER"
+          accountLabel="Khách hàng"
+          emptyLabel="Chưa có giao dịch của khách hàng trong khoảng thời gian này."
+          onCounts={handleCounts}
+        />
       )}
     </div>
   );
