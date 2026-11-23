@@ -1,10 +1,6 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { 
-  Heart, X, MapPin,
-  Bed, Bath, Maximize,
-  MessageSquare, Loader2
-} from 'lucide-react';
+import { X } from 'lucide-react';
 import { useMotionValue, useTransform, useAnimation } from 'framer-motion';
 import PropertyDetailModal from '../components/PropertyDetailModal';
 import './Swipe.css';
@@ -19,6 +15,7 @@ import SwipeHistoryPanel from '../features/swipe/SwipeHistoryPanel';
 import { fetchSwipeHistory, SWIPE_HISTORY_PREVIEW } from '../features/swipe/swipeHistoryApi';
 import SwipeMainSection from '../features/swipe/SwipeMainSection';
 import SwipeChatPrompt from '../features/swipe/SwipeChatPrompt';
+import SavedPropertiesView from '../features/swipe/SavedPropertiesView';
 import { getCategoryKey } from '../services/propertyCategory.js';
 
 
@@ -370,27 +367,16 @@ const Swipe = () => {
     }
   };
 
-  const filteredLikedProperties = useMemo(() => {
-    let list = [...dbFavorites];
-    
-    // Filter by Category
-    if (selectedSavedCategory !== 'Tất cả') {
-      list = list.filter(p => getCategoryKey(p.property_type) === selectedSavedCategory);
+  const handleOpenSavedChat = async (propertyId) => {
+    if (openingChatPropertyId) return;
+    try {
+      setOpeningChatPropertyId(propertyId);
+      await openPropertyChat({ propertyId, requireAuth, navigate });
+    } catch (error) {
+      alert(error.message || 'Kh\u00f4ng th\u1ec3 m\u1edf cu\u1ed9c tr\u00f2 chuy\u1ec7n l\u00fac n\u00e0y.');
+    } finally {
+      setOpeningChatPropertyId(null);
     }
-
-    // Sort by
-    if (sortBy === 'price-desc') {
-      list.sort((a, b) => b.price - a.price);
-    } else if (sortBy === 'price-asc') {
-      list.sort((a, b) => a.price - b.price);
-    }
-    
-    return list;
-  }, [dbFavorites, selectedSavedCategory, sortBy]);
-
-  const getSavedCategoryCount = (category) => {
-    if (category === 'Tất cả') return dbFavorites.length;
-    return dbFavorites.filter(p => getCategoryKey(p.property_type) === category).length;
   };
 
   const activePropertyForModal = selectedSavedProperty || currentProperty;
@@ -467,205 +453,20 @@ const Swipe = () => {
 
       {/* Saved View Content */}
       {activeView === 'saved' && (
-        <div className="saved-main-layout">
-          {/* Left Sidebar */}
-          <aside className="saved-sidebar">
-            <div className="saved-sidebar-section">
-              <h3>Danh mục yêu thích</h3>
-              <div className="saved-category-list">
-                {['Tất cả', 'Căn Hộ', 'Văn Phòng', 'Chung Cư', 'Nhà Ở', 'Mặt Bằng', 'Phòng Trọ'].map((cat) => (
-                  <button 
-                    key={cat}
-                    className={`saved-category-item ${selectedSavedCategory === cat ? 'active' : ''}`}
-                    onClick={() => setSelectedSavedCategory(cat)}
-                  >
-                    <span>{cat}</span>
-                    <span className="saved-category-badge">{getSavedCategoryCount(cat)}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="saved-sidebar-section">
-              <h3>Sắp xếp theo</h3>
-              <div className="saved-sort-list">
-                <label className="saved-sort-item">
-                  <input 
-                    type="radio" 
-                    name="sortBy" 
-                    checked={sortBy === 'recent'} 
-                    onChange={() => setSortBy('recent')} 
-                  />
-                  <span className="custom-radio"></span>
-                  <span>Thêm gần đây</span>
-                </label>
-                <label className="saved-sort-item">
-                  <input 
-                    type="radio" 
-                    name="sortBy" 
-                    checked={sortBy === 'price-desc'} 
-                    onChange={() => setSortBy('price-desc')} 
-                  />
-                  <span className="custom-radio"></span>
-                  <span>Giá: Cao đến Thấp</span>
-                </label>
-                <label className="saved-sort-item">
-                  <input 
-                    type="radio" 
-                    name="sortBy" 
-                    checked={sortBy === 'price-asc'} 
-                    onChange={() => setSortBy('price-asc')} 
-                  />
-                  <span className="custom-radio"></span>
-                  <span>Giá: Thấp đến Cao</span>
-                </label>
-              </div>
-            </div>
-          </aside>
-
-          {/* Right Main Grid */}
-          <main className="saved-content-area">
-            <h1 className="saved-title">Bất động sản yêu thích</h1>
-            <p className="saved-subtitle">
-              Các bất động sản bạn đã thích. Xem xét lại các lựa chọn của bạn và tiến hành các bước tiếp theo khi bạn đã sẵn sàng.
-            </p>
-
-            {isLoadingSaved ? (
-              <div className="saved-grid">
-                {[1, 2, 3].map((n) => (
-                  <div key={n} className="saved-skeleton-card">
-                    <div className="saved-skeleton-img" />
-                    <div className="saved-skeleton-info">
-                      <div className="saved-skeleton-title" />
-                      <div className="saved-skeleton-address" />
-                      <div className="saved-skeleton-features" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : filteredLikedProperties.length === 0 ? (
-              <div className="saved-empty-state">
-                <Heart size={48} className="heart-pulse-icon" />
-                <h3>Chưa có bất động sản nào trong danh sách yêu thích</h3>
-                <p>Nhấp vào DISCOVER để lướt và thích các bất động sản phù hợp.</p>
-                <button className="back-to-swipe-btn" onClick={() => setActiveView('swipe')}>
-                  Bắt đầu tìm kiếm
-                </button>
-              </div>
-            ) : (
-              <div className="saved-grid">
-                {filteredLikedProperties.map((property) => (
-                  <div 
-                    key={property.id} 
-                    className={`saved-property-card ${['SOLD', 'RENTED'].includes(property.status) ? 'is-closed' : ''}`}
-                    onClick={() => {
-                      setSelectedSavedProperty(property);
-                      setShowDetailModal(true);
-                    }}
-                  >
-                    <div className="saved-card-img-wrapper">
-                      <img src={property.thumbnail} alt={property.title} className="saved-card-img" loading="lazy" decoding="async" />
-                      
-                      {['SOLD', 'RENTED'].includes(property.status) && (
-                        <span className="saved-card-badge closed">
-                          {property.status === 'SOLD' ? 'Đã bán' : 'Đã cho thuê'}
-                        </span>
-                      )}
-
-                      {property.property_type === 'Biệt Thự' && property.price > 10000000000 && (
-                        <span className="saved-card-badge premium">
-                          ↗ Yêu thích nhất
-                        </span>
-                      )}
-
-                      {(property.address?.toLowerCase().includes('biển') || property.description?.toLowerCase().includes('biển')) && (
-                        <span className="saved-card-badge beach">
-                          ≈ Gần biển
-                        </span>
-                      )}
-
-                      <button 
-                        className="saved-card-heart-btn"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleUnsave(property.id);
-                        }}
-                        title="Bỏ yêu thích"
-                      >
-                        <Heart size={16} fill="#1a42b8" color="#1a42b8" />
-                      </button>
-
-                      <div className="saved-card-price-tag">
-                        {formatPrice(property.price)}
-                        {property.listing_type === 'RENT' && ' /tháng'}
-                        {property.listing_type === 'SALE' && ' · mua bán'}
-                      </div>
-                    </div>
-
-                    <div className="saved-card-info">
-                      <h3 className="saved-card-title">{property.title}</h3>
-                      <div className="saved-card-address">
-                        <MapPin size={14} />
-                        <span>{property.address}</span>
-                      </div>
-
-                      <div className="saved-card-features">
-                        <div className="saved-spec">
-                          <Bed size={14} />
-                          <span>{property.bedrooms || 0} BEDS</span>
-                        </div>
-                        <div className="saved-spec-divider" />
-                        <div className="saved-spec">
-                          <Bath size={14} />
-                          <span>{property.bathrooms || 0} BATHS</span>
-                        </div>
-                        <div className="saved-spec-divider" />
-                        <div className="saved-spec">
-                          <Maximize size={14} />
-                          <span>{property.area}m² AREA</span>
-                        </div>
-                      </div>
-
-                      <div className="saved-card-footer">
-                        {user && Number(user.id) === Number(property.owner_id) ? (
-                          <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 500 }}>Tin của bạn</span>
-                        ) : (
-                          <button 
-                            className="saved-card-chat-btn"
-                            disabled={openingChatPropertyId === property.id}
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              if (openingChatPropertyId) return;
-                              try {
-                                setOpeningChatPropertyId(property.id);
-                                await openPropertyChat({ propertyId: property.id, requireAuth, navigate });
-                              } catch (error) {
-                                alert(error.message || 'Không thể mở cuộc trò chuyện lúc này.');
-                              } finally {
-                                setOpeningChatPropertyId(null);
-                              }
-                            }}
-                            title="Nhắn tin với môi giới"
-                            style={{ 
-                              opacity: openingChatPropertyId === property.id ? 0.7 : 1, 
-                              cursor: openingChatPropertyId === property.id ? 'not-allowed' : 'pointer' 
-                            }}
-                          >
-                            {openingChatPropertyId === property.id ? (
-                              <Loader2 size={16} className="animate-spin" />
-                            ) : (
-                              <MessageSquare size={16} />
-                            )}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </main>
-        </div>
+        <SavedPropertiesView
+          user={user}
+          favorites={dbFavorites}
+          isLoading={isLoadingSaved}
+          selectedCategory={selectedSavedCategory}
+          onSelectCategory={setSelectedSavedCategory}
+          sortBy={sortBy}
+          onChangeSort={setSortBy}
+          openingChatPropertyId={openingChatPropertyId}
+          onOpenDetail={(property) => { setSelectedSavedProperty(property); setShowDetailModal(true); }}
+          onUnsave={handleUnsave}
+          onOpenChat={handleOpenSavedChat}
+          onStartDiscover={() => setActiveView('swipe')}
+        />
       )}
 
       {/* Property Details Modal */}

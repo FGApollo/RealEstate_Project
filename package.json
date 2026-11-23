@@ -9,7 +9,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "test:auth-flow": "node --test src/auth/*.test.js",
-    "test:ui-logic": "node --test src/features/home/*.test.js src/features/plus/*.test.js src/pages/*.test.js",
+    "test:ui-logic": "node --test src/features/home/*.test.js src/features/plus/*.test.js src/features/swipe/*.test.js src/pages/*.test.js",
     "test:analytics": "node --test server/tests/analytics.test.js",
     "preview": "vite preview",
     "test:security": "npm run test:auth-flow && npm --prefix server test"
