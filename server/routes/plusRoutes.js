@@ -8,6 +8,7 @@ router.use(authenticate, requireRole('USER'));
 router.get('/status', rateLimiters.read, controller.status);
 router.get('/catalog', rateLimiters.read, controller.catalog);
 router.get('/official-listings', rateLimiters.read, controller.officialListings);
+router.get('/official-preview', rateLimiters.read, controller.officialPreview);
 router.get('/payments', rateLimiters.read, controller.listPayments);
 router.post('/payments', rateLimiters.expensive, controller.createPayment);
 router.get('/payments/:id', rateLimiters.read, controller.getPayment);

@@ -40,6 +40,18 @@ module.exports = {
     const properties = await propertyRepository.fetchPublicProperties({ filters: { official: true }, limit: 24 });
     return { properties: properties.map(toPublicProperty) };
   }, 'Chưa thể tải nguồn hàng Swipe Nest.'),
+  // Ảnh xem trước (chỉ trả id & thumbnail, không lộ thông tin chi tiết hay liên hệ) cho khung mời nâng cấp Plus.
+  officialPreview: action(async () => {
+    const properties = await propertyRepository.fetchPublicProperties({ filters: { official: true }, limit: 8 });
+    const previews = properties
+      .map((property) => {
+        const dto = toPublicProperty(property);
+        const image = dto.thumbnail || dto.images?.[0] || null;
+        return image ? { id: dto.id, image } : null;
+      })
+      .filter(Boolean);
+    return { previews };
+  }, 'Chưa thể tải ảnh xem trước nguồn hàng Swipe Nest.'),
 
   admin: {
     lookup: action((req) => plusAdminService.lookupUser(req.user.id, req.query)),

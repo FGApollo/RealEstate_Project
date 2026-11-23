@@ -623,6 +623,7 @@ const Home = () => {
       {/* Nguồn hàng Swipe Nest: danh sách cho thành viên Plus, lời mời nâng cấp cho người chưa có */}
       {normalizedRole === 'USER' && (
         <CheckedListingsSection
+          previewProperties={properties}
           formatPrice={formatPrice}
           favorites={dbFavorites}
           onToggleFavorite={toggleFavorite}
