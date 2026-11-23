@@ -104,6 +104,7 @@ export default function Header({
       return location.state?.activeView === 'saved' ? 'saved' : 'swipe';
     }
     if (path.startsWith('/chat')) return 'chat';
+    if (path.startsWith('/plus')) return 'plus';
     if (path.startsWith('/profile')) return 'profile';
     if (path === '/admin') return 'admin';
     if (path === '/sale/overview') return 'agent';
