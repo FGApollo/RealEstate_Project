@@ -8,14 +8,14 @@ import { TrendChart, ComparisonChart, DistributionChart, Empty } from './Analyti
 import { number, money, percent } from './analyticsFormat';
 import './AdminAnalyticsPage.css';
 import PaymentTransactions from './PaymentTransactions';
-import ActiveSubscriptionAgents from './ActiveSubscriptionAgents';
+import SubscriptionAnalytics from './SubscriptionAnalytics';
 
 const dateTime = (value) => new Date(value).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
 const today = () => new Date(Date.now() + 7 * 3600000).toISOString().slice(0, 10);
 const SECTIONS = [
   { id: 'overview', label: 'Tổng quan', icon: LayoutDashboard, title: 'Tổng quan hệ thống', description: 'Theo dõi những chỉ số chính về hoạt động của Swipe Nest.' },
   { id: 'users', label: 'Người dùng', icon: Users, title: 'Thống kê người dùng', description: 'Theo dõi tài khoản, khách hàng, môi giới và số lượt đăng ký mới.' },
-  { id: 'subscriptions', label: 'Gói dịch vụ', icon: BriefcaseBusiness, title: 'Gói dịch vụ môi giới', description: 'Theo dõi số môi giới sử dụng gói, đăng ký mới và hạn dùng.' },
+  { id: 'subscriptions', label: 'Gói dịch vụ', icon: BriefcaseBusiness, title: 'Gói dịch vụ', description: 'Theo dõi gói dịch vụ môi giới và gói Swipe Nest Plus của khách hàng.' },
   { id: 'revenue', label: 'Doanh thu', icon: Wallet, title: 'Thống kê doanh thu', description: 'Theo dõi doanh thu thực thu, tiền hoàn và hiệu quả của từng gói.' },
   { id: 'transactions', label: 'Giao dịch', icon: ReceiptText, title: 'Lịch sử giao dịch', description: 'Tra cứu các giao dịch thanh toán đã được ghi nhận trong hệ thống.' }
 ];
@@ -169,33 +169,6 @@ function UserAnalytics({ data, metric, onMetricChange }) {
   </section>;
 }
 
-function SubscriptionAnalytics({ subscriptions, packages, snapshotAt, onRefresh }) {
-  return <section className="analytics-section" aria-labelledby="analytics-subscriptions-title">
-    <h2 id="analytics-subscriptions-title"><BriefcaseBusiness size={20} /> Gói dịch vụ môi giới</h2>
-    <div className="analytics-kpis">
-      <Kpi icon={Users} label="Đang sử dụng gói dịch vụ" value={subscriptions.activeAgents} detail="Gói đang hoạt động và còn hạn tại mốc chốt · mỗi môi giới được tính một lần" />
-      <Kpi icon={UserRound} label="Chưa đăng ký gói dịch vụ" value={subscriptions.neverSubscribed} detail="Môi giới chưa từng đăng ký bất kỳ gói nào tính đến mốc chốt" />
-      <Kpi icon={BadgeCheck} label="Đăng ký mới trong kỳ" value={subscriptions.newRecords} growth={subscriptions.newGrowthPercent} detail="Số lượt đăng ký, có thể gồm nhiều lượt của một môi giới" />
-      <Kpi icon={CalendarDays} label="Hết hạn / hủy" value={subscriptions.expiredRecords + subscriptions.cancelledRecords} detail={`${number(subscriptions.expiredRecords)} lượt hết hạn · ${number(subscriptions.cancelledRecords)} lượt đã hủy tại mốc chốt · ${number(subscriptions.endedInPeriod)} lượt hết hạn trong kỳ`} />
-    </div>
-    <div className="analytics-status-strip"><span>Tổng môi giới <strong>{number(subscriptions.totalAgents)}</strong></span><span><i /> Đang sử dụng gói dịch vụ <strong>{number(subscriptions.activeAgents)}</strong></span><span>Hiện không sử dụng gói <strong>{number(subscriptions.withoutActive)}</strong></span></div>
-    <div className="analytics-grid">
-      <Panel title="Agent đang sử dụng gói dịch vụ" subtitle="Agent có gói đang hoạt động, đã bắt đầu và còn hạn tại cùng mốc chốt với thống kê" wide>
-        <ActiveSubscriptionAgents snapshotAt={snapshotAt} expectedTotal={subscriptions.activeAgents} onRefresh={onRefresh} />
-      </Panel>
-      <Panel title="Tỷ trọng gói đang dùng" subtitle="Mỗi môi giới một gói · tỷ lệ trên tổng môi giới đang sử dụng gói dịch vụ">
-        <DistributionChart data={packages} dataKey="activeAgents" />
-      </Panel>
-      <Panel title="Đăng ký theo gói" subtitle="Số lượt đăng ký mới trong khoảng đã chọn">
-        <ComparisonChart data={packages} dataKey="newSubscriptions" label="Lượt đăng ký" />
-      </Panel>
-      <Panel title="Chi tiết từng gói" subtitle="Tên gói lấy từ dữ liệu hệ thống · doanh thu trong kỳ" wide>
-        {!packages.length ? <Empty /> : <div className="analytics-table-wrap"><table><thead><tr><th>Gói dịch vụ</th><th>Agent đang dùng</th><th>Tỷ trọng</th><th>Đăng ký mới</th><th>Doanh thu (VND)</th></tr></thead><tbody>{packages.map((plan) => <tr key={plan.name}><td><strong>{plan.name}</strong></td><td>{number(plan.activeAgents)}</td><td>{percent(plan.sharePercent)}</td><td>{number(plan.newSubscriptions)}</td><td>{money(plan.revenue)}</td></tr>)}</tbody></table></div>}
-      </Panel>
-    </div>
-  </section>;
-}
-
 function RevenueAnalytics({ revenue, packages, bucket, comparison, onComparisonChange }) {
   return <section className="analytics-section" aria-labelledby="analytics-revenue-title">
     <h2 id="analytics-revenue-title"><Wallet size={20} /> Thống kê doanh thu</h2>
@@ -230,6 +203,7 @@ function AnalyticsDefinitions({ users, subscriptions }) {
     <p>“Chưa đăng ký gói dịch vụ” đếm Agent chưa từng có bản ghi đăng ký tính đến mốc chốt. “Hiện không sử dụng gói” gồm cả nhóm này và Agent đã đăng ký nhưng hiện chưa có gói đang hoạt động, đã bắt đầu và còn hạn. “Hết hạn / hủy” là tổng số lượt đăng ký đã hết hạn hoặc đã hủy tại mốc chốt; một Agent có thể có nhiều lượt.</p>
     <p>Thống kê gói dựa trên bản ghi đăng ký đã xuất hiện trong DB. Gia hạn cập nhật hạn dùng của gói hiện tại; các lần thanh toán được lưu riêng trong sổ payOS. Giá gói không phải chứng từ thanh toán. Bộ lọc quá khứ dùng ngày tạo/hạn dùng và role/status hiện tại, không tái dựng toàn bộ lịch sử đổi trạng thái.</p>
     <p>Ngày kết thúc được tính trọn ngày Việt Nam, kỳ hiện tại chốt tại thời điểm cập nhật. Timestamp cũ được đọc là UTC. Bản ghi thiếu ngày vẫn có thể nằm trong tổng nhưng không nằm trong biểu đồ đăng ký; gói thiếu ngày bắt đầu/kết thúc không được tính hiệu lực. Thiếu ngày: {number(users.unknownDates)} tài khoản, {number(subscriptions.unknownDates)} đăng ký.</p>
+    <p>“Đang sử dụng gói Plus” đếm tài khoản khách hàng (role USER) có kỳ Plus đang hoạt động và còn hạn tại mốc chốt (gồm cả mua qua payOS và Admin cấp). Nếu khách hàng có nhiều kỳ cộng dồn nối tiếp, khách hàng được tính một lần với ngày hết hạn là mốc kết thúc của kỳ cuối cùng đang hoạt động.</p>
     <p>Doanh thu dùng ngày thanh toán xác thực và số tiền gốc bằng VND trong sổ payOS; PENDING/FAILED/CANCELLED không tính. Webhook lặp không ghi nhận trùng. Không suy ra thanh toán từ gói cũ. Chưa đối soát hoàn tiền nên chỉ công bố doanh thu gộp; tiền hoàn và doanh thu sau hoàn chưa có dữ liệu.</p>
   </details>;
 }
@@ -239,7 +213,7 @@ function DashboardContent({ data, section, onNavigate, userMetric, onUserMetricC
     <p className="analytics-scope">Mốc chốt: {dateTime(data.snapshotAt)} · Trong kỳ: {data.filters.start} → {data.filters.end} · Giờ Việt Nam (UTC+7). Tài khoản và gói được phân loại theo vai trò, trạng thái hiện tại.</p>
     {section === 'overview' && <OverviewAnalytics data={data} onNavigate={onNavigate} />}
     {section === 'users' && <UserAnalytics data={data} metric={userMetric} onMetricChange={onUserMetricChange} />}
-    {section === 'subscriptions' && <SubscriptionAnalytics subscriptions={data.subscriptions} packages={data.packages} snapshotAt={data.snapshotAt} onRefresh={onRefresh} />}
+    {section === 'subscriptions' && <SubscriptionAnalytics subscriptions={data.subscriptions} packages={data.packages} plusSubscriptions={data.plusSubscriptions} snapshotAt={data.snapshotAt} onRefresh={onRefresh} Kpi={Kpi} Panel={Panel} />}
     {section === 'revenue' && <RevenueAnalytics revenue={data.revenue} packages={data.packages} bucket={data.filters.bucket} comparison={comparison} onComparisonChange={onComparisonChange} />}
     {section === 'transactions' && <Panel title="Giao dịch gần đây" subtitle="Ngày · môi giới · gói · số tiền · trạng thái" wide><PaymentTransactions filters={data.filters.preset === 'custom' ? { preset: 'custom', start: data.filters.start, end: data.filters.end, bucket: data.filters.bucket } : { preset: data.filters.preset, bucket: data.filters.bucket }} revision={revision} /></Panel>}
     <AnalyticsDefinitions users={data.users} subscriptions={data.subscriptions} />

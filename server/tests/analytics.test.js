@@ -242,7 +242,7 @@ async function tokenFor(id, role = 'ADMIN', active = true) {
 
 test('HTTP authentication: guest 401, USER/AGENT 403, active ADMIN 200 with real JWT/session/SQL', async () => {
   // Mốc chốt cố định: dữ liệu mẫu có ngày hết hạn cố định nên không được phụ thuộc đồng hồ thật.
-  for (const path of ['/analytics/overview', '/analytics/transactions', '/analytics/subscriptions/agents?at=2026-10-16T12:00:00Z']) {
+  for (const path of ['/analytics/overview', '/analytics/transactions', '/analytics/subscriptions/agents?at=2026-10-16T12:00:00Z', '/analytics/subscriptions/plus-users?at=2026-10-16T12:00:00Z']) {
     assert.equal((await fetch(`${base}${path}`)).status, 401);
     for (const id of [1, 9]) {
       const token = await tokenFor(id, id === 1 ? 'USER' : 'AGENT');
@@ -257,7 +257,7 @@ test('HTTP authentication: guest 401, USER/AGENT 403, active ADMIN 200 with real
       assert.equal(body.users.total, 13);
       assert.equal(body.revenue.available, false);
       for (const forbidden of ['email', 'password', 'phone', 'accessToken', 'refresh_token_hash']) assert.ok(!Object.hasOwn(body, forbidden));
-    } else if (path.includes('/agents')) {
+    } else if (path.includes('/agents') || path.includes('/plus-users')) {
       assert.equal(body.total, 2);
       assert.equal(body.items.length, 2);
     } else assert.equal(body.total, null);
@@ -359,4 +359,28 @@ test('large fixture uses indexed date/active lookups and keeps aggregated respon
   assert.equal(detail.items.length, 50);
   assert.ok(JSON.stringify(detail).length < 30000);
   t.diagnostic(`30,012 accounts + 60,005 subscriptions: ${elapsed.toFixed(1)} ms, ${JSON.stringify(result).length} JSON characters; indexed growth and active-plan lookups verified. All-time totals intentionally scan applicable facts.`);
+});
+
+test('customer Plus analytics reconciles dashboard KPIs with active Plus customer list', async () => {
+  const now = new Date('2026-10-16T12:00:00Z');
+  const dashboard = await service.getDashboard({ start: '2026-10-10', end: '2026-10-16' }, now);
+  const plus = dashboard.plusSubscriptions;
+  assert.equal(plus.available, true);
+  assert.equal(plus.totalCustomers, 8);
+  assert.equal(plus.activeUsers, 2);
+  assert.equal(plus.everSubscribed, 4);
+  assert.equal(plus.neverSubscribed, 4);
+  assert.equal(plus.withoutActive, 6);
+  assert.equal(plus.newRecords, 3);
+  assert.equal(plus.expiredRecords, 1);
+  assert.equal(plus.cancelledRecords, 1);
+
+  const page1 = await service.getActivePlusUsers({ at: dashboard.snapshotAt, page: '1', limit: '1' }, now);
+  const page2 = await service.getActivePlusUsers({ at: dashboard.snapshotAt, page: '2', limit: '1' }, now);
+  assert.equal(page1.total, plus.activeUsers);
+  assert.equal(page1.items[0].userId, 2);
+  assert.equal(page1.items[0].source, 'ADMIN');
+  assert.equal(page2.items[0].userId, 1);
+  assert.equal(page2.items[0].activePeriods, 2);
+  assert.equal(page2.items[0].endDate, '2026-12-10T04:00:00.000Z');
 });

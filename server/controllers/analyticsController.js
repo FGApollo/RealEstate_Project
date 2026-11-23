@@ -15,5 +15,6 @@ const handle = (action) => async (req, res) => {
 module.exports = {
   getDashboard: handle(service.getDashboard),
   getTransactions: handle(service.getTransactions),
-  getActiveAgents: handle(service.getActiveAgents)
+  getActiveAgents: handle(service.getActiveAgents),
+  getActivePlusUsers: handle(service.getActivePlusUsers)
 };
