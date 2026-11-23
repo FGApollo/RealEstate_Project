@@ -1,5 +1,9 @@
 const { supabase } = require('../config/supabase');
-const { getTransactionsWindowIso, normalizeTransactionRow } = require('../services/transactionsAnalyticsLogic');
+const {
+  getTransactionsWindowIso,
+  matchesAccountSearch,
+  normalizeTransactionRow
+} = require('../services/transactionsAnalyticsLogic');
 
 const MISSING_SCHEMA_CODES = new Set(['PGRST202', 'PGRST205', '42883', '42P01', '42703']);
 const MISSING_TABLE_CODES = new Set(['PGRST202', 'PGRST205', '42883', '42P01']);
@@ -71,9 +75,106 @@ async function getLegacyTransactions(filters, pagination, now, audience) {
   };
 }
 
-async function getTransactions(filters, pagination, now, audience = 'ALL') {
+async function fetchOrderUserIdsInWindow(startIso, cutoffIso, audience) {
+  const userIds = new Set();
+  for (let offset = 0; offset < MAX_PLUS_ROWS; offset += PAGE_SIZE) {
+    let query = supabase
+      .from('agent_payment_orders')
+      .select('user_id')
+      .gte('created_at', startIso)
+      .lt('created_at', cutoffIso)
+      .order('id', { ascending: true })
+      .range(offset, offset + PAGE_SIZE - 1);
+    if (audience === 'AGENT' || audience === 'USER') {
+      query = query.eq('audience', audience);
+    }
+    const { data, error } = await query;
+    if (error) return { userIds: null, error };
+    const batch = Array.isArray(data) ? data : [];
+    for (const row of batch) {
+      const id = Number(row.user_id);
+      if (Number.isFinite(id)) userIds.add(id);
+    }
+    if (batch.length < PAGE_SIZE) break;
+  }
+  return { userIds: [...userIds], error: null };
+}
+
+async function getTransactions(filters, pagination, now, audience = 'ALL', search = '') {
   const { startIso, cutoffIso } = getTransactionsWindowIso(filters, now);
   const offset = (pagination.page - 1) * pagination.limit;
+
+  const countByAudience = (target) => supabase
+    .from('agent_payment_orders')
+    .select('id', { count: 'exact', head: true })
+    .gte('created_at', startIso)
+    .lt('created_at', cutoffIso)
+    .eq('audience', target);
+
+  let matchingUserIds = null;
+  let preloadedUsersById = null;
+
+  if (search) {
+    const [{ userIds, error: idsError }, agentCountRes, userCountRes] = await Promise.all([
+      fetchOrderUserIdsInWindow(startIso, cutoffIso, audience),
+      countByAudience('AGENT'),
+      countByAudience('USER')
+    ]);
+    if (idsError) {
+      if (MISSING_TABLE_CODES.has(idsError.code)) return null;
+      if (idsError.code === '42703') return getLegacyTransactions(filters, pagination, now, audience);
+      throw Object.assign(new Error('Không thể tải thống kê thanh toán.'), { statusCode: 503 });
+    }
+    if (agentCountRes.error || userCountRes.error) {
+      throw Object.assign(new Error('Không thể tải thống kê thanh toán.'), { statusCode: 503 });
+    }
+    preloadedUsersById = userIds.length ? await fetchUsersByIds(userIds) : new Map();
+    matchingUserIds = userIds.filter((id) => matchesAccountSearch(preloadedUsersById.get(id), search));
+    const agentCount = Number(agentCountRes.count || 0);
+    const userCount = Number(userCountRes.count || 0);
+    const counts = { all: agentCount + userCount, agent: agentCount, user: userCount };
+
+    if (!matchingUserIds.length) {
+      return {
+        available: true,
+        audience,
+        search,
+        total: 0,
+        counts,
+        page: pagination.page,
+        limit: pagination.limit,
+        items: []
+      };
+    }
+
+    let searchQuery = supabase
+      .from('agent_payment_orders')
+      .select('id, order_code, user_id, plan_code, plan_name, amount_vnd, currency, status, audience, created_at, paid_at', { count: 'exact' })
+      .gte('created_at', startIso)
+      .lt('created_at', cutoffIso)
+      .in('user_id', matchingUserIds)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: true })
+      .range(offset, offset + pagination.limit - 1);
+    if (audience === 'AGENT' || audience === 'USER') {
+      searchQuery = searchQuery.eq('audience', audience);
+    }
+    const listRes = await searchQuery;
+    if (listRes.error) {
+      throw Object.assign(new Error('Không thể tải thống kê thanh toán.'), { statusCode: 503 });
+    }
+    const rows = Array.isArray(listRes.data) ? listRes.data : [];
+    return {
+      available: true,
+      audience,
+      search,
+      total: Number(listRes.count || 0),
+      counts,
+      page: pagination.page,
+      limit: pagination.limit,
+      items: rows.map((row) => normalizeTransactionRow(row, preloadedUsersById))
+    };
+  }
 
   let listQuery = supabase
     .from('agent_payment_orders')
@@ -86,13 +187,6 @@ async function getTransactions(filters, pagination, now, audience = 'ALL') {
   if (audience === 'AGENT' || audience === 'USER') {
     listQuery = listQuery.eq('audience', audience);
   }
-
-  const countByAudience = (target) => supabase
-    .from('agent_payment_orders')
-    .select('id', { count: 'exact', head: true })
-    .gte('created_at', startIso)
-    .lt('created_at', cutoffIso)
-    .eq('audience', target);
 
   const [listRes, agentCountRes, userCountRes] = await Promise.all([
     listQuery,
