@@ -1,7 +1,7 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { useNavigate, useOutletContext, useSearchParams } from 'react-router-dom';
 import {
-  Home, Search, LayoutDashboard, Settings, LogOut, BarChart2, HelpCircle, MessageSquare, Shield,
+  Home, Search, LayoutDashboard, Settings, LogOut, BarChart2, MessageSquare, Shield,
   User, Star, CreditCard, Scale, ShieldAlert, Menu, X
 } from 'lucide-react';
 import OverviewDashboard from '../features/agent/overview/OverviewDashboard';
@@ -226,7 +226,7 @@ const AgentOverview = () => {
           </button>
         </nav>
 
-        {/* Bottom: Help Center + logout */}
+        {/* Bottom: Subscription Plan + logout */}
         <div className="sidebar-bottom">
           <a 
             href="#" 
@@ -238,7 +238,6 @@ const AgentOverview = () => {
           >
             <CreditCard size={16} /> Subscription Plan
           </a>
-          <a href="#" className="nav-item"><HelpCircle size={16} /> Help Center</a>
           <a href="#" className="nav-item" onClick={handleLogout}><LogOut size={16} /> Log Out</a>
         </div>
         </div>
