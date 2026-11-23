@@ -341,7 +341,41 @@ export default function UserProfile() {
               className="uprofile-hero-villa-img"
               decoding="async"
             />
-            <div className="uprofile-hero-scrim" />
+            <svg
+              className="uprofile-hero-waves"
+              viewBox="0 0 1180 220"
+              preserveAspectRatio="none"
+              fill="none"
+            >
+              <path
+                d="M-40 138C125 66 290 202 510 150C700 105 840 36 1040 68L1180 0V220H-40V138Z"
+                fill="url(#uprofileHeroWave1)"
+              />
+              <path
+                d="M-40 178C160 124 325 220 560 176C745 142 900 114 1180 146V220H-40V178Z"
+                fill="url(#uprofileHeroWave2)"
+              />
+              <path
+                d="M90 -10C215 62 380 76 550 32C665 2 765 -14 880 -10H90Z"
+                fill="url(#uprofileHeroWave3)"
+              />
+              <defs>
+                <linearGradient id="uprofileHeroWave1" x1="0" y1="20" x2="960" y2="210" gradientUnits="userSpaceOnUse">
+                  <stop stopColor="#ffffff" stopOpacity="0.46" />
+                  <stop offset="0.52" stopColor="#dbe9ff" stopOpacity="0.3" />
+                  <stop offset="1" stopColor="#9ec2fb" stopOpacity="0.06" />
+                </linearGradient>
+                <linearGradient id="uprofileHeroWave2" x1="0" y1="130" x2="920" y2="220" gradientUnits="userSpaceOnUse">
+                  <stop stopColor="#ffffff" stopOpacity="0.56" />
+                  <stop offset="0.48" stopColor="#e2eeff" stopOpacity="0.34" />
+                  <stop offset="1" stopColor="#b2d0fd" stopOpacity="0.08" />
+                </linearGradient>
+                <linearGradient id="uprofileHeroWave3" x1="90" y1="0" x2="880" y2="55" gradientUnits="userSpaceOnUse">
+                  <stop stopColor="#94bafa" stopOpacity="0.42" />
+                  <stop offset="1" stopColor="#7caef9" stopOpacity="0.16" />
+                </linearGradient>
+              </defs>
+            </svg>
           </div>
 
           <div className="uprofile-hero-content">
