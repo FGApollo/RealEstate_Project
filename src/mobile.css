@@ -199,9 +199,9 @@ body dialog.app-header-mobile-backdrop::backdrop { background: transparent; }
   body .admin-dashboard .admin-audit-stats-grid { grid-template-columns: minmax(0, 1fr); }
   body .admin-dashboard .admin-header-banner { padding: 18px; }
   body .uprofile-page-wrapper .uprofile-main-container { padding: 0 12px; margin: 20px auto; gap: 18px; }
-  body .uprofile-page-wrapper .uprofile-hero-content { padding: 0 18px 22px; }
-  body .uprofile-page-wrapper :is(.uprofile-card, .uprofile-form-card) { padding: 18px; }
-  body .uprofile-page-wrapper .uprofile-form-row { flex-direction: column; grid-template-columns: minmax(0, 1fr); }
+  body .uprofile-page-wrapper .uprofile-hero-content { padding: 24px 18px; }
+  body .uprofile-page-wrapper :is(.uprofile-card-panel, .uprofile-sidebar-card) { padding: 18px; }
+  body .uprofile-page-wrapper .uprofile-form-grid { grid-template-columns: minmax(0, 1fr); }
   body .uprofile-page-wrapper .uprofile-submit-btn { width: 100%; justify-content: center; }
   body .auth-container { padding: 16px 12px max(16px, env(safe-area-inset-bottom)); min-height: 100dvh; }
   body .auth-card { min-width: 0; max-width: 100%; }
