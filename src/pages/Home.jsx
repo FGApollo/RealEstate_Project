@@ -7,7 +7,7 @@ import AuthLoading from '../components/AuthLoading';
 import { 
   Search, MapPin, Home as HomeIcon, 
   Bed, Bath,
-  ChevronDown, ArrowRight, Heart, X, Scan, Tag,
+  ChevronDown, ArrowRight, Heart, X, Scan,
   ChevronRight, Sparkles,
   Ruler, Zap, SlidersHorizontal, Building2, BriefcaseBusiness, Store, BedDouble
 } from 'lucide-react';
@@ -23,6 +23,7 @@ import CheckedListingsSection from '../features/plus/CheckedListingsSection';
 import { SwipeNestBadges } from '../features/plus/SwipeNestBadges';
 import { priceRangeOf, writeSearch } from '../features/search/searchParams';
 import AreaSelect from '../features/location/AreaSelect';
+import { HomeAreaDropdown, HomePropertyTypeDropdown, HomePriceDropdown } from '../features/home/HomeSearchDropdowns';
 
 const getCategoryIllustration = (name = '') => {
   const normalized = String(name).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -294,37 +295,6 @@ const Home = () => {
     navigate(`/search${query ? `?${query}` : ''}`);
   };
 
-  // Handle price range quick select
-  const handlePriceRangeChange = (e) => {
-    const val = e.target.value;
-    if (val === 'under-5m') {
-      setMinPrice('0');
-      setMaxPrice('5000000');
-    } else if (val === '5m-10m') {
-      setMinPrice('5000000');
-      setMaxPrice('10000000');
-    } else if (val === '10m-20m') {
-      setMinPrice('10000000');
-      setMaxPrice('20000000');
-    } else if (val === 'over-20m') {
-      setMinPrice('20000000');
-      setMaxPrice('');
-    } else {
-      setMinPrice('');
-      setMaxPrice('');
-    }
-  };
-
-  // Sync select dropdown change to chips
-  const handleSearchTypeChange = (e) => {
-    const val = e.target.value;
-    if (val === 'ALL') {
-      setSelectedCategories([]);
-    } else if (val !== 'CUSTOM') {
-      setSelectedCategories([val]);
-    }
-  };
-
   const handleToggleCategoryChip = (cat) => {
     if (selectedCategories.includes(cat)) {
       setSelectedCategories(selectedCategories.filter(c => c !== cat));
@@ -535,46 +505,26 @@ const Home = () => {
               <MapPin size={16} aria-hidden="true" /><span>{searchArea.ward || searchArea.province || 'Toàn thành phố'}</span>
               <ChevronDown size={14} aria-hidden="true" />
             </button>
-            <div className="home-hero-field home-hero-field-area">
-              <MapPin aria-hidden="true" size={20} />
-              <div className="home-hero-field-content">
-                <span>Khu vực</span>
-                <AreaSelect province={searchArea.province} ward={searchArea.ward}
-                  className={searchArea.province ? 'home-hero-area has-province' : 'home-hero-area'} onChange={setSearchArea} />
-              </div>
-            </div>
+            <HomeAreaDropdown
+              province={searchArea.province}
+              ward={searchArea.ward}
+              onChange={setSearchArea}
+            />
 
-            <label className="home-hero-field">
-              <HomeIcon aria-hidden="true" size={20} />
-              <span className="home-hero-field-content">
-                <span>Loại bất động sản</span>
-                <select value={searchType} onChange={handleSearchTypeChange}>
-                  <option value="ALL">Tất cả loại</option>
-                  <option value="Căn Hộ">Căn hộ</option>
-                  <option value="Chung Cư">Chung cư</option>
-                  <option value="Nhà Ở">Nhà ở</option>
-                  <option value="Phòng Trọ">Phòng trọ</option>
-                  <option value="Mặt Bằng">Mặt bằng</option>
-                  <option value="Văn Phòng">Văn phòng</option>
-                  {searchType === 'CUSTOM' && <option value="CUSTOM">Nhiều loại hình</option>}
-                </select>
-              </span>
-            </label>
+            <HomePropertyTypeDropdown
+              selectedCategories={selectedCategories}
+              onApplyCategories={setSelectedCategories}
+            />
 
-            <label className="home-hero-field">
-              <Tag aria-hidden="true" size={20} />
-              <span className="home-hero-field-content">
-                <span>Khoảng giá</span>
-                <select value={priceRange} onChange={handlePriceRangeChange}>
-                  <option value="ALL">Tất cả mức giá</option>
-                  <option value="under-5m">Dưới 5 triệu</option>
-                  <option value="5m-10m">5 - 10 triệu</option>
-                  <option value="10m-20m">10 - 20 triệu</option>
-                  <option value="over-20m">Trên 20 triệu</option>
-                  {priceRange === 'CUSTOM' && <option value="CUSTOM">Tùy chọn giá</option>}
-                </select>
-              </span>
-            </label>
+            <HomePriceDropdown
+              priceRange={priceRange}
+              minPrice={minPrice}
+              maxPrice={maxPrice}
+              onApplyPrice={({ minPrice: nextMin, maxPrice: nextMax }) => {
+                setMinPrice(nextMin);
+                setMaxPrice(nextMax);
+              }}
+            />
 
             <button type="button" className="home-hero-field home-hero-advanced" onClick={() => setShowAdvModal(true)}
               aria-haspopup="dialog">

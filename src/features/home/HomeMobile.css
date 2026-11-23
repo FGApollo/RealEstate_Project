@@ -159,9 +159,9 @@
   body .home-container .home-hero-field > svg { position: static; width: 15px; height: 15px; }
   body .home-container .home-hero-field-content { display: block; flex: initial; }
   body .home-container .home-hero-field-content > span:first-child { padding: 0; font-size: 11px; font-weight: 650; }
-  body .home-container label.home-hero-field:first-of-type .home-hero-field-content > span:first-child { font-size: 0; }
-  body .home-container label.home-hero-field:first-of-type .home-hero-field-content > span:first-child::after { content: 'Loại BĐS'; font-size: 11px; }
-  body .home-container label.home-hero-field::after { width: 7px; height: 7px; margin: -3px 0 0 4px; border: solid #354c73; border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); content: ''; }
+  body .home-container .home-hero-field-type .home-hero-field-content > span:first-child { font-size: 0; }
+  body .home-container .home-hero-field-type .home-hero-field-content > span:first-child::after { content: 'Loại BĐS'; font-size: 11px; }
+  body .home-container .home-hero-dropdown-trigger .hsd-chevron { width: 13px; height: 13px; }
   body .home-container .home-hero-field select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
   body .home-container .home-hero-filters .home-hero-field-area { display: none; }
   body .home-container .home-hero-field-value { display: none; }
