@@ -92,12 +92,20 @@
   position: relative;
   border-radius: 26px;
   overflow: hidden;
-  min-height: 206px;
-  background: linear-gradient(125deg, #f3f8ff 0%, #e4f0ff 46%, #cde2ff 100%);
-  border: 1.5px solid rgba(255, 255, 255, 0.92);
+  min-height: 214px;
+  background:
+    radial-gradient(ellipse 40% 88% at 6% 52%, rgba(238, 244, 255, 0.82) 0%, rgba(224, 235, 255, 0.36) 54%, transparent 100%),
+    linear-gradient(
+      180deg,
+      #b1ccfd 0%,
+      #b9d0fe 32%,
+      #ccdcfe 62%,
+      #dce8fd 100%
+    );
+  border: 1.5px solid rgba(255, 255, 255, 0.88);
   box-shadow:
-    0 20px 44px -18px rgba(37, 99, 235, 0.18),
-    0 4px 14px -4px rgba(15, 23, 42, 0.04);
+    0 20px 44px -18px rgba(37, 99, 235, 0.2),
+    0 4px 16px -4px rgba(15, 23, 42, 0.05);
   display: flex;
   align-items: center;
 }
@@ -110,41 +118,38 @@
   z-index: 0;
 }
 
+.uprofile-hero-waves {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
 .uprofile-hero-villa-img {
   position: absolute;
-  right: -8px;
-  top: 50%;
-  transform: translateY(-49%);
-  height: 122%;
+  right: 0;
+  top: -12%;
+  height: 148%;
   width: auto;
   max-width: none;
   object-fit: cover;
   user-select: none;
+  z-index: 1;
   -webkit-mask-image: linear-gradient(
     to right,
     transparent 0%,
-    rgba(0, 0, 0, 0.2) 14%,
-    rgba(0, 0, 0, 0.85) 34%,
-    #000000 54%
+    rgba(0, 0, 0, 0.25) 14%,
+    rgba(0, 0, 0, 0.85) 30%,
+    #000000 44%
   );
   mask-image: linear-gradient(
     to right,
     transparent 0%,
-    rgba(0, 0, 0, 0.2) 14%,
-    rgba(0, 0, 0, 0.85) 34%,
-    #000000 54%
-  );
-}
-
-.uprofile-hero-scrim {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    90deg,
-    rgba(241, 247, 255, 0.94) 0%,
-    rgba(235, 244, 255, 0.82) 38%,
-    rgba(222, 237, 255, 0.34) 60%,
-    rgba(222, 237, 255, 0) 76%
+    rgba(0, 0, 0, 0.25) 14%,
+    rgba(0, 0, 0, 0.85) 30%,
+    #000000 44%
   );
 }
 
@@ -195,6 +200,9 @@
 }
 
 .uprofile-avatar-circle .avatar-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 100%;
   height: 100%;
   background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 56%, #6d48c7 100%);
@@ -1019,14 +1027,9 @@
     right: 4px;
   }
 
-  .uprofile-hero-scrim {
-    background: linear-gradient(
-      90deg,
-      rgba(241, 247, 255, 0.96) 0%,
-      rgba(235, 244, 255, 0.88) 54%,
-      rgba(222, 237, 255, 0.45) 80%,
-      rgba(222, 237, 255, 0.15) 100%
-    );
+  .uprofile-hero-villa-img {
+    opacity: 0.72;
+    right: -48px;
   }
 }
 
@@ -1045,18 +1048,10 @@
   }
 
   .uprofile-hero-villa-img {
-    height: 100%;
-    opacity: 0.32;
-    right: -24px;
-    top: 50%;
-  }
-
-  .uprofile-hero-scrim {
-    background: linear-gradient(
-      180deg,
-      rgba(241, 247, 255, 0.82) 0%,
-      rgba(234, 243, 255, 0.92) 100%
-    );
+    height: 115%;
+    opacity: 0.28;
+    right: -36px;
+    top: -6%;
   }
 
   .uprofile-user-meta {
