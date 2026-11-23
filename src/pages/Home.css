@@ -2416,9 +2416,9 @@
 }
 
 .home-bg-decor {
-  position: fixed;
+  position: absolute;
   inset: auto 0 0 0;
-  height: 290px;
+  height: 500px;
   pointer-events: none;
   z-index: 0;
   overflow: hidden;
