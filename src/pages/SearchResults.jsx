@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Bath, Bed, Heart, Loader2, MapPin, Ruler, X } from 'lucide-react';
 import Header from '../components/Header';
 import PropertyDetailModal from '../components/PropertyDetailModal';
+import PlusLockedCard from '../features/plus/PlusLockedCard';
 import { SwipeNestBadges } from '../features/plus/SwipeNestBadges';
 import SearchFilterBar from '../features/search/SearchFilterBar';
 import { API_BASE_URL } from '../config';
@@ -20,7 +21,7 @@ const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1560518883-ce09059eeff
 const SearchResults = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const isCustomer = String(user?.role || '').toUpperCase() === 'USER';
   const search = useMemo(() => readSearch(new URLSearchParams(location.search)), [location.search]);
 
@@ -29,8 +30,8 @@ const SearchResults = () => {
   const [selected, setSelected] = useState(null);
   const [favorites, setFavorites] = useState([]);
 
-  const queryKey = location.search;
-  const loading = result.key !== queryKey;
+  const queryKey = `${location.search}|${user?.id || 'guest'}`;
+  const loading = authLoading || result.key !== queryKey;
 
   const fetchPage = useCallback((offset, signal) => {
     const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(offset), filters: toApiFilters(search) });
@@ -42,13 +43,14 @@ const SearchResults = () => {
   }, [search]);
 
   useEffect(() => {
+    if (authLoading) return undefined;
     const controller = new AbortController();
     fetchPage(0, controller.signal).then(
       (items) => setResult({ key: queryKey, items, hasMore: items.length === PAGE_SIZE, error: '' }),
       (error) => { if (error.name !== 'AbortError') setResult({ key: queryKey, items: [], hasMore: false, error: error.message }); }
     );
     return () => controller.abort();
-  }, [fetchPage, queryKey]);
+  }, [authLoading, fetchPage, queryKey]);
 
   useEffect(() => {
     if (!isCustomer) return undefined;
@@ -137,36 +139,40 @@ const SearchResults = () => {
         {!loading && result.items.length > 0 && (
           <div className="search-page-grid">
             {result.items.map((property) => (
-              <article key={property.id} className="search-card" onClick={() => setSelected(property)}
-                onKeyDown={(e) => { if (e.key === 'Enter') setSelected(property); }} tabIndex={0} role="button" aria-label={property.title}>
-                <div className="search-card-image">
-                  <img src={property.thumbnail || property.images?.[0] || FALLBACK_IMAGE} alt="" loading="lazy"
-                    onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = FALLBACK_IMAGE; }} />
-                  {isCustomer && (
-                    <button type="button" className={`search-card-favorite ${isFavorite(property) ? 'active' : ''}`}
-                      aria-label={isFavorite(property) ? 'Bỏ lưu' : 'Lưu tin'}
-                      onClick={(e) => { e.stopPropagation(); toggleFavorite(property); }}>
-                      <Heart size={16} fill={isFavorite(property) ? 'currentColor' : 'none'} />
-                    </button>
-                  )}
-                </div>
-                <div className="search-card-body">
-                  <SwipeNestBadges property={property} />
-                  <h2>{property.title}</h2>
-                  <p className="search-card-address"><MapPin size={12} /> {property.address}</p>
-                  <div className="search-card-bottom">
-                    <p className="search-card-price">
-                      <strong>{formatPrice(property.price)}</strong>
-                      {property.listing_type === 'RENT' && <span>/tháng</span>}
-                    </p>
-                    <div className="search-card-specs">
-                      <span><Bed size={12} /> {property.bedrooms || 0}</span>
-                      <span><Bath size={12} /> {property.bathrooms || 0}</span>
-                      <span><Ruler size={12} /> {property.area || '—'}m²</span>
+              property.plus_locked ? (
+                <PlusLockedCard key={property.id} property={property} formatPrice={formatPrice} />
+              ) : (
+                <article key={property.id} className="search-card" onClick={() => setSelected(property)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') setSelected(property); }} tabIndex={0} role="button" aria-label={property.title}>
+                  <div className="search-card-image">
+                    <img src={property.thumbnail || property.images?.[0] || FALLBACK_IMAGE} alt="" loading="lazy"
+                      onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = FALLBACK_IMAGE; }} />
+                    {isCustomer && (
+                      <button type="button" className={`search-card-favorite ${isFavorite(property) ? 'active' : ''}`}
+                        aria-label={isFavorite(property) ? 'Bỏ lưu' : 'Lưu tin'}
+                        onClick={(e) => { e.stopPropagation(); toggleFavorite(property); }}>
+                        <Heart size={16} fill={isFavorite(property) ? 'currentColor' : 'none'} />
+                      </button>
+                    )}
+                  </div>
+                  <div className="search-card-body">
+                    <SwipeNestBadges property={property} />
+                    <h2>{property.title}</h2>
+                    <p className="search-card-address"><MapPin size={12} /> {property.address}</p>
+                    <div className="search-card-bottom">
+                      <p className="search-card-price">
+                        <strong>{formatPrice(property.price)}</strong>
+                        {property.listing_type === 'RENT' && <span>/tháng</span>}
+                      </p>
+                      <div className="search-card-specs">
+                        <span><Bed size={12} /> {property.bedrooms || 0}</span>
+                        <span><Bath size={12} /> {property.bathrooms || 0}</span>
+                        <span><Ruler size={12} /> {property.area || '—'}m²</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </article>
+                </article>
+              )
             ))}
           </div>
         )}

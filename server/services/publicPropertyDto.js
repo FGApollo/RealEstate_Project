@@ -77,4 +77,65 @@ const toPublicProperty = (property = {}) => {
   };
 };
 
-module.exports = { toPublicProperty, scrubPublicDescription };
+const isPlusExclusiveProperty = (property) => property?.owner?.is_official === true;
+
+// Phiên bản khóa cho khách vãng lai / tài khoản chưa có Swipe Nest Plus:
+// chỉ giữ 1 ảnh nền làm mờ, tỉnh/thành phố và thông số cơ bản; ẩn toàn bộ tiêu đề, mô tả, phường/địa chỉ, tọa độ và bộ ảnh.
+const toLockedPlusProperty = (property = {}) => {
+  const propertyImages = (property.property_images || property.images || []).map(mapImage).filter(Boolean);
+  const teaserImage = property.thumbnail || propertyImages[0]?.image_url || null;
+  const city = String(property.city || '').trim();
+  const lockedLocation = city || 'Nguồn hàng độc quyền Swipe Nest';
+
+  return {
+    id: property.id,
+    plus_locked: true,
+    title: 'Bất động sản độc quyền Swipe Nest Plus',
+    description: null,
+    price: property.price,
+    area: property.area,
+    bedrooms: property.bedrooms,
+    bathrooms: property.bathrooms,
+    property_type: property.property_type,
+    listing_type: property.listing_type,
+    status: property.status,
+    city: city || null,
+    district: null,
+    ward: null,
+    public_location: lockedLocation,
+    address: lockedLocation,
+    latitude: null,
+    longitude: null,
+    floor_range: null,
+    thumbnail: teaserImage,
+    images: teaserImage ? [teaserImage] : [],
+    property_images: teaserImage ? [{ image_url: teaserImage }] : [],
+    property_features: [],
+    features: [],
+    lifestyle_tags: [],
+    virtual_tour_url: null,
+    created_at: property.created_at,
+    average_rating: null,
+    review_count: 0,
+    owner: {
+      name: 'Swipe Nest',
+      role: 'AGENT',
+      is_official: true
+    }
+  };
+};
+
+const toViewerProperty = (property = {}, { canViewPlus = false } = {}) => {
+  if (!canViewPlus && isPlusExclusiveProperty(property)) {
+    return toLockedPlusProperty(property);
+  }
+  return toPublicProperty(property);
+};
+
+module.exports = {
+  toPublicProperty,
+  toLockedPlusProperty,
+  toViewerProperty,
+  isPlusExclusiveProperty,
+  scrubPublicDescription
+};

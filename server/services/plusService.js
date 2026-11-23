@@ -46,4 +46,19 @@ const assertPlusForOfficialContact = async (requesterId) => {
   if (!(await isPlusActive(requesterId))) throw serviceError(PLUS_REQUIRED_MESSAGE, 403, 'PLUS_REQUIRED');
 };
 
-module.exports = { PLUS_REQUIRED_MESSAGE, getPlusState, isPlusActive, isOfficialUser, assertPlusForOfficialContact };
+// Kiểm tra người xem có quyền xem chi tiết tin nguồn hàng Swipe Nest (Plus) hay không.
+// Khách vãng lai: không; Admin / Môi giới: có; Khách hàng (USER): chỉ khi có gói Plus đang hoạt động.
+const canViewerAccessPlus = async (user) => {
+  if (!user || !user.id) return false;
+  if (String(user.role || '').toUpperCase() !== 'USER') return true;
+  return isPlusActive(user.id);
+};
+
+module.exports = {
+  PLUS_REQUIRED_MESSAGE,
+  getPlusState,
+  isPlusActive,
+  isOfficialUser,
+  assertPlusForOfficialContact,
+  canViewerAccessPlus
+};

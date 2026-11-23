@@ -2,7 +2,8 @@ const { safeErrorMessage } = require('../services/httpError');
 const propertyService = require('../services/propertyService');
 const reviewService = require('../services/reviewService');
 const geminiService = require('../services/geminiService');
-const { toPublicProperty } = require('../services/publicPropertyDto');
+const plusService = require('../services/plusService');
+const { toViewerProperty, toLockedPlusProperty, isPlusExclusiveProperty } = require('../services/publicPropertyDto');
 const { propertyInput, positiveId } = require('../services/businessValidation');
 const { parseSearchFilters } = require('../services/propertySearchFilters');
 const { assertListingCapacity } = require('../services/listingEntitlements');
@@ -56,8 +57,10 @@ const getProperties = async (req, res) => {
     const requestedOffset = Number.parseInt(req.query.offset, 10);
     const offset = Number.isInteger(requestedOffset) ? Math.max(0, Math.min(1000 - limit, requestedOffset)) : 0;
     const properties = await propertyService.getProperties(limit, propertyType, parseSearchFilters(req.query.filters), offset);
+    const hasLockedCandidate = properties.some((property) => !isAgentOwner(property, req.user) && isPlusExclusiveProperty(property));
+    const canViewPlus = hasLockedCandidate ? await plusService.canViewerAccessPlus(req.user) : false;
     res.status(200).json({ properties: properties.map((property) => (
-      isAgentOwner(property, req.user) ? property : toPublicProperty(property)
+      isAgentOwner(property, req.user) ? property : toViewerProperty(property, { canViewPlus })
     )) });
   } catch (error) {
     console.error('Error fetching properties:', error);
@@ -86,7 +89,17 @@ const getPropertyById = async (req, res) => {
         || Number(property.owner?.trust_score ?? 50) <= 30))) {
       return res.status(404).json({ error: 'Property not found' });
     }
-    res.status(200).json({ property: isAgentOwner(property, req.user) ? property : toPublicProperty(property) });
+    if (!isAgentOwner(property, req.user) && isPlusExclusiveProperty(property)) {
+      const canViewPlus = await plusService.canViewerAccessPlus(req.user);
+      if (!canViewPlus) {
+        return res.status(403).json({
+          error: plusService.PLUS_REQUIRED_MESSAGE,
+          code: 'PLUS_REQUIRED',
+          property: toLockedPlusProperty(property)
+        });
+      }
+    }
+    res.status(200).json({ property: isAgentOwner(property, req.user) ? property : toViewerProperty(property, { canViewPlus: true }) });
   } catch (error) {
     console.error('Error fetching property by id:', error);
     res.status(error.statusCode || 500).json({ error: error.statusCode ? error.message : 'Internal server error' });
@@ -202,7 +215,12 @@ const getSimilarProperties = async (req, res) => {
   try {
     const { id } = req.params;
     const similar = await propertyService.getSimilarProperties(id);
-    res.status(200).json({ success: true, properties: similar.map(toPublicProperty) });
+    const hasLockedCandidate = similar.some((property) => !isAgentOwner(property, req.user) && isPlusExclusiveProperty(property));
+    const canViewPlus = hasLockedCandidate ? await plusService.canViewerAccessPlus(req.user) : false;
+    res.status(200).json({
+      success: true,
+      properties: similar.map((property) => toViewerProperty(property, { canViewPlus }))
+    });
   } catch (error) {
     console.error('Error in getSimilarProperties:', error);
     res.status(500).json({ error: safeErrorMessage(error, 'Internal server error') });

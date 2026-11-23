@@ -463,6 +463,11 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
   const ownerDetails = property.owner;
 
   const handleSelectSimilar = (sim) => {
+    if (sim?.plus_locked) {
+      onClose?.();
+      navigate('/plus');
+      return;
+    }
     setActiveSliderIdx(0);
     const modalBody = document.querySelector('.modal-body.premium-body');
     if (modalBody) modalBody.scrollTo({ top: 0, behavior: 'smooth' });
@@ -715,7 +720,23 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
                         transition: 'transform 0.2s, box-shadow 0.2s' 
                       }}
                     >
-                      <img src={sim.thumbnail} alt={sim.title} style={{ width: '100%', height: '120px', objectFit: 'cover' }} />
+                      <div style={{ position: 'relative', overflow: 'hidden', height: '120px', backgroundColor: '#1e293b' }}>
+                        <img
+                          src={sim.thumbnail}
+                          alt={sim.title}
+                          style={{
+                            width: '100%',
+                            height: '120px',
+                            objectFit: 'cover',
+                            ...(sim.plus_locked ? { filter: 'blur(6px)', transform: 'scale(1.08)' } : {})
+                          }}
+                        />
+                        {sim.plus_locked && (
+                          <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(15, 29, 64, 0.5)', color: '#fde68a', fontSize: '12px', fontWeight: 700 }}>
+                            Độc quyền Plus
+                          </span>
+                        )}
+                      </div>
                       <div style={{ padding: '12px' }}>
                         <h4 style={{ fontSize: '13px', fontWeight: '600', color: '#1e293b', margin: '0 0 4px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sim.title}</h4>
                         <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 8px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
