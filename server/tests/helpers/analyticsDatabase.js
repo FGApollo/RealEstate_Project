@@ -79,7 +79,7 @@ async function queryDashboard(db, start = '2026-10-10', end = '2026-10-16', buck
 }
 
 // Test-only bridge: real PostgreSQL executes the production RPC. Authentication
-// and Plus analytics read the isolated local tables, never any remote database.
+// and Plus/transaction analytics read the isolated local tables, never any remote database.
 function connectTestDatabase(supabase, db) {
   const original = { from: supabase.from, rpc: supabase.rpc };
   supabase.rpc = async (name, args) => {
@@ -96,32 +96,48 @@ function connectTestDatabase(supabase, db) {
     catch (error) { return { data: null, error }; }
   };
   supabase.from = (table) => {
-    if (!['users', 'auth_sessions', 'user_subscriptions', 'user_billing_plans'].includes(table)) {
+    if (!['users', 'auth_sessions', 'user_subscriptions', 'user_billing_plans', 'agent_payment_orders'].includes(table)) {
       throw new Error(`Unexpected test table ${table}`);
     }
     let columns = '*';
+    let selectOptions = {};
     const predicates = [];
     const values = [];
-    let orderClause = '';
+    const orderClauses = [];
     let rangeBounds = null;
 
     const execute = async () => {
       if (!/^[a-z_, *]+$/.test(columns)) throw new Error('Invalid test columns');
       const where = predicates.length ? ` WHERE ${predicates.join(' AND ')}` : '';
+      const orderSql = orderClauses.length ? ` ORDER BY ${orderClauses.join(', ')}` : '';
       const limit = rangeBounds ? ` LIMIT ${rangeBounds[1] - rangeBounds[0] + 1} OFFSET ${rangeBounds[0]}` : '';
       try {
-        const { rows } = await db.query(`SELECT ${columns} FROM ${table}${where}${orderClause}${limit}`, values);
-        return { data: rows, error: null };
+        let count = null;
+        if (selectOptions.count === 'exact') {
+          const countRes = await db.query(`SELECT count(*)::integer AS total FROM ${table}${where}`, values);
+          count = countRes.rows[0]?.total ?? 0;
+        }
+        if (selectOptions.head) return { data: null, count, error: null };
+        const { rows } = await db.query(`SELECT ${columns} FROM ${table}${where}${orderSql}${limit}`, values);
+        return { data: rows, count, error: null };
       } catch (error) {
-        return { data: null, error };
+        return { data: null, count: null, error };
       }
     };
 
     const builder = {
-      select(value) { columns = value; return builder; },
+      select(value, options = {}) { columns = value; selectOptions = options || {}; return builder; },
       eq(column, value) {
         if (!/^[a-z_]+$/.test(column)) throw new Error('Invalid test column');
         values.push(value); predicates.push(`${column}=$${values.length}`); return builder;
+      },
+      gte(column, value) {
+        if (!/^[a-z_]+$/.test(column)) throw new Error('Invalid test column');
+        values.push(value); predicates.push(`${column}>=$${values.length}`); return builder;
+      },
+      lt(column, value) {
+        if (!/^[a-z_]+$/.test(column)) throw new Error('Invalid test column');
+        values.push(value); predicates.push(`${column}<$${values.length}`); return builder;
       },
       in(column, list) {
         if (!/^[a-z_]+$/.test(column)) throw new Error('Invalid test column');
@@ -138,7 +154,7 @@ function connectTestDatabase(supabase, db) {
       },
       order(column, options = {}) {
         if (!/^[a-z_]+$/.test(column)) throw new Error('Invalid test order column');
-        orderClause = ` ORDER BY ${column} ${options.ascending === false ? 'DESC' : 'ASC'}`;
+        orderClauses.push(`${column} ${options.ascending === false ? 'DESC' : 'ASC'}`);
         return builder;
       },
       range(from, to) {

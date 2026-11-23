@@ -215,7 +215,7 @@ function DashboardContent({ data, section, onNavigate, userMetric, onUserMetricC
     {section === 'users' && <UserAnalytics data={data} metric={userMetric} onMetricChange={onUserMetricChange} />}
     {section === 'subscriptions' && <SubscriptionAnalytics subscriptions={data.subscriptions} packages={data.packages} plusSubscriptions={data.plusSubscriptions} snapshotAt={data.snapshotAt} onRefresh={onRefresh} Kpi={Kpi} Panel={Panel} />}
     {section === 'revenue' && <RevenueAnalytics revenue={data.revenue} packages={data.packages} bucket={data.filters.bucket} comparison={comparison} onComparisonChange={onComparisonChange} />}
-    {section === 'transactions' && <Panel title="Giao dịch gần đây" subtitle="Ngày · môi giới · gói · số tiền · trạng thái" wide><PaymentTransactions filters={data.filters.preset === 'custom' ? { preset: 'custom', start: data.filters.start, end: data.filters.end, bucket: data.filters.bucket } : { preset: data.filters.preset, bucket: data.filters.bucket }} revision={revision} /></Panel>}
+    {section === 'transactions' && <PaymentTransactions filters={data.filters.preset === 'custom' ? { preset: 'custom', start: data.filters.start, end: data.filters.end, bucket: data.filters.bucket } : { preset: data.filters.preset, bucket: data.filters.bucket }} revision={revision} />}
     <AnalyticsDefinitions users={data.users} subscriptions={data.subscriptions} />
   </>;
 }
