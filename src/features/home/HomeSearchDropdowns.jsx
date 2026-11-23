@@ -6,71 +6,31 @@ import {
   MapPin, Search, Store, Tag, X
 } from 'lucide-react';
 import { useAdminAreas } from '../location/adminAreas';
+import {
+  PRICE_PRESET_OPTIONS,
+  PROPERTY_TYPE_ITEMS,
+  REGION_TABS,
+  filterAndSortProvinces,
+  filterWards,
+  formatAreaDropdownLabel,
+  formatPriceDropdownLabel,
+  formatPropertyTypeLabel,
+  matchPricePreset,
+  millionInputToVnd,
+  normalizeSearchText,
+  shortProvinceName,
+  vndToMillionInput
+} from './searchDropdownLogic';
 import './HomeSearchDropdowns.css';
 
-// Phân vùng 34 tỉnh/thành phố theo hệ thống hành chính mới 2025.
-const SOUTH_CODES = new Set([75, 79, 80, 82, 86, 91, 92, 96]);
-const CENTRAL_CODES = new Set([38, 40, 42, 44, 46, 48, 51, 52, 56, 66, 68]);
-const MAJOR_CITY_ORDER = [79, 1, 48, 92, 31];
-
-const REGION_TABS = [
-  { key: 'ALL', label: 'Tất cả' },
-  { key: 'SOUTH', label: 'Miền Nam' },
-  { key: 'CENTRAL', label: 'Miền Trung' },
-  { key: 'NORTH', label: 'Miền Bắc' }
-];
-
-const PROPERTY_TYPE_OPTIONS = [
-  { value: 'ALL', label: 'Tất cả loại', Icon: LayoutGrid },
-  { value: 'Căn Hộ', label: 'Căn hộ', Icon: Building2 },
-  { value: 'Chung Cư', label: 'Chung cư', Icon: Building2 },
-  { value: 'Nhà Ở', label: 'Nhà ở', Icon: HomeIcon },
-  { value: 'Phòng Trọ', label: 'Phòng trọ', Icon: BedDouble },
-  { value: 'Mặt Bằng', label: 'Mặt bằng', Icon: Store },
-  { value: 'Văn Phòng', label: 'Văn phòng', Icon: BriefcaseBusiness }
-];
-
-const PRICE_PRESET_OPTIONS = [
-  { value: 'ALL', label: 'Tất cả mức giá', min: '', max: '' },
-  { value: 'under-5m', label: 'Dưới 5 triệu', min: '0', max: '5000000' },
-  { value: '5m-10m', label: '5 - 10 triệu', min: '5000000', max: '10000000' },
-  { value: '10m-20m', label: '10 - 20 triệu', min: '10000000', max: '20000000' },
-  { value: 'over-20m', label: 'Trên 20 triệu', min: '20000000', max: '' }
-];
-
-const vndToMillionInput = (value) => {
-  if (value === '' || value === null || value === undefined) return '';
-  const num = Number(value);
-  if (!Number.isFinite(num)) return '';
-  if (num === 0) return '0';
-  return String(Number((num / 1000000).toFixed(2)));
+const TYPE_ICONS = {
+  all: LayoutGrid,
+  building: Building2,
+  home: HomeIcon,
+  room: BedDouble,
+  shop: Store,
+  office: BriefcaseBusiness
 };
-
-const millionInputToVnd = (value) => {
-  const trimmed = String(value ?? '').trim();
-  if (trimmed === '') return '';
-  const num = Number(trimmed);
-  if (!Number.isFinite(num) || num < 0) return '';
-  return String(Math.round(num * 1000000));
-};
-
-const normalizeSearchText = (value = '') =>
-  String(value)
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[đĐ]/g, 'd')
-    .toLowerCase()
-    .trim();
-
-const regionOfProvince = (code) => {
-  const num = Number(code);
-  if (SOUTH_CODES.has(num)) return 'SOUTH';
-  if (CENTRAL_CODES.has(num)) return 'CENTRAL';
-  return 'NORTH';
-};
-
-const shortProvinceName = (name = '') =>
-  String(name).replace(/^(Thành phố|Tỉnh)\s+/i, '').trim();
 
 const DropdownPopover = ({ open, anchorRef, onClose, width = 336, label, children }) => {
   const panelRef = useRef(null);
@@ -81,26 +41,14 @@ const DropdownPopover = ({ open, anchorRef, onClose, width = 336, label, childre
     if (!anchor) return;
     const rect = anchor.getBoundingClientRect();
     const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    const isNarrow = vw <= 640;
-
-    if (isNarrow) {
-      setCoords({
-        isMobileSheet: true,
-        top: Math.min(rect.bottom + 10, Math.max(76, vh * 0.16)),
-        left: 14,
-        width: vw - 28
-      });
+    const isMobile = vw <= 640;
+    if (isMobile) {
+      setCoords({ isMobile: true, top: Math.min(rect.bottom + 10, Math.max(76, window.innerHeight * 0.16)), left: 14, width: vw - 28 });
       return;
     }
-
     const panelW = Math.min(width, vw - 24);
-    let left = rect.left;
-    if (left + panelW > vw - 16) {
-      left = Math.max(16, vw - panelW - 16);
-    }
-    const top = rect.bottom + 12;
-    setCoords({ isMobileSheet: false, top, left, width: panelW });
+    const left = rect.left + panelW > vw - 16 ? Math.max(16, vw - panelW - 16) : rect.left;
+    setCoords({ isMobile: false, top: rect.bottom + 12, left, width: panelW });
   }, [anchorRef, width]);
 
   useLayoutEffect(() => {
@@ -116,24 +64,22 @@ const DropdownPopover = ({ open, anchorRef, onClose, width = 336, label, childre
 
   useEffect(() => {
     if (!open) return undefined;
-    const handlePointerDown = (event) => {
-      if (panelRef.current?.contains(event.target)) return;
-      if (anchorRef.current?.contains(event.target)) return;
-      onClose();
+    const onPointerDown = (e) => {
+      if (!panelRef.current?.contains(e.target) && !anchorRef.current?.contains(e.target)) onClose();
     };
-    const handleKeyDown = (event) => {
-      if (event.key === 'Escape') {
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') {
         onClose();
         anchorRef.current?.focus();
       }
     };
-    document.addEventListener('mousedown', handlePointerDown);
-    document.addEventListener('touchstart', handlePointerDown, { passive: true });
-    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('touchstart', onPointerDown, { passive: true });
+    document.addEventListener('keydown', onKeyDown);
     return () => {
-      document.removeEventListener('mousedown', handlePointerDown);
-      document.removeEventListener('touchstart', handlePointerDown);
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('touchstart', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
     };
   }, [open, anchorRef, onClose]);
 
@@ -141,19 +87,13 @@ const DropdownPopover = ({ open, anchorRef, onClose, width = 336, label, childre
 
   return createPortal(
     <>
-      {coords.isMobileSheet && (
-        <div className="hsd-mobile-backdrop" onClick={onClose} aria-hidden="true" />
-      )}
+      {coords.isMobile && <div className="hsd-mobile-backdrop" onClick={onClose} aria-hidden="true" />}
       <div
         ref={panelRef}
         role="dialog"
         aria-label={label}
-        className={`hsd-popover ${coords.isMobileSheet ? 'is-mobile' : ''}`}
-        style={{
-          top: `${coords.top}px`,
-          left: `${coords.left}px`,
-          width: `${coords.width}px`
-        }}
+        className={`hsd-popover ${coords.isMobile ? 'is-mobile' : ''}`}
+        style={{ top: `${coords.top}px`, left: `${coords.left}px`, width: `${coords.width}px` }}
       >
         {children}
       </div>
@@ -162,58 +102,114 @@ const DropdownPopover = ({ open, anchorRef, onClose, width = 336, label, childre
   );
 };
 
-/* =========================================================
-   1. KHU VỰC DROPDOWN
-   ========================================================= */
+// Shared trigger + popover shell with consistent footer actions.
+const FilterDropdown = ({
+  fieldClassName,
+  icon: Icon,
+  label,
+  value,
+  isActive,
+  open,
+  onToggle,
+  onClose,
+  onReset,
+  onApply,
+  width,
+  dialogLabel,
+  children
+}) => {
+  const triggerRef = useRef(null);
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        className={`home-hero-field ${fieldClassName} home-hero-dropdown-trigger ${open ? 'is-open' : ''}`}
+        onClick={onToggle}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+      >
+        <Icon aria-hidden="true" size={20} />
+        <span className="home-hero-field-content">
+          <span>{label}</span>
+          <span className={`home-hero-field-value ${isActive ? 'is-active' : ''}`}>{value}</span>
+        </span>
+        <ChevronDown aria-hidden="true" size={14} className="hsd-chevron" />
+      </button>
+
+      <DropdownPopover open={open} anchorRef={triggerRef} onClose={onClose} width={width} label={dialogLabel}>
+        <div className="hsd-body">{children}</div>
+        <div className="hsd-footer">
+          <button type="button" className="hsd-reset-btn" onClick={onReset}>Đặt lại</button>
+          <button type="button" className="hsd-apply-btn" onClick={onApply}>Áp dụng</button>
+        </div>
+      </DropdownPopover>
+    </>
+  );
+};
+
+const DropdownSearchInput = ({ value, onChange, placeholder, autoFocus = false }) => (
+  <div className="hsd-search-wrap">
+    <Search size={16} className="hsd-search-icon" aria-hidden="true" />
+    <input
+      type="text"
+      className="hsd-search-input"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      autoFocus={autoFocus}
+    />
+    {value && (
+      <button type="button" className="hsd-search-clear" onClick={() => onChange('')} aria-label="Xóa từ khóa">
+        <X size={15} />
+      </button>
+    )}
+  </div>
+);
+
+const DropdownOptionRow = ({ icon: Icon, label, selected, onClick }) => (
+  <button
+    type="button"
+    role="option"
+    aria-selected={selected}
+    className={`hsd-option ${selected ? 'is-selected' : ''}`}
+    onClick={onClick}
+  >
+    <Icon size={16} className="hsd-opt-icon" />
+    <span className="hsd-opt-label">{label}</span>
+    {selected && <Check size={16} className="hsd-opt-check" />}
+  </button>
+);
+
 export const HomeAreaDropdown = ({ province, ward, onChange }) => {
   const { provinces, error } = useAdminAreas();
-  const triggerRef = useRef(null);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [region, setRegion] = useState('ALL');
-  const [step, setStep] = useState('province'); // 'province' | 'ward'
+  const [step, setStep] = useState('province');
   const [draft, setDraft] = useState({ province: province || '', ward: ward || '' });
 
-  const openDropdown = () => {
+  const selectedProvince = useMemo(
+    () => provinces.find((item) => item.name === draft.province) || null,
+    [provinces, draft.province]
+  );
+  const visibleProvinces = useMemo(
+    () => filterAndSortProvinces(provinces, { region, query }),
+    [provinces, region, query]
+  );
+  const visibleWards = useMemo(
+    () => filterWards(selectedProvince?.wards || [], query),
+    [selectedProvince, query]
+  );
+
+  const toggle = () => {
     setDraft({ province: province || '', ward: ward || '' });
     setQuery('');
     setStep('province');
     setOpen((prev) => !prev);
   };
 
-  const selectedProvinceObj = useMemo(
-    () => provinces.find((item) => item.name === draft.province) || null,
-    [provinces, draft.province]
-  );
-
-  const sortedProvinces = useMemo(() => {
-    const q = normalizeSearchText(query);
-    return provinces
-      .filter((item) => {
-        if (region !== 'ALL' && regionOfProvince(item.code) !== region) return false;
-        if (!q) return true;
-        return normalizeSearchText(item.name).includes(q);
-      })
-      .sort((a, b) => {
-        if (region === 'ALL' && !q) {
-          const ia = MAJOR_CITY_ORDER.indexOf(Number(a.code));
-          const ib = MAJOR_CITY_ORDER.indexOf(Number(b.code));
-          if (ia !== -1 && ib !== -1) return ia - ib;
-          if (ia !== -1) return -1;
-          if (ib !== -1) return 1;
-        }
-        return a.name.localeCompare(b.name, 'vi');
-      });
-  }, [provinces, region, query]);
-
-  const filteredWards = useMemo(() => {
-    const list = selectedProvinceObj?.wards || [];
-    const q = normalizeSearchText(query);
-    if (!q) return list;
-    return list.filter((item) => normalizeSearchText(item.name).includes(q));
-  }, [selectedProvinceObj, query]);
-
-  const handleReset = () => {
+  const reset = () => {
     const empty = { province: '', ward: '' };
     setDraft(empty);
     setQuery('');
@@ -222,498 +218,205 @@ export const HomeAreaDropdown = ({ province, ward, onChange }) => {
     onChange(empty);
   };
 
-  const handleApply = () => {
-    onChange(draft);
-    setOpen(false);
-  };
-
-  const displayValue = ward
-    ? `${ward}, ${shortProvinceName(province)}`
-    : (province || (provinces.length ? 'Tất cả tỉnh/thành phố' : (error || 'Đang tải…')));
-
   return (
-    <>
-      <button
-        ref={triggerRef}
-        type="button"
-        className={`home-hero-field home-hero-field-area home-hero-dropdown-trigger ${open ? 'is-open' : ''}`}
-        onClick={openDropdown}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-      >
-        <MapPin aria-hidden="true" size={20} />
-        <span className="home-hero-field-content">
-          <span>Khu vực</span>
-          <span className={`home-hero-field-value ${province ? 'is-active' : ''}`}>
-            {displayValue}
-          </span>
-        </span>
-        <ChevronDown aria-hidden="true" size={14} className="hsd-chevron" />
-      </button>
+    <FilterDropdown
+      fieldClassName="home-hero-field-area"
+      icon={MapPin}
+      label="Khu vực"
+      value={formatAreaDropdownLabel({ province, ward, hasProvinces: provinces.length > 0, error })}
+      isActive={Boolean(province)}
+      open={open}
+      onToggle={toggle}
+      onClose={() => setOpen(false)}
+      onReset={reset}
+      onApply={() => { onChange(draft); setOpen(false); }}
+      width={346}
+      dialogLabel="Chọn khu vực"
+    >
+      <DropdownSearchInput
+        value={query}
+        onChange={setQuery}
+        placeholder={step === 'ward' ? `Tìm phường/xã tại ${shortProvinceName(draft.province)}...` : 'Tìm kiếm khu vực...'}
+        autoFocus
+      />
 
-      <DropdownPopover
-        open={open}
-        anchorRef={triggerRef}
-        onClose={() => setOpen(false)}
-        width={346}
-        label="Chọn khu vực"
-      >
-        <div className="hsd-body">
-          {/* Search Input */}
-          <div className="hsd-search-wrap">
-            <Search size={16} className="hsd-search-icon" aria-hidden="true" />
-            <input
-              type="text"
-              className="hsd-search-input"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={step === 'ward' ? `Tìm phường/xã tại ${shortProvinceName(draft.province)}...` : 'Tìm kiếm khu vực...'}
-              autoFocus
-            />
-            {query && (
+      {step === 'province' ? (
+        <>
+          <div className="hsd-tabs" role="tablist" aria-label="Lọc theo miền">
+            {REGION_TABS.map((tab) => (
               <button
+                key={tab.key}
                 type="button"
-                className="hsd-search-clear"
-                onClick={() => setQuery('')}
-                aria-label="Xóa từ khóa"
+                role="tab"
+                aria-selected={region === tab.key}
+                className={`hsd-tab ${region === tab.key ? 'active' : ''}`}
+                onClick={() => setRegion(tab.key)}
               >
-                <X size={15} />
+                {tab.label}
               </button>
-            )}
+            ))}
           </div>
 
-          {step === 'province' ? (
-            <>
-              {/* Region Segmented Tabs */}
-              <div className="hsd-tabs" role="tablist" aria-label="Lọc theo miền">
-                {REGION_TABS.map((tab) => (
-                  <button
-                    key={tab.key}
-                    type="button"
-                    role="tab"
-                    aria-selected={region === tab.key}
-                    className={`hsd-tab ${region === tab.key ? 'active' : ''}`}
-                    onClick={() => setRegion(tab.key)}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* Optional quick jump to Ward selection when a province is picked */}
-              {selectedProvinceObj && selectedProvinceObj.wards?.length > 0 && (
-                <button
-                  type="button"
-                  className="hsd-ward-banner"
-                  onClick={() => {
-                    setQuery('');
-                    setStep('ward');
-                  }}
-                >
-                  <span>
-                    {draft.ward
-                      ? `Phường/xã: ${draft.ward}`
-                      : `Chọn phường/xã tại ${shortProvinceName(selectedProvinceObj.name)}`}
-                  </span>
-                  <ChevronRight size={15} />
-                </button>
-              )}
-
-              {/* Province Scrollable List */}
-              <div className="hsd-list" role="listbox" aria-label="Danh sách tỉnh thành">
-                {!query && region === 'ALL' && (
-                  <button
-                    type="button"
-                    role="option"
-                    aria-selected={!draft.province}
-                    className={`hsd-option ${!draft.province ? 'is-selected' : ''}`}
-                    onClick={() => setDraft({ province: '', ward: '' })}
-                  >
-                    <MapPin size={16} className="hsd-opt-icon" />
-                    <span className="hsd-opt-label">Tất cả tỉnh/thành phố</span>
-                    {!draft.province && <Check size={16} className="hsd-opt-check" />}
-                  </button>
-                )}
-
-                {sortedProvinces.length === 0 ? (
-                  <div className="hsd-empty">Không tìm thấy khu vực phù hợp</div>
-                ) : (
-                  sortedProvinces.map((item) => {
-                    const selected = draft.province === item.name;
-                    return (
-                      <button
-                        key={item.code}
-                        type="button"
-                        role="option"
-                        aria-selected={selected}
-                        className={`hsd-option ${selected ? 'is-selected' : ''}`}
-                        onClick={() =>
-                          setDraft((prev) => ({
-                            province: item.name,
-                            ward: prev.province === item.name ? prev.ward : ''
-                          }))
-                        }
-                      >
-                        <MapPin size={16} className="hsd-opt-icon" />
-                        <span className="hsd-opt-label">{item.name}</span>
-                        {selected && <Check size={16} className="hsd-opt-check" />}
-                      </button>
-                    );
-                  })
-                )}
-              </div>
-            </>
-          ) : (
-            <>
-              {/* Ward step header */}
-              <div className="hsd-sub-header">
-                <button
-                  type="button"
-                  className="hsd-sub-back"
-                  onClick={() => {
-                    setQuery('');
-                    setStep('province');
-                  }}
-                >
-                  <ArrowLeft size={15} />
-                  <span>{selectedProvinceObj?.name}</span>
-                </button>
-              </div>
-
-              <div className="hsd-list" role="listbox" aria-label="Danh sách phường xã">
-                {!query && (
-                  <button
-                    type="button"
-                    role="option"
-                    aria-selected={!draft.ward}
-                    className={`hsd-option ${!draft.ward ? 'is-selected' : ''}`}
-                    onClick={() => setDraft((prev) => ({ ...prev, ward: '' }))}
-                  >
-                    <MapPin size={16} className="hsd-opt-icon" />
-                    <span className="hsd-opt-label">Tất cả phường/xã</span>
-                    {!draft.ward && <Check size={16} className="hsd-opt-check" />}
-                  </button>
-                )}
-
-                {filteredWards.length === 0 ? (
-                  <div className="hsd-empty">Không tìm thấy phường/xã phù hợp</div>
-                ) : (
-                  filteredWards.map((item) => {
-                    const selected = draft.ward === item.name;
-                    return (
-                      <button
-                        key={item.code}
-                        type="button"
-                        role="option"
-                        aria-selected={selected}
-                        className={`hsd-option ${selected ? 'is-selected' : ''}`}
-                        onClick={() => setDraft((prev) => ({ ...prev, ward: item.name }))}
-                      >
-                        <MapPin size={16} className="hsd-opt-icon" />
-                        <span className="hsd-opt-label">{item.name}</span>
-                        {selected && <Check size={16} className="hsd-opt-check" />}
-                      </button>
-                    );
-                  })
-                )}
-              </div>
-            </>
+          {selectedProvince?.wards?.length > 0 && (
+            <button type="button" className="hsd-ward-banner" onClick={() => { setQuery(''); setStep('ward'); }}>
+              <span>{draft.ward ? `Phường/xã: ${draft.ward}` : `Chọn phường/xã tại ${shortProvinceName(selectedProvince.name)}`}</span>
+              <ChevronRight size={15} />
+            </button>
           )}
-        </div>
 
-        <div className="hsd-footer">
-          <button type="button" className="hsd-reset-btn" onClick={handleReset}>
-            Đặt lại
-          </button>
-          <button type="button" className="hsd-apply-btn" onClick={handleApply}>
-            Áp dụng
-          </button>
-        </div>
-      </DropdownPopover>
-    </>
+          <div className="hsd-list" role="listbox" aria-label="Danh sách tỉnh thành">
+            {!query && region === 'ALL' && (
+              <DropdownOptionRow
+                icon={MapPin}
+                label="Tất cả tỉnh/thành phố"
+                selected={!draft.province}
+                onClick={() => setDraft({ province: '', ward: '' })}
+              />
+            )}
+            {visibleProvinces.length === 0 ? (
+              <div className="hsd-empty">Không tìm thấy khu vực phù hợp</div>
+            ) : (
+              visibleProvinces.map((item) => (
+                <DropdownOptionRow
+                  key={item.code}
+                  icon={MapPin}
+                  label={item.name}
+                  selected={draft.province === item.name}
+                  onClick={() => setDraft((prev) => ({ province: item.name, ward: prev.province === item.name ? prev.ward : '' }))}
+                />
+              ))
+            )}
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="hsd-sub-header">
+            <button type="button" className="hsd-sub-back" onClick={() => { setQuery(''); setStep('province'); }}>
+              <ArrowLeft size={15} />
+              <span>{selectedProvince?.name}</span>
+            </button>
+          </div>
+          <div className="hsd-list" role="listbox" aria-label="Danh sách phường xã">
+            {!query && (
+              <DropdownOptionRow
+                icon={MapPin}
+                label="Tất cả phường/xã"
+                selected={!draft.ward}
+                onClick={() => setDraft((prev) => ({ ...prev, ward: '' }))}
+              />
+            )}
+            {visibleWards.length === 0 ? (
+              <div className="hsd-empty">Không tìm thấy phường/xã phù hợp</div>
+            ) : (
+              visibleWards.map((item) => (
+                <DropdownOptionRow
+                  key={item.code}
+                  icon={MapPin}
+                  label={item.name}
+                  selected={draft.ward === item.name}
+                  onClick={() => setDraft((prev) => ({ ...prev, ward: item.name }))}
+                />
+              ))
+            )}
+          </div>
+        </>
+      )}
+    </FilterDropdown>
   );
 };
 
-/* =========================================================
-   2. LOẠI BẤT ĐỘNG SẢN DROPDOWN
-   ========================================================= */
 export const HomePropertyTypeDropdown = ({ selectedCategories = [], onApplyCategories }) => {
-  const triggerRef = useRef(null);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [draft, setDraft] = useState(selectedCategories);
 
-  const openDropdown = () => {
-    setDraft(selectedCategories);
-    setQuery('');
-    setOpen((prev) => !prev);
-  };
-
-  const filteredOptions = useMemo(() => {
+  const visibleItems = useMemo(() => {
     const q = normalizeSearchText(query);
-    if (!q) return PROPERTY_TYPE_OPTIONS;
-    return PROPERTY_TYPE_OPTIONS.filter(
-      (opt) => opt.value !== 'ALL' && normalizeSearchText(opt.label).includes(q)
-    );
+    return q ? PROPERTY_TYPE_ITEMS.filter((o) => o.value !== 'ALL' && normalizeSearchText(o.label).includes(q)) : PROPERTY_TYPE_ITEMS;
   }, [query]);
 
-  const toggleOption = (val) => {
-    if (val === 'ALL') {
-      setDraft([]);
-      return;
-    }
-    setDraft((prev) =>
-      prev.includes(val) ? prev.filter((item) => item !== val) : [...prev, val]
-    );
+  const toggleItem = (val) => {
+    if (val === 'ALL') return setDraft([]);
+    setDraft((prev) => (prev.includes(val) ? prev.filter((item) => item !== val) : [...prev, val]));
   };
-
-  const handleReset = () => {
-    setDraft([]);
-    setQuery('');
-    onApplyCategories([]);
-  };
-
-  const handleApply = () => {
-    onApplyCategories(draft);
-    setOpen(false);
-  };
-
-  const displayLabel =
-    selectedCategories.length === 0
-      ? 'Tất cả loại'
-      : selectedCategories.length === 1
-        ? (PROPERTY_TYPE_OPTIONS.find((o) => o.value === selectedCategories[0])?.label || selectedCategories[0])
-        : `${selectedCategories.length} loại hình`;
 
   return (
-    <>
-      <button
-        ref={triggerRef}
-        type="button"
-        className={`home-hero-field home-hero-field-type home-hero-dropdown-trigger ${open ? 'is-open' : ''}`}
-        onClick={openDropdown}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-      >
-        <HomeIcon aria-hidden="true" size={20} />
-        <span className="home-hero-field-content">
-          <span>Loại bất động sản</span>
-          <span className={`home-hero-field-value ${selectedCategories.length ? 'is-active' : ''}`}>
-            {displayLabel}
-          </span>
-        </span>
-        <ChevronDown aria-hidden="true" size={14} className="hsd-chevron" />
-      </button>
-
-      <DropdownPopover
-        open={open}
-        anchorRef={triggerRef}
-        onClose={() => setOpen(false)}
-        width={312}
-        label="Chọn loại bất động sản"
-      >
-        <div className="hsd-body">
-          <div className="hsd-search-wrap">
-            <Search size={16} className="hsd-search-icon" aria-hidden="true" />
-            <input
-              type="text"
-              className="hsd-search-input"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Tìm loại bất động sản..."
+    <FilterDropdown
+      fieldClassName="home-hero-field-type"
+      icon={HomeIcon}
+      label="Loại bất động sản"
+      value={formatPropertyTypeLabel(selectedCategories)}
+      isActive={selectedCategories.length > 0}
+      open={open}
+      onToggle={() => { setDraft(selectedCategories); setQuery(''); setOpen((prev) => !prev); }}
+      onClose={() => setOpen(false)}
+      onReset={() => { setDraft([]); setQuery(''); onApplyCategories([]); }}
+      onApply={() => { onApplyCategories(draft); setOpen(false); }}
+      width={312}
+      dialogLabel="Chọn loại bất động sản"
+    >
+      <DropdownSearchInput value={query} onChange={setQuery} placeholder="Tìm loại bất động sản..." />
+      <div className="hsd-list hsd-list-compact" role="listbox" aria-label="Danh sách loại bất động sản">
+        {visibleItems.length === 0 ? (
+          <div className="hsd-empty">Không tìm thấy loại hình phù hợp</div>
+        ) : (
+          visibleItems.map((opt) => (
+            <DropdownOptionRow
+              key={opt.value}
+              icon={TYPE_ICONS[opt.iconKey] || HomeIcon}
+              label={opt.label}
+              selected={opt.value === 'ALL' ? draft.length === 0 : draft.includes(opt.value)}
+              onClick={() => toggleItem(opt.value)}
             />
-            {query && (
-              <button
-                type="button"
-                className="hsd-search-clear"
-                onClick={() => setQuery('')}
-                aria-label="Xóa từ khóa"
-              >
-                <X size={15} />
-              </button>
-            )}
-          </div>
-
-          <div className="hsd-list hsd-list-compact" role="listbox" aria-label="Danh sách loại bất động sản">
-            {filteredOptions.length === 0 ? (
-              <div className="hsd-empty">Không tìm thấy loại hình phù hợp</div>
-            ) : (
-              filteredOptions.map((opt) => {
-                const Icon = opt.Icon;
-                const isSelected =
-                  opt.value === 'ALL'
-                    ? draft.length === 0
-                    : draft.includes(opt.value);
-                return (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    role="option"
-                    aria-selected={isSelected}
-                    className={`hsd-option ${isSelected ? 'is-selected' : ''}`}
-                    onClick={() => toggleOption(opt.value)}
-                  >
-                    <Icon size={16} className="hsd-opt-icon" />
-                    <span className="hsd-opt-label">{opt.label}</span>
-                    {isSelected && <Check size={16} className="hsd-opt-check" />}
-                  </button>
-                );
-              })
-            )}
-          </div>
-        </div>
-
-        <div className="hsd-footer">
-          <button type="button" className="hsd-reset-btn" onClick={handleReset}>
-            Đặt lại
-          </button>
-          <button type="button" className="hsd-apply-btn" onClick={handleApply}>
-            Áp dụng
-          </button>
-        </div>
-      </DropdownPopover>
-    </>
+          ))
+        )}
+      </div>
+    </FilterDropdown>
   );
 };
 
-/* =========================================================
-   3. KHOẢNG GIÁ DROPDOWN
-   ========================================================= */
 export const HomePriceDropdown = ({ priceRange, minPrice, maxPrice, onApplyPrice }) => {
-  const triggerRef = useRef(null);
   const [open, setOpen] = useState(false);
-  const [draftMinMillion, setDraftMinMillion] = useState(() => vndToMillionInput(minPrice));
-  const [draftMaxMillion, setDraftMaxMillion] = useState(() => vndToMillionInput(maxPrice));
+  const [draftMin, setDraftMin] = useState(() => vndToMillionInput(minPrice));
+  const [draftMax, setDraftMax] = useState(() => vndToMillionInput(maxPrice));
 
-  const openDropdown = () => {
-    setDraftMinMillion(vndToMillionInput(minPrice));
-    setDraftMaxMillion(vndToMillionInput(maxPrice));
-    setOpen((prev) => !prev);
-  };
-
-  const activeDraftPreset = useMemo(() => {
-    const minVnd = millionInputToVnd(draftMinMillion);
-    const maxVnd = millionInputToVnd(draftMaxMillion);
-    const matched = PRICE_PRESET_OPTIONS.find(
-      (opt) => opt.min === minVnd && opt.max === maxVnd
-    );
-    return matched ? matched.value : 'CUSTOM';
-  }, [draftMinMillion, draftMaxMillion]);
-
-  const handleSelectPreset = (opt) => {
-    setDraftMinMillion(vndToMillionInput(opt.min));
-    setDraftMaxMillion(vndToMillionInput(opt.max));
-  };
-
-  const handleReset = () => {
-    setDraftMinMillion('');
-    setDraftMaxMillion('');
-    onApplyPrice({ minPrice: '', maxPrice: '' });
-  };
-
-  const handleApply = () => {
-    onApplyPrice({
-      minPrice: millionInputToVnd(draftMinMillion),
-      maxPrice: millionInputToVnd(draftMaxMillion)
-    });
-    setOpen(false);
-  };
-
-  const displayLabel = useMemo(() => {
-    const matched = PRICE_PRESET_OPTIONS.find((opt) => opt.value === priceRange);
-    if (matched) return matched.label;
-    const minM = vndToMillionInput(minPrice);
-    const maxM = vndToMillionInput(maxPrice);
-    if (minM && maxM) return `${minM} - ${maxM} triệu`;
-    if (minM) return `Từ ${minM} triệu`;
-    if (maxM) return `Đến ${maxM} triệu`;
-    return 'Tất cả mức giá';
-  }, [priceRange, minPrice, maxPrice]);
+  const activePreset = useMemo(() => matchPricePreset(draftMin, draftMax), [draftMin, draftMax]);
 
   return (
-    <>
-      <button
-        ref={triggerRef}
-        type="button"
-        className={`home-hero-field home-hero-field-price home-hero-dropdown-trigger ${open ? 'is-open' : ''}`}
-        onClick={openDropdown}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-      >
-        <Tag aria-hidden="true" size={20} />
-        <span className="home-hero-field-content">
-          <span>Khoảng giá</span>
-          <span className={`home-hero-field-value ${(minPrice || maxPrice) ? 'is-active' : ''}`}>
-            {displayLabel}
-          </span>
-        </span>
-        <ChevronDown aria-hidden="true" size={14} className="hsd-chevron" />
-      </button>
+    <FilterDropdown
+      fieldClassName="home-hero-field-price"
+      icon={Tag}
+      label="Khoảng giá"
+      value={formatPriceDropdownLabel({ priceRange, minPrice, maxPrice })}
+      isActive={Boolean(minPrice || maxPrice)}
+      open={open}
+      onToggle={() => { setDraftMin(vndToMillionInput(minPrice)); setDraftMax(vndToMillionInput(maxPrice)); setOpen((prev) => !prev); }}
+      onClose={() => setOpen(false)}
+      onReset={() => { setDraftMin(''); setDraftMax(''); onApplyPrice({ minPrice: '', maxPrice: '' }); }}
+      onApply={() => { onApplyPrice({ minPrice: millionInputToVnd(draftMin), maxPrice: millionInputToVnd(draftMax) }); setOpen(false); }}
+      width={316}
+      dialogLabel="Chọn khoảng giá"
+    >
+      <div className="hsd-list hsd-list-compact" role="listbox" aria-label="Danh sách khoảng giá">
+        {PRICE_PRESET_OPTIONS.map((opt) => (
+          <DropdownOptionRow
+            key={opt.value}
+            icon={Tag}
+            label={opt.label}
+            selected={activePreset === opt.value}
+            onClick={() => { setDraftMin(vndToMillionInput(opt.min)); setDraftMax(vndToMillionInput(opt.max)); }}
+          />
+        ))}
+      </div>
 
-      <DropdownPopover
-        open={open}
-        anchorRef={triggerRef}
-        onClose={() => setOpen(false)}
-        width={316}
-        label="Chọn khoảng giá"
-      >
-        <div className="hsd-body">
-          <div className="hsd-list hsd-list-compact" role="listbox" aria-label="Danh sách khoảng giá">
-            {PRICE_PRESET_OPTIONS.map((opt) => {
-              const isSelected = activeDraftPreset === opt.value;
-              return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  role="option"
-                  aria-selected={isSelected}
-                  className={`hsd-option ${isSelected ? 'is-selected' : ''}`}
-                  onClick={() => handleSelectPreset(opt)}
-                >
-                  <Tag size={15} className="hsd-opt-icon" />
-                  <span className="hsd-opt-label">{opt.label}</span>
-                  {isSelected && <Check size={16} className="hsd-opt-check" />}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Custom price range inputs */}
-          <div className="hsd-custom-price">
-            <span className="hsd-custom-label">Hoặc nhập mức giá (triệu/tháng)</span>
-            <div className="hsd-custom-inputs">
-              <input
-                type="number"
-                min="0"
-                step="0.5"
-                placeholder="Từ"
-                value={draftMinMillion}
-                onChange={(e) => setDraftMinMillion(e.target.value)}
-                aria-label="Giá tối thiểu (triệu)"
-              />
-              <span className="hsd-custom-dash">–</span>
-              <input
-                type="number"
-                min="0"
-                step="0.5"
-                placeholder="Đến"
-                value={draftMaxMillion}
-                onChange={(e) => setDraftMaxMillion(e.target.value)}
-                aria-label="Giá tối đa (triệu)"
-              />
-            </div>
-          </div>
+      <div className="hsd-custom-price">
+        <span className="hsd-custom-label">Hoặc nhập mức giá (triệu/tháng)</span>
+        <div className="hsd-custom-inputs">
+          <input type="number" min="0" step="0.5" placeholder="Từ" value={draftMin} onChange={(e) => setDraftMin(e.target.value)} aria-label="Giá tối thiểu (triệu)" />
+          <span className="hsd-custom-dash">–</span>
+          <input type="number" min="0" step="0.5" placeholder="Đến" value={draftMax} onChange={(e) => setDraftMax(e.target.value)} aria-label="Giá tối đa (triệu)" />
         </div>
-
-        <div className="hsd-footer">
-          <button type="button" className="hsd-reset-btn" onClick={handleReset}>
-            Đặt lại
-          </button>
-          <button type="button" className="hsd-apply-btn" onClick={handleApply}>
-            Áp dụng
-          </button>
-        </div>
-      </DropdownPopover>
-    </>
+      </div>
+    </FilterDropdown>
   );
 };
