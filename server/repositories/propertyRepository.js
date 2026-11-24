@@ -1,10 +1,13 @@
 const { supabase } = require('../config/supabase');
 const { asciiFold } = require('../services/propertySearchFilters');
-const { matchesArea } = require('../services/adminAreas');
+const { matchesArea, getProvinceKeys, getWardSqlFilter } = require('../services/adminAreas');
 
 
 const SEARCH_POOL_LIMIT = 1000;
 const MAX_CANDIDATE_SEARCH = 10000;
+const MISSING_RPC_CODES = new Set(['PGRST202', '42883', '42725']);
+const RPC_RETRY_COOLDOWN_MS = 5 * 60 * 1000;
+let favoriteCountRpcRetryAfter = 0;
 
 // Tìm theo địa điểm dạng chữ (đã chuẩn hóa ở propertySearchFilters): khớp nguyên từ trên phường + quận + thành phố,
 // không phân biệt dấu. "quan 1" khớp "Quận 1" nhưng không khớp "Quận 10". Không so địa chỉ đường:
@@ -15,26 +18,70 @@ const matchesLocation = (property, location) => {
   return ` ${haystack} `.includes(` ${location} `);
 };
 
-// Lọc địa điểm và phân trang làm ở đây: khi có bộ lọc client-side (location/province/ward/official),
-// lấy ứng viên theo từng đợt để không bỏ sót tin phù hợp đứng sau 1.000 ứng viên đầu tiên.
+// Lọc địa điểm và phân trang làm ở đây:
+// - Khi có official / province / ward (không có từ khóa tự do location): đẩy bộ lọc xuống SQL (migration 029)
+//   để chỉ lấy đúng số dòng cần thiết thay vì kéo 1.000 dòng về Node.js. Nếu DB chưa chạy migration 029 (trả về
+//   dòng không khớp), tự động lùi về quét theo lô 1.000 dòng để không bỏ sót tin nào.
+// - Khi có từ khóa tự do location: quét theo lô 1.000 dòng và lọc nguyên từ ở Node.js.
 // province / ward: đơn vị hành chính mới chọn từ dropdown, khớp cả tin ghi theo đơn vị cũ (services/adminAreas).
-const fetchPublicProperties = async ({ filters = {}, listingType = null, category = null, limit = 24, ids = null, offset = 0 } = {}) => {
-  // official: chỉ tin của tài khoản chính thức Swipe Nest (nguồn hàng của Plus), lọc ở đây vì RPC không có bộ lọc này.
+const fetchPublicProperties = async ({
+  filters = {},
+  listingType = null,
+  category = null,
+  limit = 24,
+  ids = null,
+  offset = 0,
+  sortByPriority = false
+} = {}) => {
   const { location, province, ward, official, ...rpcFilters } = filters;
   const filterHere = Boolean(location || province || ward || official);
+  const normalizedCategory = category === 'ALL' ? null : category;
 
   const isMatch = (property) => (!official || property.owner?.is_official === true)
     && (!location || matchesLocation(property, location))
     && (!(province || ward) || matchesArea(property, { province, ward }));
 
+  const baseFilters = sortByPriority ? { ...rpcFilters, sortByPriority: true } : rpcFilters;
+
   if (!filterHere) {
     const rpcLimit = Math.min(SEARCH_POOL_LIMIT, offset + limit);
     const { data, error } = await supabase.rpc('search_ranked_properties', {
-      p_filters: rpcFilters, p_listing_type: listingType, p_category: category === 'ALL' ? null : category,
-      p_limit: rpcLimit, p_ids: ids
+      p_filters: baseFilters,
+      p_listing_type: listingType,
+      p_category: normalizedCategory,
+      p_limit: rpcLimit,
+      p_ids: ids
     });
     if (error) throw new Error('Không thể tải danh sách bất động sản.');
     return (data || []).slice(offset, offset + limit);
+  }
+
+  // Nhánh nhanh đẩy official / province / ward xuống SQL (migration 029) với fallback an toàn cho migration 026.
+  if (!location) {
+    const cities = province ? getProvinceKeys(province) : [];
+    const wardFilter = ward ? getWardSqlFilter(province, ward) : null;
+    const sqlFilters = {
+      ...baseFilters,
+      ...(official ? { official: true } : {}),
+      ...(cities.length ? { cities } : {}),
+      ...(wardFilter ? { wardFilter } : {})
+    };
+    const fastLimit = Math.min(SEARCH_POOL_LIMIT, offset + limit);
+
+    const { data, error } = await supabase.rpc('search_ranked_properties', {
+      p_filters: sqlFilters,
+      p_listing_type: listingType,
+      p_category: normalizedCategory,
+      p_limit: fastLimit,
+      p_ids: ids
+    });
+    if (error) throw new Error('Không thể tải danh sách bất động sản.');
+
+    const batch = data || [];
+    const matching = batch.filter(isMatch);
+    if (matching.length >= offset + limit || batch.length < fastLimit) {
+      return matching.slice(offset, offset + limit);
+    }
   }
 
   let matchingRows = [];
@@ -42,9 +89,9 @@ const fetchPublicProperties = async ({ filters = {}, listingType = null, categor
 
   while (currentOffset < MAX_CANDIDATE_SEARCH) {
     const rpcArgs = {
-      p_filters: rpcFilters,
+      p_filters: baseFilters,
       p_listing_type: listingType,
-      p_category: category === 'ALL' ? null : category,
+      p_category: normalizedCategory,
       p_limit: SEARCH_POOL_LIMIT,
       p_ids: ids
     };
@@ -52,8 +99,8 @@ const fetchPublicProperties = async ({ filters = {}, listingType = null, categor
       rpcArgs.p_offset = currentOffset;
     }
 
-    let { data, error } = await supabase.rpc('search_ranked_properties', rpcArgs);
-    if (error && currentOffset > 0 && ['PGRST202', '42883', '42725'].includes(error.code)) {
+    const { data, error } = await supabase.rpc('search_ranked_properties', rpcArgs);
+    if (error && currentOffset > 0 && MISSING_RPC_CODES.has(error.code)) {
       break;
     }
     if (error) throw new Error('Không thể tải danh sách bất động sản.');
@@ -108,9 +155,34 @@ const fetchFavoriteIds = async (userId, candidateIds) => {
 };
 
 // Số lượt thích của mỗi tin (dùng xếp hạng phần "Phổ biến" của feed).
+// Ưu tiên đếm bằng SQL GROUP BY (migration 029); tự động lùi về truy vấn bảng favorites nếu DB chưa chạy 029.
 const fetchFavoriteCounts = async (propertyIds) => {
   const counts = new Map();
   if (!propertyIds.length) return counts;
+
+  if (Date.now() >= favoriteCountRpcRetryAfter && typeof supabase.rpc === 'function') {
+    try {
+      const { data, error } = await supabase.rpc('count_property_favorites', {
+        p_property_ids: propertyIds
+      });
+      if (!error && Array.isArray(data)) {
+        data.forEach((row) => {
+          const propId = Number(row.property_id);
+          const count = Number(row.favorite_count);
+          if (Number.isFinite(propId) && Number.isFinite(count)) {
+            counts.set(propId, count);
+          }
+        });
+        return counts;
+      }
+      if (error && (MISSING_RPC_CODES.has(error.code) || /count_property_favorites/i.test(error.message || ''))) {
+        favoriteCountRpcRetryAfter = Date.now() + RPC_RETRY_COOLDOWN_MS;
+      }
+    } catch {
+      // Fallback to direct table query below.
+    }
+  }
+
   const { data, error } = await supabase.from('favorites').select('property_id').in('property_id', propertyIds);
   if (error) throw new Error(error.message);
   (data || []).forEach((row) => counts.set(Number(row.property_id), (counts.get(Number(row.property_id)) || 0) + 1));

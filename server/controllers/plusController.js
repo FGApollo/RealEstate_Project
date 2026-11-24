@@ -6,57 +6,91 @@ const { createPayosService } = require('../services/payosService');
 const propertyRepository = require('../repositories/propertyRepository');
 const { toPublicProperty } = require('../services/publicPropertyDto');
 const { safeErrorMessage } = require('../services/httpError');
+const { appCache } = require('../services/ttlCache');
 
 // Đơn Plus dùng chung luồng payOS với môi giới, chỉ khác danh mục gói và hàm giữ chỗ đơn.
 const provider = createPayosService();
 const payments = createPaymentService(userPaymentRepository, provider);
 
-const action = (fn, fallback) => async (req, res) => {
-  res.set('Cache-Control', 'no-store');
+const OFFICIAL_PREVIEW_TTL_MS = 60 * 1000;
+const PLUS_PLANS_TTL_MS = 2 * 60 * 1000;
+
+const getOfficialPreviewsCached = () => appCache.getOrSet('plus:official-preview', OFFICIAL_PREVIEW_TTL_MS, async () => {
+  const properties = await propertyRepository.fetchPublicProperties({ filters: { official: true }, limit: 8 });
+  return properties
+    .map((property) => {
+      const dto = toPublicProperty(property);
+      const image = dto.thumbnail || dto.images?.[0] || null;
+      return image ? { id: dto.id, image } : null;
+    })
+    .filter(Boolean);
+});
+
+const getPlusPlansCached = () => appCache.getOrSet('plans:user-plus', PLUS_PLANS_TTL_MS, () => userPaymentRepository.plans());
+
+const action = (fn, fallback, { cacheControl = 'no-store' } = {}) => async (req, res) => {
+  res.set('Cache-Control', cacheControl);
   try { res.json(await fn(req)); }
   catch (error) {
+    res.set('Cache-Control', 'no-store');
     const status = error.statusCode || 503;
-    res.status(status).json({ error: safeErrorMessage(error, fallback), code: error.code || 'PLUS_UNAVAILABLE' });
+    res.status(status).json({
+      error: safeErrorMessage(error, fallback),
+      code: error.code || 'PLUS_UNAVAILABLE',
+      ...(error.payload || {})
+    });
   }
 };
 
 module.exports = {
   status: action(async (req) => ({ plus: await plusService.getPlusState(req.user.id) }),
     'Chưa thể kiểm tra gói Plus. Vui lòng thử lại.'),
-  catalog: action(async (req) => ({
-    plans: await userPaymentRepository.plans(),
-    plus: await plusService.getPlusState(req.user.id),
-    checkout: provider.availability()
-  }), 'Chưa thể tải thông tin gói Plus.'),
+  catalog: action(async (req) => {
+    const [plans, plus] = await Promise.all([
+      getPlusPlansCached(),
+      plusService.getPlusState(req.user.id)
+    ]);
+    return {
+      plans,
+      plus,
+      checkout: provider.availability()
+    };
+  }, 'Chưa thể tải thông tin gói Plus.'),
   listPayments: action((req) => payments.list(req.user.id, req.query), 'Chưa thể tải lịch sử thanh toán.'),
   createPayment: action((req) => payments.create(req.user.id, req.body), 'Thanh toán chưa sẵn sàng hoặc tạm thời gián đoạn. Vui lòng thử lại.'),
   getPayment: action((req) => payments.get(req.user.id, req.params.id), 'Chưa thể kiểm tra thanh toán.'),
   cancelPayment: action((req) => payments.cancel(req.user.id, req.params.id), 'Chưa thể hủy đơn.'),
   // Mục "Nguồn hàng Swipe Nest" ở trang chủ (tin của tài khoản chính thức): chỉ dành cho người có Plus.
+  // Khi chưa có Plus: vẫn trả 403 PLUS_REQUIRED, đính kèm ảnh xem trước (chỉ id + thumbnail) và giá gói để
+  // giao diện không cần gọi nối tiếp thêm 2 request /official-preview và /catalog.
   officialListings: action(async (req) => {
     if (!(await plusService.isPlusActive(req.user.id))) {
-      throw Object.assign(new Error('Nguồn hàng Swipe Nest dành cho thành viên Swipe Nest Plus.'), { statusCode: 403, code: 'PLUS_REQUIRED' });
+      const [previews, plans] = await Promise.all([
+        getOfficialPreviewsCached().catch(() => []),
+        getPlusPlansCached().catch(() => [])
+      ]);
+      throw Object.assign(
+        new Error('Nguồn hàng Swipe Nest dành cho thành viên Swipe Nest Plus.'),
+        { statusCode: 403, code: 'PLUS_REQUIRED', payload: { previews, plan: plans?.[0] || null } }
+      );
     }
     const properties = await propertyRepository.fetchPublicProperties({ filters: { official: true }, limit: 24 });
     return { properties: properties.map(toPublicProperty) };
   }, 'Chưa thể tải nguồn hàng Swipe Nest.'),
   // Ảnh xem trước (chỉ trả id & thumbnail, không lộ thông tin chi tiết hay liên hệ) cho khung mời nâng cấp Plus.
-  officialPreview: action(async () => {
-    const properties = await propertyRepository.fetchPublicProperties({ filters: { official: true }, limit: 8 });
-    const previews = properties
-      .map((property) => {
-        const dto = toPublicProperty(property);
-        const image = dto.thumbnail || dto.images?.[0] || null;
-        return image ? { id: dto.id, image } : null;
-      })
-      .filter(Boolean);
-    return { previews };
-  }, 'Chưa thể tải ảnh xem trước nguồn hàng Swipe Nest.'),
+  officialPreview: action(async () => ({
+    previews: await getOfficialPreviewsCached()
+  }), 'Chưa thể tải ảnh xem trước nguồn hàng Swipe Nest.', { cacheControl: 'private, max-age=60' }),
 
   admin: {
     lookup: action((req) => plusAdminService.lookupUser(req.user.id, req.query)),
     grant: action(async (req) => ({ plus: await plusAdminService.grant(req.user.id, req.params.userId, req.body) })),
     remove: action(async (req) => ({ plus: await plusAdminService.remove(req.user.id, req.params.userId, req.body) })),
-    setOfficial: action(async (req) => ({ account: await plusAdminService.setOfficial(req.user.id, req.params.agentId, req.body) }))
+    setOfficial: action(async (req) => {
+      const account = await plusAdminService.setOfficial(req.user.id, req.params.agentId, req.body);
+      appCache.invalidate('plus:official-preview');
+      appCache.invalidate('properties:guest:');
+      return { account };
+    })
   }
 };

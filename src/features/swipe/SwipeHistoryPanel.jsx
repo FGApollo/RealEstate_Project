@@ -17,7 +17,7 @@ const SwipeHistoryPanel = ({ history, favorites, onSelect, onExplore, onViewAll 
           <span className="mascot-cloud cloud-right" aria-hidden="true" />
           <span className="mascot-home-bubble" aria-hidden="true"><Home size={25} strokeWidth={1.8} /></span>
           <span className="mascot-skyline" aria-hidden="true"><i /><i /><i /><i /><i /></span>
-          <img className="swipe-history-mascot" src="/mascots/otter-builder-paper.png" alt="Rái cá Swipe Nest đang cầm tờ giấy" draggable="false" />
+          <img className="swipe-history-mascot" src="/mascots/otter-builder-paper.webp" alt="Rái cá Swipe Nest đang cầm tờ giấy" draggable="false" />
         </div>
         <h3>Chưa có bài đăng nào<br />được vuốt qua</h3>
         <p>Hãy bắt đầu khám phá để lưu lại lịch sử những bất động sản bạn đã xem nhé!</p>

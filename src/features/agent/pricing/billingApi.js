@@ -7,7 +7,7 @@ export async function billingRequest(path, options = {}) {
   });
   const data = await response.json().catch(() => null);
   if (!response.ok) throw Object.assign(new Error(data?.error || 'Không thể tải thông tin thanh toán. Vui lòng thử lại.'), {
-    status: response.status, code: data?.code
+    status: response.status, code: data?.code, data
   });
   return data;
 }

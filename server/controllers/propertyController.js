@@ -7,6 +7,10 @@ const { toViewerProperty, toLockedPlusProperty, isPlusExclusiveProperty } = requ
 const { propertyInput, positiveId } = require('../services/businessValidation');
 const { parseSearchFilters } = require('../services/propertySearchFilters');
 const { assertListingCapacity } = require('../services/listingEntitlements');
+const { appCache } = require('../services/ttlCache');
+
+const GUEST_PROPERTIES_CACHE_TTL_MS = 20 * 1000;
+const defaultGetProperties = propertyService.getProperties;
 
 const isAgentOwner = (property, user) => String(user?.role || '').toUpperCase() === 'AGENT'
   && String(property?.owner_id) === String(user?.id);
@@ -56,9 +60,30 @@ const getProperties = async (req, res) => {
     // Trang kết quả tìm kiếm tải thêm theo offset (0–1000).
     const requestedOffset = Number.parseInt(req.query.offset, 10);
     const offset = Number.isInteger(requestedOffset) ? Math.max(0, Math.min(1000 - limit, requestedOffset)) : 0;
-    const properties = await propertyService.getProperties(limit, propertyType, parseSearchFilters(req.query.filters), offset);
-    const hasLockedCandidate = properties.some((property) => !isAgentOwner(property, req.user) && isPlusExclusiveProperty(property));
-    const canViewPlus = hasLockedCandidate ? await plusService.canViewerAccessPlus(req.user) : false;
+    const parsedFilters = parseSearchFilters(req.query.filters);
+    const isGuest = !req.user;
+
+    if (isGuest) {
+      const canUseCache = propertyService.getProperties === defaultGetProperties;
+      const cacheKey = `properties:guest:${limit}|${propertyType || ''}|${offset}|${JSON.stringify(parsedFilters)}`;
+      const loadGuestProperties = async () => {
+        const properties = await propertyService.getProperties(limit, propertyType, parsedFilters, offset);
+        return properties.map((property) => toViewerProperty(property, { canViewPlus: false }));
+      };
+      const dtoList = canUseCache
+        ? await appCache.getOrSet(cacheKey, GUEST_PROPERTIES_CACHE_TTL_MS, loadGuestProperties)
+        : await loadGuestProperties();
+      if (typeof res.set === 'function') {
+        res.set('Cache-Control', 'public, max-age=20, stale-while-revalidate=40');
+        res.set('Vary', 'Authorization');
+      }
+      return res.status(200).json({ properties: dtoList });
+    }
+
+    const [properties, canViewPlus] = await Promise.all([
+      propertyService.getProperties(limit, propertyType, parsedFilters, offset),
+      plusService.canViewerAccessPlus(req.user)
+    ]);
     res.status(200).json({ properties: properties.map((property) => (
       isAgentOwner(property, req.user) ? property : toViewerProperty(property, { canViewPlus })
     )) });
@@ -83,14 +108,16 @@ const createProperty = async (req, res) => {
 const getPropertyById = async (req, res) => {
   try {
     const { id } = req.params;
-    const property = await propertyService.getPropertyById(id, { publicRead: true, viewerId: req.user?.id, allowClosed: true });
+    const [property, canViewPlus] = await Promise.all([
+      propertyService.getPropertyById(id, { publicRead: true, viewerId: req.user?.id, allowClosed: true }),
+      plusService.canViewerAccessPlus(req.user)
+    ]);
     if (!property || (!isAgentOwner(property, req.user)
       && (property.is_hidden === true || !VIEWABLE_STATUSES.includes(property.status)
         || Number(property.owner?.trust_score ?? 50) <= 30))) {
       return res.status(404).json({ error: 'Property not found' });
     }
     if (!isAgentOwner(property, req.user) && isPlusExclusiveProperty(property)) {
-      const canViewPlus = await plusService.canViewerAccessPlus(req.user);
       if (!canViewPlus) {
         return res.status(403).json({
           error: plusService.PLUS_REQUIRED_MESSAGE,
@@ -143,18 +170,22 @@ const deleteProperty = async (req, res) => {
 const getPropertyReviews = async (req, res) => {
   try {
     const { id } = req.params;
-    const property = await propertyService.getPropertyById(id, { publicRead: true, viewerId: req.user?.id, allowClosed: true });
-    if (!property || (!isAgentOwner(property, req.user)
-      && (property.is_hidden === true || !VIEWABLE_STATUSES.includes(property.status)
-        || Number(property.owner?.trust_score ?? 50) <= 30))) {
+    const currentUserId = req.user ? req.user.id : null;
+    const [readable, reviews] = await Promise.all([
+      propertyService.isPropertyReadable(id, {
+        viewerId: req.user?.id,
+        viewerRole: req.user?.role,
+        allowClosed: true
+      }),
+      reviewService.getPropertyReviews(id, currentUserId)
+    ]);
+    if (!readable) {
       return res.status(404).json({ error: 'Property not found' });
     }
-    const currentUserId = req.user ? req.user.id : null;
-    const reviews = await reviewService.getPropertyReviews(id, currentUserId);
     res.status(200).json({ reviews });
   } catch (error) {
     console.error('Error fetching property reviews:', error);
-    res.status(500).json({ error: safeErrorMessage(error, 'Internal server error') });
+    res.status(error.statusCode || 500).json({ error: safeErrorMessage(error, 'Internal server error') });
   }
 };
 
@@ -214,16 +245,17 @@ const checkBeforeSave = async (req, res) => {
 const getSimilarProperties = async (req, res) => {
   try {
     const { id } = req.params;
-    const similar = await propertyService.getSimilarProperties(id);
-    const hasLockedCandidate = similar.some((property) => !isAgentOwner(property, req.user) && isPlusExclusiveProperty(property));
-    const canViewPlus = hasLockedCandidate ? await plusService.canViewerAccessPlus(req.user) : false;
+    const [similar, canViewPlus] = await Promise.all([
+      propertyService.getSimilarProperties(id),
+      plusService.canViewerAccessPlus(req.user)
+    ]);
     res.status(200).json({
       success: true,
       properties: similar.map((property) => toViewerProperty(property, { canViewPlus }))
     });
   } catch (error) {
     console.error('Error in getSimilarProperties:', error);
-    res.status(500).json({ error: safeErrorMessage(error, 'Internal server error') });
+    res.status(error.statusCode || 500).json({ error: safeErrorMessage(error, 'Internal server error') });
   }
 };
 

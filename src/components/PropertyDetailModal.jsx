@@ -28,6 +28,16 @@ const REPORT_REASONS = [
 ];
 const CLOSED_STATUS_LABELS = { SOLD: 'Đã bán', RENTED: 'Đã cho thuê' };
 
+const hasCompletePropertyDetails = (item) => Boolean(
+  item
+  && !item.plus_locked
+  && item.owner
+  && item.description !== undefined
+  && Array.isArray(item.property_images)
+  && Array.isArray(item.property_features)
+  && Array.isArray(item.lifestyle_tags)
+);
+
 const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = false, isFavorite = false, onToggleFavorite, onSelectProperty }) => {
   const [activePropertyId, setActivePropertyId] = useState(prop?.id);
   const location = useLocation();
@@ -35,6 +45,11 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
   const requireAuth = useRequireAuth();
   const [fetchedProperty, setFetchedProperty] = useState(null);
   const property = fetchedProperty || prop;
+  const isSyncingProp = prop?.id !== undefined && prop?.id !== activePropertyId && fetchedProperty?.id !== activePropertyId;
+  const currentRecord = fetchedProperty?.id === activePropertyId
+    ? fetchedProperty
+    : (prop?.id === activePropertyId ? prop : null);
+  const needsFullPropertyFetch = Boolean(activePropertyId) && !isSyncingProp && !hasCompletePropertyDetails(currentRecord);
 
   const [activeSliderIdx, setActiveSliderIdx] = useState(0);
   const [similarProperties, setSimilarProperties] = useState([]);
@@ -153,46 +168,64 @@ const PropertyDetailModal = ({ property: prop, onClose, showFavoriteActions = fa
     setActiveSliderIdx(0);
   }, [prop?.id]);
 
+  // Chỉ gọi /api/properties/:id khi thẻ nguồn chưa đủ trường chi tiết (ví dụ từ Yêu thích / Lịch sử / Chat).
+  useEffect(() => {
+    if (!needsFullPropertyFetch || !activePropertyId) return undefined;
+    const controller = new AbortController();
+    publicApiFetch(`${API_BASE_URL}/api/properties/${activePropertyId}`, { signal: controller.signal })
+      .then(res => (res.ok ? res.json() : {}))
+      .then(data => {
+        if (!controller.signal.aborted && data.property) {
+          setFetchedProperty(data.property);
+        }
+      })
+      .catch(err => {
+        if (err?.name !== 'AbortError') console.error('Error fetching full property details:', err);
+      });
+    return () => controller.abort();
+  }, [activePropertyId, needsFullPropertyFetch]);
+
   useEffect(() => {
     if (!activePropertyId) {
       setReviews([]);
       setSimilarProperties([]);
-      return;
+      return undefined;
     }
 
-    // Always fetch full details to ensure all relations (features, tags, images, owner) are up to date
-    publicApiFetch(`${API_BASE_URL}/api/properties/${activePropertyId}`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.property) {
-          setFetchedProperty(data.property);
-        }
-      })
-      .catch(err => console.error('Error fetching full property details:', err));
+    const controller = new AbortController();
+    const { signal } = controller;
 
     setIsLoadingReviews(true);
-    publicApiFetch(`${API_BASE_URL}/api/properties/${activePropertyId}/reviews`)
-      .then(res => res.json())
+    publicApiFetch(`${API_BASE_URL}/api/properties/${activePropertyId}/reviews`, { signal })
+      .then(res => (res.ok ? res.json() : { reviews: [] }))
       .then(data => {
-        setReviews(data.reviews || []);
-        setIsLoadingReviews(false);
+        if (!signal.aborted) {
+          setReviews(data.reviews || []);
+          setIsLoadingReviews(false);
+        }
       })
       .catch(err => {
+        if (err?.name === 'AbortError') return;
         console.error('Error fetching reviews:', err);
         setIsLoadingReviews(false);
       });
 
     setIsLoadingSimilar(true);
-    publicApiFetch(`${API_BASE_URL}/api/properties/${activePropertyId}/similar`)
-      .then(res => res.json())
+    publicApiFetch(`${API_BASE_URL}/api/properties/${activePropertyId}/similar`, { signal })
+      .then(res => (res.ok ? res.json() : { properties: [] }))
       .then(data => {
-        setSimilarProperties(data.properties || []);
-        setIsLoadingSimilar(false);
+        if (!signal.aborted) {
+          setSimilarProperties(data.properties || []);
+          setIsLoadingSimilar(false);
+        }
       })
       .catch(err => {
+        if (err?.name === 'AbortError') return;
         console.error('Error fetching similar properties:', err);
         setIsLoadingSimilar(false);
       });
+
+    return () => controller.abort();
   }, [activePropertyId]);
 
   const handleImageSelect = (e) => {

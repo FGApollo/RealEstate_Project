@@ -7,22 +7,6 @@
     #e4e8f9 url('../../assets/hero-panorama.webp') center 33.6% / 100% 200.8% no-repeat;
 }
 
-/* Reuse the visible scene from the reference at the original desktop framing. */
-.home-hero::before {
-  position: absolute;
-  z-index: -1;
-  inset: 0;
-  background: url('../../assets/hero-reference.png') center / 100% 100% no-repeat;
-  mask:
-    linear-gradient(to right, #000 88%, transparent) left / 13.1% 100% no-repeat,
-    linear-gradient(to left, #000 90%, transparent) right / 12.9% 100% no-repeat,
-    linear-gradient(to left, #000 85%, transparent) top right / 56.2% 68.3% no-repeat,
-    linear-gradient(to bottom, #000 75%, transparent) top / 100% 7.5% no-repeat,
-    linear-gradient(to top, #000 65%, transparent) bottom / 100% 4.5% no-repeat;
-  pointer-events: none;
-  content: '';
-}
-
 .home-hero-inner {
   width: min(73%, 1180px);
   margin-inline: auto;
@@ -221,7 +205,6 @@
       #e4e8f9 url('../../assets/hero-panorama.webp') 63% center / cover no-repeat;
   }
 
-  .home-hero::before { content: none; }
   .home-hero-inner { width: calc(100% - 28px); }
   .home-hero-intro { padding: 3px 3px 12px; }
   .home-hero-kicker { font-size: 10px; }
@@ -285,7 +268,6 @@
       #e4e8f9 url('../../assets/hero-panorama.webp') center 22% / cover no-repeat;
   }
 
-  .home-hero::before { content: none; }
   .home-hero-inner { width: min(73%, 1180px); }
   .home-hero-intro { min-height: 0; padding: 0 10px 10px; }
   .home-hero-copy { max-width: min(600px, calc(55% - clamp(100px, 9.6vw, 150px) - 24px)); }

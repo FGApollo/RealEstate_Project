@@ -162,20 +162,24 @@ const buildBehaviorProfile = async (userId) => {
 
 // Mỗi truy vấn tới Supabase mất ~250ms (mạng), nên các bước không phụ thuộc nhau được chạy song song.
 const getRecommendations = async (userId, { category, limit, offset, feedToken, filters = {} } = {}) => {
-  // Trang tiếp theo (có feedToken) chỉ cần khảo sát để đối chiếu; trang đầu thì tải sẵn nguồn tin + hành vi cùng lúc.
-  const [savedPreferences, pool, behaviorResult] = await Promise.all([
-    preferenceService.getPreferences(userId),
-    feedToken ? null : propertyRepository.fetchRecommendationCandidates(null, SCORING.candidateLimit, filters, category),
-    feedToken ? null : buildBehaviorProfile(userId)
-  ]);
-  const preference = savedPreferences?.onboarding_completed ? savedPreferences : DEFAULT_PREFERENCES;
-
   const requestedLimit = Number(limit);
   const requestedOffset = Number(offset);
   const pageSize = Number.isFinite(requestedLimit) && requestedLimit > 0
     ? Math.min(SCORING.maxPageSize, Math.floor(requestedLimit)) : SCORING.defaultPageSize;
   const pageOffset = Number.isFinite(requestedOffset) && requestedOffset > 0
     ? Math.min(SCORING.candidateLimit, Math.floor(requestedOffset)) : 0;
+  // Trang chủ chỉ cần 4 tin xem trước (limit <= 8, offset = 0): giảm tập ứng viên từ 500 xuống 80 để giảm tải SQL/JSON.
+  const effectiveCandidateLimit = !feedToken && pageOffset === 0 && pageSize <= 8
+    ? Math.min(SCORING.candidateLimit, Math.max(pageSize * 20, 80))
+    : SCORING.candidateLimit;
+
+  // Trang tiếp theo (có feedToken) chỉ cần khảo sát để đối chiếu; trang đầu thì tải sẵn nguồn tin + hành vi cùng lúc.
+  const [savedPreferences, pool, behaviorResult] = await Promise.all([
+    preferenceService.getPreferences(userId),
+    feedToken ? null : propertyRepository.fetchRecommendationCandidates(null, effectiveCandidateLimit, filters, category),
+    feedToken ? null : buildBehaviorProfile(userId)
+  ]);
+  const preference = savedPreferences?.onboarding_completed ? savedPreferences : DEFAULT_PREFERENCES;
 
   if (feedToken) {
     let snapshot;
@@ -220,10 +224,10 @@ const getRecommendations = async (userId, { category, limit, offset, feedToken, 
   const behavior = behaviorResult;
   // Nguồn chưa chạm giới hạn thì đã chứa mọi tin đủ điều kiện: lọc thuê/bán ngay tại đây, khỏi gọi RPC lần hai.
   const candidates = !preference.listing_type ? popularPool
-    : popularPool.length < SCORING.candidateLimit
+    : popularPool.length < effectiveCandidateLimit
       // Giống điều kiện của RPC search_ranked_properties: tin chưa ghi thuê/bán vẫn được tính.
       ? popularPool.filter((property) => !property.listing_type || property.listing_type === preference.listing_type)
-      : await propertyRepository.fetchRecommendationCandidates(preference.listing_type, SCORING.candidateLimit, filters, category);
+      : await propertyRepository.fetchRecommendationCandidates(preference.listing_type, effectiveCandidateLimit, filters, category);
   const poolIds = [...new Set([...candidates, ...popularPool].map((property) => property.id))];
   const [favoriteIds, favoriteCounts] = await Promise.all([
     propertyRepository.fetchFavoriteIds(userId, poolIds),

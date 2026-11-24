@@ -28,10 +28,12 @@ const { getJwtConfig, getCookieOptions } = require('./services/authSessionServic
 const { corsOptions } = require('./middleware/trustedOrigin');
 const { rateLimiters } = require('./middleware/rateLimiters');
 const { securityHeaders, apiErrorHandler, denyPrivateUploads } = require('./middleware/securityHeaders');
+const { responseCompression } = require('./middleware/responseCompression');
 
 const app = express();
 app.disable('x-powered-by');
 app.use(securityHeaders);
+app.use(responseCompression());
 const PORT = process.env.PORT || 3000;
 
 const configuredTrustProxyHops = process.env.TRUST_PROXY_HOPS;

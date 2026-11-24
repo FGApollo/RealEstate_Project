@@ -53,7 +53,7 @@ const AuthLayout = ({ children, title, subtitle, theme = 'user', variant = 'defa
 
           <div className="auth-story-art" aria-hidden="true">
             <div className="auth-story-bubble">Cùng tìm<br />ngôi nhà lý tưởng<br />nào!</div>
-            <img src="/auth-welcome.png" alt="" width="1800" height="900" loading="lazy" decoding="async" />
+            <img src="/auth-welcome.webp" alt="" width="1800" height="900" loading="lazy" decoding="async" />
           </div>
         </aside>
       )}

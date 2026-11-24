@@ -111,6 +111,7 @@ const Home = () => {
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [dbFavorites, setDbFavorites] = useState([]);
   const pendingFavoritesRef = useRef(new Set());
+  const hasFetchedInitialRef = useRef(false);
 
   const categories = useMemo(() => {
     const counts = {};
@@ -226,9 +227,16 @@ const Home = () => {
       }
     };
 
-    const timer = setTimeout(fetchProperties, 180);
+    // Tải lần đầu chạy ngay lập tức (không trễ 180ms); các lần đổi bộ lọc sau mới debounce nhẹ.
+    let timer = null;
+    if (!hasFetchedInitialRef.current) {
+      hasFetchedInitialRef.current = true;
+      fetchProperties();
+    } else {
+      timer = setTimeout(fetchProperties, 180);
+    }
     return () => {
-      clearTimeout(timer);
+      if (timer) clearTimeout(timer);
       active = false;
       controller.abort();
     };
@@ -431,7 +439,7 @@ const Home = () => {
     && personalPicks.items.length > 0;
   const showcaseProperties = showPersonal ? personalPicks.items : featuredProperties;
 
-  if (isLoadingProperties || authStatus === 'authenticating') {
+  if (authStatus === 'authenticating') {
     return (
       <AuthLoading
         description="Vui lòng đợi trong giây lát, Swipe Nest đang chuẩn bị những không gian phù hợp cho bạn."
@@ -560,6 +568,7 @@ const Home = () => {
                 src={getCategoryIllustration(category.name)}
                 alt=""
                 aria-hidden="true"
+                decoding="async"
                 className="category-img" 
               />
               <CategoryIcon className="home-mobile-category-icon" aria-hidden="true" size={28} />
@@ -599,8 +608,23 @@ const Home = () => {
           </button>
         </div>
 
-        <div className="featured-properties-grid">
+        <div className="featured-properties-grid" aria-busy={isLoadingProperties}>
           {actionNotice && <p className="home-action-notice" role="status">{actionNotice}</p>}
+          {isLoadingProperties && showcaseProperties.length === 0 && (
+            [0, 1, 2, 3].map((slot) => (
+              <article className="listing-card listing-card--skeleton" key={`skeleton-${slot}`} aria-hidden="true">
+                <div className="listing-image-wrap home-skeleton-block" />
+                <div className="listing-card-body">
+                  <div className="home-skeleton-line home-skeleton-line--title" />
+                  <div className="home-skeleton-line home-skeleton-line--address" />
+                  <div className="listing-card-bottom">
+                    <div className="home-skeleton-line home-skeleton-line--price" />
+                    <div className="home-skeleton-line home-skeleton-line--specs" />
+                  </div>
+                </div>
+              </article>
+            ))
+          )}
           {showcaseProperties.map((property) => {
             if (property.plus_locked) {
               return <PlusLockedCard key={property.id} property={property} formatPrice={formatPrice} />;
@@ -618,7 +642,9 @@ const Home = () => {
                 <div className="listing-image-wrap">
                   <img 
                     src={property.thumbnail || (property.images && property.images[0]) || 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=600&q=80'} 
-                    alt={property.title} 
+                    alt={property.title}
+                    loading="lazy"
+                    decoding="async"
                     onError={(e) => {
                       e.target.onerror = null;
                       e.target.src = 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=600&q=80';
@@ -672,7 +698,7 @@ const Home = () => {
             </div>
           )}
 
-          {!propertiesError && showcaseProperties.length === 0 && (
+          {!isLoadingProperties && !propertiesError && showcaseProperties.length === 0 && (
             <div className="listings-empty-state">
               {selectedCategories.length
                 ? `Chưa có tin ${selectedCategories[0]} trong phần xem trước.`

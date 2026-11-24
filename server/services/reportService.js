@@ -1,5 +1,6 @@
 const { supabase } = require('../config/supabase');
 const trustScoreService = require('./trustScoreService');
+const { invalidatePublicListingCaches } = require('./ttlCache');
 const { positiveId, text, badRequest } = require('./businessValidation');
 
 const VALID_REASONS = [
@@ -191,6 +192,7 @@ const resolveReport = async (reportId, adminId) => {
         .update({ is_hidden: true })
         .eq('id', targetPropertyId);
     }
+    invalidatePublicListingCaches();
   }
 
   return {

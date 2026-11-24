@@ -242,14 +242,18 @@ async function getActiveAgents({ snapshotAt, page, limit }) {
   return data;
 }
 
-async function fetchAllPlusSubscriptions() {
+async function fetchAllPlusSubscriptions({ activeAfterIso = null } = {}) {
   const rows = [];
   for (let offset = 0; offset < MAX_PLUS_ROWS; offset += PAGE_SIZE) {
-    const { data, error } = await supabase
+    let query = supabase
       .from('user_subscriptions')
       .select('id, user_id, plan_code, price_vnd, start_date, end_date, status, source, created_at')
       .order('id', { ascending: true })
       .range(offset, offset + PAGE_SIZE - 1);
+    if (activeAfterIso) {
+      query = query.eq('status', 'ACTIVE').gte('end_date', activeAfterIso);
+    }
+    const { data, error } = await query;
     if (error) {
       if (MISSING_SCHEMA_CODES.has(error.code)) return null;
       throw Object.assign(new Error('Không thể tải dữ liệu gói Plus. Vui lòng thử lại.'), {
@@ -296,16 +300,37 @@ async function fetchPlusPlans() {
   return Array.isArray(data) ? data : [];
 }
 
-async function getPlusSnapshotData() {
-  const subscriptions = await fetchAllPlusSubscriptions();
+async function getPlusSnapshotData({ activeAfterIso = null } = {}) {
+  const [subscriptions, plans] = await Promise.all([
+    fetchAllPlusSubscriptions({ activeAfterIso }),
+    fetchPlusPlans()
+  ]);
   if (subscriptions === null) return null;
 
   const uniqueUserIds = [...new Set(subscriptions.map((row) => Number(row.user_id)).filter(Number.isFinite))];
-  const [usersById, plans] = await Promise.all([
-    uniqueUserIds.length ? fetchUsersByIds(uniqueUserIds) : Promise.resolve(new Map()),
-    fetchPlusPlans()
-  ]);
+  const usersById = uniqueUserIds.length ? await fetchUsersByIds(uniqueUserIds) : new Map();
   return { subscriptions, usersById, plans };
 }
 
-module.exports = { getDashboard, getRevenue, getTransactions, getActiveAgents, getPlusSnapshotData };
+async function getActivePlusUsers({ snapshotAt, page, limit }) {
+  try {
+    const { data, error } = await supabase.rpc('admin_analytics_active_plus_users', {
+      p_snapshot_at: snapshotAt, p_page: page, p_limit: limit
+    });
+    if (error) {
+      if (['PGRST202', '42883', 'PGRST205', '42P01', '42703'].includes(error.code)) return null;
+      throw Object.assign(new Error('Không thể tải danh sách khách hàng Plus. Vui lòng thử lại.'), {
+        statusCode: 503, code: 'ACTIVE_PLUS_USERS_QUERY_FAILED'
+      });
+    }
+    if (!data || !Array.isArray(data.items) || !Number.isSafeInteger(data.total) || data.total < 0) {
+      return null;
+    }
+    return data;
+  } catch (err) {
+    if (err.code === 'ACTIVE_PLUS_USERS_QUERY_FAILED') throw err;
+    return null;
+  }
+}
+
+module.exports = { getDashboard, getRevenue, getTransactions, getActiveAgents, getPlusSnapshotData, getActivePlusUsers };

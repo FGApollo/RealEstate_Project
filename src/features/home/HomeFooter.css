@@ -20,7 +20,7 @@
   z-index: -1;
   inset: auto 0 0;
   height: var(--footer-art-height);
-  background: url('../../assets/footer-reference.png') center bottom / 100% 100% no-repeat;
+  background: url('../../assets/footer-reference.webp') center bottom / 100% 100% no-repeat;
   mask:
     radial-gradient(ellipse 100% 100% at bottom left, #000 60%, transparent 100%) bottom left / 40% 34% no-repeat,
     radial-gradient(ellipse 100% 100% at bottom right, #000 75%, transparent 100%) bottom right / 9% 95% no-repeat,

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import {
   Users, UserRound, BriefcaseBusiness, BadgeCheck, CalendarDays, Crown, Info
 } from 'lucide-react';
-import { ComparisonChart, DistributionChart, Empty } from './AnalyticsCharts';
+import { ComparisonChart, DistributionChart, Empty } from './LazyAnalyticsCharts';
 import { number, money, percent } from './analyticsFormat';
 import ActiveSubscriptionAgents, { ActivePlusUsers } from './ActiveSubscriptionAgents';
 

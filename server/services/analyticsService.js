@@ -66,7 +66,11 @@ async function getActiveAgents(query, now = new Date()) {
 
 async function getActivePlusUsers(query, now = new Date()) {
   const parsed = parseActiveAgentsQuery(query, now);
-  const plusData = await repository.getPlusSnapshotData();
+  if (typeof repository.getActivePlusUsers === 'function') {
+    const rpcPage = await repository.getActivePlusUsers(parsed);
+    if (rpcPage) return rpcPage;
+  }
+  const plusData = await repository.getPlusSnapshotData({ activeAfterIso: parsed.snapshotAt });
   if (!plusData) {
     throw Object.assign(new Error('Danh sách khách hàng Plus chưa được cấu hình. Vui lòng thử lại sau.'), {
       statusCode: 503,

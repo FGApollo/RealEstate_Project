@@ -190,7 +190,7 @@ export default function LifestyleOnboarding() {
         <section className="onboarding-card" aria-live="polite">
           <div className="onboarding-card-top">
             <div className="onboarding-step-icon"><Sparkles size={20} /></div>
-            <img src="/mascots/otter-builder-paper.png" alt="" className="onboarding-mascot" />
+            <img src="/mascots/otter-builder-paper.webp" alt="" className="onboarding-mascot" />
           </div>
 
           {step === 1 && <>

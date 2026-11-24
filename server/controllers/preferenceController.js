@@ -1,5 +1,8 @@
 const preferenceService = require('../services/preferenceService');
 const propertyEventService = require('../services/propertyEventService');
+const { appCache } = require('../services/ttlCache');
+
+const PREFERENCE_OPTIONS_TTL_MS = 60 * 1000;
 
 const sendError = (res, error, fallback) => res.status(error.statusCode || 500).json({
   error: error.statusCode ? error.message : fallback,
@@ -33,9 +36,24 @@ const savePreferences = async (req, res) => {
   }
 };
 
+const CACHEABLE_LISTING_TYPES = new Set(['', 'RENT', 'SALE']);
+
 const getOptions = async (req, res) => {
   try {
-    const options = await preferenceService.getPreferenceOptions(req.query.listingType?.toUpperCase());
+    const rawListingType = typeof req.query.listingType === 'string'
+      ? req.query.listingType.trim().toUpperCase()
+      : '';
+    const load = () => preferenceService.getPreferenceOptions(rawListingType || undefined);
+    const options = CACHEABLE_LISTING_TYPES.has(rawListingType)
+      ? await appCache.getOrSet(
+        `preferences:options:${rawListingType || 'ALL'}`,
+        PREFERENCE_OPTIONS_TTL_MS,
+        load
+      )
+      : await load();
+    if (typeof res.set === 'function') {
+      res.set('Cache-Control', 'private, max-age=60');
+    }
     return res.status(200).json({ options });
   } catch (error) {
     return sendError(res, error, 'Could not load available preference options.');

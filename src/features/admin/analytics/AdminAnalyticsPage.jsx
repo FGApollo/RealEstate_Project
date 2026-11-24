@@ -4,7 +4,7 @@ import {
   BarChart3, Info, CalendarDays, LayoutDashboard, ReceiptText, ArrowUpRight, Globe2, Search, UserPlus, TrendingDown
 } from 'lucide-react';
 import { useAnalytics } from './useAnalytics';
-import { TrendChart, ComparisonChart, DistributionChart, Empty } from './AnalyticsCharts';
+import { TrendChart, ComparisonChart, DistributionChart, Empty } from './LazyAnalyticsCharts';
 import { number, money, percent } from './analyticsFormat';
 import './AdminAnalyticsPage.css';
 import PaymentTransactions from './PaymentTransactions';

@@ -97,12 +97,22 @@ const CheckedListingsSection = ({
           return;
         }
         setState({ status: 'locked', properties: [] });
-        fetchOfficialPreview({ signal: controller.signal })
-          .then((data) => { if (!controller.signal.aborted && Array.isArray(data?.previews)) setOfficialPreviews(data.previews); })
-          .catch(() => {});
-        fetchPlusCatalog({ signal: controller.signal })
-          .then((data) => { if (!controller.signal.aborted && data?.plans?.[0]) setPlanInfo(data.plans[0]); })
-          .catch(() => {});
+        const inlinePreviews = error.data?.previews;
+        const inlinePlan = error.data?.plan;
+        if (Array.isArray(inlinePreviews)) {
+          setOfficialPreviews(inlinePreviews);
+        } else {
+          fetchOfficialPreview({ signal: controller.signal })
+            .then((data) => { if (!controller.signal.aborted && Array.isArray(data?.previews)) setOfficialPreviews(data.previews); })
+            .catch(() => {});
+        }
+        if (inlinePlan) {
+          setPlanInfo(inlinePlan);
+        } else {
+          fetchPlusCatalog({ signal: controller.signal })
+            .then((data) => { if (!controller.signal.aborted && data?.plans?.[0]) setPlanInfo(data.plans[0]); })
+            .catch(() => {});
+        }
       });
     return () => controller.abort();
   }, []);

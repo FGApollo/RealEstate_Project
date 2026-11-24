@@ -1,4 +1,5 @@
 const { supabase } = require('../config/supabase');
+const { invalidatePublicListingCaches } = require('./ttlCache');
 
 const DEFAULT_TRUST_SCORE = 50;
 const { positiveId, boundedInteger, text, badRequest } = require('./businessValidation');
@@ -71,6 +72,7 @@ const enforceTrustScoreThresholds = async (userId, oldScore, newScore) => {
     if (hideError) {
       console.error(`[Threshold Enforcement] Error auto-hiding properties for user ${userId}:`, hideError.message);
     } else {
+      invalidatePublicListingCaches();
       console.log(`[Threshold Enforcement] Auto-hid active properties for user ${userId} (Score: ${newScore} <= ${LOW_TRUST_SCORE_THRESHOLD}).`);
     }
   }
@@ -123,6 +125,7 @@ const enforceTrustScoreThresholds = async (userId, oldScore, newScore) => {
           .update({ is_hidden: false })
           .in('id', propsToUnhide);
 
+        invalidatePublicListingCaches();
         console.log(`[Threshold Enforcement] Restored ${propsToUnhide.length} properties for user ${userId} (Score recovered to ${newScore} > ${LOW_TRUST_SCORE_THRESHOLD}).`);
       }
     }
@@ -621,6 +624,8 @@ const applyPropertyHiddenPenalty = async (propertyId, adminId, shouldPenalize = 
     throw new Error(propertyUpdateError.message);
   }
 
+  invalidatePublicListingCaches();
+
   let trustScore = null;
   if (shouldPenalize) {
     trustScore = await updateTrustScore(
@@ -732,6 +737,7 @@ const reverseReportPenalty = async (reportId, adminId, adminNote = '', customRef
       .from('properties')
       .update({ is_hidden: false })
       .eq('id', propertyId);
+    invalidatePublicListingCaches();
   }
 
   return {

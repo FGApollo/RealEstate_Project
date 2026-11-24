@@ -4,6 +4,7 @@ const { positiveId, propertyInput } = require('./businessValidation');
 const { listingDatabaseError, assertListingCapacity } = require('./listingEntitlements');
 const propertyRepository = require('../repositories/propertyRepository');
 const { savePublicImage, deleteOwnedListingImage } = require('./publicImageStorage');
+const { invalidatePublicListingCaches } = require('./ttlCache');
 const saveBase64Image = (image, userId) => savePublicImage(image, 'listings', userId);
 
 // Sync a child table: delete all rows for this property then re-insert.
@@ -209,11 +210,20 @@ const createProperty = async (propertyData) => {
     console.error('Failed to link similar properties on creation:', err);
   }
 
+  invalidatePublicListingCaches();
   return property;
 };
 
 // Tin đã bán/đã cho thuê không còn trong danh sách công khai, nhưng người đã lưu tin vẫn xem lại và nhắn môi giới được.
 const CLOSED_STATUSES = ['SOLD', 'RENTED'];
+const VIEWABLE_STATUSES = ['AVAILABLE', ...CLOSED_STATUSES];
+
+const isOwnerEligibleForClosedListing = (owner) => Boolean(
+  owner && owner.role === 'AGENT' && owner.is_active === true
+  && (owner.verification_status === 'VERIFIED' || owner.is_official === true)
+  && Number(owner.trust_score ?? 50) > 30
+);
+
 const isClosedListingViewable = async (property) => {
   if (!property || !CLOSED_STATUSES.includes(property.status) || property.is_hidden === true || property.is_public === false) return false;
   let { data: owner, error } = await supabase.from('users')
@@ -224,9 +234,12 @@ const isClosedListingViewable = async (property) => {
     if (owner) owner.is_official = false;
   }
   if (error) throw new Error('Không thể kiểm tra tin đăng.');
-  return Boolean(owner && owner.role === 'AGENT' && owner.is_active === true
-    && (owner.verification_status === 'VERIFIED' || owner.is_official === true) && Number(owner.trust_score ?? 50) > 30);
+  return isOwnerEligibleForClosedListing(owner);
 };
+
+const startVisibilityCheck = (id) => Promise.resolve(
+  supabase.from('ranked_properties').select('id').eq('id', id).maybeSingle()
+).catch((err) => ({ data: null, error: err }));
 
 const getPropertyById = async (id, { publicRead = false, viewerId, allowClosed = false } = {}) => {
   id = positiveId(id);
@@ -242,6 +255,8 @@ const getPropertyById = async (id, { publicRead = false, viewerId, allowClosed =
     .eq('id', id)
     .single();
 
+  const visiblePromise = publicRead ? startVisibilityCheck(id) : null;
+
   let { data, error } = await selectProperty(true);
   if (error && (error.code === '42703' || error.message?.includes('is_official'))) {
     ({ data, error } = await selectProperty(false));
@@ -249,9 +264,7 @@ const getPropertyById = async (id, { publicRead = false, viewerId, allowClosed =
   }
 
   if (error?.code === 'PGRST116') return null;
-  if (error) {
-    throw new Error(error.message);
-  }
+  if (error) throw new Error(error.message);
   if (data?.owner && data.owner.is_official === undefined) {
     data.owner.is_official = false;
   }
@@ -259,11 +272,48 @@ const getPropertyById = async (id, { publicRead = false, viewerId, allowClosed =
     if (allowClosed && CLOSED_STATUSES.includes(data?.status)) {
       return (await isClosedListingViewable(data)) ? data : null;
     }
-    const visible = await supabase.from('ranked_properties').select('id').eq('id', id).maybeSingle();
+    const visible = await visiblePromise;
     if (visible.error) throw new Error('Không thể kiểm tra tin đăng.');
     if (!visible.data) return null;
   }
   return data;
+};
+
+// Kiểm tra quyền xem công khai nhẹ cho endpoint /reviews: không tải features, images, tags hay mô tả.
+const isPropertyReadable = async (id, { viewerId, viewerRole, allowClosed = false } = {}) => {
+  id = positiveId(id);
+  const selectMeta = (withOfficial = true) => supabase
+    .from('properties')
+    .select(`id, owner_id, status, is_hidden, is_public, owner:users!owner_id(role, is_active, verification_status, trust_score${withOfficial ? ', is_official' : ''})`)
+    .eq('id', id)
+    .maybeSingle();
+
+  const visiblePromise = startVisibilityCheck(id);
+  let { data, error } = await selectMeta(true);
+  if (error && (error.code === '42703' || error.message?.includes('is_official'))) {
+    ({ data, error } = await selectMeta(false));
+    if (data?.owner) data.owner.is_official = false;
+  }
+
+  if (error) throw new Error(error.message);
+  if (!data) return false;
+
+  const isOwner = String(viewerRole || '').toUpperCase() === 'AGENT'
+    && String(data.owner_id) === String(viewerId);
+  if (isOwner) return true;
+
+  if (data.is_hidden === true || !VIEWABLE_STATUSES.includes(data.status)
+    || Number(data.owner?.trust_score ?? 50) <= 30) {
+    return false;
+  }
+
+  if (allowClosed && CLOSED_STATUSES.includes(data.status)) {
+    return data.is_public !== false && isOwnerEligibleForClosedListing(data.owner);
+  }
+
+  const visible = await visiblePromise;
+  if (visible.error) throw new Error('Không thể kiểm tra tin đăng.');
+  return Boolean(visible.data);
 };
 
 const getContactAgentId = async (id, requesterId) => {
@@ -314,7 +364,6 @@ const getContactAgentId = async (id, requesterId) => {
     error.statusCode = 404;
     throw error;
   }
-  return agent.id;
   return agent.id;
 };
 
@@ -423,6 +472,7 @@ const updateProperty = async (id, actorId, propertyData) => {
     console.error('Failed to link similar properties on update:', err);
   }
 
+  invalidatePublicListingCaches();
   return property;
 };
 
@@ -454,6 +504,7 @@ const deleteProperty = async (id, actorId) => {
     .eq('id', id);
 
   if (error) throw new Error(error.message);
+  invalidatePublicListingCaches();
 };
 
 const checkSimilarity = async (propertyData, excludeId = null) => {
@@ -551,35 +602,51 @@ const createSimilarityLinks = async (propertyId, similarProperties) => {
 
 const getSimilarProperties = async (propertyId) => {
   const propId = positiveId(propertyId);
-  const source = await getPropertyById(propId, { publicRead: true });
-  if (!source || source.is_hidden === true || source.status !== 'AVAILABLE'
-    || Number(source.owner?.trust_score ?? 50) <= 30) return [];
+  const [sourceResult, linksResult] = await Promise.all([
+    supabase
+      .from('ranked_properties')
+      .select('id')
+      .eq('id', propId)
+      .maybeSingle(),
+    supabase
+      .from('property_links')
+      .select('property_id_1, property_id_2')
+      .or(`property_id_1.eq.${propId},property_id_2.eq.${propId}`)
+      .limit(100)
+  ]);
 
-  const { data: links, error } = await supabase
-    .from('property_links')
-    .select('property_id_1, property_id_2')
-    .or(`property_id_1.eq.${propId},property_id_2.eq.${propId}`);
+  if (sourceResult.error) throw new Error('Không thể kiểm tra tin đăng.');
+  if (!sourceResult.data) return [];
 
-  if (error) {
-    console.error('Error getting property links:', error);
+  if (linksResult.error) {
+    console.error('Error getting property links:', linksResult.error);
     return [];
   }
 
+  const links = linksResult.data;
   if (!links || links.length === 0) return [];
 
-  const similarIds = links.map(l => l.property_id_1 === propId ? l.property_id_2 : l.property_id_1);
+  const similarIds = [...new Set(links.map((l) => (l.property_id_1 === propId ? l.property_id_2 : l.property_id_1)))];
+  if (similarIds.length === 0) return [];
 
-  const properties = await propertyRepository.fetchPublicProperties({ ids: similarIds.slice(0,500), limit: 500 });
-  return properties.sort((a,b) => b.display_priority-a.display_priority || b.id-a.id).slice(0,12);
+  const boundedIds = similarIds.slice(0, 100);
+  const properties = await propertyRepository.fetchPublicProperties({
+    ids: boundedIds,
+    limit: Math.min(boundedIds.length, 100),
+    sortByPriority: true
+  });
+  return properties.sort((a, b) => (Number(b.display_priority) || 0) - (Number(a.display_priority) || 0) || b.id - a.id).slice(0, 12);
 };
 
 module.exports = {
   getProperties,
   createProperty,
   getPropertyById,
+  isPropertyReadable,
   getContactAgentId,
   updateProperty,
   deleteProperty,
   checkSimilarity,
-  getSimilarProperties
+  getSimilarProperties,
+  invalidatePublicListingCaches
 };

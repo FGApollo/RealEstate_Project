@@ -1,19 +1,20 @@
 const recommendationService = require('../services/recommendationService');
 const plusService = require('../services/plusService');
-const { toViewerProperty, isPlusExclusiveProperty } = require('../services/publicPropertyDto');
+const { toViewerProperty } = require('../services/publicPropertyDto');
 const { parseSearchFilters } = require('../services/propertySearchFilters');
 
 const getRecommendations = async (req, res) => {
   try {
-    const { properties, ...pagination } = await recommendationService.getRecommendations(req.user.id, {
-      category: req.query.category === 'ALL' ? null : req.query.category,
-      limit: req.query.limit,
-      offset: req.query.offset,
-      feedToken: req.query.feedToken,
-      filters: parseSearchFilters(req.query.filters)
-    });
-    const hasOfficial = properties.some(isPlusExclusiveProperty);
-    const canViewPlus = hasOfficial ? await plusService.canViewerAccessPlus(req.user) : false;
+    const [{ properties, ...pagination }, canViewPlus] = await Promise.all([
+      recommendationService.getRecommendations(req.user.id, {
+        category: req.query.category === 'ALL' ? null : req.query.category,
+        limit: req.query.limit,
+        offset: req.query.offset,
+        feedToken: req.query.feedToken,
+        filters: parseSearchFilters(req.query.filters)
+      }),
+      plusService.canViewerAccessPlus(req.user)
+    ]);
     // feed_section: "for_you" (hợp gu) hoặc "popular" (phần nối tiếp khi đã hết tin hợp gu).
     return res.status(200).json({
       properties: properties.map((property) => ({
