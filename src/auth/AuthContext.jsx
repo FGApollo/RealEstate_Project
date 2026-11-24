@@ -1,6 +1,14 @@
 import { startTransition, useCallback, useEffect, useRef, useState } from 'react';
 import { API_BASE_URL } from '../config';
-import { apiFetch, clearAccessToken, getAccessSessionKey, getAccessToken, restoreSession, setAccessToken } from './apiClient';
+import {
+  apiFetch,
+  clearAccessToken,
+  getAccessSessionKey,
+  getAccessToken,
+  getLatestSessionMeta,
+  restoreSession,
+  setAccessToken
+} from './apiClient';
 import { isSessionUser } from './roleDestination.js';
 import { withSessionLock } from './sessionClient.js';
 import { AuthContext } from './context';
@@ -116,12 +124,25 @@ export const AuthProvider = ({ children }) => {
         clearLegacyCache();
         if (restoredUser) {
           const isRegularUser = String(restoredUser.role).toUpperCase() === 'USER';
-          updateAuthState({
-            user: restoredUser,
-            authStatus: 'authenticated',
-            onboardingStatus: isRegularUser ? 'checking' : 'not_required'
-          });
-          if (isRegularUser) void refreshOnboardingStatus(restoredUser);
+          const sessionMeta = getLatestSessionMeta();
+          const hasServerOnboarding = isRegularUser
+            && sessionMeta?.userId === String(restoredUser.id)
+            && typeof sessionMeta?.onboardingCompleted === 'boolean';
+          if (hasServerOnboarding) {
+            const rawStatus = sessionMeta.onboardingCompleted ? 'complete' : 'required';
+            updateAuthState({
+              user: restoredUser,
+              authStatus: 'authenticated',
+              onboardingStatus: effectiveOnboardingStatus(rawStatus, getAccessSessionKey(restoredUser.id))
+            });
+          } else {
+            updateAuthState({
+              user: restoredUser,
+              authStatus: 'authenticated',
+              onboardingStatus: isRegularUser ? 'checking' : 'not_required'
+            });
+            if (isRegularUser) void refreshOnboardingStatus(restoredUser);
+          }
         } else {
           clearOnboardingSkip();
           updateAuthState({ user: null, authStatus: 'unauthenticated', onboardingStatus: 'unknown' });

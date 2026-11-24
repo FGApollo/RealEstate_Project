@@ -8,7 +8,7 @@ import Header from '../components/Header';
 import { billingDate, billingDay, billingMoney, openCheckout, paymentStatus } from '../features/agent/pricing/billingApi';
 import { PLUS_BENEFITS, createPlusPayment, fetchPlusCatalog, fetchPlusPayments } from '../features/plus/plusApi';
 import PlusCrownIcon from '../features/plus/PlusCrownIcon';
-import plusCrownArt from '../assets/plus-crown-art.jpg';
+import plusCrownArt from '../assets/plus-crown-art.webp';
 import './Plus.css';
 
 const SparkleStar = ({ className = '', size = 16 }) => (

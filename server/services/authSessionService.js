@@ -180,10 +180,57 @@ const getRefreshTokenFromRequest = (req) => {
   }
 };
 
+const ROTATE_RPC_MISSING_CODES = new Set(['PGRST202', '42883', '42P01', '42703']);
+const ROTATE_RPC_RETRY_COOLDOWN_MS = 5 * 60 * 1000;
+let rotateRpcRetryAfter = 0;
+
 const refreshSession = async (refreshToken) => {
   if (typeof refreshToken !== 'string' || !/^[A-Za-z0-9_-]{64}$/.test(refreshToken)) return null;
 
   const oldHash = hashToken(refreshToken);
+  const newRefreshToken = generateRefreshToken();
+  const newHash = hashToken(newRefreshToken);
+
+  if (Date.now() >= rotateRpcRetryAfter && typeof supabase.rpc === 'function') {
+    let rpcResult;
+    let rpcFailed = false;
+    try {
+      rpcResult = await supabase.rpc('rotate_auth_session', {
+        p_old_hash: oldHash,
+        p_new_hash: newHash
+      });
+    } catch {
+      rpcFailed = true;
+    }
+
+    if (!rpcFailed && rpcResult) {
+      const { data, error } = rpcResult;
+      if (!error) {
+        if (!data || !data.session_id || !data.user) return null;
+        const user = { ...data.user, role: normalizeAccountRole(data.user.role) };
+        if (!user.email_verified_at) return null;
+        try {
+          assertAccountCanAuthenticate(user);
+        } catch {
+          return null;
+        }
+        return {
+          user,
+          accessToken: signAccessToken(user.id, data.session_id),
+          refreshToken: newRefreshToken,
+          ...(typeof data.onboarding_completed === 'boolean'
+            ? { onboardingCompleted: data.onboarding_completed }
+            : {})
+        };
+      }
+      if (ROTATE_RPC_MISSING_CODES.has(error.code) || /rotate_auth_session/i.test(error.message || '')) {
+        rotateRpcRetryAfter = Date.now() + ROTATE_RPC_RETRY_COOLDOWN_MS;
+      } else if (!/fetch failed|network|ENOTFOUND|ECONNREFUSED/i.test(error.message || '')) {
+        throw new Error(error.message);
+      }
+    }
+  }
+
   const { data: session, error } = await supabase
     .from('auth_sessions')
     .select('id, user_id, expires_at, revoked_at')
@@ -203,11 +250,10 @@ const refreshSession = async (refreshToken) => {
     return null;
   }
 
-  const newRefreshToken = generateRefreshToken();
   const { data: rotated, error: rotationError } = await supabase
     .from('auth_sessions')
     .update({
-      refresh_token_hash: hashToken(newRefreshToken),
+      refresh_token_hash: newHash,
       rotated_at: new Date().toISOString()
     })
     .eq('id', session.id)

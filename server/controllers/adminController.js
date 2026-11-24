@@ -100,6 +100,7 @@ const updateReviewStatus = async (req, res) => {
 };
 
 const trustScoreService = require('../services/trustScoreService');
+const { invalidatePublicListingCaches } = require('../services/ttlCache');
 
 const hideProperty = async (req, res) => {
   const { propertyId } = req.params;
@@ -107,6 +108,7 @@ const hideProperty = async (req, res) => {
 
   try {
     const result = await trustScoreService.applyPropertyHiddenPenalty(propertyId, adminId);
+    invalidatePublicListingCaches();
     return res.status(200).json(result);
   } catch (error) {
     console.error('Error in hideProperty:', error);
@@ -129,6 +131,7 @@ const unhideProperty = async (req, res) => {
       throw listingDatabaseError(error);
     }
 
+    invalidatePublicListingCaches();
     return res.status(200).json({
       success: true,
       message: 'Đã mở khóa hiển thị bài đăng thành công.',

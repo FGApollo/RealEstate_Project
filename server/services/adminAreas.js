@@ -11,8 +11,18 @@ const PROVINCES = new Map(Object.entries(legacyData.provinces).map(([name, entry
   const wards = new Map(Object.entries(entry.wards).map(([ward, olds]) => [key(ward),
     olds.map(([oldWard, oldDistrict]) => ({ ward: key(oldWard), district: key(oldDistrict) }))]));
   // Mọi cặp (phường cũ, quận cũ) đã có trong bảng ánh xạ của tỉnh.
-  const mappedPairs = new Set([...wards.values()].flat().map((old) => `${old.ward}|${old.district}`));
-  return [key(name), { provinceKeys: new Set([key(name), ...entry.legacyProvinces.map(key)]), wards, mappedPairs }];
+  const mappedPairs = new Set();
+  const mappedWardsByDistrict = new Map();
+  for (const olds of wards.values()) {
+    for (const old of olds) {
+      mappedPairs.add(`${old.ward}|${old.district}`);
+      if (old.district) {
+        if (!mappedWardsByDistrict.has(old.district)) mappedWardsByDistrict.set(old.district, new Set());
+        mappedWardsByDistrict.get(old.district).add(old.ward);
+      }
+    }
+  }
+  return [key(name), { provinceKeys: new Set([key(name), ...entry.legacyProvinces.map(key)]), wards, mappedPairs, mappedWardsByDistrict }];
 }));
 
 const matchesProvince = (property, province) => {
@@ -64,10 +74,46 @@ const resolveNewArea = (property) => {
   return { province, ward: null };
 };
 
+const getProvinceKeys = (province) => {
+  const provinceKey = key(province);
+  if (!provinceKey) return [];
+  const known = PROVINCES.get(provinceKey);
+  return known ? [...known.provinceKeys] : [provinceKey];
+};
+
+const getWardSqlFilter = (province, ward) => {
+  const wardKey = key(ward);
+  if (!wardKey) return null;
+  const known = PROVINCES.get(key(province));
+  const legacy = known?.wards.get(wardKey) || [];
+  const legacyPairs = [...new Set(
+    legacy
+      .filter((old) => old.district)
+      .map((old) => `${old.ward}|${old.district}`)
+  )];
+  const allowUnmappedDistrict = !/^\d|^quan \d/.test(wardKey);
+  const excludedDistrictWards = allowUnmappedDistrict && known?.mappedWardsByDistrict.has(wardKey)
+    ? [...known.mappedWardsByDistrict.get(wardKey)]
+    : [];
+  return {
+    wardKey,
+    ...(legacyPairs.length ? { legacyPairs } : {}),
+    allowUnmappedDistrict,
+    ...(excludedDistrictWards.length ? { excludedDistrictWards } : {})
+  };
+};
+
 const matchesArea = (property, { province, ward } = {}) => {
   if (province && !matchesProvince(property, province)) return false;
   if (ward && !matchesWard(property, province, ward)) return false;
   return true;
 };
 
-module.exports = { matchesArea, matchesProvince, matchesWard, resolveNewArea };
+module.exports = {
+  matchesArea,
+  matchesProvince,
+  matchesWard,
+  resolveNewArea,
+  getProvinceKeys,
+  getWardSqlFilter
+};

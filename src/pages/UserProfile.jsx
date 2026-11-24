@@ -13,7 +13,7 @@ import { fetchPlusStatus } from '../features/plus/plusApi';
 import Header from '../components/Header';
 import Avatar from '../components/Avatar';
 import PageWaveBackground from '../components/PageWaveBackground';
-import heroVillaArt from '../assets/profile-hero-villa.jpg';
+import heroVillaArt from '../assets/profile-hero-villa.webp';
 import {
   formatProfileDate,
   getRoleLabel,

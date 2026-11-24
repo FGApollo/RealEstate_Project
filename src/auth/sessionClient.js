@@ -59,7 +59,9 @@ export const createSessionClient = ({ apiBaseUrl, fetchImpl, onUser = () => {}, 
       }
       accessToken = data.accessToken;
       userId = String(data.user.id);
-      onUser(data.user);
+      onUser(data.user, {
+        ...(typeof data.onboardingCompleted === 'boolean' ? { onboardingCompleted: data.onboardingCompleted } : {})
+      });
       return data.user;
     }).finally(() => { if (refreshTask?.promise === promise) refreshTask = null; });
     refreshTask = { generation: expected, promise };

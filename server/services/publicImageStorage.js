@@ -1,9 +1,52 @@
 const crypto = require('crypto');
 const fs = require('fs/promises');
 const path = require('path');
+const sharp = require('sharp');
 const { supabase } = require('../config/supabase');
-const { validateImageBuffer } = require('./imageValidation');
+const { MAX_IMAGE_BYTES, validateImageBuffer } = require('./imageValidation');
 const { badRequest, positiveId } = require('./businessValidation');
+
+const PUBLIC_IMAGE_MAX_DIMENSION = 1600;
+const PUBLIC_IMAGE_WEBP_QUALITY = 82;
+const PUBLIC_IMAGE_OPTIMIZE_MIN_BYTES = 16 * 1024;
+
+const optimizePublicImageBuffer = async (validatedImage) => {
+  const meta = await sharp(validatedImage.buffer, { failOn: 'warning', animated: false }).metadata();
+  const needsResize = (meta.width || 0) > PUBLIC_IMAGE_MAX_DIMENSION || (meta.height || 0) > PUBLIC_IMAGE_MAX_DIMENSION;
+
+  // Keep already-tiny images in their validated format when no resize is needed.
+  if (!needsResize && validatedImage.size <= PUBLIC_IMAGE_OPTIMIZE_MIN_BYTES) {
+    return validatedImage;
+  }
+
+  const pipeline = sharp(validatedImage.buffer, { failOn: 'warning', animated: false });
+  if (needsResize) {
+    pipeline.resize({
+      width: PUBLIC_IMAGE_MAX_DIMENSION,
+      height: PUBLIC_IMAGE_MAX_DIMENSION,
+      fit: 'inside',
+      withoutEnlargement: true
+    });
+  }
+  const optimized = await pipeline
+    .webp({ quality: PUBLIC_IMAGE_WEBP_QUALITY, effort: 4 })
+    .toBuffer();
+
+  if (optimized.length > MAX_IMAGE_BYTES) {
+    throw Object.assign(badRequest('Ảnh sau khi nén vẫn vượt quá 5MB.'), { statusCode: 413 });
+  }
+
+  if (!needsResize && optimized.length >= validatedImage.size) {
+    return validatedImage;
+  }
+
+  return {
+    buffer: optimized,
+    mimetype: 'image/webp',
+    extension: 'webp',
+    size: optimized.length
+  };
+};
 
 const savePublicImage = async (value, category, userId) => {
   if (value === undefined || value === null || value === '') return value;
@@ -21,12 +64,17 @@ const savePublicImage = async (value, category, userId) => {
   if (match[1].length > Math.ceil(5 * 1024 * 1024 / 3) * 4) {
     throw Object.assign(badRequest('Ảnh không được vượt quá 5MB.'), { statusCode: 413 });
   }
-  const image = await validateImageBuffer(Buffer.from(match[1], 'base64'));
+  const validated = await validateImageBuffer(Buffer.from(match[1], 'base64'));
+  const image = await optimizePublicImageBuffer(validated);
   const ownerId = positiveId(userId, 'userId');
   const filename = `${category}-${ownerId}-${crypto.randomUUID()}.${image.extension}`;
   const objectPath = `${category}/${ownerId}/${filename}`;
   const { error } = await supabase.storage.from('property-images')
-    .upload(objectPath, image.buffer, { contentType: image.mimetype, upsert: false });
+    .upload(objectPath, image.buffer, {
+      contentType: image.mimetype,
+      cacheControl: '31536000',
+      upsert: false
+    });
   if (error) {
     // Không ghi tạm ra ổ đĩa: trên máy chủ deploy, ổ đĩa bị xóa mỗi lần triển khai nên ảnh sẽ mất.
     console.error('Public image upload failed:', error.message || error);
@@ -64,4 +112,10 @@ const deleteOwnedListingImage = async (value, userId) => {
   });
 };
 
-module.exports = { savePublicImage, deleteOwnedListingImage };
+module.exports = {
+  PUBLIC_IMAGE_MAX_DIMENSION,
+  PUBLIC_IMAGE_WEBP_QUALITY,
+  optimizePublicImageBuffer,
+  savePublicImage,
+  deleteOwnedListingImage
+};

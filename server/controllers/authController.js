@@ -182,7 +182,13 @@ const refresh = async (req, res) => {
     }
 
     authSessionService.setRefreshCookie(res, result.refreshToken);
-    return res.status(200).json({ user: result.user, accessToken: result.accessToken });
+    return res.status(200).json({
+      user: result.user,
+      accessToken: result.accessToken,
+      ...(typeof result.onboardingCompleted === 'boolean'
+        ? { onboardingCompleted: result.onboardingCompleted }
+        : {})
+    });
   } catch (error) {
     console.error('Session refresh failed:', error);
     return res.status(500).json({ error: 'Session refresh failed' });
