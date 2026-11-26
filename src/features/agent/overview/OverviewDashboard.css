@@ -120,6 +120,7 @@
   padding: 16px;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
+  cursor: pointer;
   transition: all 0.2s ease;
 }
 

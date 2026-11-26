@@ -264,7 +264,11 @@ const OverviewDashboard = ({
                 <p>Bạn chưa có tin đăng nào.</p>
               ) : (
                 recentListings.map(listing => (
-                  <div key={listing.id} className="listing-item">
+                  <div
+                    key={listing.id}
+                    className="listing-item"
+                    onClick={() => setPreviewProperty(listing)}
+                  >
                     <img src={listing.thumbnail || 'https://via.placeholder.com/80'} alt={listing.title} className="listing-image" />
                     <div className="listing-info">
                       <h3>{listing.title}</h3>
@@ -283,7 +287,16 @@ const OverviewDashboard = ({
                         <span>{listing.views || 0}</span>
                       </div>
                     </div>
-                    <button className="action-btn">
+                    <button
+                      type="button"
+                      className="action-btn"
+                      title="Xem chi tiết tin đăng"
+                      aria-label={`Xem chi tiết ${listing.title}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPreviewProperty(listing);
+                      }}
+                    >
                       <ChevronRight size={20} />
                     </button>
                   </div>
