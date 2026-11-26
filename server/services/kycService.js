@@ -334,26 +334,6 @@ const uploadCard = async ({ userId, fullName, phone, frontImage, backImage }) =>
   const ocrData = ocrResult.data || {};
   let idNumber = ocrResult.data?.idNumber || null;
 
-  // Chống gian lận: Kiểm tra số CCCD này đã được tài khoản khác xác minh thành công chưa
-  if (idNumber) {
-    const { data: existingVerified, error: checkError } = await supabase
-      .from('identity_verifications')
-      .select('id, user_id')
-      .eq('id_number', idNumber)
-      .eq('status', APPROVED_STATUS)
-      .neq('user_id', userId)
-      .limit(1)
-      .maybeSingle();
-
-    if (checkError) throw new Error('Failed to check existing identity verification');
-    if (existingVerified) {
-      return {
-        success: false,
-        error: 'Số CCCD này đã được sử dụng và xác minh cho một tài khoản khác.'
-      };
-    }
-  }
-
   const [uploadedFront, uploadedBack] = await Promise.all([
     storeKycImage(userId, 'front', frontImage),
     storeKycImage(userId, 'back', backImage)

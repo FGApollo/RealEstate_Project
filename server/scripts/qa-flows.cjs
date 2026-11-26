@@ -188,7 +188,7 @@ async function kycDuplicate() {
   await db.from('users').update({ verification_status: 'UNVERIFIED' }).eq('id', a2);
   await login('agent2');
   const card = await uploadCard('agent2');
-  check('agent2 reusing an already-approved CCCD is blocked', card.json?.success === false || card.status >= 400, card.json);
+  check('agent2 reusing an already-approved CCCD is allowed', card.status === 200 && card.json?.success === true, card.json);
 }
 
 async function tinyJpegDataUrl(seed) {
