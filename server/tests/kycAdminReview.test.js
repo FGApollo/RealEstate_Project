@@ -106,3 +106,54 @@ test('admin_approve_kyc updates both tables atomically and rejects non-admins', 
   const again = await approve(10, 1);
   assert.equal(again.applied, false);
 });
+
+test('kycService.uploadCard allows reusing a CCCD idNumber already approved on another account', async (t) => {
+  const { supabase } = require('../config/supabase');
+  const ocrService = require('../services/ocrService');
+  const kycService = require('../services/kycService');
+
+  t.mock.method(ocrService, 'analyzeCitizenId', async () => ({
+    isValid: true,
+    data: { idNumber: '042083009480', fullName: 'NGUYEN VAN TEST', dob: '01/01/1990' },
+    warnings: []
+  }));
+  t.mock.method(supabase.storage, 'from', () => ({
+    upload: async () => ({ data: { path: 'kyc/22/mock.jpg' }, error: null })
+  }));
+  t.mock.method(supabase, 'from', (table) => {
+    if (table === 'users') {
+      return {
+        select: () => ({ eq: () => ({ single: async () => ({ data: { id: 22, verification_status: 'UNVERIFIED' }, error: null }) }) }),
+        update: () => ({ eq: async () => ({ error: null }) })
+      };
+    }
+    if (table === 'identity_verifications') {
+      return {
+        select: () => ({
+          eq: () => ({
+            eq: () => ({
+              order: () => ({
+                limit: () => ({ maybeSingle: async () => ({ data: null, error: null }) })
+              })
+            })
+          })
+        }),
+        insert: (row) => ({
+          select: () => ({ single: async () => ({ data: { id: 99, ...row }, error: null }) })
+        })
+      };
+    }
+    throw new Error(`Unexpected table: ${table}`);
+  });
+
+  const res = await kycService.uploadCard({
+    userId: 22,
+    fullName: 'Nguyen Van Test',
+    phone: '0901234567',
+    frontImage: { buffer: Buffer.from('front'), mimetype: 'image/jpeg' },
+    backImage: { buffer: Buffer.from('back'), mimetype: 'image/jpeg' }
+  });
+  assert.equal(res.success, true);
+  assert.equal(res.nextStep, 'SELFIE');
+  assert.equal(res.data.idNumber, '042083009480');
+});
