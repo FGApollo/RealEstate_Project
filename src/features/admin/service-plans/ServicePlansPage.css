@@ -9,6 +9,22 @@
 .service-page-heading h1 { font-size: clamp(25px, 2.3vw, 32px); letter-spacing: -.8px; margin: 8px 0 10px; font-weight: 800; }
 .service-page-heading p { color: #6c82a4; font-size: 14px; line-height: 1.6; margin: 0; }
 .service-heading-actions { display: flex; gap: 10px; flex-wrap: wrap; padding-top: 8px; }
+.service-audience-tabs { display: inline-flex; gap: 8px; flex-wrap: wrap; padding: 6px; margin-bottom: 20px; background: #fff; border: 1px solid #e0e8f5; border-radius: 13px; box-shadow: 0 3px 12px #15397006; }
+.service-plans-page .service-audience-tab { border: 0; background: transparent; color: #5f7596; padding: 10px 16px; border-radius: 9px; font-size: 13px; }
+.service-plans-page .service-audience-tab:hover { background: #f2f7ff; color: #1d4ed8; }
+.service-plans-page .service-audience-tab.active { background: #2563eb; color: #fff; box-shadow: 0 3px 10px #2563eb2b; }
+.plus-preview-card { border: 1px solid #dbe6fa; border-radius: 14px; padding: 20px; background: #f9fbff; margin-top: 10px; }
+.plus-preview-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.plus-preview-head h3 { margin: 0 0 6px; font-size: 18px; }
+.plus-preview-price { margin: 0; color: #102646; }
+.plus-preview-price strong { font-size: 24px; letter-spacing: -.5px; }
+.plus-preview-price span { color: #6c82a4; font-size: 13px; margin-left: 4px; }
+.plus-preview-benefits { list-style: none; padding: 0; margin: 0 0 16px; display: grid; gap: 10px; }
+.plus-preview-benefits li { display: flex; align-items: flex-start; gap: 10px; color: #2a456c; }
+.plus-preview-benefits li svg { color: #059669; flex-shrink: 0; margin-top: 2px; }
+.plus-preview-benefits strong { display: block; font-size: 13px; margin-bottom: 2px; }
+.plus-preview-benefits p { margin: 0; color: #6c82a4; font-size: 12px; line-height: 1.5; }
+.plus-preview-btn { width: 100%; }
 .service-summary { display: grid; grid-template-columns: 1fr 1fr 1.3fr; gap: 14px; margin-bottom: 22px; }
 .service-summary article { display: flex; gap: 13px; align-items: center; padding: 20px; background: #fff; border: 1px solid #e0e8f5; border-radius: 16px; box-shadow: 0 5px 22px #15397004; }
 .service-summary-icon { flex-shrink: 0; background: #ecf4ff; color: #2673ff; padding: 12px; display: flex; border-radius: 13px; }

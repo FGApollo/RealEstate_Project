@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import Header from '../components/Header';
 import { billingDate, billingDay, billingMoney, openCheckout, paymentStatus } from '../features/agent/pricing/billingApi';
-import { PLUS_BENEFITS, createPlusPayment, fetchPlusCatalog, fetchPlusPayments } from '../features/plus/plusApi';
+import { getPlusBenefits, createPlusPayment, fetchPlusCatalog, fetchPlusPayments } from '../features/plus/plusApi';
 import PlusCrownIcon from '../features/plus/PlusCrownIcon';
 import plusCrownArt from '../assets/plus-crown-art.webp';
 import './Plus.css';
@@ -117,7 +117,7 @@ const PlusPlanView = ({ plan, plus, checkout, busy, onBuy, onBackToOwned }) => {
             <div className="plus-card-divider" />
 
             <ul className="plus-benefits">
-              {PLUS_BENEFITS.map((item) => (
+              {getPlusBenefits(plan?.duration_months).map((item) => (
                 <li key={item.title}>
                   <span className="plus-benefit-check" aria-hidden="true"><Check size={13} strokeWidth={3} /></span>
                   <div>
@@ -136,8 +136,12 @@ const PlusPlanView = ({ plan, plus, checkout, busy, onBuy, onBackToOwned }) => {
 
         <button type="button" className="plus-buy" onClick={onBuy} disabled={busy || !plan || checkout?.available === false}>
           {busy ? <Loader2 size={18} className="plus-spin" /> : <CreditCard size={18} />}
-          <span>{plus?.active ? 'Gia hạn thêm 1 tháng' : 'Đăng ký Plus'}</span>
+          <span>{plus?.active ? `Gia hạn thêm ${durationLabel}` : 'Đăng ký Plus'}</span>
         </button>
+
+        {!plan && (
+          <p className="plus-note plus-note-center">Gói Swipe Nest Plus hiện đang tạm ngừng đăng ký mới.</p>
+        )}
 
         {checkout?.available === false && (
           <p className="plus-note plus-note-center">{checkout.reason || 'Thanh toán payOS chưa sẵn sàng.'}</p>

@@ -13,6 +13,9 @@ router.use(authenticate, requireRole('ADMIN'));
 router.get('/service-plans', rateLimiters.read, adminPlanController.catalog);
 router.get('/service-plans/history', rateLimiters.read, adminPlanController.history);
 router.post('/service-plans/paid', rateLimiters.write, adminPlanController.change);
+router.get('/service-plans/user', rateLimiters.read, adminPlanController.userCatalog);
+router.get('/service-plans/user/history', rateLimiters.read, adminPlanController.userHistory);
+router.post('/service-plans/user/paid', rateLimiters.write, adminPlanController.changeUserPlan);
 // Gói của một môi giới cụ thể: tra cứu (?id= hoặc ?email=), cấp, đổi hạng kỳ đang chạy, gỡ.
 router.get('/agents/subscription', rateLimiters.read, adminPlanController.agentSubscription);
 router.post('/agents/:agentId/subscription/grant', rateLimiters.write, adminPlanController.grantAgentPlan);

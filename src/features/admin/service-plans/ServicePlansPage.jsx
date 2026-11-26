@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowRight, BriefcaseBusiness, Check, Clock3, CreditCard, Eye, History, Info, Pencil, RefreshCw, ShieldCheck, TriangleAlert } from 'lucide-react';
+import { ArrowRight, BriefcaseBusiness, Check, CheckCircle2, Clock3, CreditCard, Crown, Eye, History, Info, Pencil, RefreshCw, ShieldCheck, TriangleAlert, Users } from 'lucide-react';
 import { billingRequest, billingMoney, billingDate } from '../../agent/pricing/billingApi';
 import ServicePlanCards from '../../agent/pricing/ServicePlanCards';
 import PlanDialog from '../../agent/pricing/PlanDialog';
+import { getPlusBenefits } from '../../plus/plusApi';
 import '../../agent/pricing/AgentPricing.css';
 import './ServicePlansPage.css';
 
-const endpoint = '/api/admin/service-plans';
+const ENDPOINTS = {
+  AGENT: '/api/admin/service-plans',
+  USER: '/api/admin/service-plans/user'
+};
 const actionNames = { UPDATED: 'Cập nhật ngay', SCHEDULED: 'Lên lịch', APPLIED: 'Đã áp dụng lịch', CANCELLED: 'Hủy lịch' };
 const amountLabel = plan => plan.price_kind === 'CONTACT' ? 'Liên hệ' : billingMoney(plan.amount_vnd);
 const initialDraft = plan => ({ amount: String(plan.amount_vnd), durationMonths: plan.duration_months, active: plan.active,
@@ -18,7 +22,7 @@ const vietnamDate = value => {
   return parsed.toISOString();
 };
 
-function PlanEditor({ plan, pending, onSaved }) {
+function PlanEditor({ endpoint, audience, plan, pending, onSaved }) {
   const [draft, setDraft] = useState(() => initialDraft(plan));
   const [confirmation, setConfirmation] = useState(null);
   const [error, setError] = useState('');
@@ -53,8 +57,9 @@ function PlanEditor({ plan, pending, onSaved }) {
       if (err.status === 409) request.current = null;
     } finally { setBusy(false); }
   };
+  const targetLabel = audience === 'USER' ? 'người dùng (Plus)' : 'Agent';
   return <section className="service-panel service-editor" aria-label={`Cấu hình ${plan.name}`}>
-    <div className="service-panel-head"><div><h2>{readOnly ? 'Cấu hình' : 'Chỉnh sửa giá'} · {plan.name}</h2><p>{readOnly ? 'Thông tin được sử dụng trên trang Agent.' : 'Quản lý giá niêm yết và thời điểm áp dụng.'}</p></div><span className="service-badge">{readOnly ? 'Chỉ xem' : 'Đang chỉnh sửa'}</span></div>
+    <div className="service-panel-head"><div><h2>{readOnly ? 'Cấu hình' : 'Chỉnh sửa giá'} · {plan.name}</h2><p>{readOnly ? `Thông tin được sử dụng trên trang ${targetLabel}.` : 'Quản lý giá niêm yết và thời điểm áp dụng.'}</p></div><span className="service-badge">{readOnly ? 'Chỉ xem' : 'Đang chỉnh sửa'}</span></div>
     <div className="service-editor-body">
       {error && <div className="service-feedback error" role="alert">{error}<span>Thông tin nhập vẫn được giữ lại. Dùng “Làm mới” để kiểm tra cấu hình mới nhất nếu có xung đột.</span></div>}
       {readOnly ? <div className="service-readonly"><span className="service-field-label">Loại gói</span><h3>{plan.name}</h3><strong>{amountLabel(plan)}</strong><p>{plan.description}</p>
@@ -78,7 +83,7 @@ function PlanEditor({ plan, pending, onSaved }) {
           <div className="service-note warning"><TriangleAlert size={18} /><span>Đơn đã tạo giữ nguyên giá đã chốt. Giao dịch đã hoàn tất và hạn dùng đã cấp được giữ nguyên.</span></div>
           <div className="service-form-actions"><button type="button" disabled={!dirty && !draft.reason} onClick={() => { setDraft(initialDraft(plan)); request.current = null; setError(''); }}>Hủy thay đổi</button><button className="service-primary" type="submit" disabled={!dirty}><Check size={17} />Lưu cấu hình mới</button></div>
         </fieldset>
-        <div className="service-mini-preview"><div><b>Xem trước trên trang Agent</b><span>GIÁ DỰ KIẾN</span></div><article><div><strong>{plan.name}</strong><small>{draft.active ? 'Đang mở đăng ký' : 'Tạm ngừng đăng ký mới'}</small></div><strong>{draft.amount ? billingMoney(Number(draft.amount)) : '—'}<small> / {draft.durationMonths} tháng</small></strong></article></div>
+        <div className="service-mini-preview"><div><b>Xem trước trên trang {audience === 'USER' ? 'Plus' : 'Agent'}</b><span>GIÁ DỰ KIẾN</span></div><article><div><strong>{plan.name}</strong><small>{draft.active ? 'Đang mở đăng ký' : 'Tạm ngừng đăng ký mới'}</small></div><strong>{draft.amount ? billingMoney(Number(draft.amount)) : '—'}<small> / {draft.durationMonths} tháng</small></strong></article></div>
       </form>}
     </div>
     {confirmation && <PlanDialog title={confirmation.action === 'CANCEL' ? 'Xác nhận hủy lịch' : 'Xác nhận thay đổi gói'} locked={busy} onClose={() => setConfirmation(null)}>
@@ -90,7 +95,7 @@ function PlanEditor({ plan, pending, onSaved }) {
   </section>;
 }
 
-function ChangeHistory({ revision }) {
+function ChangeHistory({ endpoint, revision }) {
   const [page, setPage] = useState(1);
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
@@ -101,7 +106,7 @@ function ChangeHistory({ revision }) {
       if (!controller.signal.aborted) { setData(result); setError(''); }
     }).catch(err => { if (!controller.signal.aborted) setError(err.message); });
     return () => controller.abort();
-  }, [page, revision, retry]);
+  }, [endpoint, page, revision, retry]);
   return <section className="service-panel service-history" id="service-change-history"><div className="service-panel-head"><div><h2><History size={18} />Lịch sử thay đổi</h2><p>Nhật ký thay đổi giá, lịch áp dụng và người thực hiện.</p></div></div>
     {error ? <div className="service-feedback error" role="alert">{error}<button onClick={() => setRetry(value => value + 1)}>Thử lại</button></div>
       : !data || data.page !== page ? <p className="service-loading" role="status">Đang tải lịch sử…</p> : !data.items.length ? <p className="service-loading">Chưa có thay đổi cấu hình nào được ghi nhận.</p>
@@ -110,7 +115,36 @@ function ChangeHistory({ revision }) {
   </section>;
 }
 
+function UserPlusPreview({ plan }) {
+  if (!plan) return null;
+  return (
+    <div className="plus-preview-card">
+      <div className="plus-preview-head">
+        <div>
+          <h3>{plan.name}</h3>
+          <p className="plus-preview-price">
+            <strong>{billingMoney(plan.amount_vnd)}</strong>
+            <span>/{plan.duration_months} tháng</span>
+          </p>
+        </div>
+        <span className={`service-badge ${plan.active ? '' : 'muted'}`}>
+          {plan.active ? '● Đang mở bán' : 'Tạm ngừng đăng ký'}
+        </span>
+      </div>
+      <ul className="plus-preview-benefits">
+        {getPlusBenefits(plan.duration_months).map((item) => (
+          <li key={item.title}><CheckCircle2 size={17} /><div><strong>{item.title}</strong><p>{item.text}</p></div></li>
+        ))}
+      </ul>
+      <button type="button" className="service-primary plus-preview-btn" disabled>
+        {plan.active ? 'Đăng ký Plus (Chế độ xem trước)' : 'Đang tạm ngừng đăng ký mới'}
+      </button>
+    </div>
+  );
+}
+
 export default function ServicePlansPage() {
+  const [audience, setAudience] = useState('AGENT');
   const [data, setData] = useState(null);
   const [selected, setSelected] = useState('LITE');
   const [error, setError] = useState('');
@@ -119,38 +153,85 @@ export default function ServicePlansPage() {
   const [history, setHistory] = useState(false);
   const [preview, setPreview] = useState(false);
   const controller = useRef(null);
-  const load = useCallback(async () => {
-    controller.current?.abort(); const request = new AbortController(); controller.current = request;
-    setLoading(true); setError('');
-    try { const result = await billingRequest(endpoint, { signal: request.signal }); if (!request.signal.aborted) setData(result); }
-    catch (err) { if (!request.signal.aborted) setError(err.message); }
-    finally { if (!request.signal.aborted) setLoading(false); }
-  }, []);
+  const endpoint = ENDPOINTS[audience];
+
+  const load = useCallback(async (targetAudience = audience) => {
+    controller.current?.abort();
+    const request = new AbortController();
+    controller.current = request;
+    setLoading(true);
+    setError('');
+    try {
+      const result = await billingRequest(ENDPOINTS[targetAudience], { signal: request.signal });
+      if (!request.signal.aborted) {
+        setData(result);
+        setSelected(prev => result?.plans?.some(item => item.code === prev) ? prev : (result?.plans?.[0]?.code || ''));
+      }
+    } catch (err) {
+      if (!request.signal.aborted) setError(err.message);
+    } finally {
+      if (!request.signal.aborted) setLoading(false);
+    }
+  }, [audience]);
+
   useEffect(() => {
-    const request = new AbortController(); controller.current = request;
-    billingRequest(endpoint, { signal: request.signal }).then(result => {
-      if (!request.signal.aborted) { setData(result); setError(''); }
-    }).catch(err => { if (!request.signal.aborted) setError(err.message); })
-      .finally(() => { if (!request.signal.aborted) setLoading(false); });
+    const request = new AbortController();
+    controller.current = request;
+    billingRequest(ENDPOINTS[audience], { signal: request.signal }).then(result => {
+      if (!request.signal.aborted) {
+        setData(result);
+        setSelected(result?.plans?.[0]?.code || '');
+        setError('');
+      }
+    }).catch(err => {
+      if (!request.signal.aborted) setError(err.message);
+    }).finally(() => {
+      if (!request.signal.aborted) setLoading(false);
+    });
     return () => request.abort();
-  }, []);
-  const plan = data?.plans.find(item => item.code === selected);
+  }, [audience]);
+
+  const switchAudience = (nextAudience) => {
+    if (nextAudience === audience) return;
+    setLoading(true);
+    setData(null);
+    setError('');
+    setMessage('');
+    setPreview(false);
+    setHistory(false);
+    setAudience(nextAudience);
+  };
+
+  const plan = data?.plans.find(item => item.code === selected) || data?.plans?.[0];
+
   return <div className="service-plans-page">
-    <header className="service-page-heading"><div><span className="service-eyebrow"><CreditCard size={14} />CẤU HÌNH THANH TOÁN</span><h1>Quản lý gói dịch vụ</h1><p>Quản lý bảng giá và thiết lập gói hiển thị trên trang dành cho môi giới (Agent).</p></div><div className="service-heading-actions"><button onClick={() => setHistory(value => !value)} aria-expanded={history}><History size={16} />Lịch sử thay đổi</button><button disabled={!data} onClick={() => setPreview(true)}><Eye size={16} />Xem trang Agent</button><button disabled={loading} onClick={load} aria-label="Làm mới cấu hình"><RefreshCw size={16} /></button></div></header>
+    <header className="service-page-heading"><div><span className="service-eyebrow"><CreditCard size={14} />CẤU HÌNH THANH TOÁN</span><h1>Quản lý gói dịch vụ</h1><p>Quản lý bảng giá và thiết lập gói hiển thị cho môi giới (Agent) và người dùng (Plus).</p></div><div className="service-heading-actions"><button onClick={() => setHistory(value => !value)} aria-expanded={history}><History size={16} />Lịch sử thay đổi</button><button disabled={!data} onClick={() => setPreview(true)}><Eye size={16} />{audience === 'USER' ? 'Xem trang Plus' : 'Xem trang Agent'}</button><button disabled={loading} onClick={() => load(audience)} aria-label="Làm mới cấu hình"><RefreshCw size={16} /></button></div></header>
+    <div className="service-audience-tabs" role="tablist" aria-label="Loại gói dịch vụ">
+      <button type="button" role="tab" aria-selected={audience === 'AGENT'} className={`service-audience-tab${audience === 'AGENT' ? ' active' : ''}`} onClick={() => switchAudience('AGENT')}>
+        <BriefcaseBusiness size={16} /><span>Gói môi giới (Agent)</span>
+      </button>
+      <button type="button" role="tab" aria-selected={audience === 'USER'} className={`service-audience-tab${audience === 'USER' ? ' active' : ''}`} onClick={() => switchAudience('USER')}>
+        <Crown size={16} /><span>Gói người dùng (Swipe Nest Plus)</span>
+      </button>
+    </div>
     {message && <div className="service-feedback success" role="status"><Check size={18} />{message}</div>}
-    {error && <div className="service-feedback error" role="alert">{error}<button disabled={loading} onClick={load}>Thử lại</button></div>}
+    {error && <div className="service-feedback error" role="alert">{error}<button disabled={loading} onClick={() => load(audience)}>Thử lại</button></div>}
     {!data ? <div className="service-loading" role="status">{loading ? 'Đang tải cấu hình gói dịch vụ…' : 'Chưa tải được cấu hình gói dịch vụ.'}</div> : <>
-      <div className="service-summary"><article><span className="service-summary-icon"><BriefcaseBusiness size={21} /></span><div><small>Gói đang hiển thị</small><strong>{data.plans.length} gói</strong></div></article><article><span className="service-summary-icon purple"><CreditCard size={21} /></span><div><small>Gói có giá cố định</small><strong>{data.plans.filter(item => item.price_kind === 'FIXED').length} gói</strong></div></article><article><span className="service-summary-icon green"><ShieldCheck size={22} /></span><div><small>Cách áp dụng giá mới</small><strong className="service-summary-policy">Cho đơn thanh toán mới</strong></div></article></div>
+      <div className="service-summary"><article><span className="service-summary-icon">{audience === 'USER' ? <Users size={21} /> : <BriefcaseBusiness size={21} />}</span><div><small>Gói đang hiển thị</small><strong>{data.plans.length} gói</strong></div></article><article><span className="service-summary-icon purple"><CreditCard size={21} /></span><div><small>Gói có giá cố định</small><strong>{data.plans.filter(item => item.price_kind === 'FIXED').length} gói</strong></div></article><article><span className="service-summary-icon green"><ShieldCheck size={22} /></span><div><small>Cách áp dụng giá mới</small><strong className="service-summary-policy">Cho đơn thanh toán mới</strong></div></article></div>
       {loading && <p className="service-refreshing" role="status">Đang làm mới cấu hình…</p>}
-      <div className="service-workspace"><section className="service-panel service-list"><div className="service-panel-head"><div><h2>Danh sách gói dịch vụ</h2><p>Chọn Lite, Plus hoặc Pro để cập nhật giá và xem trước thay đổi.</p></div><span className="service-count">{data.plans.length} GÓI DỊCH VỤ</span></div>
-        <div className="service-plan-list">{data.plans.map(item => <button className={`service-plan-item${selected === item.code ? ' selected' : ''}`} key={item.code} onClick={() => setSelected(item.code)} aria-pressed={selected === item.code}><div><h3>{item.name}</h3><span className={`service-badge ${item.price_kind === 'FREE' ? 'muted' : item.price_kind === 'CONTACT' ? 'orange' : !item.active ? 'muted' : ''}`}>{item.price_kind === 'FREE' ? 'Miễn phí' : item.price_kind === 'CONTACT' ? 'Tư vấn riêng' : item.active ? '● Đang bán' : 'Tạm ngừng đăng ký'}</span></div><p>{item.description}</p><p>{item.listing_limit} tin công khai · {item.priority_points} điểm ưu tiên · Support {item.support_tier}</p><span className="service-plan-link">{item.price_kind === 'FIXED' ? <><Pencil size={14} />Chỉnh giá</> : <>Xem cấu hình<ArrowRight size={15} /></>}</span><div className="service-plan-price"><strong>{amountLabel(item)}</strong>{item.duration_months && <small> / {item.duration_months} tháng</small>}</div></button>)}</div>
-        <footer className="service-list-footer"><Info size={15} />Mức giá trên trang Agent được lấy từ cấu hình đã lưu.<span>Cập nhật: {billingDate(data.snapshotAt)}</span></footer>
+      <div className="service-workspace"><section className="service-panel service-list"><div className="service-panel-head"><div><h2>Danh sách gói dịch vụ</h2><p>{audience === 'USER' ? 'Chọn gói Swipe Nest Plus để cập nhật giá, chu kỳ hoặc trạng thái bán.' : 'Chọn Lite, Plus hoặc Pro để cập nhật giá và xem trước thay đổi.'}</p></div><span className="service-count">{data.plans.length} GÓI DỊCH VỤ</span></div>
+        <div className="service-plan-list">{data.plans.map(item => <button className={`service-plan-item${selected === item.code ? ' selected' : ''}`} key={item.code} onClick={() => setSelected(item.code)} aria-pressed={selected === item.code}><div><h3>{item.name}</h3><span className={`service-badge ${item.price_kind === 'FREE' ? 'muted' : item.price_kind === 'CONTACT' ? 'orange' : !item.active ? 'muted' : ''}`}>{item.price_kind === 'FREE' ? 'Miễn phí' : item.price_kind === 'CONTACT' ? 'Tư vấn riêng' : item.active ? '● Đang bán' : 'Tạm ngừng đăng ký'}</span></div><p>{item.description}</p><p>{audience === 'USER' ? 'Truy cập nguồn hàng chính thức Swipe Nest · Nhắn tin & xem liên hệ' : `${item.listing_limit} tin công khai · ${item.priority_points} điểm ưu tiên · Support ${item.support_tier}`}</p><span className="service-plan-link">{item.price_kind === 'FIXED' ? <><Pencil size={14} />Chỉnh giá</> : <>Xem cấu hình<ArrowRight size={15} /></>}</span><div className="service-plan-price"><strong>{amountLabel(item)}</strong>{item.duration_months && <small> / {item.duration_months} tháng</small>}</div></button>)}</div>
+        <footer className="service-list-footer"><Info size={15} />Mức giá trên trang {audience === 'USER' ? 'Plus người dùng' : 'Agent'} được lấy từ cấu hình đã lưu.<span>Cập nhật: {billingDate(data.snapshotAt)}</span></footer>
       </section>
-        {plan && <PlanEditor key={`${plan.code}:${plan.version ?? 0}:${data.snapshotAt}`} plan={plan} pending={data.pending.find(item => item.plan_code === plan.code)} onSaved={(result, notice) => { setData(result); setMessage(notice); setError(''); }} />}
+        {plan && <PlanEditor key={`${audience}:${plan.code}:${plan.version ?? 0}:${data.snapshotAt}`} endpoint={endpoint} audience={audience} plan={plan} pending={data.pending.find(item => item.plan_code === plan.code)} onSaved={(result, notice) => { setData(result); setMessage(notice); setError(''); }} />}
       </div>
-      {history && <ChangeHistory revision={data.snapshotAt} />}
+      {history && <ChangeHistory key={audience} endpoint={endpoint} revision={data.snapshotAt} />}
       <div className="service-footnote"><ShieldCheck size={18} /><span>Mỗi thay đổi cần xác nhận và được ghi nhật ký. Lịch đã lưu được áp dụng theo giờ Việt Nam khi mở bảng giá hoặc tạo đơn mới.</span></div>
     </>}
-    {preview && data && <PlanDialog title="Trang gói dịch vụ dành cho Agent" wide onClose={() => setPreview(false)}><p>Bản xem trước dùng cấu hình đã lưu. Các nút đăng ký bị tắt trong chế độ Admin.</p><ServicePlanCards plans={data.plans} preview /></PlanDialog>}
+    {preview && data && <PlanDialog title={audience === 'USER' ? 'Trang gói Swipe Nest Plus dành cho Người dùng' : 'Trang gói dịch vụ dành cho Agent'} wide={audience === 'AGENT'} onClose={() => setPreview(false)}>
+      {audience === 'USER'
+        ? <><p>Bản xem trước dùng cấu hình đã lưu trên trang /plus. Nút đăng ký bị tắt trong chế độ Admin.</p><UserPlusPreview plan={plan} /></>
+        : <><p>Bản xem trước dùng cấu hình đã lưu. Các nút đăng ký bị tắt trong chế độ Admin.</p><ServicePlanCards plans={data.plans} preview /></>}
+    </PlanDialog>}
   </div>;
 }

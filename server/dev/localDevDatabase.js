@@ -25,11 +25,18 @@ async function createDevDatabase() {
       created_at timestamp DEFAULT CURRENT_TIMESTAMP
     );
 
+    CREATE TABLE app_schema_migrations (
+      id text PRIMARY KEY,
+      applied_at timestamptz NOT NULL DEFAULT now(),
+      note text
+    );
+
     CREATE TABLE auth_sessions (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
       user_id integer REFERENCES users(id) ON DELETE CASCADE,
       refresh_token_hash text,
       expires_at timestamptz,
+      rotated_at timestamptz,
       revoked_at timestamptz,
       created_at timestamptz DEFAULT CURRENT_TIMESTAMP
     );
@@ -117,22 +124,24 @@ async function createDevDatabase() {
     CREATE TABLE user_billing_plans (
       code text PRIMARY KEY,
       name text NOT NULL,
-      amount_vnd numeric NOT NULL,
+      amount_vnd integer NOT NULL,
       duration_months integer DEFAULT 1,
       version integer DEFAULT 1,
-      active boolean DEFAULT true
+      active boolean DEFAULT true,
+      updated_at timestamptz NOT NULL DEFAULT now()
     );
 
     CREATE TABLE agent_billing_plans (
       code text PRIMARY KEY,
       name text NOT NULL,
-      amount_vnd numeric NOT NULL,
+      amount_vnd integer NOT NULL,
       listing_limit integer DEFAULT 10,
       priority_points integer DEFAULT 100,
       support_tier text DEFAULT 'LITE',
       duration_months integer DEFAULT 1,
       version integer DEFAULT 1,
-      active boolean DEFAULT true
+      active boolean DEFAULT true,
+      updated_at timestamptz NOT NULL DEFAULT now()
     );
 
     CREATE TABLE agent_payment_orders (
@@ -260,7 +269,136 @@ async function createDevDatabase() {
       (1, 'Nguyễn Văn Plus (Đã mua Plus)', 'plus.user@estate.test', '$2b$10$NOQO6hndtIwknCrhmnCxkuvL2h/ZEs5xsa2.1CQH7934UeYvKsqmm', 'USER', '0901111111', true, 'UNVERIFIED', 50, true, false),
       (2, 'Trần Môi Giới Pro (Đã mua gói Pro)', 'pro.agent@estate.test', '$2b$10$NOQO6hndtIwknCrhmnCxkuvL2h/ZEs5xsa2.1CQH7934UeYvKsqmm', 'AGENT', '0902222222', true, 'VERIFIED', 95, true, false),
       (3, 'Swipe Nest Official', 'swipenest.discovery.seed@estate.test', '$2b$10$NOQO6hndtIwknCrhmnCxkuvL2h/ZEs5xsa2.1CQH7934UeYvKsqmm', 'AGENT', '0903333333', true, 'VERIFIED', 100, true, true),
-      (4, 'Người Dùng Thường (Chưa mua Plus)', 'free.user@estate.test', '$2b$10$NOQO6hndtIwknCrhmnCxkuvL2h/ZEs5xsa2.1CQH7934UeYvKsqmm', 'USER', '0904444444', true, 'UNVERIFIED', 50, true, false);
+      (4, 'Người Dùng Thường (Chưa mua Plus)', 'free.user@estate.test', '$2b$10$NOQO6hndtIwknCrhmnCxkuvL2h/ZEs5xsa2.1CQH7934UeYvKsqmm', 'USER', '0904444444', true, 'UNVERIFIED', 50, true, false),
+      (5, 'Admin Swipe Nest', 'admin@estate.test', '$2b$10$NOQO6hndtIwknCrhmnCxkuvL2h/ZEs5xsa2.1CQH7934UeYvKsqmm', 'ADMIN', '0905555555', true, 'VERIFIED', 100, true, false);
+    SELECT setval(pg_get_serial_sequence('users', 'id'), (SELECT max(id) FROM users));
+
+    CREATE TABLE IF NOT EXISTS public.agent_service_packages (
+      code text PRIMARY KEY, name text NOT NULL, description text NOT NULL,
+      price_kind text NOT NULL, duration_months integer, sort_order integer NOT NULL
+    );
+    INSERT INTO public.agent_service_packages(code, name, description, price_kind, duration_months, sort_order) VALUES
+      ('LITE', 'Lite', 'Dành cho môi giới có danh mục nhỏ', 'FIXED', 1, 1),
+      ('PLUS', 'Plus', 'Mở rộng danh mục và tăng ưu tiên hiển thị', 'FIXED', 1, 2),
+      ('PRO', 'Pro', 'Danh mục lớn với ưu tiên hiển thị cao nhất', 'FIXED', 1, 3)
+    ON CONFLICT (code) DO NOTHING;
+
+    CREATE TABLE IF NOT EXISTS public.agent_plan_schedules (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      plan_code text NOT NULL REFERENCES public.agent_billing_plans(code),
+      amount_vnd integer NOT NULL, duration_months integer NOT NULL, active boolean NOT NULL,
+      effective_at timestamptz NOT NULL, status text NOT NULL DEFAULT 'SCHEDULED',
+      actor_id integer NOT NULL REFERENCES public.users(id), reason text NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now(), completed_at timestamptz
+    );
+    CREATE TABLE IF NOT EXISTS public.agent_plan_audit (
+      id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      plan_code text NOT NULL REFERENCES public.agent_billing_plans(code),
+      action text NOT NULL, actor_id integer NOT NULL REFERENCES public.users(id), actor_name text NOT NULL,
+      request_id uuid, request_payload jsonb, before_config jsonb NOT NULL, after_config jsonb NOT NULL,
+      effective_at timestamptz NOT NULL, reason text NOT NULL, created_at timestamptz NOT NULL DEFAULT now(),
+      UNIQUE (actor_id, request_id)
+    );
+    CREATE OR REPLACE FUNCTION public.assert_plan_admin(p_actor_id integer)
+    RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM public.users WHERE id = p_actor_id AND upper(role) = 'ADMIN'
+        AND is_active IS TRUE AND email_verified_at IS NOT NULL) THEN
+        RAISE EXCEPTION 'Admin required' USING ERRCODE = '42501';
+      END IF;
+    END; $$;
+    CREATE OR REPLACE FUNCTION public.apply_due_agent_plan_changes()
+    RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+    DECLARE v_plan public.agent_billing_plans%ROWTYPE; v_schedule public.agent_plan_schedules%ROWTYPE;
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM public.agent_plan_schedules WHERE status = 'SCHEDULED' AND effective_at <= now()) THEN RETURN; END IF;
+      FOR v_plan IN SELECT * FROM public.agent_billing_plans ORDER BY code FOR UPDATE LOOP
+        SELECT * INTO v_schedule FROM public.agent_plan_schedules
+          WHERE plan_code = v_plan.code AND status = 'SCHEDULED' AND effective_at <= now() FOR UPDATE;
+        IF FOUND THEN
+          UPDATE public.agent_billing_plans SET amount_vnd = v_schedule.amount_vnd, duration_months = v_schedule.duration_months,
+            active = v_schedule.active, version = version + 1, updated_at = now() WHERE code = v_plan.code;
+          UPDATE public.agent_plan_schedules SET status = 'APPLIED', completed_at = now() WHERE id = v_schedule.id;
+          INSERT INTO public.agent_plan_audit(plan_code, action, actor_id, actor_name, before_config, after_config, effective_at, reason)
+            SELECT v_plan.code, 'APPLIED', v_schedule.actor_id, coalesce(u.name, 'Admin'), to_jsonb(v_plan),
+              jsonb_build_object('amount_vnd', v_schedule.amount_vnd, 'duration_months', v_schedule.duration_months, 'active', v_schedule.active),
+              v_schedule.effective_at, v_schedule.reason FROM public.users u WHERE u.id = v_schedule.actor_id;
+        END IF;
+      END LOOP;
+    END; $$;
+    CREATE OR REPLACE FUNCTION public.agent_service_catalog()
+    RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+    DECLARE v_plans jsonb;
+    BEGIN
+      PERFORM public.apply_due_agent_plan_changes();
+      SELECT coalesce(jsonb_agg(jsonb_build_object('code', b.code, 'name', b.name, 'description', c.description,
+        'price_kind', 'FIXED', 'amount_vnd', b.amount_vnd, 'duration_months', b.duration_months, 'active', b.active, 'version', b.version,
+        'listing_limit', b.listing_limit, 'priority_points', b.priority_points, 'support_tier', b.support_tier) ORDER BY c.sort_order), '[]'::jsonb)
+        INTO v_plans FROM public.agent_billing_plans b JOIN public.agent_service_packages c USING(code) WHERE b.code IN ('LITE', 'PLUS', 'PRO');
+      RETURN jsonb_build_object('plans', v_plans, 'snapshotAt', now());
+    END; $$;
+    CREATE OR REPLACE FUNCTION public.admin_agent_plan_catalog(p_actor_id integer)
+    RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+    DECLARE v_catalog jsonb; v_pending jsonb;
+    BEGIN
+      PERFORM public.assert_plan_admin(p_actor_id);
+      v_catalog := public.agent_service_catalog();
+      SELECT coalesce(jsonb_agg(to_jsonb(s) ORDER BY effective_at), '[]'::jsonb) INTO v_pending
+        FROM public.agent_plan_schedules s WHERE status = 'SCHEDULED';
+      RETURN v_catalog || jsonb_build_object('pending', v_pending);
+    END; $$;
+    CREATE OR REPLACE FUNCTION public.admin_change_agent_plan(
+      p_actor_id integer, p_request_id uuid, p_expected_version integer, p_amount integer, p_duration integer, p_active boolean,
+      p_effective_at timestamptz, p_reason text, p_action text DEFAULT 'SAVE', p_plan_code text DEFAULT NULL)
+    RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+    DECLARE v_plan public.agent_billing_plans%ROWTYPE; v_previous public.agent_plan_audit%ROWTYPE;
+      v_schedule public.agent_plan_schedules%ROWTYPE; v_payload jsonb; v_after jsonb; v_action text; v_actor_name text;
+    BEGIN
+      PERFORM public.assert_plan_admin(p_actor_id);
+      IF p_plan_code IS NULL OR p_plan_code NOT IN ('LITE', 'PLUS', 'PRO') THEN RAISE EXCEPTION 'Invalid plan' USING ERRCODE = '22023'; END IF;
+      PERFORM public.apply_due_agent_plan_changes();
+      SELECT * INTO STRICT v_plan FROM public.agent_billing_plans WHERE code = p_plan_code FOR UPDATE;
+      v_payload := jsonb_build_object('planCode', p_plan_code, 'expectedVersion', p_expected_version, 'amount', p_amount,
+        'duration', p_duration, 'active', p_active, 'effectiveAt', p_effective_at, 'reason', p_reason, 'action', p_action);
+      SELECT * INTO v_previous FROM public.agent_plan_audit WHERE actor_id = p_actor_id AND request_id = p_request_id;
+      IF FOUND THEN
+        IF v_previous.request_payload IS DISTINCT FROM v_payload THEN RAISE EXCEPTION 'Request reused' USING ERRCODE = '23505'; END IF;
+        RETURN public.admin_agent_plan_catalog(p_actor_id);
+      END IF;
+      IF p_expected_version IS DISTINCT FROM v_plan.version THEN RAISE EXCEPTION 'Stale plan' USING ERRCODE = '40001'; END IF;
+      SELECT * INTO v_schedule FROM public.agent_plan_schedules WHERE plan_code = p_plan_code AND status = 'SCHEDULED' FOR UPDATE;
+      IF p_action = 'CANCEL' THEN
+        IF v_schedule.id IS NULL THEN RAISE EXCEPTION 'No pending schedule' USING ERRCODE = '23505'; END IF;
+        UPDATE public.agent_plan_schedules SET status = 'CANCELLED', completed_at = now() WHERE id = v_schedule.id;
+        v_action := 'CANCELLED'; v_after := to_jsonb(v_plan);
+      ELSE
+        IF v_schedule.id IS NOT NULL THEN RAISE EXCEPTION 'Cancel existing schedule first' USING ERRCODE = '23505'; END IF;
+        v_after := jsonb_build_object('amount_vnd', p_amount, 'duration_months', p_duration, 'active', p_active);
+        IF p_effective_at IS NOT NULL THEN
+          INSERT INTO public.agent_plan_schedules(plan_code, amount_vnd, duration_months, active, effective_at, actor_id, reason)
+            VALUES(p_plan_code, p_amount, p_duration, p_active, p_effective_at, p_actor_id, btrim(p_reason));
+          v_action := 'SCHEDULED';
+        ELSE
+          UPDATE public.agent_billing_plans SET amount_vnd = p_amount, duration_months = p_duration, active = p_active WHERE code = p_plan_code;
+          v_action := 'UPDATED';
+        END IF;
+      END IF;
+      UPDATE public.agent_billing_plans SET version = version + 1, updated_at = now() WHERE code = p_plan_code;
+      SELECT coalesce(name, 'Admin') INTO v_actor_name FROM public.users WHERE id = p_actor_id;
+      INSERT INTO public.agent_plan_audit(plan_code, action, actor_id, actor_name, request_id, request_payload, before_config, after_config, effective_at, reason)
+        VALUES(p_plan_code, v_action, p_actor_id, v_actor_name, p_request_id, v_payload, to_jsonb(v_plan), v_after, coalesce(p_effective_at, now()), btrim(p_reason));
+      RETURN public.admin_agent_plan_catalog(p_actor_id);
+    END; $$;
+    CREATE OR REPLACE FUNCTION public.admin_agent_plan_history(p_actor_id integer, p_page integer DEFAULT 1, p_limit integer DEFAULT 10)
+    RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+    DECLARE v_items jsonb; v_total bigint;
+    BEGIN
+      PERFORM public.assert_plan_admin(p_actor_id);
+      SELECT count(*) INTO v_total FROM public.agent_plan_audit;
+      SELECT coalesce(jsonb_agg(to_jsonb(a) - 'request_payload' - 'request_id' ORDER BY created_at DESC, id DESC), '[]'::jsonb) INTO v_items
+        FROM (SELECT * FROM public.agent_plan_audit ORDER BY created_at DESC, id DESC LIMIT p_limit OFFSET (p_page - 1) * p_limit) a;
+      RETURN jsonb_build_object('items', v_items, 'total', v_total, 'page', p_page, 'limit', p_limit);
+    END; $$;
 
     -- User 1 active Plus subscription & order history
     INSERT INTO user_subscriptions (user_id, plan_code, source, start_date, end_date, status)
@@ -276,6 +414,9 @@ async function createDevDatabase() {
     INSERT INTO agent_payment_orders (order_code, user_id, plan_code, amount_vnd, audience, status)
     VALUES (100002, 2, 'PRO', 1000000, 'AGENT', 'PAID');
   `);
+
+  // Áp dụng migration 030 thật để dev server dùng đúng các hàm quản lý giá gói người dùng.
+  await db.exec(fs.readFileSync(path.join(__dirname, '../db-migration/030-admin-user-plus-pricing.sql'), 'utf8'));
 
   // Seed fixtures
   const fixtures = buildFixtures();
