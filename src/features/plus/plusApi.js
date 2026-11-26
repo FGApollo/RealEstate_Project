@@ -14,7 +14,12 @@ export const createPlusPayment = (plan) => billingRequest('/api/plus/payments', 
   body: { planCode: plan.code, planVersion: plan.version, requestId: crypto.randomUUID() }
 });
 
-export const PLUS_BENEFITS = [
-  { title: 'Tiếp cận nguồn hàng Swipe Nest', text: 'Xem toàn bộ nguồn hàng do đội Swipe Nest đăng ở mục riêng trên trang chủ, nhắn tin và xem liên hệ trực tiếp.' },
-  { title: 'Không tự gia hạn', text: 'Mỗi lần thanh toán là 1 tháng. Mua thêm thì cộng dồn sau ngày hết hạn hiện tại.' }
-];
+export const getPlusBenefits = (durationMonths = 1) => {
+  const months = Number.isInteger(Number(durationMonths)) && Number(durationMonths) > 0 ? Number(durationMonths) : 1;
+  return [
+    { title: 'Tiếp cận nguồn hàng Swipe Nest', text: 'Xem toàn bộ nguồn hàng do đội Swipe Nest đăng ở mục riêng trên trang chủ, nhắn tin và xem liên hệ trực tiếp.' },
+    { title: 'Không tự gia hạn', text: `Mỗi lần thanh toán là ${months} tháng. Mua thêm thì cộng dồn sau ngày hết hạn hiện tại.` }
+  ];
+};
+
+export const PLUS_BENEFITS = getPlusBenefits(1);

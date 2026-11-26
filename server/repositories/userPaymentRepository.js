@@ -15,6 +15,14 @@ module.exports = {
   DEFAULT_PLANS,
   async plans() {
     try {
+      const rpcResp = await supabase.rpc('user_service_catalog', {});
+      if (!rpcResp.error && Array.isArray(rpcResp.data?.plans)) {
+        return rpcResp.data.plans;
+      }
+    } catch {
+      // Fallback to direct table read when migration 029 RPC is not yet installed.
+    }
+    try {
       const response = await supabase.from('user_billing_plans')
         .select('code, name, amount_vnd, duration_months, version').eq('active', true).order('amount_vnd');
       if (response.error) {

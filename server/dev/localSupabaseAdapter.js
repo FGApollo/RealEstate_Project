@@ -32,10 +32,6 @@ async function attachLocalSupabase(supabase) {
       }
       return { data: { active: false, current_end: null, periods: [] }, error: null };
     }
-    if (name === 'agent_service_catalog') {
-      const plans = (await db.query('SELECT * FROM agent_billing_plans WHERE active = true ORDER BY amount_vnd')).rows;
-      return { data: { plans }, error: null };
-    }
     if (name === 'agent_subscription_state') {
       const sub = (await db.query(`SELECT * FROM seller_subscriptions WHERE user_id = $1 AND status = 'ACTIVE' LIMIT 1`, [args.p_user_id])).rows[0];
       if (!sub) return { data: null, error: null };
