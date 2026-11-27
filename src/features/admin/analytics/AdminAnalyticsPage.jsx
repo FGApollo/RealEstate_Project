@@ -196,27 +196,13 @@ function RevenueAnalytics({ revenue, packages, bucket, comparison, onComparisonC
   </section>;
 }
 
-function AnalyticsDefinitions({ users, subscriptions }) {
-  return <details className="analytics-definitions"><summary>Quy tắc tính và giới hạn dữ liệu</summary>
-    <p>Tổng tài khoản gồm mọi role và cả tài khoản is_active=false. USER và AGENT là role hiện tại của tài khoản; tỷ lệ chỉ tính trên hai nhóm này. is_active=false là vô hiệu hóa, không suy ra nguyên nhân khóa. Tăng trưởng tổng tài khoản so với đầu kỳ; đăng ký mới so với kỳ liền trước có cùng số ngày. Kỳ trước bằng 0 hiển thị không có tỷ lệ.</p>
-    <p>“Đang sử dụng gói dịch vụ” đếm Agent có gói đang hoạt động, đã bắt đầu và còn hạn tại mốc chốt; bao gồm gói dùng thử và gói trả phí. Mỗi Agent được tính một lần, chọn gói có ngày bắt đầu mới nhất, sau đó ngày tạo và ID mới nhất. Bao gồm Agent bị vô hiệu hóa vì hiệu lực gói và quyền truy cập tài khoản là hai chỉ số riêng.</p>
-    <p>“Chưa đăng ký gói dịch vụ” đếm Agent chưa từng có bản ghi đăng ký tính đến mốc chốt. “Hiện không sử dụng gói” gồm cả nhóm này và Agent đã đăng ký nhưng hiện chưa có gói đang hoạt động, đã bắt đầu và còn hạn. “Hết hạn / hủy” là tổng số lượt đăng ký đã hết hạn hoặc đã hủy tại mốc chốt; một Agent có thể có nhiều lượt.</p>
-    <p>Thống kê gói dựa trên bản ghi đăng ký đã xuất hiện trong DB. Gia hạn cập nhật hạn dùng của gói hiện tại; các lần thanh toán được lưu riêng trong sổ payOS. Giá gói không phải chứng từ thanh toán. Bộ lọc quá khứ dùng ngày tạo/hạn dùng và role/status hiện tại, không tái dựng toàn bộ lịch sử đổi trạng thái.</p>
-    <p>Ngày kết thúc được tính trọn ngày Việt Nam, kỳ hiện tại chốt tại thời điểm cập nhật. Timestamp cũ được đọc là UTC. Bản ghi thiếu ngày vẫn có thể nằm trong tổng nhưng không nằm trong biểu đồ đăng ký; gói thiếu ngày bắt đầu/kết thúc không được tính hiệu lực. Thiếu ngày: {number(users.unknownDates)} tài khoản, {number(subscriptions.unknownDates)} đăng ký.</p>
-    <p>“Đang sử dụng gói Plus” đếm tài khoản khách hàng (role USER) có kỳ Plus đang hoạt động và còn hạn tại mốc chốt (gồm cả mua qua payOS và Admin cấp). Nếu khách hàng có nhiều kỳ cộng dồn nối tiếp, khách hàng được tính một lần với ngày hết hạn là mốc kết thúc của kỳ cuối cùng đang hoạt động.</p>
-    <p>Doanh thu dùng ngày thanh toán xác thực và số tiền gốc bằng VND trong sổ payOS; PENDING/FAILED/CANCELLED không tính. Webhook lặp không ghi nhận trùng. Không suy ra thanh toán từ gói cũ. Chưa đối soát hoàn tiền nên chỉ công bố doanh thu gộp; tiền hoàn và doanh thu sau hoàn chưa có dữ liệu.</p>
-  </details>;
-}
-
 function DashboardContent({ data, section, onNavigate, userMetric, onUserMetricChange, comparison, onComparisonChange, revision, onRefresh }) {
   return <>
-    <p className="analytics-scope">Mốc chốt: {dateTime(data.snapshotAt)} · Trong kỳ: {data.filters.start} → {data.filters.end} · Giờ Việt Nam (UTC+7). Tài khoản và gói được phân loại theo vai trò, trạng thái hiện tại.</p>
     {section === 'overview' && <OverviewAnalytics data={data} onNavigate={onNavigate} />}
     {section === 'users' && <UserAnalytics data={data} metric={userMetric} onMetricChange={onUserMetricChange} />}
     {section === 'subscriptions' && <SubscriptionAnalytics subscriptions={data.subscriptions} packages={data.packages} plusSubscriptions={data.plusSubscriptions} snapshotAt={data.snapshotAt} onRefresh={onRefresh} Kpi={Kpi} Panel={Panel} />}
     {section === 'revenue' && <RevenueAnalytics revenue={data.revenue} packages={data.packages} bucket={data.filters.bucket} comparison={comparison} onComparisonChange={onComparisonChange} />}
     {section === 'transactions' && <PaymentTransactions filters={data.filters.preset === 'custom' ? { preset: 'custom', start: data.filters.start, end: data.filters.end, bucket: data.filters.bucket } : { preset: data.filters.preset, bucket: data.filters.bucket }} revision={revision} />}
-    <AnalyticsDefinitions users={data.users} subscriptions={data.subscriptions} />
   </>;
 }
 

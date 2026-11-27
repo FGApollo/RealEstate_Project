@@ -236,7 +236,7 @@ const OverviewDashboard = ({
               <div className="stat-icon views-icon">
                 <Eye size={24} />
               </div>
-              <div className="stat-label">Tổng số khách đã xem</div>
+              <div className="stat-label">Tổng số lượt xem</div>
               <div className="stat-value">{loading ? '-' : data.totalViews}</div>
               <div className="stat-trend">Cập nhật lúc {new Date().toLocaleTimeString()}</div>
             </div>
@@ -245,7 +245,7 @@ const OverviewDashboard = ({
               <div className="stat-icon favorites-icon">
                 <Heart size={24} />
               </div>
-              <div className="stat-label">Tổng số khách yêu thích</div>
+              <div className="stat-label">Tổng lượt yêu thích</div>
               <div className="stat-value">{loading ? '-' : data.totalFavorites}</div>
               <div className="stat-trend">Cập nhật lúc {new Date().toLocaleTimeString()}</div>
             </div>
