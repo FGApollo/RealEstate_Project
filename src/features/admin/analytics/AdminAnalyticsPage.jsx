@@ -16,7 +16,7 @@ const SECTIONS = [
   { id: 'overview', label: 'Tổng quan', icon: LayoutDashboard, title: 'Tổng quan hệ thống', description: 'Theo dõi những chỉ số chính về hoạt động của Swipe Nest.' },
   { id: 'users', label: 'Người dùng', icon: Users, title: 'Thống kê người dùng', description: 'Theo dõi tài khoản, khách hàng, môi giới và số lượt đăng ký mới.' },
   { id: 'subscriptions', label: 'Gói dịch vụ', icon: BriefcaseBusiness, title: 'Gói dịch vụ', description: 'Theo dõi gói dịch vụ môi giới và gói Swipe Nest Plus của khách hàng.' },
-  { id: 'revenue', label: 'Doanh thu', icon: Wallet, title: 'Thống kê doanh thu', description: 'Theo dõi doanh thu thực thu, tiền hoàn và hiệu quả của từng gói.' },
+  { id: 'revenue', label: 'Doanh thu', icon: Wallet, title: 'Thống kê doanh thu', description: 'Theo dõi doanh thu đã xác minh qua payOS và hiệu quả của từng gói.' },
   { id: 'transactions', label: 'Giao dịch', icon: ReceiptText, title: 'Lịch sử giao dịch', description: 'Tra cứu các giao dịch thanh toán đã được ghi nhận trong hệ thống.' }
 ];
 const USER_SERIES = {
@@ -172,19 +172,17 @@ function UserAnalytics({ data, metric, onMetricChange }) {
 function RevenueAnalytics({ revenue, packages, bucket, comparison, onComparisonChange }) {
   return <section className="analytics-section" aria-labelledby="analytics-revenue-title">
     <h2 id="analytics-revenue-title"><Wallet size={20} /> Thống kê doanh thu</h2>
-    <div className="analytics-notice"><Info size={20} /><div><strong>{revenue.available ? 'Doanh thu đã xác minh qua payOS' : revenue.reason}</strong><p>{revenue.available ? `${revenue.coverage} Chưa tích hợp đối soát hoàn tiền; số tiền hoàn và doanh thu sau hoàn được để trống.` : 'Hệ thống chưa có sổ giao dịch thanh toán và hoàn tiền được xác thực. Giá gói và trạng thái đăng ký không được dùng để tính doanh thu.'}</p></div></div>
+    <div className="analytics-notice"><Info size={20} /><div><strong>{revenue.available ? 'Doanh thu đã xác minh qua payOS' : revenue.reason}</strong><p>{revenue.available ? revenue.coverage : 'Hệ thống chưa có sổ giao dịch thanh toán được xác thực. Giá gói và trạng thái đăng ký không được dùng để tính doanh thu.'}</p></div></div>
     <div className="analytics-kpis">
       <Kpi icon={Wallet} label="Tổng đã thanh toán" value={revenue.totalGross} moneyValue detail="Doanh thu gộp, toàn bộ lịch sử" />
       <Kpi icon={CalendarDays} label="Doanh thu tháng hiện tại" value={revenue.currentMonthGross} moneyValue detail="Theo ngày thanh toán, giờ Việt Nam" />
       <Kpi icon={TrendingUp} label="Doanh thu trong kỳ" value={revenue.periodGross} moneyValue detail="Doanh thu gộp của khoảng đã chọn" growth={revenue.growthPercent} />
       <Kpi icon={BadgeCheck} label="Giao dịch thành công" value={revenue.successfulTransactions} detail="Chỉ giao dịch đã xác thực thanh toán" />
       <Kpi icon={Wallet} label="Giá trị giao dịch trung bình" value={revenue.averageTransaction} moneyValue detail="Doanh thu gộp kỳ / giao dịch thành công kỳ" />
-      <Kpi icon={RefreshCw} label="Số tiền hoàn trong kỳ" value={revenue.periodRefunds} moneyValue detail="Theo ngày hoàn tiền thực tế" />
-      <Kpi icon={Wallet} label="Doanh thu sau hoàn tiền" value={revenue.periodNet} moneyValue detail="Doanh thu gộp kỳ − hoàn tiền trong kỳ" />
     </div>
     <div className="analytics-grid">
       <Panel title="Xu hướng doanh thu" subtitle="VND · theo ngày thanh toán · cùng khoảng thời gian đã chọn" wide>
-        {revenue.available ? <TrendChart data={revenue.trend} series={revenue.refundsAvailable ? [{ key: 'gross', name: 'Doanh thu gộp' }, { key: 'net', name: 'Sau hoàn tiền' }] : [{ key: 'gross', name: 'Doanh thu gộp' }]} bucket={bucket} currency /> : <Empty>{revenue.reason}</Empty>}
+        {revenue.available ? <TrendChart data={revenue.trend} series={[{ key: 'gross', name: 'Doanh thu gộp' }]} bucket={bucket} currency /> : <Empty>{revenue.reason}</Empty>}
       </Panel>
       <Panel title="So sánh doanh thu" subtitle={comparison === 'subscriptions' ? 'Số lượt đăng ký trong kỳ' : 'VND · doanh thu gộp trong kỳ'} action={<select aria-label="Loại so sánh" value={comparison} onChange={(event) => onComparisonChange(event.target.value)}><option value="package">Theo gói dịch vụ</option><option value="month">Theo tháng</option><option value="subscriptions">Số lượt đăng ký theo gói</option></select>}>
         {comparison === 'subscriptions' ? <ComparisonChart data={packages} dataKey="newSubscriptions" label="Lượt đăng ký" /> : revenue.available ? <ComparisonChart data={comparison === 'month' ? revenue.monthly : revenue.byPackage} dataKey="gross" label="Doanh thu (VND)" currency /> : <Empty>{revenue.reason}</Empty>}
