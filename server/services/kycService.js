@@ -47,7 +47,7 @@ const debugField = (faceResult) => {
 const ensureUserCanUseKyc = async (userId) => {
   const { data: user, error } = await supabase
     .from('users')
-    .select('id, verification_status')
+    .select('id, verification_status, phone')
     .eq('id', userId)
     .single();
 
@@ -319,7 +319,10 @@ const updateUserVerificationStatus = async (userId, status) => {
 };
 
 const uploadCard = async ({ userId, fullName, phone, frontImage, backImage }) => {
-  await ensureUserCanUseKyc(userId);
+  const user = await ensureUserCanUseKyc(userId);
+  const resolvedPhone = (typeof user.phone === 'string' && user.phone.trim())
+    ? user.phone.trim()
+    : (typeof phone === 'string' && phone.trim() ? phone.trim() : null);
 
   const ocrResult = await ocrService.analyzeCitizenId(frontImage.buffer, backImage.buffer);
   if (!ocrResult.isValid) {
@@ -347,7 +350,7 @@ const uploadCard = async ({ userId, fullName, phone, frontImage, backImage }) =>
   const mergedOcrData = {
     ...ocrData,
     fullName: ocrName || declaredName || null,
-    phone: phone || null,
+    phone: resolvedPhone,
     ocrPassed: Boolean(ocrResult.isValid)
   };
 
@@ -356,7 +359,7 @@ const uploadCard = async ({ userId, fullName, phone, frontImage, backImage }) =>
     fullName: ocrName || declaredName,
     declaredName,
     nameMismatch,
-    phone,
+    phone: resolvedPhone,
     frontImageUrl: uploadedFront.url,
     backImageUrl: uploadedBack.url,
     ocrData: mergedOcrData,

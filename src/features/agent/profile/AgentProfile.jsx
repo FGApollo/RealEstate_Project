@@ -15,6 +15,12 @@ import PropertyDetailModal from '../../../components/PropertyDetailModal';
 import DeleteConfirmModal from '../overview/DeleteConfirmModal';
 import TrustScoreBonusModal from './TrustScoreBonusModal';
 import KycCameraModal from './KycCameraModal';
+import {
+  resolveKycPhoneState,
+  getEffectiveKycPhone,
+  isKycPhoneAlreadyVerified
+} from './kycPhoneLogic';
+import { normalizeVietnamPhone } from '../../../auth/registrationValidation';
 import './AgentProfile.css';
 
 import AreaSelect from '../../location/AreaSelect';
@@ -162,8 +168,12 @@ const AgentProfile = ({
   const [kycLoadingMsg, setKycLoadingMsg] = useState('');
   const [kycError, setKycError] = useState('');
   const [kycVerificationData, setKycVerificationData] = useState(null);
+  const {
+    registeredPhone,
+    hasRegisteredPhone
+  } = resolveKycPhoneState(currentUser);
   const [kycFullName, setKycFullName] = useState(currentUser?.name || 'Nguyễn Văn A');
-  const [kycPhone, setKycPhone] = useState(currentUser?.phone || '');
+  const [kycPhone, setKycPhone] = useState('');
   const [kycOtp, setKycOtp] = useState('');
   const [kycSubmitting, setKycSubmitting] = useState(false);
   const [isOtpSending, setIsOtpSending] = useState(false);
@@ -228,16 +238,13 @@ const AgentProfile = ({
   };
 
   useEffect(() => {
-    if (currentUser?.phone) {
-      setKycPhone((prev) => prev || currentUser.phone);
-    }
     if (currentUser?.name) {
       setKycFullName((prev) => (prev === 'Nguyễn Văn A' ? currentUser.name : prev || currentUser.name));
     }
     if (currentUser?.phone_verified !== undefined) {
       setPhoneVerified(Boolean(currentUser.phone_verified));
     }
-  }, [currentUser?.phone, currentUser?.name, currentUser?.phone_verified]);
+  }, [currentUser?.name, currentUser?.phone_verified]);
 
   useEffect(() => {
     if (kycError && kycErrorRef.current) {
@@ -516,13 +523,13 @@ const AgentProfile = ({
   };
 
   const handleSendOtp = async () => {
-    if (!kycPhone) {
+    const targetPhone = getEffectiveKycPhone({ currentUser, inputPhone: kycPhone });
+    if (!targetPhone) {
       setKycError('Vui lòng nhập số điện thoại');
       return;
     }
-    const vnPhoneRegex = /^(03|05|07|08|09)\d{8}$/;
-    const cleanPhone = kycPhone.trim();
-    if (!vnPhoneRegex.test(cleanPhone)) {
+    const cleanPhone = normalizeVietnamPhone(targetPhone);
+    if (!cleanPhone) {
       setKycError('Số điện thoại không hợp lệ (cần là số ĐT Việt Nam 10 chữ số bắt đầu bằng 03, 05, 07, 08, 09)');
       return;
     }
@@ -563,15 +570,20 @@ const AgentProfile = ({
 
   const handleStep1Submit = async (e) => {
     if (e) e.preventDefault();
-    if (!kycFullName || !kycPhone) {
+    const targetPhone = getEffectiveKycPhone({ currentUser, inputPhone: kycPhone });
+    if (!kycFullName || !targetPhone) {
       setKycError('Vui lòng điền họ tên và số điện thoại');
       return;
     }
 
-    const cleanPhone = kycPhone.trim();
+    const cleanPhone = normalizeVietnamPhone(targetPhone);
+    if (!cleanPhone) {
+      setKycError('Số điện thoại không hợp lệ (cần là số ĐT Việt Nam 10 chữ số bắt đầu bằng 03, 05, 07, 08, 09)');
+      return;
+    }
 
     // Nếu số điện thoại này đã được xác thực trước đó
-    if (phoneVerified && currentUser?.phone === cleanPhone) {
+    if (phoneVerified && isKycPhoneAlreadyVerified({ currentUser, phone: cleanPhone })) {
       setKycError('');
       setKycWizardStep(2);
       return;
@@ -623,9 +635,10 @@ const AgentProfile = ({
     setKycError('');
 
     try {
+      const targetPhone = getEffectiveKycPhone({ currentUser, inputPhone: kycPhone });
       const formData = new FormData();
       formData.append('fullName', kycFullName);
-      formData.append('phone', kycPhone);
+      formData.append('phone', targetPhone);
       formData.append('frontImage', kycFrontFile);
       formData.append('backImage', kycBackFile);
 
@@ -1555,7 +1568,12 @@ const AgentProfile = ({
                       </div>
                     )}
 
-                    {kycWizardStep === 1 && (
+                    {kycWizardStep === 1 && (() => {
+                      const effectivePhone = hasRegisteredPhone ? registeredPhone : kycPhone;
+                      const isCurrentPhoneVerified = phoneVerified
+                        && isKycPhoneAlreadyVerified({ currentUser, phone: effectivePhone });
+
+                      return (
                       <form onSubmit={handleStep1Submit} className="kyc-wizard-form-box">
                         <div className="kyc-step-card">
                           <h4 className="step-card-heading">Thông tin cơ bản</h4>
@@ -1574,35 +1592,40 @@ const AgentProfile = ({
                               <input
                                 type="text"
                                 placeholder="VD: 0982123456"
-                                value={kycPhone}
+                                value={effectivePhone}
+                                readOnly={hasRegisteredPhone}
+                                aria-readonly={hasRegisteredPhone}
                                 onChange={(e) => {
+                                  if (hasRegisteredPhone) return;
                                   const val = e.target.value;
                                   setKycPhone(val);
-                                  if (currentUser?.phone_verified && val.trim() === currentUser?.phone) {
+                                  if (isKycPhoneAlreadyVerified({ currentUser, phone: val })) {
                                     setPhoneVerified(true);
-                                  } else if (phoneVerified && val.trim() !== currentUser?.phone) {
+                                  } else if (phoneVerified) {
                                     setPhoneVerified(false);
                                   }
                                 }}
-                                style={{ flex: 1 }}
+                                style={hasRegisteredPhone
+                                  ? { flex: 1, background: '#f1f5f9', color: '#475569', cursor: 'not-allowed' }
+                                  : { flex: 1 }}
                               />
                               <button
                                 type="button"
                                 onClick={handleSendOtp}
-                                disabled={isOtpSending || otpCountdown > 0 || (phoneVerified && currentUser?.phone === kycPhone)}
+                                disabled={isOtpSending || otpCountdown > 0 || isCurrentPhoneVerified}
                                 style={{
                                   padding: '0 16px',
                                   borderRadius: '8px',
                                   border: 'none',
-                                  background: (phoneVerified && currentUser?.phone === kycPhone) ? '#10b981' : (otpCountdown > 0 ? '#94a3b8' : '#2563eb'),
+                                  background: isCurrentPhoneVerified ? '#10b981' : (otpCountdown > 0 ? '#94a3b8' : '#2563eb'),
                                   color: '#fff',
                                   fontWeight: 600,
-                                  cursor: (otpCountdown > 0 || (phoneVerified && currentUser?.phone === kycPhone)) ? 'not-allowed' : 'pointer',
+                                  cursor: (otpCountdown > 0 || isCurrentPhoneVerified) ? 'not-allowed' : 'pointer',
                                   whiteSpace: 'nowrap',
                                   fontSize: '13px'
                                 }}
                               >
-                                {phoneVerified && currentUser?.phone === kycPhone ? (
+                                {isCurrentPhoneVerified ? (
                                   '✓ Đã xác thực'
                                 ) : isOtpSending ? (
                                   'Đang gửi...'
@@ -1615,14 +1638,19 @@ const AgentProfile = ({
                                 )}
                               </button>
                             </div>
+                            <span style={{ fontSize: '12px', color: '#64748b' }}>
+                              {hasRegisteredPhone
+                                ? 'Sử dụng số điện thoại đã đăng ký tài khoản.'
+                                : 'Tài khoản chưa có số điện thoại. Vui lòng nhập số điện thoại để xác minh.'}
+                            </span>
                           </div>
                         </div>
 
-                        {(!phoneVerified || currentUser?.phone !== kycPhone) && (
+                        {!isCurrentPhoneVerified && (
                           <div className="kyc-step-card mt-5">
                             <h4 className="step-card-heading">Xác minh số điện thoại qua SMS</h4>
                             <p className="step-phone-hint">
-                              Vui lòng nhập mã OTP được gửi qua SMS đến số điện thoại <strong className="text-blue-600">{kycPhone || '...'}</strong> để xác minh tài khoản.
+                              Vui lòng nhập mã OTP được gửi qua SMS đến số điện thoại <strong className="text-blue-600">{effectivePhone || '...'}</strong> để xác minh tài khoản.
                             </p>
                             <div className="step-input-group mt-3">
                               <label>MÃ OTP (6 CHỮ SỐ)</label>
@@ -1656,7 +1684,8 @@ const AgentProfile = ({
                           </button>
                         </div>
                       </form>
-                    )}
+                      );
+                    })()}
 
                     {kycWizardStep === 2 && (
                       <form onSubmit={handleCardSubmit} className="kyc-wizard-form-box">

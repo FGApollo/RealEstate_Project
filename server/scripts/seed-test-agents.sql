@@ -23,7 +23,7 @@ BEGIN
       email_verified_at, verification_status, trust_score, is_active, updated_at
     )
     VALUES (
-      'Agent Đã Xác Minh SĐT',
+      'Tô Xuân Nam',
       'agent.phone@estate.test',
       v_password_hash,
       'AGENT',
@@ -39,7 +39,7 @@ BEGIN
     RETURNING id INTO v_agent_phone_id;
   ELSE
     UPDATE public.users
-    SET name = 'Agent Đã Xác Minh SĐT',
+    SET name = 'Tô Xuân Nam',
         password = v_password_hash,
         role = 'AGENT',
         phone = '0908111222',

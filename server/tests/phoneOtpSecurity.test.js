@@ -98,3 +98,35 @@ test('PostgreSQL OTP consume is single-use, bounded to five attempts and checks 
     await insert(3); assert.equal((await consume(3)).code, 'INACTIVE');
   } finally { await db.close(); }
 });
+
+test('sendOtp enforces registered user phone when present and allows input only when user has no phone', async (t) => {
+  process.env.NODE_ENV = 'test';
+  let sentTo = [];
+  t.mock.method(esmsService, 'isLiveSmsEnabled', () => false);
+  t.mock.method(esmsService, 'sendOtpSms', async ({ phone }) => {
+    sentTo.push(phone);
+    return { isMock: true };
+  });
+
+  t.mock.method(supabase, 'from', () => ({
+    select() { return this; },
+    eq() { return this; },
+    order() { return this; },
+    limit() { return this; },
+    async single() { return { data: { id: 1, phone: '0908111222' } }; },
+    async maybeSingle() { return { data: null }; },
+    update() { return this; },
+    insert() { return this; },
+    then(resolve, reject) { return Promise.resolve({ error: null }).then(resolve, reject); }
+  }));
+
+  await assert.rejects(
+    phoneOtpService.sendOtp({ userId: 1, phone: '0912345678' }),
+    { statusCode: 400 }
+  );
+  assert.equal(sentTo.length, 0);
+
+  await phoneOtpService.sendOtp({ userId: 1 });
+  await phoneOtpService.sendOtp({ userId: 1, phone: '+84 908 111 222' });
+  assert.deepEqual(sentTo, ['0908111222', '0908111222']);
+});
