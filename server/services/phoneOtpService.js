@@ -3,10 +3,10 @@ const { supabase } = require('../config/supabase');
 const trustScoreService = require('./trustScoreService');
 const esmsService = require('./esmsService');
 const { getOtpSendLimits, createOtpQuotaHash } = require('./otpSendPolicy');
+const { normalizeVietnamPhone } = require('./registrationValidation');
 
 const OTP_TTL_MS = 5 * 60 * 1000;
 const OTP_COOLDOWN_MS = 60 * 1000;
-const VIETNAM_PHONE_PATTERN = /^(03|05|07|08|09)\d{8}$/;
 
 const createServiceError = (message, statusCode = 400, code, retryAfterSeconds) => {
   const error = new Error(message);
@@ -15,8 +15,6 @@ const createServiceError = (message, statusCode = 400, code, retryAfterSeconds) 
   if (retryAfterSeconds) error.retryAfterSeconds = retryAfterSeconds;
   return error;
 };
-
-const normalizePhone = (phone) => typeof phone === 'string' ? phone.trim() : '';
 
 const parseDatabaseTimestamp = (value) => {
   if (!value) return NaN;
@@ -29,9 +27,9 @@ const parseDatabaseTimestamp = (value) => {
 };
 
 const validatePhone = (phone) => {
-  const normalizedPhone = normalizePhone(phone);
+  const normalizedPhone = normalizeVietnamPhone(phone);
 
-  if (!VIETNAM_PHONE_PATTERN.test(normalizedPhone)) {
+  if (!normalizedPhone) {
     throw createServiceError('Invalid Vietnamese phone number');
   }
 
@@ -91,7 +89,7 @@ const reserveLiveSmsQuota = async (phone) => {
 const ensureUserExists = async (userId) => {
   const { data: user, error } = await supabase
     .from('users')
-    .select('id')
+    .select('id, phone')
     .eq('id', userId)
     .single();
 
@@ -167,9 +165,16 @@ const sendOtp = async ({ userId, phone }) => {
   if (process.env.NODE_ENV === 'production' && !esmsService.isLiveSmsEnabled()) {
     throw createServiceError('Dịch vụ SMS xác thực chưa sẵn sàng.', 503);
   }
-  const normalizedPhone = validatePhone(phone);
+  const hasInputPhone = typeof phone === 'string' && phone.trim() !== '';
+  const validatedInputPhone = hasInputPhone ? validatePhone(phone) : null;
 
-  await ensureUserExists(userId);
+  const user = await ensureUserExists(userId);
+  const registeredPhone = normalizeVietnamPhone(user?.phone);
+  if (registeredPhone && validatedInputPhone && validatedInputPhone !== registeredPhone) {
+    throw createServiceError('Vui lòng sử dụng số điện thoại đã đăng ký tài khoản để xác thực.');
+  }
+  const normalizedPhone = registeredPhone || validatedInputPhone || validatePhone(phone);
+
   await ensureOtpCooldownPassed(userId, normalizedPhone);
   // For billable SMS, reserve a shared, atomic per-phone quota before calling eSMS.
   // Failed provider requests still consume the reservation to avoid retry storms.

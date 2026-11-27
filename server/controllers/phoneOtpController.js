@@ -6,8 +6,8 @@ const sendOtp = async (req, res) => {
     const { phone } = req.body;
     const userId = req.user.id;
 
-    if (!userId || !phone) {
-      return res.status(400).json({ error: 'Missing userId or phone' });
+    if (!userId) {
+      return res.status(400).json({ error: 'Missing userId' });
     }
 
     const result = await phoneOtpService.sendOtp({ userId, phone });
