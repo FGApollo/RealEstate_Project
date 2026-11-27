@@ -2,7 +2,7 @@ import { useState, useEffect, lazy, Suspense } from 'react';
 import { useNavigate, Link, useOutletContext } from 'react-router-dom';
 import {
   ShieldCheck, AlertTriangle, Search, UserX, CheckCircle,
-  XCircle, FileText, Image, ImageIcon, User, Check, X, ShieldAlert, Flag, Home, Mail, Clock, Award,
+  XCircle, FileText, Image, ImageIcon, User, Check, X, Flag, Home, Mail, Clock, Award,
   Star, EyeOff, Eye, Scale, ExternalLink, Activity, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, RotateCcw, History,
   SlidersHorizontal
 } from 'lucide-react';
@@ -762,9 +762,6 @@ const AdminPage = () => {
           </div>}
 
           <div className="admin-topbar-right">
-            <div className="admin-shield-icon">
-              <ShieldAlert size={20} />
-            </div>
             <div className="admin-profile-pill">
               <div className="admin-avatar">{initials}</div>
               <div className="admin-user-info">
